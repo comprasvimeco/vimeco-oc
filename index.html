@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Sistema de Órdenes de Compra</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    .login-page { background: linear-gradient(135deg, #0f2236 0%, #1a3a5c 55%, #2557a7 100%); }
+    .login-card { animation: fadeIn .35s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .login-logo { background: transparent; padding: 0; text-align: center; margin-bottom: .5rem; }
+    .login-logo img { width: 180px; display: block; margin: 0 auto; }
+  </style>
+</head>
+<body class="login-page">
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-logo">
+        <img id="logo-img" src="" alt="VIMECO S.A." style="width:180px; margin-bottom:.25rem;">
+      </div>
+
+      <hr class="login-divider">
+      <p class="login-title">Sistema de Órdenes de Compra</p>
+
+      <div class="form-group">
+        <label for="responsable">Responsable</label>
+        <select id="responsable" class="form-control">
+          <option value="">— Seleccione un responsable —</option>
+        </select>
+      </div>
+
+      <div id="login-error" class="alert alert-error hidden"></div>
+
+      <button id="btn-login" class="btn btn-primary btn-full" style="margin-top:.75rem; padding:.75rem;">
+        Ingresar al Sistema
+      </button>
+    </div>
+  </div>
+
+  <script src="js/logoBase64.js"></script>
+  <script>document.getElementById('logo-img').src = LOGO_BASE64;</script>
+  <script src="whitelist.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      const hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hadController) window.location.reload();
+      });
+    }
+  </script>
+</body>
+</html>

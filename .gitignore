@@ -1,0 +1,9 @@
+# Archivos temporales / originales grandes
+IMG_0290.jpg
+logo.png.png
+logo_cropped.png
+assets/
+
+# OS
+.DS_Store
+Thumbs.db

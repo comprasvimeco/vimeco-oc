@@ -1,0 +1,13 @@
+// Clave de API de Google Gemini
+const GEMINI_API_KEY = "AIzaSyDNr0YEzRb5OOWMEXPh_KfelomVE9FXCik";
+
+// Configuración de Firebase — completar con los valores del proyecto
+var FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDXv7uOvCIQqoH5mn-SWu_GSTiCfKPR-Jo",
+  authDomain:        "vimeco-oc.firebaseapp.com",
+  databaseURL:       "https://vimeco-oc-default-rtdb.firebaseio.com",
+  projectId:         "vimeco-oc",
+  storageBucket:     "vimeco-oc.firebasestorage.app",
+  messagingSenderId: "966767474963",
+  appId:             "1:966767474963:web:d7ba5dc40f561198e902e6"
+};

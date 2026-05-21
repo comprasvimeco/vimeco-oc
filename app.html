@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Nueva Orden de Compra</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="js/logoBase64.js"></script>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="app-header">
+  <div class="header-brand">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Órdenes de Compra</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge">
+      <span id="hdr-name">—</span>
+    </div>
+    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="app-main">
+
+  <!-- OC Number banner -->
+  <div class="oc-banner">
+    <div class="oc-number-display">
+      <span class="oc-number-label">Próxima OC:</span>
+      <span class="oc-number-value" id="oc-number-display">0001-00002060</span>
+    </div>
+    <div class="oc-banner-actions">
+      <span id="date-display" class="text-muted" style="font-size:.82rem;"></span>
+      <button class="btn btn-secondary btn-sm" id="btn-edit-ocnum">✏ Editar N°</button>
+      <button class="btn btn-outline btn-sm" id="btn-new-oc">+ Nueva OC</button>
+    </div>
+  </div>
+
+  <!-- STEP 1 — Importar documento -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <span class="step-badge">1</span>
+        Importar Documento con IA <span class="step-optional">(opcional)</span>
+      </span>
+      <button class="btn btn-sm btn-secondary hidden" id="btn-clear-file">✕ Quitar</button>
+    </div>
+    <div class="card-body">
+      <input type="file" id="file-input"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
+      <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
+      <div class="import-buttons">
+        <button class="btn import-btn" id="btn-upload-file">
+          <span class="import-btn-icon">📁</span>
+          <span class="import-btn-label">Subir archivo</span>
+          <span class="import-btn-sub">JPG · PNG · PDF · WEBP</span>
+        </button>
+        <button class="btn import-btn" id="btn-camera" style="display:none">
+          <span class="import-btn-icon">📷</span>
+          <span class="import-btn-label">Sacar foto</span>
+          <span class="import-btn-sub">Cámara del dispositivo</span>
+        </button>
+        <button class="btn import-btn" id="btn-voice">
+          <span class="import-btn-icon">🎤</span>
+          <span class="import-btn-label">Dictar datos</span>
+          <span class="import-btn-sub">Reconocimiento de voz</span>
+        </button>
+      </div>
+      <div class="upload-filename hidden" id="upload-filename"></div>
+      <div class="extract-bar">
+        <button class="btn btn-primary" id="btn-extract" disabled>
+          ✨ Extraer datos con Gemini
+        </button>
+        <div id="extract-status" class="extract-status hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 — Datos de la Orden -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <span class="step-badge">2</span>
+        Datos de la Orden
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="obra">Obra / Proyecto / Ubicación *</label>
+          <div class="combo-wrap">
+            <input type="text" id="obra" class="form-control combo-input" placeholder="Identificación de la obra">
+            <button type="button" class="combo-arrow" id="obra-arrow" tabindex="-1">▾</button>
+            <div class="combo-dropdown hidden" id="obra-dropdown"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="condicion-pago">Condición de Pago</label>
+          <input type="text" id="condicion-pago" class="form-control" placeholder="Ej: Contado, 30 días, etc.">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="plazo-entrega">Plazo de Entrega</label>
+          <input type="text" id="plazo-entrega" class="form-control" placeholder="Ej: 15 días hábiles">
+        </div>
+        <div class="form-group">
+          <label for="lugar-entrega">Lugar de Entrega</label>
+          <input type="text" id="lugar-entrega" class="form-control" placeholder="Ej: Obra, depósito, etc.">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <input type="text" id="observaciones" class="form-control" placeholder="Notas adicionales (opcional)">
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 — Datos del Proveedor -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <span class="step-badge">3</span>
+        Datos del Proveedor
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="proveedor">Proveedor / Razón Social *</label>
+          <input type="text" id="proveedor" class="form-control" placeholder="Nombre del proveedor">
+        </div>
+        <div class="form-group">
+          <label for="cuit-proveedor">CUIT del Proveedor</label>
+          <input type="text" id="cuit-proveedor" class="form-control" placeholder="XX-XXXXXXXX-X">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="domicilio-proveedor">Domicilio del Proveedor</label>
+          <input type="text" id="domicilio-proveedor" class="form-control" placeholder="Dirección del proveedor">
+        </div>
+        <div class="form-group">
+          <label for="telefonos-proveedor">Teléfonos del Proveedor</label>
+          <input type="text" id="telefonos-proveedor" class="form-control" placeholder="(0351) 000-0000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="condicion-iva-proveedor">Condición IVA Proveedor</label>
+          <input type="text" id="condicion-iva-proveedor" class="form-control" value="Resp. Inscripto">
+        </div>
+        <div class="form-group">
+          <label for="ref-presupuesto">Ref. de Presupuesto</label>
+          <input type="text" id="ref-presupuesto" class="form-control" placeholder="N° de presupuesto">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 — Tabla de ítems -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <span class="step-badge">4</span>
+        Ítems de la Orden
+      </span>
+      <button class="btn btn-sm btn-secondary" id="btn-add-row">+ Agregar ítem</button>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <div class="items-table-wrapper">
+        <table class="items-table" id="items-table">
+          <thead>
+            <tr>
+              <th class="text-center" style="width:38px;">N°</th>
+              <th style="min-width:200px;">Descripción</th>
+              <th class="text-center" style="width:70px;">Unidad</th>
+              <th class="text-right" style="width:90px;">Cantidad</th>
+              <th class="text-right" style="width:125px;">Precio Unit. ($)</th>
+              <th class="text-right" style="width:125px;">Importe ($)</th>
+              <th style="width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody id="items-tbody"></tbody>
+        </table>
+      </div>
+      <div id="items-cards"></div>
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📋</div>
+        <p>Usá <strong>Importar con IA</strong> o hacé clic en <strong>+ Agregar ítem</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 — Impuestos y Totales -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <span class="step-badge">5</span>
+        Impuestos y Totales
+      </span>
+      <button class="btn btn-sm btn-secondary" id="btn-add-impuesto">+ Agregar impuesto</button>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <table class="imp-table" id="impuestos-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <th class="text-center" style="width:80px;">%</th>
+            <th class="text-right" style="width:155px;">Monto ($)</th>
+            <th style="width:44px;"></th>
+          </tr>
+        </thead>
+        <tbody id="imp-fixed-body">
+          <tr id="row-subtotal">
+            <td>Subtotal</td>
+            <td></td>
+            <td class="text-right" id="val-subtotal">0,00</td>
+            <td></td>
+          </tr>
+          <tr id="row-descuento">
+            <td>Descuento</td>
+            <td><input type="text" id="pct-descuento" class="imp-pct text-right" placeholder=""></td>
+            <td><input type="text" id="monto-descuento" class="imp-monto num-input text-right" value="0,00"></td>
+            <td></td>
+          </tr>
+          <tr id="row-nogravado">
+            <td>No gravado</td>
+            <td><input type="text" id="pct-nogravado" class="imp-pct text-right" placeholder=""></td>
+            <td><input type="text" id="monto-nogravado" class="imp-monto num-input text-right" value="0,00"></td>
+            <td></td>
+          </tr>
+          <tr id="row-gravado">
+            <td><strong>Gravado</strong></td>
+            <td></td>
+            <td class="text-right" id="val-gravado">0,00</td>
+            <td></td>
+          </tr>
+        </tbody>
+        <tbody id="impuestos-tbody"></tbody>
+        <tfoot>
+          <tr id="imp-total-row">
+            <td colspan="2"><strong>TOTAL</strong></td>
+            <td class="text-right" id="imp-total-value">0,00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Generate bar -->
+  <div class="generate-bar">
+    <button class="btn btn-secondary" id="btn-clear-form">Limpiar formulario</button>
+    <button class="btn btn-success btn-generate" id="btn-generate">
+      🖨 Generar PDF — Orden de Compra
+    </button>
+  </div>
+
+</main>
+
+<!-- ===== MODAL: Editar número de OC ===== -->
+<div class="modal-overlay hidden" id="modal-ocnum">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Editar número de OC</span>
+      <button class="modal-close" id="modal-ocnum-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="input-ocnum">Número de OC</label>
+        <input type="text" id="input-ocnum" class="form-control"
+               style="font-family:'Courier New',monospace;font-size:1.1rem;letter-spacing:.05em">
+        <small class="form-hint">Formato: SSSS-NNNNNNNN &nbsp;(ej: 0001-00002060)</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-ocnum-cancel">Cancelar</button>
+      <button class="btn btn-primary"   id="modal-ocnum-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ===== UPDATE BANNER ===== -->
+<div id="update-banner" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:1100;
+  background:#1a3a5c;color:#fff;padding:.65rem 1rem;align-items:center;
+  justify-content:space-between;gap:.75rem;font-size:.87rem;box-shadow:0 2px 8px rgba(0,0,0,.25);">
+  <span>✨ Nueva versión disponible</span>
+  <button onclick="window.location.reload()"
+    style="background:#fff;color:#1a3a5c;border:none;border-radius:6px;
+    padding:.3rem .8rem;font-weight:700;cursor:pointer;font-size:.85rem;">
+    Actualizar
+  </button>
+</div>
+
+<!-- ===== SCRIPTS ===== -->
+<script src="obras.js"></script>
+<script src="whitelist.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/ocGenerator.js"></script>
+<script src="js/voice.js"></script>
+<script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'SW_UPDATED' && hadController) {
+        document.getElementById('update-banner').style.display = 'flex';
+      }
+    });
+  }
+</script>
+</body>
+</html>
