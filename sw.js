@@ -1,6 +1,4 @@
-// DEPLOY VERSION: v6
-// *** Cambiar este número en cada deploy para forzar actualización en móviles ***
-// Ej: 'vimeco-oc-v5', 'vimeco-oc-v6', etc.
+// Versión reemplazada automáticamente por build.js en cada deploy de Netlify
 const CACHE_NAME = 'vimeco-oc-v6';
 
 const STATIC_ASSETS = [
