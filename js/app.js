@@ -789,7 +789,7 @@ async function handleGenerate() {
 
   // Subir a Drive en segundo plano
   if (typeof window.uploadToDrive === 'function') {
-    uploadToDrive(blob, fname)
+    uploadToDrive(blob, fname, ocData.proveedor.nombre)
       .then(link => toast(
         `Guardada en Drive — <a href="${link}" target="_blank" style="color:inherit;font-weight:bold;text-decoration:underline">Abrir</a>`,
         'success'

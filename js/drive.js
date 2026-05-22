@@ -20,7 +20,7 @@
     const now     = Math.floor(Date.now() / 1000);
     const claims  = b64u(JSON.stringify({
       iss:   client_email,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/drive',
       aud:   'https://oauth2.googleapis.com/token',
       exp:   now + 3600,
       iat:   now
@@ -47,10 +47,13 @@
     return `${signing}.${b64uBytes(new Uint8Array(sig))}`;
   }
 
+  const SCOPE_VERSION = 'v2'; // incrementar si cambia el scope
+
   async function getAccessToken() {
     const cached = sessionStorage.getItem('_dtok');
     const expiry = parseInt(sessionStorage.getItem('_dexp') || '0', 10);
-    if (cached && Date.now() < expiry) return cached;
+    const sv     = sessionStorage.getItem('_dsv');
+    if (cached && Date.now() < expiry && sv === SCOPE_VERSION) return cached;
 
     const jwt  = await generateJWT();
     const resp = await fetch('https://oauth2.googleapis.com/token', {
@@ -65,13 +68,14 @@
     const { access_token } = await resp.json();
     sessionStorage.setItem('_dtok', access_token);
     sessionStorage.setItem('_dexp', String(Date.now() + 55 * 60 * 1000));
+    sessionStorage.setItem('_dsv', SCOPE_VERSION);
     return access_token;
   }
 
-  async function getOrCreateYearFolder(token) {
-    const year   = String(new Date().getFullYear());
-    const parent = DRIVE_CONFIG.folderId;
-    const q      = `name='${year}' and mimeType='application/vnd.google-apps.folder' and '${parent}' in parents and trashed=false`;
+  async function getOrCreateProviderFolder(token, providerName) {
+    const parent    = DRIVE_CONFIG.folderId;
+    const folderName = providerName.trim() || 'Sin proveedor';
+    const q = `name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and '${parent}' in parents and trashed=false`;
 
     const s = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
@@ -84,18 +88,16 @@
     const c = await fetch('https://www.googleapis.com/drive/v3/files', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: year, mimeType: 'application/vnd.google-apps.folder', parents: [parent] })
+      body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', parents: [parent] })
     });
     if (!c.ok) throw new Error(`Drive mkdir (${c.status})`);
     const { id } = await c.json();
     return id;
   }
 
-  window.uploadToDrive = async function (pdfBlob, filename) {
+  window.uploadToDrive = async function (pdfBlob, filename, providerName) {
     const token    = await getAccessToken();
-    const folderId = DRIVE_CONFIG.organizarPorAnio
-      ? await getOrCreateYearFolder(token)
-      : DRIVE_CONFIG.folderId;
+    const folderId = await getOrCreateProviderFolder(token, providerName || '');
 
     const meta     = JSON.stringify({ name: filename, parents: [folderId] });
     const boundary = 'vimeco_b_271828';
