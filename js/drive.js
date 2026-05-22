@@ -1,0 +1,134 @@
+/* global DRIVE_CONFIG */
+(function () {
+  'use strict';
+
+  function b64u(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  }
+
+  function b64uBytes(arr) {
+    let bin = '';
+    arr.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  }
+
+  async function generateJWT() {
+    const { client_email, private_key } = DRIVE_CONFIG.serviceAccount;
+
+    const header  = b64u(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+    const now     = Math.floor(Date.now() / 1000);
+    const claims  = b64u(JSON.stringify({
+      iss:   client_email,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      aud:   'https://oauth2.googleapis.com/token',
+      exp:   now + 3600,
+      iat:   now
+    }));
+    const signing = `${header}.${claims}`;
+
+    const pem      = private_key
+      .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+      .replace(/-----END PRIVATE KEY-----/g, '')
+      .replace(/\s+/g, '');
+    const keyBytes = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'pkcs8', keyBytes.buffer,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false, ['sign']
+    );
+
+    const sig = await crypto.subtle.sign(
+      'RSASSA-PKCS1-v1_5', cryptoKey,
+      new TextEncoder().encode(signing)
+    );
+
+    return `${signing}.${b64uBytes(new Uint8Array(sig))}`;
+  }
+
+  async function getAccessToken() {
+    const cached = sessionStorage.getItem('_dtok');
+    const expiry = parseInt(sessionStorage.getItem('_dexp') || '0', 10);
+    if (cached && Date.now() < expiry) return cached;
+
+    const jwt  = await generateJWT();
+    const resp = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      throw new Error(`Token Drive (${resp.status}): ${t}`);
+    }
+    const { access_token } = await resp.json();
+    sessionStorage.setItem('_dtok', access_token);
+    sessionStorage.setItem('_dexp', String(Date.now() + 55 * 60 * 1000));
+    return access_token;
+  }
+
+  async function getOrCreateYearFolder(token) {
+    const year   = String(new Date().getFullYear());
+    const parent = DRIVE_CONFIG.folderId;
+    const q      = `name='${year}' and mimeType='application/vnd.google-apps.folder' and '${parent}' in parents and trashed=false`;
+
+    const s = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!s.ok) throw new Error(`Drive search (${s.status})`);
+    const { files } = await s.json();
+    if (files.length) return files[0].id;
+
+    const c = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: year, mimeType: 'application/vnd.google-apps.folder', parents: [parent] })
+    });
+    if (!c.ok) throw new Error(`Drive mkdir (${c.status})`);
+    const { id } = await c.json();
+    return id;
+  }
+
+  window.uploadToDrive = async function (pdfBlob, filename) {
+    const token    = await getAccessToken();
+    const folderId = DRIVE_CONFIG.organizarPorAnio
+      ? await getOrCreateYearFolder(token)
+      : DRIVE_CONFIG.folderId;
+
+    const meta     = JSON.stringify({ name: filename, parents: [folderId] });
+    const boundary = 'vimeco_b_271828';
+    const enc      = new TextEncoder();
+
+    const part1 = enc.encode(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+      `--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`
+    );
+    const part2 = enc.encode(`\r\n--${boundary}--`);
+    const pdf   = await pdfBlob.arrayBuffer();
+
+    const body = new Uint8Array(part1.byteLength + pdf.byteLength + part2.byteLength);
+    body.set(part1, 0);
+    body.set(new Uint8Array(pdf), part1.byteLength);
+    body.set(part2, part1.byteLength + pdf.byteLength);
+
+    const up = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary="${boundary}"`
+        },
+        body
+      }
+    );
+    if (!up.ok) {
+      const t = await up.text();
+      throw new Error(`Drive upload (${up.status}): ${t}`);
+    }
+    const { webViewLink } = await up.json();
+    return webViewLink;
+  };
+})();

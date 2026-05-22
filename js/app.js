@@ -750,27 +750,54 @@ async function handleGenerate() {
   };
 
   const fname = `OC_${numero}_${sanitize(ocData.proveedor.nombre || 'SinProveedor')}.pdf`;
-  let shared = false;
-
+  let blob;
   try {
-    if (navigator.canShare) {
-      const blob = generateOCBlob(ocData);
-      const file = new File([blob], fname, { type: 'application/pdf' });
-      if (navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ title: `OC ${numero} — VIMECO S.A.`, files: [file] });
-          shared = true;
-        } catch (e) {
-          if (e.name !== 'AbortError') console.warn('Web Share:', e);
-        }
-      }
-    }
-    if (!shared) generateOC(ocData);
-    refreshOCNumberDisplay();
-    toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada exitosamente.`, 'success');
+    blob = generateOCBlob(ocData);
   } catch (err) {
     toast(`Error al generar el PDF: ${err.message}`, 'error');
     console.error(err);
+    btn.disabled = false;
+    btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
+    return;
+  }
+
+  // Compartir o descargar
+  let shared = false;
+  if (navigator.canShare) {
+    const file = new File([blob], fname, { type: 'application/pdf' });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ title: `OC ${numero} — VIMECO S.A.`, files: [file] });
+        shared = true;
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('Web Share:', e);
+      }
+    }
+  }
+  if (!shared) {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
+
+  refreshOCNumberDisplay();
+  toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada.`, 'success');
+
+  // Subir a Drive en segundo plano
+  if (typeof window.uploadToDrive === 'function') {
+    uploadToDrive(blob, fname)
+      .then(link => toast(
+        `Guardada en Drive — <a href="${link}" target="_blank" style="color:inherit;font-weight:bold;text-decoration:underline">Abrir</a>`,
+        'success'
+      ))
+      .catch(e => {
+        console.error('Drive:', e);
+        toast('No se pudo guardar en Drive.', 'warning');
+      });
   }
 
   btn.disabled = false;
