@@ -233,6 +233,22 @@ function setupImportButtons() {
 
   fileInput.addEventListener('change',   () => { if (fileInput.files[0])   handleFileSelected(fileInput.files[0]); });
   cameraInput.addEventListener('change', () => { if (cameraInput.files[0]) handleFileSelected(cameraInput.files[0]); });
+
+  // Drag & drop (desktop)
+  const dropZone = $('drop-zone');
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', e => {
+    if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelected(file);
+  });
 }
 
 function handleFileSelected(file) {
