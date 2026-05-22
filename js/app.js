@@ -28,9 +28,11 @@ const $ = id => document.getElementById(id);
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
-  const code = sessionStorage.getItem('responsable_code');
-  const name = sessionStorage.getItem('responsable_name');
+  const code = sessionStorage.getItem('responsable_code') || localStorage.getItem('responsable_code');
+  const name = sessionStorage.getItem('responsable_name') || localStorage.getItem('responsable_name');
   if (!code || !name) { window.location.href = 'index.html'; return; }
+  sessionStorage.setItem('responsable_code', code);
+  sessionStorage.setItem('responsable_name', name);
 
   $('hdr-name').textContent = name;
   $('date-display').textContent = formatDateDisplay(new Date());
@@ -109,7 +111,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ---- Auth ----
-function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
+function logout() {
+  sessionStorage.clear();
+  localStorage.removeItem('responsable_code');
+  localStorage.removeItem('responsable_name');
+  window.location.href = 'index.html';
+}
 
 // ---- Web Share Target: recibe archivo compartido desde otra app ----
 async function checkSharedFile() {

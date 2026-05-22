@@ -1,6 +1,16 @@
 /* global USUARIOS */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Auto-login si el dispositivo tiene un usuario guardado
+  const savedCode = localStorage.getItem('responsable_code');
+  const savedName = localStorage.getItem('responsable_name');
+  if (savedCode && savedName) {
+    sessionStorage.setItem('responsable_code', savedCode);
+    sessionStorage.setItem('responsable_name', savedName);
+    window.location.href = 'app.html';
+    return;
+  }
+
   if (sessionStorage.getItem('responsable_code')) {
     window.location.href = 'app.html';
     return;
@@ -35,8 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
       selResp.focus();
       return;
     }
+    const name = getUserName(code);
     sessionStorage.setItem('responsable_code', code);
-    sessionStorage.setItem('responsable_name', getUserName(code));
+    sessionStorage.setItem('responsable_name', name);
+    localStorage.setItem('responsable_code', code);
+    localStorage.setItem('responsable_name', name);
     window.location.href = 'app.html';
   });
 });
