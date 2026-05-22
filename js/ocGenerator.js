@@ -45,8 +45,8 @@ const FTR_COLS  = [74.0, 57.0, 59.0];              // sum=190
 const HDR_R1H = 20;   // fila 1 — logo + título  (ajustado a datos fiscales)
 const HDR_R2H = 16;   // fila 2 — fecha / N° OC  (fila inferior compacta)
 
-// ─── Función principal ───────────────────────────────
-function generateOC(data) {
+// ─── Construcción del documento (sin guardar) ────────
+function buildOCDoc(data) {
   let jsPDFClass = null;
   if (window.jspdf && window.jspdf.jsPDF) {
     jsPDFClass = window.jspdf.jsPDF;
@@ -69,8 +69,19 @@ function generateOC(data) {
   y += 3;
   drawFooter(doc, data, y);
 
+  return doc;
+}
+
+// ─── Descarga directa ────────────────────────────────
+function generateOC(data) {
+  const doc   = buildOCDoc(data);
   const fname = `OC_${data.nroOC}_${sanitize(data.proveedor.nombre || 'SinProveedor')}.pdf`;
   doc.save(fname);
+}
+
+// ─── Devuelve Blob (para Web Share API) ─────────────
+function generateOCBlob(data) {
+  return buildOCDoc(data).output('blob');
 }
 
 /* =====================================================

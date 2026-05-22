@@ -32,7 +32,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME && k !== 'share-target').map(k => caches.delete(k))))
       .then(() => self.clients.claim())
       .then(() => self.clients.matchAll({ type: 'window' }))
       .then(clients => clients.forEach(c => c.postMessage({ type: 'SW_UPDATED' })))
@@ -41,6 +41,20 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+
+  // Web Share Target: guarda el archivo en cache y redirige a app.html
+  if (event.request.method === 'POST' && url.pathname === '/app.html') {
+    event.respondWith((async () => {
+      const formData = await event.request.formData();
+      const file = formData.get('file');
+      if (file) {
+        const cache = await caches.open('share-target');
+        await cache.put('shared-file', new Response(file));
+      }
+      return Response.redirect('/app.html', 303);
+    })());
+    return;
+  }
 
   // Network-only: Gemini API y Firebase
   if (url.hostname === 'generativelanguage.googleapis.com' ||

@@ -103,10 +103,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   recalcTotales();
 
   await loadLogo();
+  checkSharedFile();
 });
 
 // ---- Auth ----
 function logout() { sessionStorage.clear(); window.location.href = 'index.html'; }
+
+// ---- Web Share Target: recibe archivo compartido desde otra app ----
+async function checkSharedFile() {
+  if (!('caches' in window)) return;
+  try {
+    const cache = await caches.open('share-target');
+    const match = await cache.match('shared-file');
+    if (!match) return;
+    await cache.delete('shared-file');
+    const blob = await match.blob();
+    const ext  = blob.type === 'application/pdf' ? '.pdf' : '.jpg';
+    handleFileSelected(new File([blob], 'compartido' + ext, { type: blob.type }));
+    toast('Archivo recibido. Usá "Extraer con Gemini" para cargar los datos.', 'success');
+  } catch (e) {
+    console.warn('checkSharedFile:', e);
+  }
+}
 
 // ---- Logo loader ----
 async function loadLogo() {
@@ -731,10 +749,25 @@ async function handleGenerate() {
     totalLetras: numberToWords(total)
   };
 
+  const fname = `OC_${numero}_${sanitize(ocData.proveedor.nombre || 'SinProveedor')}.pdf`;
+  let shared = false;
+
   try {
-    generateOC(ocData);
+    if (navigator.canShare) {
+      const blob = generateOCBlob(ocData);
+      const file = new File([blob], fname, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ title: `OC ${numero} — VIMECO S.A.`, files: [file] });
+          shared = true;
+        } catch (e) {
+          if (e.name !== 'AbortError') console.warn('Web Share:', e);
+        }
+      }
+    }
+    if (!shared) generateOC(ocData);
     refreshOCNumberDisplay();
-    toast(`OC ${numero} generada exitosamente.`, 'success');
+    toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada exitosamente.`, 'success');
   } catch (err) {
     toast(`Error al generar el PDF: ${err.message}`, 'error');
     console.error(err);
