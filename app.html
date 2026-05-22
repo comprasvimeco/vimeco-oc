@@ -320,7 +320,7 @@
 <script>
   if ('serviceWorker' in navigator) {
     const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
     navigator.serviceWorker.addEventListener('message', e => {
       if (e.data && e.data.type === 'SW_UPDATED' && hadController) {
         document.getElementById('update-banner').style.display = 'flex';

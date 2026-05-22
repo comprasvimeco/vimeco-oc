@@ -124,8 +124,12 @@
       }
     );
     if (!upload.ok) {
-      const t = await upload.text();
-      throw new Error(`Upload ${upload.status}: ${t}`);
+      let reason = `HTTP ${upload.status}`;
+      try {
+        const j = await upload.json();
+        reason = j.error?.message || j.error?.errors?.[0]?.reason || reason;
+      } catch (_) { reason = await upload.text() || reason; }
+      throw new Error(reason);
     }
     return webViewLink;
   };

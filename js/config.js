@@ -1,5 +1,5 @@
 // Clave de API de Google Gemini
-const GEMINI_API_KEY = "AIzaSyDNr0YEzRb5OOWMEXPh_KfelomVE9FXCik";
+const GEMINI_API_KEY = "AIzaSyAz_2urUmcGkjfwSFmc3OoOBNx0zLC-9Ds";
 
 // Configuración de Google Drive
 var DRIVE_CONFIG = {

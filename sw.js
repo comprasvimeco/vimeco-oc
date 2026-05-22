@@ -1,23 +1,25 @@
-// Versión reemplazada automáticamente por build.js en cada deploy de Netlify
+// Versión reemplazada automáticamente por build.js en cada push (GitHub Actions)
 const CACHE_NAME = 'vimeco-oc-v6';
 
+const BASE = '/vimeco-oc';
+
 const STATIC_ASSETS = [
-  '/index.html',
-  '/app.html',
-  '/css/styles.css',
-  '/js/auth.js',
-  '/js/app.js',
-  '/js/firebase.js',
-  '/js/gemini.js',
-  '/js/ocGenerator.js',
-  '/js/voice.js',
-  '/js/logoBase64.js',
-  '/obras.js',
-  '/whitelist.js',
-  '/manifest.json',
-  '/icono_app.png',
-  '/js/jspdf.umd.min.js',
-  '/js/drive.js'
+  BASE + '/index.html',
+  BASE + '/app.html',
+  BASE + '/css/styles.css',
+  BASE + '/js/auth.js',
+  BASE + '/js/app.js',
+  BASE + '/js/firebase.js',
+  BASE + '/js/gemini.js',
+  BASE + '/js/ocGenerator.js',
+  BASE + '/js/voice.js',
+  BASE + '/js/logoBase64.js',
+  BASE + '/obras.js',
+  BASE + '/whitelist.js',
+  BASE + '/manifest.json',
+  BASE + '/icono_app.png',
+  BASE + '/js/jspdf.umd.min.js',
+  BASE + '/js/drive.js'
 ];
 
 self.addEventListener('install', event => {
@@ -45,7 +47,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // Web Share Target: guarda el archivo en cache y redirige a app.html
-  if (event.request.method === 'POST' && url.pathname === '/app.html') {
+  if (event.request.method === 'POST' && url.pathname === BASE + '/app.html') {
     event.respondWith((async () => {
       const formData = await event.request.formData();
       const file = formData.get('file');
@@ -53,7 +55,7 @@ self.addEventListener('fetch', event => {
         const cache = await caches.open('share-target');
         await cache.put('shared-file', new Response(file));
       }
-      return Response.redirect('/app.html', 303);
+      return Response.redirect(BASE + '/app.html', 303);
     })());
     return;
   }

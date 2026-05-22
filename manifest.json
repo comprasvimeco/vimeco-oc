@@ -2,7 +2,7 @@
   "name": "VIMECO Órdenes de Compra",
   "short_name": "VIMECO OC",
   "description": "Generador de órdenes de compra para VIMECO S.A.",
-  "start_url": "/index.html",
+  "start_url": "/vimeco-oc/",
   "display": "standalone",
   "background_color": "#1a2740",
   "theme_color": "#1a3a5c",
@@ -12,7 +12,7 @@
     { "src": "icono_app.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "share_target": {
-    "action": "/app.html",
+    "action": "/vimeco-oc/app.html",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {

@@ -52,7 +52,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       const hadController = !!navigator.serviceWorker.controller;
-      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+      navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (hadController) window.location.reload();
       });
