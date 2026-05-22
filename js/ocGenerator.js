@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    VIMECO S.A. — Generador de PDF Orden de Compra
    ===================================================== */
 
@@ -119,10 +119,11 @@ function drawHeader(doc, data, y) {
   if (logoSrc) {
     try {
       const fmt  = logoSrc.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-	const maxW = HDR_COLS[0] - 1;   // ← ANCHO máximo en mm (actualmente 64mm)
- 	const maxH = HDR_R1H - 4;       // ← ALTO máximo en mm (actualmente 19mm)      
+      const pad  = 5;
+      const maxW = HDR_COLS[0] - pad * 2;
+      const maxH = HDR_R1H - 6;
 
-	let lw = maxW, lh;
+      let lw = maxW, lh;
       if (window.__logoDims && window.__logoDims.w) {
         lh = lw * (window.__logoDims.h / window.__logoDims.w);
         if (lh > maxH) { lh = maxH; lw = lh * (window.__logoDims.w / window.__logoDims.h); }
@@ -132,7 +133,9 @@ function drawHeader(doc, data, y) {
       lw = Math.round(lw * 10) / 10;
       lh = Math.round(lh * 10) / 10;
       logoH = lh;
-      doc.addImage(logoSrc, fmt, x0 + 0.5, y + 1, lw, lh);
+      const logoX = x0 + (HDR_COLS[0] - lw) / 2;
+      const logoY = y + (HDR_R1H  - lh) / 2;
+      doc.addImage(logoSrc, fmt, logoX, logoY, lw, lh);
     } catch (_) {}
   }
 
