@@ -268,6 +268,11 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
   .import-btn-label { font-size: 11px; }
   .import-btn-sub   { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
+  /* OC banner — una sola línea en mobile */
+  .oc-number-display { background: none; border: none; padding: 0; gap: .35rem; }
+  .oc-number-label { display: none; }
+  .oc-number-value { font-size: .95rem; }
+
   /* Table hidden on mobile — card view rendered by JS */
   .items-table-wrapper { display: none; }
 }
@@ -280,8 +285,8 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 }
 
 /* ===== OC BANNER ===== */
-.oc-banner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
-.oc-banner-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.oc-banner { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: 1rem; }
+.oc-banner-actions { display: flex; align-items: center; gap: .5rem; }
 
 /* ===== STEP OPTIONAL LABEL ===== */
 .step-optional { font-size: .72rem; font-weight: 400; color: var(--gray-500); margin-left: .25rem; }
