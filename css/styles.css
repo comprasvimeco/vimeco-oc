@@ -82,6 +82,8 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 
 /* ===== APP LAYOUT ===== */
 .app-header { background: var(--primary); color: var(--white); padding: 0 1.5rem; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100; }
+.app-header .btn-outline { border-color: rgba(255,255,255,.55); color: var(--white); }
+.app-header .btn-outline:hover { background: rgba(255,255,255,.15); border-color: var(--white); }
 .header-brand { display: flex; align-items: center; gap: .85rem; }
 .header-logo { height: 35px; width: auto; object-fit: contain; }
 .header-logo-fallback { font-size: 1.1rem; font-weight: 800; letter-spacing: .05em; }
