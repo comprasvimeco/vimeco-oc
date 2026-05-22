@@ -814,7 +814,11 @@ function buildOCData(numero) {
     })),
     impuestos:   pdfTotals,
     totalLetras: numberToWords(total),
-    _total:      total
+    _total:      total,
+    // Datos crudos para restaurar en historial → Usar como base
+    _descuento:      { pct: descuento.pct, monto: descuento.monto },
+    _noGravado:      { pct: noGravado.pct, monto: noGravado.monto },
+    _impuestosExtra: impuestos.map(imp => ({ nombre: imp.nombre, pct: imp.pct, monto: imp.monto }))
   };
 }
 
@@ -973,13 +977,16 @@ function loadOCBase(oc) {
     precio_unitario:  it.unitario || 0
   }));
 
-  descuento = { pct: null, monto: 0 };
-  noGravado = { pct: null, monto: 0 };
-  impuestos = [];
-  $('pct-descuento').value   = '';
-  $('monto-descuento').value = fmtMoneyDisplay(0);
-  $('pct-nogravado').value   = '';
-  $('monto-nogravado').value = fmtMoneyDisplay(0);
+  descuento = { pct: oc.descuento?.pct ?? null, monto: oc.descuento?.monto || 0 };
+  noGravado = { pct: oc.noGravado?.pct ?? null, monto: oc.noGravado?.monto || 0 };
+  impuestos = (oc.impuestosExtra || []).map(imp => ({
+    nombre: imp.nombre || '', pct: imp.pct ?? null, monto: imp.monto || 0
+  }));
+
+  $('pct-descuento').value   = descuento.pct  ? String(descuento.pct)  : '';
+  $('monto-descuento').value = fmtMoneyDisplay(descuento.monto);
+  $('pct-nogravado').value   = noGravado.pct  ? String(noGravado.pct)  : '';
+  $('monto-nogravado').value = fmtMoneyDisplay(noGravado.monto);
 
   clearFile();
   renderTable();

@@ -76,11 +76,14 @@
         condicionIVA: clean(prov.iva),
         ref:         clean(prov.ref)
       },
-      obra:         prov.ubicacion,
-      condicionPago: clean(prov.pago),
-      items:        ocData.items,
-      impuestos:    ocData.impuestos,
-      total:        total
+      obra:           prov.ubicacion,
+      condicionPago:  clean(prov.pago),
+      items:          ocData.items,
+      impuestos:      ocData.impuestos,
+      total:          total,
+      descuento:      ocData._descuento      || { pct: null, monto: 0 },
+      noGravado:      ocData._noGravado      || { pct: null, monto: 0 },
+      impuestosExtra: ocData._impuestosExtra || []
     };
 
     const base = _base();

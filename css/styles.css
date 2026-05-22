@@ -233,11 +233,16 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 700px) {
-  .app-header { padding: 0 1rem; }
+  .app-header { padding: 0 .75rem; }
   .header-title { display: none; }
+  .header-user { gap: .4rem; }
+  .user-badge { padding: .25rem .55rem; font-size: .76rem; }
   .action-bar { flex-direction: column-reverse; }
   .action-bar-left, .action-bar-right { width: 100%; justify-content: stretch; }
   .action-bar-left .btn, .action-bar-right .btn { flex: 1; }
+}
+@media (max-width: 500px) {
+  .hdr-btn-label { display: none; }
 }
 
 @media (max-width: 768px) {
@@ -249,9 +254,13 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
   .items-table input,
   .imp-table input { font-size: 16px !important; }
 
-  /* Generate bar — normal flow, stacked */
-  .generate-bar { flex-direction: column-reverse; gap: .5rem; margin-bottom: 2rem; }
+  /* Generate bar — stacked, Generar first (top), Limpiar last */
+  .generate-bar { flex-direction: column; gap: .5rem; margin-bottom: 2rem; }
   .generate-bar .btn { width: 100%; }
+  .generate-bar .btn-generate { order: -1; }
+  .generate-bar #btn-preview { order: 0; }
+  .generate-bar #btn-same-provider { order: 1; }
+  .generate-bar #btn-clear-form { order: 2; }
 
   /* ---- Import buttons ---- */
   .import-btn { height: 80px; padding: .5rem .4rem; min-width: 0; }
