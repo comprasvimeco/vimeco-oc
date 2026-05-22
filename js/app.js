@@ -41,14 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-clear-form').addEventListener('click', resetForm);
   $('btn-add-row').addEventListener('click', addEmptyRow);
   $('btn-generate').addEventListener('click', handleGenerate);
-  $('btn-edit-ocnum').addEventListener('click', openOCNumModal);
   $('btn-extract').addEventListener('click', handleExtract);
   $('btn-clear-file').addEventListener('click', clearFile);
   $('btn-add-impuesto').addEventListener('click', addImpuestoRow);
-
-  $('modal-ocnum-close').addEventListener('click',  closeOCNumModal);
-  $('modal-ocnum-cancel').addEventListener('click', closeOCNumModal);
-  $('modal-ocnum-save').addEventListener('click',   saveOCNum);
 
   // ---- Descuento ----
   $('pct-descuento').addEventListener('input', e => {
@@ -136,33 +131,6 @@ async function loadLogo() {
     img.onerror = resolve;
     img.src = LOGO_BASE64;
   });
-}
-
-// ---- OC Number modal ----
-function openOCNumModal() {
-  $('input-ocnum').value = $('oc-number-display').textContent.trim();
-  $('modal-ocnum').classList.remove('hidden');
-  setTimeout(() => $('input-ocnum').select(), 50);
-}
-function closeOCNumModal() { $('modal-ocnum').classList.add('hidden'); }
-async function saveOCNum() {
-  const val = $('input-ocnum').value.trim();
-  if (!/^\d{4}-\d{8}$/.test(val)) {
-    toast('Formato inválido. Usá: SSSS-NNNNNNNN (ej: 0001-00002060)', 'error'); return;
-  }
-  const targetSeq = parseInt(val.split('-')[1], 10);
-  const btn = $('modal-ocnum-save');
-  btn.disabled = true;
-  try {
-    await setOCSeqTo(targetSeq);
-    await refreshOCNumberDisplay();
-    closeOCNumModal();
-    toast('Número de OC actualizado.', 'success');
-  } catch {
-    toast('Error al guardar. Verificá la conexión.', 'error');
-  } finally {
-    btn.disabled = false;
-  }
 }
 
 // ---- Obra combo ----

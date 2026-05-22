@@ -39,12 +39,11 @@
   <div class="oc-banner">
     <div class="oc-number-display">
       <span class="oc-number-label">Próxima OC:</span>
-      <span class="oc-number-value" id="oc-number-display">0001-00002060</span>
+      <span class="oc-number-value" id="oc-number-display">—</span>
     </div>
     <div class="oc-banner-actions">
       <span id="date-display" class="text-muted" style="font-size:.82rem;"></span>
-      <button class="btn btn-secondary btn-sm" id="btn-edit-ocnum">✏ Editar N°</button>
-      <button class="btn btn-outline btn-sm" id="btn-new-oc">+ Nueva OC</button>
+<button class="btn btn-outline btn-sm" id="btn-new-oc">+ Nueva OC</button>
     </div>
   </div>
 
@@ -270,27 +269,6 @@
 
 </main>
 
-<!-- ===== MODAL: Editar número de OC ===== -->
-<div class="modal-overlay hidden" id="modal-ocnum">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Editar número de OC</span>
-      <button class="modal-close" id="modal-ocnum-close">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label for="input-ocnum">Número de OC</label>
-        <input type="text" id="input-ocnum" class="form-control"
-               style="font-family:'Courier New',monospace;font-size:1.1rem;letter-spacing:.05em">
-        <small class="form-hint">Formato: SSSS-NNNNNNNN &nbsp;(ej: 0001-00002060)</small>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-ocnum-cancel">Cancelar</button>
-      <button class="btn btn-primary"   id="modal-ocnum-save">Guardar</button>
-    </div>
-  </div>
-</div>
 
 <!-- ===== TOAST ===== -->
 <div class="toast-container" id="toast-container"></div>
