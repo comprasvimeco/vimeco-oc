@@ -287,7 +287,17 @@ function applyExtractionResult(r) {
   fillIfEmpty('plazo-entrega',           r.plazo_entrega);
   fillIfEmpty('lugar-entrega',           r.lugar_entrega);
 
+  const warnings = [];
   if (r.items?.length) {
+    r.items.forEach((it, idx) => {
+      if (it.total_documento > 0) {
+        const calc = (it.cantidad || 0) * (it.precio_unitario || 0);
+        const diff = Math.abs(calc - it.total_documento) / it.total_documento;
+        if (diff > 0.01) {
+          warnings.push(`⚠️ Revisar ítem ${idx + 1}: total calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(it.total_documento)}`);
+        }
+      }
+    });
     items = r.items.map(normalizeItem);
     renderTable();
   }
@@ -320,6 +330,7 @@ function applyExtractionResult(r) {
   }
 
   recalcTotales();
+  return warnings;
 }
 
 async function handleExtract() {
@@ -329,11 +340,12 @@ async function handleExtract() {
 
   try {
     const r = await extractFromFile(selectedFile);
-    applyExtractionResult(r);
+    const warnings = applyExtractionResult(r);
     const impMsg = impuestos.length ? ` y ${impuestos.length} impuesto(s)` : '';
     if (r.items?.length) {
       setExtractStatus('success', `✓ Se extrajeron ${r.items.length} ítem(s)${impMsg}.`);
       toast(`Gemini extrajo ${r.items.length} ítem(s)${impMsg}.`, 'success');
+      warnings.forEach(w => toast(w, 'warning'));
     } else {
       setExtractStatus('success', '✓ Datos del proveedor completados. No se detectaron ítems.');
       toast('Datos extraídos. No se detectaron ítems — podés agregarlos manualmente.', 'warning');

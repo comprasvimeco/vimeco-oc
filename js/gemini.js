@@ -38,6 +38,15 @@ Estructura JSON requerida:
   ]
 }
 
+FORMATO DE NÚMEROS CRÍTICO:
+- En documentos argentinos el punto es separador de miles y la coma es decimal
+- Ejemplos: 10.000 = 10000, 72,674 = 72.674, 1.114,20 = 1114.20
+- Al extraer cantidades y precios, convertir siempre al formato numérico estándar (punto decimal, sin separador de miles)
+- Si ves '10.000' como cantidad es diez mil (10000), no diez
+- Si ves '72,674' como precio unitario es 72.674 pesos, no 72674
+- Verificar que cantidad × precio unitario = importe declarado en el documento
+- Si no coincide, revisar la interpretación de los separadores
+
 Reglas importantes:
 - Los precios usan formato ARGENTINO: punto como separador de miles, coma como decimal (ej: 1.500,50 → 1500.50). Convertí siempre a número decimal con punto
 - Si el documento tiene IVA discriminado, el unitario debe ser el precio NETO sin IVA
@@ -167,7 +176,8 @@ function parseGeminiResponse(text) {
       descripcion:     String(it.desc || it.descripcion || '').trim(),
       unidad:          String(it.unidad || 'u').trim(),
       cantidad:        parseFloatSafe(it.cant  ?? it.cantidad),
-      precio_unitario: parseFloatSafe(it.unitario ?? it.precio_unitario)
+      precio_unitario: parseFloatSafe(it.unitario ?? it.precio_unitario),
+      total_documento: parseFloatSafe(it.total)
     })),
     descuento: parsed.descuento ? {
       porcentaje: parseFloatSafe(parsed.descuento.porcentaje) || null,
