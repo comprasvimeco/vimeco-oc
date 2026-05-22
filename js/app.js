@@ -22,6 +22,7 @@ let selectedFile = null;
 let descuento    = { pct: null, monto: 0 };
 let noGravado    = { pct: null, monto: 0 };
 let impuestos    = [];   // [{nombre, pct, monto}]
+let firmaBase64  = null; // firma del usuario activo (cargada desde Firebase)
 
 // ---- DOM shortcut ----
 const $ = id => document.getElementById(id);
@@ -38,7 +39,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('date-display').textContent = formatDateDisplay(new Date());
   refreshOCNumberDisplay();
 
-  $('btn-logout').addEventListener('click', logout);
   $('btn-new-oc').addEventListener('click', resetForm);
   $('btn-clear-form').addEventListener('click', resetForm);
   $('btn-add-row').addEventListener('click', addEmptyRow);
@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-extract').addEventListener('click', handleExtract);
   $('btn-clear-file').addEventListener('click', clearFile);
   $('btn-add-impuesto').addEventListener('click', addImpuestoRow);
+  setupMenu();
 
   // ---- Descuento ----
   $('pct-descuento').addEventListener('input', e => {
@@ -97,9 +98,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-preview-close').addEventListener('click',  closePreview);
   $('modal-preview-close2').addEventListener('click', closePreview);
   $('modal-preview-generate').addEventListener('click', () => { closePreview(); handleGenerate(); });
-  $('btn-historial').addEventListener('click', () => { window.location.href = 'historial.html'; });
   $('btn-same-provider').addEventListener('click', resetFormKeepProvider);
 
+  setupFirmaModalButtons();
   setupImportButtons();
   setupObraCombo();
   setupProveedorCombo();
@@ -110,6 +111,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadLogo();
   loadProveedoresCache();
   checkSharedFile();
+
+  getFirma(code).then(f => { firmaBase64 = f || null; }).catch(() => {});
 
   const ocBaseRaw = sessionStorage.getItem('oc_base');
   if (ocBaseRaw) {
@@ -124,6 +127,103 @@ function logout() {
   localStorage.removeItem('responsable_code');
   localStorage.removeItem('responsable_name');
   window.location.href = 'index.html';
+}
+
+// ---- Menú de usuario ----
+function setupMenu() {
+  const btnMenu   = $('btn-menu');
+  const dropdown  = $('hdr-dropdown');
+
+  btnMenu.addEventListener('click', e => {
+    e.stopPropagation();
+    dropdown.classList.toggle('hidden');
+  });
+  document.addEventListener('click', () => dropdown.classList.add('hidden'));
+  dropdown.addEventListener('click', e => e.stopPropagation());
+
+  $('btn-historial').addEventListener('click', () => { window.location.href = 'historial.html'; });
+  $('btn-logout').addEventListener('click', logout);
+  $('btn-firma').addEventListener('click', () => {
+    dropdown.classList.add('hidden');
+    openFirmaModal();
+  });
+}
+
+// ---- Firma ----
+let _firmaDrawing = false, _firmaLX = 0, _firmaLY = 0;
+
+function openFirmaModal() {
+  const canvas = $('firma-canvas');
+  const ctx    = canvas.getContext('2d');
+
+  if (!canvas._ready) {
+    canvas.width  = 560;
+    canvas.height = 200;
+    canvas._ready = true;
+
+    function pos(e) {
+      const r  = canvas.getBoundingClientRect();
+      const sx = canvas.width  / r.width;
+      const sy = canvas.height / r.height;
+      const s  = e.touches ? e.touches[0] : e;
+      return { x: (s.clientX - r.left) * sx, y: (s.clientY - r.top) * sy };
+    }
+    function stroke(e) {
+      const p = pos(e);
+      ctx.beginPath(); ctx.moveTo(_firmaLX, _firmaLY); ctx.lineTo(p.x, p.y); ctx.stroke();
+      _firmaLX = p.x; _firmaLY = p.y;
+    }
+
+    canvas.addEventListener('mousedown',  e => { _firmaDrawing = true;  const p = pos(e); _firmaLX = p.x; _firmaLY = p.y; });
+    canvas.addEventListener('mousemove',  e => { if (_firmaDrawing) stroke(e); });
+    canvas.addEventListener('mouseup',    () => _firmaDrawing = false);
+    canvas.addEventListener('mouseleave', () => _firmaDrawing = false);
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); _firmaDrawing = true;  const p = pos(e); _firmaLX = p.x; _firmaLY = p.y; }, { passive: false });
+    canvas.addEventListener('touchmove',  e => { e.preventDefault(); if (_firmaDrawing) stroke(e); }, { passive: false });
+    canvas.addEventListener('touchend',   () => _firmaDrawing = false);
+  }
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#1a3a5c';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap   = 'round';
+  ctx.lineJoin  = 'round';
+
+  if (firmaBase64) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    img.src = firmaBase64;
+  }
+
+  $('modal-firma').classList.remove('hidden');
+}
+
+function setupFirmaModalButtons() {
+  $('modal-firma-close').addEventListener('click', () => $('modal-firma').classList.add('hidden'));
+  $('btn-firma-limpiar').addEventListener('click', () => {
+    const canvas = $('firma-canvas');
+    const ctx    = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  });
+  $('btn-firma-guardar').addEventListener('click', async () => {
+    const canvas = $('firma-canvas');
+    const base64 = canvas.toDataURL('image/png');
+    const btn    = $('btn-firma-guardar');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      const code = sessionStorage.getItem('responsable_code');
+      await saveFirma(code, base64);
+      firmaBase64 = base64;
+      $('modal-firma').classList.add('hidden');
+      toast('Firma guardada.', 'success');
+    } catch {
+      toast('Error al guardar la firma.', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Guardar firma';
+    }
+  });
 }
 
 // ---- Web Share Target: recibe archivo compartido desde otra app ----
@@ -769,7 +869,7 @@ function validateOCForm() {
   return true;
 }
 
-function buildOCData(numero) {
+function buildOCData(numero, firma = null) {
   const proveedor = $('proveedor').value.trim();
   const obra      = $('obra').value.trim();
   const total     = calcTotal();
@@ -818,12 +918,28 @@ function buildOCData(numero) {
     // Datos crudos para restaurar en historial → Usar como base
     _descuento:      { pct: descuento.pct, monto: descuento.monto },
     _noGravado:      { pct: noGravado.pct, monto: noGravado.monto },
-    _impuestosExtra: impuestos.map(imp => ({ nombre: imp.nombre, pct: imp.pct, monto: imp.monto }))
+    _impuestosExtra: impuestos.map(imp => ({ nombre: imp.nombre, pct: imp.pct, monto: imp.monto })),
+    _firma:          firma
   };
+}
+
+function confirmarFirma() {
+  return new Promise(resolve => {
+    const modal = $('modal-firma-confirm');
+    modal.classList.remove('hidden');
+    $('btn-firma-sin').onclick = () => { modal.classList.add('hidden'); resolve(false); };
+    $('btn-firma-con').onclick = () => { modal.classList.add('hidden'); resolve(true); };
+  });
 }
 
 async function handleGenerate() {
   if (!validateOCForm()) return;
+
+  // Preguntar si incluir firma antes de bloquear el botón
+  let usarFirma = false;
+  if (firmaBase64) {
+    usarFirma = await confirmarFirma();
+  }
 
   const btn = $('btn-generate');
   btn.disabled = true;
@@ -841,7 +957,7 @@ async function handleGenerate() {
     return;
   }
 
-  const ocData = buildOCData(numero);
+  const ocData = buildOCData(numero, usarFirma ? firmaBase64 : null);
   const fname  = `OC_${numero}_${sanitize(ocData.proveedor.nombre || 'SinProveedor')}.pdf`;
 
   let blob;

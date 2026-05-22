@@ -448,11 +448,19 @@ function drawFooter(doc, data, y) {
   doc.setTextColor(...C.azul);
   doc.text('Autorizado por VIMECO S.A.:', xs[2] + 2.5, y + 6);
   if (data.ejecutor) {
-    // Nombre alineado a la izquierda, posicionado arriba en la celda
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
     doc.setTextColor(...C.negro);
     doc.text(data.ejecutor, xs[2] + 2.5, y + 12);
+  }
+  if (data._firma) {
+    try {
+      const sigX = xs[2] + 3;
+      const sigY = y + 14;
+      const sigW = FTR_COLS[2] - 6;
+      const sigH = COL_H - 24;  // deja margen para la línea abajo
+      doc.addImage(data._firma, 'PNG', sigX, sigY, sigW, sigH);
+    } catch (_) {}
   }
   doc.setLineWidth(0.3);
   doc.setDrawColor(...C.borde);

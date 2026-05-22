@@ -28,8 +28,15 @@
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <button class="btn btn-sm btn-outline" id="btn-historial">📋<span class="hdr-btn-label"> Historial</span></button>
-    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+    <div class="hdr-menu-wrap">
+      <button class="btn btn-sm btn-outline" id="btn-menu" title="Menú">☰</button>
+      <div class="hdr-dropdown hidden" id="hdr-dropdown">
+        <button class="hdr-drop-item" id="btn-historial">📋 Historial</button>
+        <button class="hdr-drop-item" id="btn-firma">✍ Mi firma</button>
+        <div class="hdr-drop-sep"></div>
+        <button class="hdr-drop-item hdr-drop-danger" id="btn-logout">Salir</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -287,6 +294,43 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" id="modal-preview-close2">Cerrar</button>
       <button class="btn btn-success" id="modal-preview-generate">🖨 Generar y descargar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Firma ===== -->
+<div class="modal-overlay hidden" id="modal-firma">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Mi Firma</span>
+      <button class="modal-close" id="modal-firma-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="firma-hint-top">Dibujá tu firma. Se guardará y podrás incluirla en futuras OC.</p>
+      <div class="firma-canvas-wrap">
+        <canvas id="firma-canvas"></canvas>
+      </div>
+      <p class="firma-hint-bot">Usá el dedo o el mouse para dibujar</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-firma-limpiar">Limpiar</button>
+      <button class="btn btn-primary" id="btn-firma-guardar">Guardar firma</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Confirmar firma en OC ===== -->
+<div class="modal-overlay hidden" id="modal-firma-confirm">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">¿Incluir firma?</span>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+      <p style="color:var(--gray-600);">Tenés una firma guardada.<br>¿Querés incluirla en esta OC?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-firma-sin">Sin firma</button>
+      <button class="btn btn-primary"   id="btn-firma-con">✍ Con firma</button>
     </div>
   </div>
 </div>

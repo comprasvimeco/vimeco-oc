@@ -111,6 +111,21 @@
     return Object.values(data).filter(p => p && p.nombre);
   };
 
+  window.getFirma = async function (codigo) {
+    const resp = await fetch(_base() + '/firmas/' + codigo + '.json');
+    if (!resp.ok) return null;
+    return await resp.json(); // base64 string o null
+  };
+
+  window.saveFirma = async function (codigo, base64) {
+    const resp = await fetch(_base() + '/firmas/' + codigo + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(base64)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
   window.getHistorial = async function (codigoResponsable) {
     const resp = await fetch(_base() + '/historial.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
