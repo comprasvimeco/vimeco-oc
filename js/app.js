@@ -787,19 +787,6 @@ async function handleGenerate() {
   refreshOCNumberDisplay();
   toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada.`, 'success');
 
-  // Subir a Drive en segundo plano
-  if (typeof window.uploadToDrive === 'function') {
-    uploadToDrive(blob, fname, ocData.proveedor.nombre)
-      .then(link => toast(
-        `Guardada en Drive — <a href="${link}" target="_blank" style="color:inherit;font-weight:bold;text-decoration:underline">Abrir</a>`,
-        'success'
-      ))
-      .catch(e => {
-        console.error('Drive:', e);
-        toast(`Drive: ${e.message}`, 'warning');
-      });
-  }
-
   btn.disabled = false;
   btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
 }

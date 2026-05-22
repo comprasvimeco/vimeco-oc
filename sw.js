@@ -18,8 +18,7 @@ const STATIC_ASSETS = [
   BASE + '/whitelist.js',
   BASE + '/manifest.json',
   BASE + '/icono_app.png',
-  BASE + '/js/jspdf.umd.min.js',
-  BASE + '/js/drive.js'
+  BASE + '/js/jspdf.umd.min.js'
 ];
 
 self.addEventListener('install', event => {
@@ -60,11 +59,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-only: Gemini API, Firebase, Google OAuth y Drive
+  // Network-only: Gemini API y Firebase
   if (url.hostname === 'generativelanguage.googleapis.com' ||
-      url.hostname.endsWith('.firebaseio.com') ||
-      url.hostname === 'oauth2.googleapis.com' ||
-      url.hostname === 'www.googleapis.com') {
+      url.hostname.endsWith('.firebaseio.com')) {
     event.respondWith(fetch(event.request));
     return;
   }
