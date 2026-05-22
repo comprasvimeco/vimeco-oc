@@ -492,12 +492,19 @@ function renderTableMobile() {
         <input type="text" class="item-card-desc" value="${esc(item.descripcion)}" placeholder="Descripción del ítem...">
         <button class="btn btn-icon btn-danger btn-sm btn-del" title="Eliminar">✕</button>
       </div>
-      <div class="item-card-r2">
-        <label class="item-card-lbl">Unidad <input type="text" class="item-card-unit" value="${esc(item.unidad)}"></label>
-        <span class="item-card-sep">|</span>
-        <label class="item-card-lbl">Cant <input type="text" class="item-card-qty num-input" value="${fmtInput(item.cantidad)}"></label>
-        <span class="item-card-sep">|</span>
-        <label class="item-card-lbl">P.Unit <input type="text" class="item-card-price num-input" value="${fmtInput(item.precio_unitario)}"></label>
+      <div class="item-card-fields">
+        <div class="item-card-col">
+          <span class="item-card-lbl">Unidad</span>
+          <input type="text" class="item-card-unit" value="${esc(item.unidad)}">
+        </div>
+        <div class="item-card-col">
+          <span class="item-card-lbl">Cantidad</span>
+          <input type="text" class="item-card-qty num-input" value="${fmtInput(item.cantidad)}">
+        </div>
+        <div class="item-card-col">
+          <span class="item-card-lbl">P.Unit</span>
+          <input type="text" class="item-card-price num-input" value="${fmtInput(item.precio_unitario)}">
+        </div>
       </div>
       <div class="item-card-r3">
         <span class="item-card-total-lbl">Total</span>
