@@ -15,7 +15,8 @@ const STATIC_ASSETS = [
   '/obras.js',
   '/whitelist.js',
   '/manifest.json',
-  '/icono_app.png'
+  '/icono_app.png',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 ];
 
 self.addEventListener('install', event => {
