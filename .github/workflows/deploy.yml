@@ -26,6 +26,8 @@ jobs:
           node-version: '20'
       - name: Bump SW cache version
         run: node build.js
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

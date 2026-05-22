@@ -1,5 +1,5 @@
 // Clave de API de Google Gemini
-const GEMINI_API_KEY = "AIzaSyAz_2urUmcGkjfwSFmc3OoOBNx0zLC-9Ds";
+const GEMINI_API_KEY = "%%GEMINI_API_KEY%%";
 
 // Configuración de Firebase — completar con los valores del proyecto
 var FIREBASE_CONFIG = {
