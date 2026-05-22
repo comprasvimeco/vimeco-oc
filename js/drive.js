@@ -99,33 +99,34 @@
     const token    = await getAccessToken();
     const folderId = await getOrCreateProviderFolder(token, providerName || '');
 
-    const meta     = JSON.stringify({ name: filename, parents: [folderId] });
-    const boundary = 'vimeco_b_271828';
-
-    const body = new Blob([
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
-      meta,
-      `\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`,
-      pdfBlob,
-      `\r\n--${boundary}--`
-    ]);
-
-    const up = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+    // Paso 1: crear el archivo con metadata (JSON simple)
+    const create = await fetch(
+      'https://www.googleapis.com/drive/v3/files?fields=id,webViewLink',
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': `multipart/related; boundary="${boundary}"`
-        },
-        body
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: filename, parents: [folderId], mimeType: 'application/pdf' })
       }
     );
-    if (!up.ok) {
-      const t = await up.text();
-      throw new Error(`${up.status}: ${t}`);
+    if (!create.ok) {
+      const t = await create.text();
+      throw new Error(`Create ${create.status}: ${t}`);
     }
-    const { webViewLink } = await up.json();
+    const { id, webViewLink } = await create.json();
+
+    // Paso 2: subir el contenido binario
+    const upload = await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/pdf' },
+        body: pdfBlob
+      }
+    );
+    if (!upload.ok) {
+      const t = await upload.text();
+      throw new Error(`Upload ${upload.status}: ${t}`);
+    }
     return webViewLink;
   };
 })();
