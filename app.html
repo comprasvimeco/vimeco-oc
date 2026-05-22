@@ -138,7 +138,10 @@
       <div class="form-row">
         <div class="form-group">
           <label for="proveedor">Proveedor / Razón Social *</label>
-          <input type="text" id="proveedor" class="form-control" placeholder="Nombre del proveedor">
+          <div class="combo-wrap" id="proveedor-wrap">
+            <input type="text" id="proveedor" class="form-control combo-input" placeholder="Nombre del proveedor">
+            <div class="combo-dropdown hidden" id="proveedor-dropdown"></div>
+          </div>
         </div>
         <div class="form-group">
           <label for="cuit-proveedor">CUIT del Proveedor</label>
@@ -262,6 +265,7 @@
   <!-- Generate bar -->
   <div class="generate-bar">
     <button class="btn btn-secondary" id="btn-clear-form">Limpiar formulario</button>
+    <button class="btn btn-outline" id="btn-preview">👁 Vista previa</button>
     <button class="btn btn-success btn-generate" id="btn-generate">
       🖨 Generar PDF — Orden de Compra
     </button>
@@ -269,6 +273,21 @@
 
 </main>
 
+
+<!-- ===== MODAL: Vista previa PDF ===== -->
+<div class="modal-overlay hidden" id="modal-preview">
+  <div class="modal modal--xl">
+    <div class="modal-header">
+      <span class="modal-title" id="preview-title">Vista previa</span>
+      <button class="modal-close" id="modal-preview-close">✕</button>
+    </div>
+    <div class="modal-body" id="preview-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-preview-close2">Cerrar</button>
+      <button class="btn btn-success" id="modal-preview-generate">🖨 Generar y descargar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== TOAST ===== -->
 <div class="toast-container" id="toast-container"></div>

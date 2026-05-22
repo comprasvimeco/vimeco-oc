@@ -91,13 +91,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     recalcTotales();
   });
 
+  $('btn-preview').addEventListener('click', handlePreview);
+  $('modal-preview-close').addEventListener('click',  closePreview);
+  $('modal-preview-close2').addEventListener('click', closePreview);
+  $('modal-preview-generate').addEventListener('click', () => { closePreview(); handleGenerate(); });
+
   setupImportButtons();
   setupObraCombo();
+  setupProveedorCombo();
   renderTable();
   renderImpuestos();
   recalcTotales();
 
   await loadLogo();
+  loadProveedoresCache();
   checkSharedFile();
 });
 
@@ -180,6 +187,72 @@ function setupObraCombo() {
 
   document.addEventListener('click', e => {
     if (!e.target.closest('.combo-wrap')) dropdown.classList.add('hidden');
+  });
+}
+
+// ---- Caché y autocompletado de proveedores ----
+async function loadProveedoresCache() {
+  try {
+    const lista = await getProveedores();
+    sessionStorage.setItem('proveedores_cache', JSON.stringify(lista));
+  } catch (e) {
+    console.warn('loadProveedoresCache:', e);
+  }
+}
+
+async function updateProveedoresCache() {
+  try {
+    const lista = await getProveedores();
+    sessionStorage.setItem('proveedores_cache', JSON.stringify(lista));
+  } catch (_) {}
+}
+
+function getCachedProveedores() {
+  try { return JSON.parse(sessionStorage.getItem('proveedores_cache') || '[]'); }
+  catch { return []; }
+}
+
+function setupProveedorCombo() {
+  const input    = $('proveedor');
+  const dropdown = $('proveedor-dropdown');
+
+  function fillProveedor(p) {
+    $('proveedor').value               = p.nombre       || '';
+    $('cuit-proveedor').value          = p.cuit         || '';
+    $('domicilio-proveedor').value     = p.domicilio    || '';
+    $('telefonos-proveedor').value     = p.telefonos    || '';
+    $('condicion-iva-proveedor').value = p.condicionIVA || '';
+  }
+
+  function buildOptions(query) {
+    dropdown.innerHTML = '';
+    const q = (query || '').toLowerCase().trim();
+    if (!q) { dropdown.classList.add('hidden'); return; }
+
+    const matches = getCachedProveedores()
+      .filter(p => p.nombre.toLowerCase().includes(q) || (p.cuit || '').includes(q))
+      .slice(0, 5);
+
+    if (!matches.length) { dropdown.classList.add('hidden'); return; }
+
+    matches.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'combo-option';
+      div.innerHTML = `<span>${p.nombre}</span>${p.cuit ? `<span class="combo-option-sub">${p.cuit}</span>` : ''}`;
+      div.addEventListener('mousedown', e => {
+        e.preventDefault();
+        fillProveedor(p);
+        dropdown.classList.add('hidden');
+      });
+      dropdown.appendChild(div);
+    });
+    dropdown.classList.remove('hidden');
+  }
+
+  input.addEventListener('input', () => buildOptions(input.value));
+  input.addEventListener('blur',  () => setTimeout(() => dropdown.classList.add('hidden'), 150));
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#proveedor-wrap')) dropdown.classList.add('hidden');
   });
 }
 
@@ -671,61 +744,37 @@ function addImpuestoRow() {
 }
 
 // ---- PDF Generation ----
-async function handleGenerate() {
+function validateOCForm() {
   const proveedor = $('proveedor').value.trim();
   const obra      = $('obra').value.trim();
+  if (!proveedor) { toast('Ingresá el nombre del proveedor.', 'error'); $('proveedor').focus(); return false; }
+  if (!obra)      { toast('Ingresá la obra / proyecto.', 'error'); $('obra').focus(); return false; }
+  if (!items.length) { toast('Agregá al menos un ítem a la orden.', 'error'); return false; }
+  if (items.some(it => !it.descripcion.trim())) { toast('Completá la descripción de todos los ítems.', 'error'); return false; }
+  return true;
+}
 
-  if (!proveedor) { toast('Ingresá el nombre del proveedor.', 'error'); $('proveedor').focus(); return; }
-  if (!obra)      { toast('Ingresá la obra / proyecto.', 'error'); $('obra').focus(); return; }
-  if (!items.length) { toast('Agregá al menos un ítem a la orden.', 'error'); return; }
-  if (items.some(it => !it.descripcion.trim())) {
-    toast('Completá la descripción de todos los ítems.', 'error'); return;
-  }
-
-  const btn = $('btn-generate');
-  btn.disabled = true;
-  btn.innerHTML = '⏳ Asignando número…';
-
-  let numero;
-  try {
-    if (typeof window.claimNextOCSeq !== 'function')
-      throw new Error('Firebase no cargó — recargá la página (F5).');
-    const seq = await window.claimNextOCSeq();
-    numero = formatOCNumber(seq);
-  } catch (err) {
-    toast(`Error N° OC: ${err.message}`, 'error');
-    btn.disabled = false;
-    btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
-    return;
-  }
-
-  const subtotal  = calcSubtotal();
+function buildOCData(numero) {
+  const proveedor = $('proveedor').value.trim();
+  const obra      = $('obra').value.trim();
+  const total     = calcTotal();
   const descMonto = roundCents(descuento.monto || 0);
   const ngMonto   = roundCents(noGravado.monto || 0);
+  const subtotal  = calcSubtotal();
   const gravado   = calcGravado();
-  const total     = calcTotal();
 
   const pdfTotals = [];
   if (descMonto > 0 || ngMonto > 0) pdfTotals.push({ nombre: 'Subtotal', monto: subtotal });
-  if (descMonto > 0) {
-    const label = descuento.pct ? `Descuento ${descuento.pct}%` : 'Descuento';
-    pdfTotals.push({ nombre: label, monto: -descMonto });
-  }
-  if (ngMonto > 0) pdfTotals.push({ nombre: 'No gravado', monto: ngMonto });
+  if (descMonto > 0) pdfTotals.push({ nombre: descuento.pct ? `Descuento ${descuento.pct}%` : 'Descuento', monto: -descMonto });
+  if (ngMonto   > 0) pdfTotals.push({ nombre: 'No gravado', monto: ngMonto });
   pdfTotals.push({ nombre: 'Gravado', monto: gravado });
-
   impuestos.forEach(imp => {
-    if ((imp.monto || 0) !== 0) {
-      pdfTotals.push({
-        nombre: (imp.pct != null && imp.pct > 0) ? `${imp.nombre} ${imp.pct}%` : imp.nombre,
-        monto:  imp.monto
-      });
-    }
+    if ((imp.monto || 0) !== 0)
+      pdfTotals.push({ nombre: (imp.pct != null && imp.pct > 0) ? `${imp.nombre} ${imp.pct}%` : imp.nombre, monto: imp.monto });
   });
-
   pdfTotals.push({ nombre: 'TOTAL', monto: total });
 
-  const ocData = {
+  return {
     nroOC:    numero,
     fecha:    formatDateDisplay(new Date()),
     ejecutor: sessionStorage.getItem('responsable_name'),
@@ -737,9 +786,9 @@ async function handleGenerate() {
       telefonos: $('telefonos-proveedor').value.trim()     || '—',
       ref:       $('ref-presupuesto').value.trim()         || '—',
       ubicacion: obra,
-      pago:      $('condicion-pago').value.trim()  || '—',
-      plazo:     $('plazo-entrega').value.trim()   || '—',
-      lugar:     $('lugar-entrega').value.trim()   || '—'
+      pago:      $('condicion-pago').value.trim()   || '—',
+      plazo:     $('plazo-entrega').value.trim()    || '—',
+      lugar:     $('lugar-entrega').value.trim()    || '—'
     },
     items: items.map(it => ({
       desc:     it.descripcion || '—',
@@ -749,10 +798,33 @@ async function handleGenerate() {
       total:    roundCents((parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0))
     })),
     impuestos:   pdfTotals,
-    totalLetras: numberToWords(total)
+    totalLetras: numberToWords(total),
+    _total:      total
   };
+}
 
-  const fname = `OC_${numero}_${sanitize(ocData.proveedor.nombre || 'SinProveedor')}.pdf`;
+async function handleGenerate() {
+  if (!validateOCForm()) return;
+
+  const btn = $('btn-generate');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Asignando número…';
+
+  let numero;
+  try {
+    if (typeof window.claimNextOCSeq !== 'function')
+      throw new Error('Firebase no cargó — recargá la página (F5).');
+    numero = formatOCNumber(await window.claimNextOCSeq());
+  } catch (err) {
+    toast(`Error N° OC: ${err.message}`, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
+    return;
+  }
+
+  const ocData = buildOCData(numero);
+  const fname  = `OC_${numero}_${sanitize(ocData.proveedor.nombre || 'SinProveedor')}.pdf`;
+
   let blob;
   try {
     blob = generateOCBlob(ocData);
@@ -763,6 +835,11 @@ async function handleGenerate() {
     btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
     return;
   }
+
+  // Guardar en historial (no bloquea si falla)
+  saveOCToHistory(ocData, ocData._total).then(() => {
+    updateProveedoresCache();
+  }).catch(e => console.warn('saveOCToHistory:', e));
 
   // Compartir (solo mobile/táctil) o descargar
   const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
@@ -782,17 +859,80 @@ async function handleGenerate() {
     const url = URL.createObjectURL(blob);
     const a   = document.createElement('a');
     a.href = url; a.download = fname;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 
   refreshOCNumberDisplay();
   toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada.`, 'success');
-
   btn.disabled = false;
   btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
+}
+
+// ---- Vista previa ----
+async function handlePreview() {
+  if (!validateOCForm()) return;
+
+  const btn = $('btn-preview');
+  btn.disabled = true;
+
+  let numero;
+  try {
+    const seq = await readNextOCSeq();
+    numero = formatOCNumber(seq);
+  } catch {
+    numero = '????-????????';
+  }
+
+  const ocData = buildOCData(numero);
+  let blob;
+  try {
+    blob = generateOCBlob(ocData);
+  } catch (err) {
+    toast(`Error al generar vista previa: ${err.message}`, 'error');
+    btn.disabled = false;
+    return;
+  }
+
+  btn.disabled = false;
+  openPreview(blob, numero);
+}
+
+function openPreview(blob, numero) {
+  const blobUrl = URL.createObjectURL(blob);
+  const modal   = $('modal-preview');
+  const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+
+  $('preview-title').textContent = `Vista previa — OC N° ${numero}`;
+  const body = $('preview-body');
+  body.innerHTML = '';
+
+  if (isMobile) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'padding:2rem;text-align:center;';
+    wrap.innerHTML = `
+      <p style="margin-bottom:1.25rem;color:var(--gray-600);">
+        Los PDF no se pueden previsualizar en el navegador mobile.
+      </p>
+      <a href="${blobUrl}" target="_blank" class="btn btn-primary">Abrir PDF en nueva pestaña</a>`;
+    body.appendChild(wrap);
+  } else {
+    const iframe = document.createElement('iframe');
+    iframe.src   = blobUrl;
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+    body.appendChild(iframe);
+  }
+
+  modal.dataset.blobUrl = blobUrl;
+  modal.classList.remove('hidden');
+}
+
+function closePreview() {
+  const modal = $('modal-preview');
+  const blobUrl = modal.dataset.blobUrl;
+  if (blobUrl) { URL.revokeObjectURL(blobUrl); delete modal.dataset.blobUrl; }
+  $('preview-body').innerHTML = '';
+  modal.classList.add('hidden');
 }
 
 // ---- Reset ----
