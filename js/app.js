@@ -796,7 +796,7 @@ async function handleGenerate() {
       ))
       .catch(e => {
         console.error('Drive:', e);
-        toast('No se pudo guardar en Drive.', 'warning');
+        toast(`Drive: ${e.message}`, 'warning');
       });
   }
 

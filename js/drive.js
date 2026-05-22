@@ -99,19 +99,14 @@
 
     const meta     = JSON.stringify({ name: filename, parents: [folderId] });
     const boundary = 'vimeco_b_271828';
-    const enc      = new TextEncoder();
 
-    const part1 = enc.encode(
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
-      `--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`
-    );
-    const part2 = enc.encode(`\r\n--${boundary}--`);
-    const pdf   = await pdfBlob.arrayBuffer();
-
-    const body = new Uint8Array(part1.byteLength + pdf.byteLength + part2.byteLength);
-    body.set(part1, 0);
-    body.set(new Uint8Array(pdf), part1.byteLength);
-    body.set(part2, part1.byteLength + pdf.byteLength);
+    const body = new Blob([
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+      meta,
+      `\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`,
+      pdfBlob,
+      `\r\n--${boundary}--`
+    ]);
 
     const up = await fetch(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
@@ -126,7 +121,7 @@
     );
     if (!up.ok) {
       const t = await up.text();
-      throw new Error(`Drive upload (${up.status}): ${t}`);
+      throw new Error(`${up.status}: ${t}`);
     }
     const { webViewLink } = await up.json();
     return webViewLink;
