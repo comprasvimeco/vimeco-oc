@@ -347,3 +347,29 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .combo-option:hover { background: #eef4ff; color: var(--primary); }
 .combo-option { display: flex; align-items: center; justify-content: space-between; }
 .combo-option-sub { font-size: .78rem; color: #999; flex-shrink: 0; margin-left: .5rem; }
+
+/* ===== HISTORIAL ===== */
+.hist-page { max-width: 860px; margin: 0 auto; padding: 1rem; }
+.hist-toolbar { display: flex; gap: .6rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+.hist-search { flex: 1; min-width: 180px; padding: .55rem .85rem; border: 1.5px solid var(--gray-300); border-radius: var(--radius); font-size: .9rem; color: var(--gray-900); background: var(--white); }
+.hist-search:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
+.hist-count { font-size: .82rem; color: var(--gray-500); white-space: nowrap; }
+.hist-list { display: flex; flex-direction: column; gap: .6rem; }
+.hist-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);
+  padding: .9rem 1rem; display: flex; flex-direction: column; gap: .35rem;
+  transition: box-shadow .15s;
+}
+.hist-card:hover { box-shadow: var(--shadow); }
+.hist-card-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.hist-nro { font-size: .85rem; font-weight: 700; color: var(--primary); font-family: monospace; }
+.hist-fecha { font-size: .78rem; color: var(--gray-500); }
+.hist-proveedor { font-size: .95rem; font-weight: 600; color: var(--gray-900); }
+.hist-obra { font-size: .82rem; color: var(--gray-600); }
+.hist-card-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-top: .2rem; }
+.hist-total { font-size: .95rem; font-weight: 700; color: var(--success); }
+.hist-responsable { font-size: .75rem; color: var(--gray-400); }
+.hist-actions { display: flex; gap: .4rem; }
+.hist-empty { text-align: center; padding: 3rem 1rem; color: var(--gray-400); font-size: .95rem; }
+.hist-loading { text-align: center; padding: 2.5rem 1rem; color: var(--gray-500); }

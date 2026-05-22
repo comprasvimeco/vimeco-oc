@@ -18,7 +18,9 @@ const STATIC_ASSETS = [
   BASE + '/whitelist.js',
   BASE + '/manifest.json',
   BASE + '/icono_app.png',
-  BASE + '/js/jspdf.umd.min.js'
+  BASE + '/js/jspdf.umd.min.js',
+  BASE + '/historial.html',
+  BASE + '/js/historial.js'
 ];
 
 self.addEventListener('install', event => {

@@ -97,6 +97,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-preview-close').addEventListener('click',  closePreview);
   $('modal-preview-close2').addEventListener('click', closePreview);
   $('modal-preview-generate').addEventListener('click', () => { closePreview(); handleGenerate(); });
+  $('btn-historial').addEventListener('click', () => { window.location.href = 'historial.html'; });
+  $('btn-same-provider').addEventListener('click', resetFormKeepProvider);
 
   setupImportButtons();
   setupObraCombo();
@@ -108,6 +110,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadLogo();
   loadProveedoresCache();
   checkSharedFile();
+
+  const ocBaseRaw = sessionStorage.getItem('oc_base');
+  if (ocBaseRaw) {
+    try { loadOCBase(JSON.parse(ocBaseRaw)); } catch (e) { console.warn('loadOCBase:', e); }
+    sessionStorage.removeItem('oc_base');
+  }
 });
 
 // ---- Auth ----
@@ -874,6 +882,7 @@ async function handleGenerate() {
   toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada.`, 'success');
   btn.disabled = false;
   btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
+  $('btn-same-provider').classList.remove('hidden');
 }
 
 // ---- Vista previa ----
@@ -942,6 +951,73 @@ function closePreview() {
   modal.classList.add('hidden');
 }
 
+// ---- Cargar OC como base (desde historial) ----
+function loadOCBase(oc) {
+  const prov = oc.proveedor || {};
+  $('proveedor').value               = prov.nombre       || '';
+  $('cuit-proveedor').value          = prov.cuit         || '';
+  $('domicilio-proveedor').value     = prov.domicilio    || '';
+  $('telefonos-proveedor').value     = prov.telefonos    || '';
+  $('condicion-iva-proveedor').value = prov.condicionIVA || 'Resp. Inscripto';
+  $('ref-presupuesto').value         = '';
+  $('obra').value                    = oc.obra           || '';
+  $('condicion-pago').value          = oc.condicionPago  || '';
+  $('plazo-entrega').value           = '';
+  $('lugar-entrega').value           = '';
+  $('observaciones').value           = '';
+
+  items = (oc.items || []).map(it => ({
+    descripcion:      it.desc     || '',
+    unidad:           it.unidad   || '',
+    cantidad:         it.cant     || 0,
+    precio_unitario:  it.unitario || 0
+  }));
+
+  descuento = { pct: null, monto: 0 };
+  noGravado = { pct: null, monto: 0 };
+  impuestos = [];
+  $('pct-descuento').value   = '';
+  $('monto-descuento').value = fmtMoneyDisplay(0);
+  $('pct-nogravado').value   = '';
+  $('monto-nogravado').value = fmtMoneyDisplay(0);
+
+  clearFile();
+  renderTable();
+  renderImpuestos();
+  recalcTotales();
+  clearExtractStatus();
+  toast(`Base cargada: OC ${oc.nroOC}`, 'info');
+}
+
+// ---- Nueva OC mismo proveedor ----
+function resetFormKeepProvider() {
+  $('ref-presupuesto').value  = '';
+  $('obra').value             = '';
+  $('condicion-pago').value   = '';
+  $('plazo-entrega').value    = '';
+  $('lugar-entrega').value    = '';
+  $('observaciones').value    = '';
+
+  items     = [];
+  descuento = { pct: null, monto: 0 };
+  noGravado = { pct: null, monto: 0 };
+  impuestos = [];
+
+  $('pct-descuento').value   = '';
+  $('monto-descuento').value = fmtMoneyDisplay(0);
+  $('pct-nogravado').value   = '';
+  $('monto-nogravado').value = fmtMoneyDisplay(0);
+
+  clearFile();
+  renderTable();
+  renderImpuestos();
+  recalcTotales();
+  clearExtractStatus();
+  $('btn-same-provider').classList.add('hidden');
+  toast('Nueva OC — proveedor conservado.', 'info');
+  $('obra').focus();
+}
+
 // ---- Reset ----
 function resetForm() {
   ['proveedor','cuit-proveedor','domicilio-proveedor','telefonos-proveedor',
@@ -964,6 +1040,7 @@ function resetForm() {
   renderImpuestos();
   recalcTotales();
   clearExtractStatus();
+  $('btn-same-provider').classList.add('hidden');
   toast('Formulario limpiado.', 'info');
 }
 
