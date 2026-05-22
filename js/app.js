@@ -777,9 +777,10 @@ async function handleGenerate() {
     return;
   }
 
-  // Compartir o descargar
+  // Compartir (solo mobile/táctil) o descargar
+  const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
   let shared = false;
-  if (navigator.canShare) {
+  if (isMobile && navigator.canShare) {
     const file = new File([blob], fname, { type: 'application/pdf' });
     if (navigator.canShare({ files: [file] })) {
       try {
