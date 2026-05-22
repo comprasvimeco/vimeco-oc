@@ -5,6 +5,8 @@ const GEMINI_ENDPOINT =
 
 const EXTRACT_PROMPT = `Sos un asistente especializado en lectura de documentos comerciales argentinos (facturas, presupuestos, cotizaciones, remitos, órdenes de compra).
 
+El documento puede ser una foto tomada con celular, posiblemente con perspectiva, sombras, reflejos o leve distorsión. Hacé tu mejor esfuerzo para leer el contenido aunque la imagen no sea perfecta; inferí los datos por contexto cuando no sean perfectamente legibles.
+
 Analizá el documento adjunto y extraé la siguiente información. Devolvé ÚNICAMENTE un JSON válido, sin bloques de código markdown, sin texto adicional antes o después.
 
 Estructura JSON requerida:
@@ -37,22 +39,56 @@ Estructura JSON requerida:
 }
 
 Reglas importantes:
-- Los precios y montos son SOLO números decimales con punto, sin signo $ ni separadores de miles (ej: 15000.50)
+- Los precios usan formato ARGENTINO: punto como separador de miles, coma como decimal (ej: 1.500,50 → 1500.50). Convertí siempre a número decimal con punto
 - Si el documento tiene IVA discriminado, el unitario debe ser el precio NETO sin IVA
 - cant, unitario, total, porcentaje y monto son siempre numbers (no strings)
 - Si no encontrás un campo opcional, usá null (no string vacío)
 - Incluí TODOS los ítems del documento, sin excepción
 - En "items", el campo "total" es el importe total de esa línea (cant × unitario)
+- Si una descripción está parcialmente ilegible o cortada, extraé lo que puedas y agregá "..." al final
+- Para dígitos ambiguos en precios (1/7, 0/6, 3/8), elegí el que dé un precio más coherente con el contexto del ítem y el resto del documento
 - "descuento": si hay descuento, extraerlo como monto POSITIVO. Si tiene porcentaje explícito, completar "porcentaje". Si no hay descuento, devolver null
 - "noGravado": si hay ítems no gravados o no sujetos a IVA, extraer su monto total. Si no hay, devolver null
 - "impuestos": incluir SOLO los impuestos reales (IVA, percepciones, etc.). NO incluir Subtotal, Neto gravado, Gravado ni TOTAL — esos se calculan automáticamente. Si no hay impuestos, devolver []
-- Si el documento es ilegible o no tiene ítems claros, devolvé items como [] e impuestos como []`;
+- Si el documento es completamente ilegible, devolvé items como [] e impuestos como []`;
+
+async function compressImageIfNeeded(file) {
+  const LIMIT = 4 * 1024 * 1024;
+  if (file.type === 'application/pdf' || file.size <= LIMIT) return file;
+
+  const img = await new Promise((resolve, reject) => {
+    const i   = new Image();
+    const url = URL.createObjectURL(file);
+    i.onload  = () => { URL.revokeObjectURL(url); resolve(i); };
+    i.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo cargar la imagen para comprimir.')); };
+    i.src = url;
+  });
+
+  const canvas = document.createElement('canvas');
+  const ctx    = canvas.getContext('2d');
+  let scale    = 0.7;
+
+  while (scale >= 0.1) {
+    canvas.width  = Math.round(img.naturalWidth  * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.88));
+    if (!blob) break;
+    if (blob.size <= LIMIT) {
+      return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+    }
+    scale *= 0.7;
+  }
+  return file;
+}
 
 async function extractFromFile(file) {
   const apiKey = typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : null;
   if (!apiKey || apiKey === 'AQUI_VA_LA_KEY') {
     throw new Error('No hay API Key configurada. Editá js/config.js con tu clave de Gemini.');
   }
+
+  file = await compressImageIfNeeded(file);
 
   const base64   = await fileToBase64(file);
   const mimeType = normalizeMimeType(file.type, file.name);
@@ -70,11 +106,20 @@ async function extractFromFile(file) {
     }
   };
 
-  const response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  let response;
+  try {
+    response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(60000)
+    });
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      throw new Error('La solicitud a Gemini tardó demasiado. Intentá con una imagen más pequeña.');
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
