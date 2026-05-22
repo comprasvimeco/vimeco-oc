@@ -197,6 +197,8 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 
 .item-card-fields { display: flex; gap: 8px; }
 .item-card-col { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.item-card-col--unit  { flex: 0 0 56px; }
+.item-card-col--price { flex: 1.8; }
 .item-card-lbl { font-size: 9px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; }
 .item-card-col input { padding: 8px 6px; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; background: var(--white); color: var(--gray-900); text-align: right; }
 .item-card-col .item-card-unit { text-align: center; }

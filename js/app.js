@@ -493,15 +493,15 @@ function renderTableMobile() {
         <button class="btn btn-icon btn-danger btn-sm btn-del" title="Eliminar">✕</button>
       </div>
       <div class="item-card-fields">
-        <div class="item-card-col">
+        <div class="item-card-col item-card-col--unit">
           <span class="item-card-lbl">Unidad</span>
           <input type="text" class="item-card-unit" value="${esc(item.unidad)}">
         </div>
-        <div class="item-card-col">
+        <div class="item-card-col item-card-col--qty">
           <span class="item-card-lbl">Cantidad</span>
           <input type="text" class="item-card-qty num-input" value="${fmtInput(item.cantidad)}">
         </div>
-        <div class="item-card-col">
+        <div class="item-card-col item-card-col--price">
           <span class="item-card-lbl">P.Unit</span>
           <input type="text" class="item-card-price num-input" value="${fmtInput(item.precio_unitario)}">
         </div>
