@@ -133,8 +133,8 @@ function drawHeader(doc, data, y) {
       lw = Math.round(lw * 10) / 10;
       lh = Math.round(lh * 10) / 10;
       logoH = lh;
-      const logoX = x0 + (HDR_COLS[0] - lw) / 2;
-      const logoY = y + (HDR_R1H  - lh) / 2;
+      const logoX = x0 + 5;
+      const logoY = y + 5;
       doc.addImage(logoSrc, fmt, logoX, logoY, lw, lh);
     } catch (_) {}
   }
