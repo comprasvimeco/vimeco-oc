@@ -85,25 +85,30 @@
   }
 
   async function uploadFile(token, blob, name, mimeType, folderId) {
-    const create = await fetch(
-      'https://www.googleapis.com/drive/v3/files?fields=id',
+    const boundary = 'vimeco_' + Date.now();
+    const meta     = JSON.stringify({ name, parents: [folderId], mimeType });
+    const enc      = new TextEncoder();
+    const pre      = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    const post     = enc.encode(`\r\n--${boundary}--`);
+    const content  = new Uint8Array(await blob.arrayBuffer());
+
+    const body = new Uint8Array(pre.length + content.length + post.length);
+    body.set(pre, 0);
+    body.set(content, pre.length);
+    body.set(post, pre.length + content.length);
+
+    const resp = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
       {
         method:  'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name, parents: [folderId], mimeType })
+        headers: {
+          Authorization:  `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body
       }
     );
-    if (!create.ok) throw new Error(`Create (${create.status}): ${await create.text()}`);
-    const { id } = await create.json();
-    const upload = await fetch(
-      `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
-      {
-        method:  'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': mimeType },
-        body:    blob
-      }
-    );
-    if (!upload.ok) throw new Error(`Upload (${upload.status}): ${await upload.text()}`);
+    if (!resp.ok) throw new Error(`Upload (${resp.status}): ${await resp.text()}`);
   }
 
   async function logDriveError(nroOC, error) {
