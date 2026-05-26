@@ -189,6 +189,19 @@
       </span>
       <button class="btn btn-sm btn-secondary" id="btn-add-row">+ Agregar ítem</button>
     </div>
+    <div class="iva-bar">
+      <label class="iva-label">
+        <div class="toggle-switch">
+          <input type="checkbox" id="iva-toggle">
+          <span class="toggle-slider"></span>
+        </div>
+        <span>Precios con IVA incluido</span>
+      </label>
+      <div class="iva-pct-wrap hidden" id="iva-pct-wrap">
+        <input type="text" id="iva-pct" class="iva-pct-input" value="21">
+        <span class="iva-pct-label">%  →  precio neto</span>
+      </div>
+    </div>
     <div class="card-body" style="padding:0;">
       <div class="items-table-wrapper">
         <table class="items-table" id="items-table">

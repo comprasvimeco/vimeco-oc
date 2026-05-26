@@ -18,6 +18,8 @@ async function refreshOCNumberDisplay() {
 
 // ---- State ----
 let items        = [];
+let ivaActive    = false;
+let ivaPct       = 21;
 let selectedFile = null;
 let descuento    = { pct: null, monto: 0 };
 let noGravado    = { pct: null, monto: 0 };
@@ -47,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-clear-file').addEventListener('click', clearFile);
   $('btn-add-impuesto').addEventListener('click', addImpuestoRow);
   setupMenu();
+  setupIVAToggle();
 
   // ---- Descuento ----
   $('pct-descuento').addEventListener('input', e => {
@@ -128,6 +131,66 @@ function logout() {
   localStorage.removeItem('responsable_name');
   localStorage.removeItem('vimeco_session');
   window.location.href = 'index.html';
+}
+
+// ---- IVA Toggle ----
+function setupIVAToggle() {
+  const checkbox = $('iva-toggle');
+  const pctWrap  = $('iva-pct-wrap');
+  const pctInput = $('iva-pct');
+
+  checkbox.addEventListener('change', () => {
+    ivaActive = checkbox.checked;
+    pctWrap.classList.toggle('hidden', !ivaActive);
+    if (ivaActive) {
+      ivaPct = parseFloat(pctInput.value) || 21;
+      applyIVAToggle();
+    } else {
+      revertIVAToggle();
+    }
+    renderTable();
+    recalcTotales();
+  });
+
+  pctInput.addEventListener('change', () => {
+    if (!ivaActive) return;
+    revertIVAToggle();
+    ivaPct = parseFloat(pctInput.value) || 21;
+    applyIVAToggle();
+    renderTable();
+    recalcTotales();
+  });
+}
+
+function applyIVAToggle() {
+  const factor = 1 + ivaPct / 100;
+  items.forEach(item => {
+    if (item._precio_original === undefined) {
+      item._precio_original = item.precio_unitario;
+      item.precio_unitario  = Math.round((item.precio_unitario / factor) * 100) / 100;
+    }
+  });
+}
+
+function revertIVAToggle() {
+  items.forEach(item => {
+    if (item._precio_original !== undefined) {
+      item.precio_unitario  = item._precio_original;
+      delete item._precio_original;
+    }
+  });
+}
+
+function resetIVAToggle() {
+  ivaActive = false;
+  ivaPct    = 21;
+  items.forEach(item => { delete item._precio_original; });
+  const checkbox = $('iva-toggle');
+  if (checkbox) {
+    checkbox.checked = false;
+    $('iva-pct-wrap').classList.add('hidden');
+    $('iva-pct').value = '21';
+  }
 }
 
 // ---- Menú de usuario ----
@@ -701,6 +764,7 @@ function renderTableMobile() {
 
     priceInput.addEventListener('input', e => {
       items[idx].precio_unitario = parseArgFloat(e.target.value);
+      if (ivaActive) delete items[idx]._precio_original;
       updateCardTotal();
     });
     priceInput.addEventListener('focus', onNumFocus);
@@ -723,6 +787,7 @@ function onItemInput(e) {
   const field = input.dataset.field;
   if (field === 'cantidad' || field === 'precio_unitario') {
     items[idx][field] = parseArgFloat(input.value);
+    if (ivaActive && field === 'precio_unitario') delete items[idx]._precio_original;
     const sub = (parseFloat(items[idx].cantidad) || 0) * (parseFloat(items[idx].precio_unitario) || 0);
     tr.querySelector('.col-subtotal').textContent = fmtMoneyDisplay(sub);
     recalcTotales();
@@ -1136,6 +1201,7 @@ function resetFormKeepProvider() {
   $('pct-nogravado').value   = '';
   $('monto-nogravado').value = fmtMoneyDisplay(0);
 
+  resetIVAToggle();
   clearFile();
   renderTable();
   renderImpuestos();
@@ -1163,6 +1229,7 @@ function resetForm() {
   $('pct-nogravado').value    = '';
   $('monto-nogravado').value  = fmtMoneyDisplay(0);
 
+  resetIVAToggle();
   clearFile();
   renderTable();
   renderImpuestos();

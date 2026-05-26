@@ -419,6 +419,20 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-empty { text-align: center; padding: 3rem 1rem; color: var(--gray-400); font-size: .95rem; }
 .hist-loading { text-align: center; padding: 2.5rem 1rem; color: var(--gray-500); }
 
+/* ===== IVA TOGGLE ===== */
+.iva-bar { display: flex; align-items: center; gap: 1rem; padding: .55rem 1rem; background: #f8fafc; border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); flex-wrap: wrap; }
+.iva-label { display: flex; align-items: center; gap: .55rem; cursor: pointer; font-size: .85rem; color: var(--gray-700); user-select: none; }
+.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-slider { position: absolute; inset: 0; background: var(--gray-300); border-radius: 20px; transition: background .2s; cursor: pointer; }
+.toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: var(--white); border-radius: 50%; transition: transform .2s; }
+.toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+.iva-pct-wrap { display: flex; align-items: center; gap: .4rem; }
+.iva-pct-input { width: 48px; padding: .25rem .4rem; border: 1.5px solid var(--gray-300); border-radius: var(--radius); font-size: .85rem; text-align: center; }
+.iva-pct-input:focus { outline: none; border-color: var(--primary-light); }
+.iva-pct-label { font-size: .82rem; color: var(--gray-500); }
+
 /* ===== LOGIN — CONTRASEÑA ===== */
 .login-first-time-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: .85rem 1rem; margin-bottom: .5rem; }
 .login-first-time-msg { font-size: .82rem; font-weight: 600; color: #1e40af; margin-bottom: .75rem; }
