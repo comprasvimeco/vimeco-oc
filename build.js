@@ -26,21 +26,15 @@ if (apiKey) {
   console.warn('Warning: GEMINI_API_KEY not set — placeholder left in config.js');
 }
 
-// Inject Drive service account from environment (stored in GitHub Secrets)
-const saRaw = process.env.DRIVE_SERVICE_ACCOUNT || '';
-if (saRaw) {
-  try {
-    const parsed = JSON.parse(saRaw);
-    let config = fs.readFileSync('js/config.js', 'utf8');
-    config = config.replace('%%DRIVE_SERVICE_ACCOUNT%%', JSON.stringify(parsed));
-    fs.writeFileSync('js/config.js', config);
-    console.log('Drive service account injected.');
-  } catch (e) {
-    console.error('Error parsing DRIVE_SERVICE_ACCOUNT:', e.message);
-  }
+// Inject Drive OAuth credentials from environment (stored in GitHub Secrets)
+const driveClientId     = process.env.DRIVE_CLIENT_ID     || '';
+const driveClientSecret = process.env.DRIVE_CLIENT_SECRET || '';
+let config = fs.readFileSync('js/config.js', 'utf8');
+config = config.replace('%%DRIVE_CLIENT_ID%%',     driveClientId);
+config = config.replace('%%DRIVE_CLIENT_SECRET%%', driveClientSecret);
+fs.writeFileSync('js/config.js', config);
+if (driveClientId && driveClientSecret) {
+  console.log('Drive OAuth credentials injected.');
 } else {
-  console.warn('Warning: DRIVE_SERVICE_ACCOUNT not set — using null');
-  let config = fs.readFileSync('js/config.js', 'utf8');
-  config = config.replace('%%DRIVE_SERVICE_ACCOUNT%%', 'null');
-  fs.writeFileSync('js/config.js', config);
+  console.warn('Warning: DRIVE_CLIENT_ID / DRIVE_CLIENT_SECRET not set — Drive upload will fail.');
 }

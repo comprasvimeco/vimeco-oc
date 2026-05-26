@@ -2,66 +2,41 @@
 (function () {
   'use strict';
 
-  // Si no está configurado, exponer stub para no romper app.js
-  if (!window.DRIVE_CONFIG || !window.DRIVE_CONFIG.serviceAccount) {
+  if (!window.DRIVE_CONFIG || !window.DRIVE_CONFIG.clientId) {
     window.uploadToDrive = async function () { throw new Error('Drive no configurado'); };
     return;
   }
 
-  function b64u(str) {
-    return btoa(unescape(encodeURIComponent(str)))
-      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  }
-
-  function b64uBytes(arr) {
-    let bin = '';
-    arr.forEach(b => { bin += String.fromCharCode(b); });
-    return btoa(bin).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  }
-
-  async function generateJWT() {
-    const { client_email, private_key } = DRIVE_CONFIG.serviceAccount;
-    const header  = b64u(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-    const now     = Math.floor(Date.now() / 1000);
-    const claims  = b64u(JSON.stringify({
-      iss: client_email, scope: 'https://www.googleapis.com/auth/drive',
-      aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now
-    }));
-    const signing  = `${header}.${claims}`;
-    const pem      = private_key
-      .replace(/-----BEGIN PRIVATE KEY-----/g, '')
-      .replace(/-----END PRIVATE KEY-----/g, '')
-      .replace(/\s+/g, '');
-    const keyBytes = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
-    const cryptoKey = await crypto.subtle.importKey(
-      'pkcs8', keyBytes.buffer,
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false, ['sign']
-    );
-    const sig = await crypto.subtle.sign(
-      'RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signing)
-    );
-    return `${signing}.${b64uBytes(new Uint8Array(sig))}`;
-  }
-
-  const SCOPE_VERSION = 'v3';
+  const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
   async function getAccessToken() {
     const cached = sessionStorage.getItem('_dtok');
     const expiry = parseInt(sessionStorage.getItem('_dexp') || '0', 10);
-    const sv     = sessionStorage.getItem('_dsv');
-    if (cached && Date.now() < expiry && sv === SCOPE_VERSION) return cached;
-    const jwt  = await generateJWT();
-    const resp = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
+    if (cached && Date.now() < expiry) return cached;
+
+    // Leer refresh token desde Firebase
+    const fbResp = await fetch(
+      FIREBASE_CONFIG.databaseURL + '/drive_refresh_token.json'
+    );
+    if (!fbResp.ok) throw new Error(`Firebase RT (${fbResp.status})`);
+    const refreshToken = await fbResp.json();
+    if (!refreshToken) throw new Error('No hay refresh token en Firebase');
+
+    const resp = await fetch(TOKEN_URL, {
+      method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body:   `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+      body:    new URLSearchParams({
+        grant_type:    'refresh_token',
+        refresh_token: refreshToken,
+        client_id:     DRIVE_CONFIG.clientId,
+        client_secret: DRIVE_CONFIG.clientSecret
+      })
     });
     if (!resp.ok) throw new Error(`Token (${resp.status}): ${await resp.text()}`);
-    const { access_token } = await resp.json();
+    const { access_token, expires_in } = await resp.json();
+
     sessionStorage.setItem('_dtok', access_token);
-    sessionStorage.setItem('_dexp', String(Date.now() + 55 * 60 * 1000));
-    sessionStorage.setItem('_dsv', SCOPE_VERSION);
+    sessionStorage.setItem('_dexp', String(Date.now() + (expires_in - 60) * 1000));
     return access_token;
   }
 
@@ -75,10 +50,15 @@
     if (!s.ok) throw new Error(`Drive search (${s.status})`);
     const { files } = await s.json();
     if (files.length) return files[0].id;
+
     const c = await fetch('https://www.googleapis.com/drive/v3/files', {
       method:  'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name: safe, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+      body:    JSON.stringify({
+        name:     safe,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents:  [parentId]
+      })
     });
     if (!c.ok) throw new Error(`Drive mkdir (${c.status})`);
     return (await c.json()).id;
@@ -88,9 +68,12 @@
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify({ name, parents: [folderId], mimeType });
     const enc      = new TextEncoder();
-    const pre      = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
-    const post     = enc.encode(`\r\n--${boundary}--`);
-    const content  = new Uint8Array(await blob.arrayBuffer());
+    const pre      = enc.encode(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
+    );
+    const post    = enc.encode(`\r\n--${boundary}--`);
+    const content = new Uint8Array(await blob.arrayBuffer());
 
     const body = new Uint8Array(pre.length + content.length + post.length);
     body.set(pre, 0);
@@ -145,7 +128,6 @@
       await uploadFile(token, pdfBlob, pdfName, 'application/pdf', ocFolderId);
     } catch (err) {
       await logDriveError(nroOC, new Error(`PDF: ${err.message}`));
-      // Dejar registro visible en la carpeta
       try {
         const marker = new Blob(
           [`Error al subir PDF\nOC: ${nroOC}\nFecha: ${new Date().toISOString()}\nError: ${err.message}`],
