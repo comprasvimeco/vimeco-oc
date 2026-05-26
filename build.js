@@ -39,5 +39,8 @@ if (saRaw) {
     console.error('Error parsing DRIVE_SERVICE_ACCOUNT:', e.message);
   }
 } else {
-  console.warn('Warning: DRIVE_SERVICE_ACCOUNT not set — placeholder left in config.js');
+  console.warn('Warning: DRIVE_SERVICE_ACCOUNT not set — using null');
+  let config = fs.readFileSync('js/config.js', 'utf8');
+  config = config.replace('%%DRIVE_SERVICE_ACCOUNT%%', 'null');
+  fs.writeFileSync('js/config.js', config);
 }
