@@ -383,6 +383,7 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hdr-drop-sep { border-top: 1px solid var(--gray-200); margin: .25rem 0; }
 .hdr-drop-danger { color: var(--danger) !important; }
 .hdr-drop-danger:hover { background: #fef2f2 !important; }
+.hdr-drop-version { padding: .35rem 1rem .45rem; font-size: .68rem; color: var(--gray-400); text-align: right; letter-spacing: .04em; }
 
 /* ===== FIRMA CANVAS ===== */
 .firma-canvas-wrap {
