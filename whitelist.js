@@ -17,7 +17,6 @@
 // =====================================================
 
 const USUARIOS = [
-  { codigo: "0000", nombre: "Admin" },
   { codigo: "0001", nombre: "Arq. Matías Pes" },
   { codigo: "0002", nombre: "Ing. David Barreto" },
   { codigo: "0003", nombre: "Ing. Stefano Raisino" },
@@ -25,4 +24,5 @@ const USUARIOS = [
   { codigo: "0005", nombre: "Martín Olea" },
   { codigo: "0006", nombre: "Ing. Marcelo Pes" },
   { codigo: "0007", nombre: "Arq. Gustavo Pes" },
+  { codigo: "0000", nombre: "Admin" },
 ];
