@@ -418,3 +418,32 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-actions { display: flex; gap: .4rem; }
 .hist-empty { text-align: center; padding: 3rem 1rem; color: var(--gray-400); font-size: .95rem; }
 .hist-loading { text-align: center; padding: 2.5rem 1rem; color: var(--gray-500); }
+
+/* ===== LOGIN — CONTRASEÑA ===== */
+.login-first-time-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); padding: .85rem 1rem; margin-bottom: .5rem; }
+.login-first-time-msg { font-size: .82rem; font-weight: 600; color: #1e40af; margin-bottom: .75rem; }
+
+/* ===== USUARIOS ADMIN ===== */
+.users-list { display: flex; flex-direction: column; gap: .6rem; }
+.user-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);
+  padding: .85rem 1rem; display: flex; align-items: center;
+  justify-content: space-between; gap: .75rem; flex-wrap: wrap;
+  transition: box-shadow .15s;
+}
+.user-card:hover { box-shadow: var(--shadow); }
+.user-card--inactive { opacity: .55; }
+.user-card-info { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; min-width: 0; }
+.user-card-code { font-size: .8rem; font-weight: 700; color: var(--gray-500); font-family: monospace; background: var(--gray-100); padding: .1rem .4rem; border-radius: 4px; }
+.user-card-name { font-size: .93rem; font-weight: 600; color: var(--gray-900); }
+.user-card-actions { display: flex; gap: .4rem; flex-wrap: wrap; flex-shrink: 0; }
+.u-badge { display: inline-flex; align-items: center; padding: .15rem .5rem; border-radius: 999px; font-size: .7rem; font-weight: 600; }
+.u-badge-activo   { background: #dcfce7; color: #166534; }
+.u-badge-inactivo { background: #fee2e2; color: #991b1b; }
+.u-badge-pwd-ok   { background: #dbeafe; color: #1e40af; }
+.u-badge-pwd-none { background: #fef9c3; color: #854d0e; }
+@media (max-width: 600px) {
+  .user-card { flex-direction: column; align-items: flex-start; }
+  .user-card-actions { width: 100%; justify-content: flex-start; }
+}

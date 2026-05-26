@@ -32,13 +32,34 @@
       <div class="form-group">
         <label for="responsable">Responsable</label>
         <select id="responsable" class="form-control">
-          <option value="">— Seleccione un responsable —</option>
+          <option value="">— Seleccioná un responsable —</option>
         </select>
+      </div>
+
+      <!-- Contraseña (usuario existente) -->
+      <div class="form-group hidden" id="pwd-section">
+        <label for="pwd-input">Contraseña</label>
+        <input type="password" id="pwd-input" class="form-control" placeholder="Ingresá tu contraseña" autocomplete="current-password">
+      </div>
+
+      <!-- Primera vez: crear contraseña -->
+      <div id="new-pwd-section" class="hidden">
+        <div class="login-first-time-box">
+          <p class="login-first-time-msg">Primera vez — creá tu contraseña de acceso:</p>
+          <div class="form-group">
+            <label for="new-pwd-1">Nueva contraseña</label>
+            <input type="password" id="new-pwd-1" class="form-control" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label for="new-pwd-2">Confirmar contraseña</label>
+            <input type="password" id="new-pwd-2" class="form-control" placeholder="Repetí la contraseña" autocomplete="new-password">
+          </div>
+        </div>
       </div>
 
       <div id="login-error" class="alert alert-error hidden"></div>
 
-      <button id="btn-login" class="btn btn-primary btn-full" style="margin-top:.75rem; padding:.75rem;">
+      <button id="btn-login" class="btn btn-primary btn-full" style="margin-top:.75rem; padding:.75rem;" disabled>
         Ingresar al Sistema
       </button>
     </div>
@@ -46,8 +67,8 @@
 
   <script src="js/logoBase64.js"></script>
   <script>document.getElementById('logo-img').src = LOGO_BASE64;</script>
-  <script src="whitelist.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/firebase.js"></script>
   <script src="js/auth.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

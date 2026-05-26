@@ -97,6 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     sessionStorage.clear();
     localStorage.removeItem('responsable_code');
     localStorage.removeItem('responsable_name');
+    localStorage.removeItem('vimeco_session');
     window.location.href = 'index.html';
   });
 

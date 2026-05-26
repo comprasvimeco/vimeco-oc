@@ -126,6 +126,7 @@ function logout() {
   sessionStorage.clear();
   localStorage.removeItem('responsable_code');
   localStorage.removeItem('responsable_name');
+  localStorage.removeItem('vimeco_session');
   window.location.href = 'index.html';
 }
 
@@ -141,7 +142,11 @@ function setupMenu() {
   document.addEventListener('click', () => dropdown.classList.add('hidden'));
   dropdown.addEventListener('click', e => e.stopPropagation());
 
+  const code = sessionStorage.getItem('responsable_code');
+  if (code === '0000') $('btn-usuarios').classList.remove('hidden');
+
   $('btn-historial').addEventListener('click', () => { window.location.href = 'historial.html'; });
+  $('btn-usuarios').addEventListener('click',  () => { window.location.href = 'usuarios.html'; });
   $('btn-logout').addEventListener('click', logout);
   $('btn-firma').addEventListener('click', () => {
     dropdown.classList.add('hidden');

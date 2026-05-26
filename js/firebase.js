@@ -138,3 +138,54 @@
     return ocs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   };
 })();
+
+// ─── Gestión de Usuarios ────────────────────────────
+(function () {
+  const _base = () => FIREBASE_CONFIG.databaseURL;
+
+  window.getUsuariosActivos = async function () {
+    const resp = await fetch(_base() + '/usuarios.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, u]) => u && u.nombre && u.activo)
+      .map(([codigo, u]) => ({ codigo, nombre: u.nombre }))
+      .sort((a, b) => a.codigo.localeCompare(b.codigo));
+  };
+
+  window.getAllUsuarios = async function () {
+    const resp = await fetch(_base() + '/usuarios.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, u]) => u && u.nombre)
+      .map(([codigo, u]) => ({ codigo, ...u }))
+      .sort((a, b) => a.codigo.localeCompare(b.codigo));
+  };
+
+  window.getUsuario = async function (codigo) {
+    const resp = await fetch(_base() + '/usuarios/' + codigo + '.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.json();
+  };
+
+  window.saveUsuario = async function (codigo, data) {
+    const resp = await fetch(_base() + '/usuarios/' + codigo + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.patchUsuario = async function (codigo, fields) {
+    const resp = await fetch(_base() + '/usuarios/' + codigo + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+})();
