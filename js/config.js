@@ -1,6 +1,12 @@
 // Clave de API de Google Gemini
 const GEMINI_API_KEY = "%%GEMINI_API_KEY%%";
 
+// Configuración de Google Drive (service account inyectada por build.js)
+var DRIVE_CONFIG = {
+  folderId:       "1TIYO5bNg7Dxbqo1pxGkpGbR_LK9C3NEL",
+  serviceAccount: %%DRIVE_SERVICE_ACCOUNT%%
+};
+
 // Configuración de Firebase — completar con los valores del proyecto
 var FIREBASE_CONFIG = {
   apiKey:            "AIzaSyDXv7uOvCIQqoH5mn-SWu_GSTiCfKPR-Jo",

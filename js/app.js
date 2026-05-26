@@ -1073,6 +1073,15 @@ async function handleGenerate() {
   btn.disabled = false;
   btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
   $('btn-same-provider').classList.remove('hidden');
+
+  // Subir a Drive en background
+  if (typeof uploadToDrive === 'function') {
+    const driveObra  = ($('obra').value || '').trim() || 'Sin obra';
+    const driveFecha = new Date().toISOString().slice(0, 10);
+    const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
+    uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
+      .catch(() => toast('No se pudo subir a Drive. Se registró el error.', 'warning'));
+  }
 }
 
 // ---- Vista previa ----

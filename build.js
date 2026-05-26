@@ -16,3 +16,19 @@ if (apiKey) {
 } else {
   console.warn('Warning: GEMINI_API_KEY not set — placeholder left in config.js');
 }
+
+// Inject Drive service account from environment (stored in GitHub Secrets)
+const saRaw = process.env.DRIVE_SERVICE_ACCOUNT || '';
+if (saRaw) {
+  try {
+    const parsed = JSON.parse(saRaw);
+    let config = fs.readFileSync('js/config.js', 'utf8');
+    config = config.replace('%%DRIVE_SERVICE_ACCOUNT%%', JSON.stringify(parsed));
+    fs.writeFileSync('js/config.js', config);
+    console.log('Drive service account injected.');
+  } catch (e) {
+    console.error('Error parsing DRIVE_SERVICE_ACCOUNT:', e.message);
+  }
+} else {
+  console.warn('Warning: DRIVE_SERVICE_ACCOUNT not set — placeholder left in config.js');
+}
