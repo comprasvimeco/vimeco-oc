@@ -5,7 +5,7 @@ const GEMINI_API_KEY = "%%GEMINI_API_KEY%%";
 var FIREBASE_CONFIG = {
   apiKey:            "AIzaSyDXv7uOvCIQqoH5mn-SWu_GSTiCfKPR-Jo",
   authDomain:        "vimeco-oc.firebaseapp.com",
-  databaseURL:       "https://vimeco-oc-default-rtdb.firebaseio.com",
+  databaseURL:       "https://vimeco-oc-1a978-default-rtdb.firebaseio.com",
   projectId:         "vimeco-oc",
   storageBucket:     "vimeco-oc.firebasestorage.app",
   messagingSenderId: "966767474963",
