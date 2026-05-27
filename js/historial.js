@@ -1,7 +1,7 @@
 /* VIMECO S.A. — Historial de Órdenes de Compra */
 
 let allOCs = [];
-let attachFileReady = null; // archivo pendiente de adjuntar (modo share)
+let attachFileReady = null;
 
 const $ = id => document.getElementById(id);
 
@@ -34,6 +34,8 @@ function renderCards(ocs) {
     return;
   }
 
+  const canRegen = typeof generateOCBlob === 'function';
+
   list.innerHTML = '';
   ocs.forEach(oc => {
     const card = document.createElement('div');
@@ -56,12 +58,18 @@ function renderCards(ocs) {
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
         <div class="hist-actions">
           <span class="hist-attach-status hidden" style="font-size:.78rem;color:var(--gray-500);"></span>
+          ${canRegen ? '<button class="btn btn-sm btn-outline btn-regenerar" title="Regenerar y descargar PDF">🖨</button>' : ''}
           <button class="btn btn-sm btn-outline btn-adjuntar" title="Adjuntar archivo a Drive">📎</button>
           <button class="btn btn-sm btn-primary btn-usar-base" title="Cargar en formulario">Usar como base</button>
         </div>
       </div>`;
 
     card.querySelector('.btn-usar-base').addEventListener('click', () => usarComoBase(oc));
+
+    if (canRegen) {
+      const regenBtn = card.querySelector('.btn-regenerar');
+      regenBtn.addEventListener('click', () => regenerarPDF(oc, regenBtn));
+    }
 
     const attachBtn    = card.querySelector('.btn-adjuntar');
     const attachStatus = card.querySelector('.hist-attach-status');
@@ -91,7 +99,6 @@ function renderCards(ocs) {
 }
 
 function displayToISODate(d) {
-  // "27/05/2026" → "2026-05-27"  (locale argentina DD/MM/YYYY → ISO)
   const p = (d || '').split('/');
   return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : (d || '');
 }
@@ -102,21 +109,94 @@ function esc(str) {
     .replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function filterOCs(query) {
-  if (!query.trim()) return allOCs;
-  const q = query.toLowerCase();
-  return allOCs.filter(oc =>
-    (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
-    (oc.obra || '').toLowerCase().includes(q) ||
-    (oc.nroOC || '').toLowerCase().includes(q)
-  );
+function sanitizeStr(str) {
+  return (str || '').replace(/[^\w\s\-\.]/g, '_').substring(0, 60).trim();
 }
 
-function usarComoBase(oc) {
-  sessionStorage.setItem('oc_base', JSON.stringify(oc));
-  window.location.href = 'app.html';
+// ---- Filtros ----
+function applyFilters() {
+  const q     = ($('hist-search').value || '').toLowerCase().trim();
+  const desde = $('hist-desde').value; // YYYY-MM-DD
+  const hasta = $('hist-hasta').value;
+
+  let result = allOCs;
+
+  if (q) {
+    result = result.filter(oc =>
+      (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
+      (oc.obra || '').toLowerCase().includes(q) ||
+      (oc.nroOC || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (desde || hasta) {
+    const desdeTs = desde ? new Date(desde + 'T00:00:00').getTime() : 0;
+    const hastaTs = hasta ? new Date(hasta + 'T23:59:59').getTime() : Infinity;
+    result = result.filter(oc => {
+      const ts = oc.timestamp || 0;
+      return ts >= desdeTs && ts <= hastaTs;
+    });
+    $('btn-clear-dates').classList.remove('hidden');
+  } else {
+    $('btn-clear-dates').classList.add('hidden');
+  }
+
+  renderCards(result);
 }
 
+// ---- Regenerar PDF ----
+async function regenerarPDF(oc, btn) {
+  btn.disabled = true;
+  try {
+    const prov   = oc.proveedor || {};
+    const ocData = {
+      nroOC:    oc.nroOC,
+      fecha:    oc.fecha,
+      ejecutor: oc.responsable?.nombre || '',
+      proveedor: {
+        nombre:    prov.nombre       || '',
+        cuit:      prov.cuit         || '',
+        domicilio: prov.domicilio    || '',
+        telefonos: prov.telefonos    || '',
+        iva:       prov.condicionIVA || '',
+        pago:      oc.condicionPago  || '',
+        plazo:     '',
+        lugar:     '',
+        ref:       prov.ref          || '',
+        ubicacion: oc.obra           || ''
+      },
+      items: (oc.items || []).map(it => ({
+        descripcion:     it.descripcion     || '',
+        unidad:          it.unidad          || '',
+        cantidad:        it.cantidad        || 0,
+        precio_unitario: it.precio_unitario || 0,
+        total:           it.total           || 0
+      })),
+      impuestos:       oc.impuestos      || [],
+      totalLetras:     numberToWords(oc.total || 0),
+      _total:          oc.total          || 0,
+      _firma:          null,
+      _descuento:      oc.descuento      || { pct: null, monto: 0 },
+      _noGravado:      oc.noGravado      || { pct: null, monto: 0 },
+      _impuestosExtra: oc.impuestosExtra || []
+    };
+    const blob  = generateOCBlob(ocData);
+    const fname = `OC_${oc.nroOC}_${sanitizeStr(prov.nombre || 'SinProveedor')}.pdf`;
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    toast(`PDF de OC ${oc.nroOC} generado.`, 'success');
+  } catch (e) {
+    toast('Error al regenerar el PDF.', 'error');
+    console.error('regenerarPDF:', e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---- Adjuntar archivo a Drive ----
 async function doAttach(file, oc, attachBtn, statusEl, fromShare) {
   if (typeof attachToDriveOC !== 'function') {
     toast('Drive no disponible.', 'error');
@@ -146,6 +226,7 @@ async function doAttach(file, oc, attachBtn, statusEl, fromShare) {
   }
 }
 
+// ---- Modo adjuntar desde share ----
 async function checkAttachFile() {
   if (!('caches' in window)) return;
   try {
@@ -172,6 +253,11 @@ async function clearAttachFile() {
   $('attach-banner').classList.add('hidden');
 }
 
+function usarComoBase(oc) {
+  sessionStorage.setItem('oc_base', JSON.stringify(oc));
+  window.location.href = 'app.html';
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const code = sessionStorage.getItem('responsable_code') || localStorage.getItem('responsable_code');
   const name = sessionStorage.getItem('responsable_name') || localStorage.getItem('responsable_name');
@@ -181,7 +267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = name;
 
-  $('btn-back').addEventListener('click', () => { window.location.href = 'app.html'; });
+  $('btn-back').addEventListener('click',   () => { window.location.href = 'app.html'; });
   $('btn-logout').addEventListener('click', () => {
     sessionStorage.clear();
     localStorage.removeItem('responsable_code');
@@ -190,8 +276,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'index.html';
   });
 
-  $('hist-search').addEventListener('input', e => {
-    renderCards(filterOCs(e.target.value));
+  $('hist-search').addEventListener('input',  applyFilters);
+  $('hist-desde').addEventListener('change',  applyFilters);
+  $('hist-hasta').addEventListener('change',  applyFilters);
+  $('btn-clear-dates').addEventListener('click', () => {
+    $('hist-desde').value = '';
+    $('hist-hasta').value = '';
+    applyFilters();
   });
 
   $('btn-attach-cancel').addEventListener('click', clearAttachFile);

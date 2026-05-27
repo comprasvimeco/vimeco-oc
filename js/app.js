@@ -116,6 +116,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadLogo();
   loadProveedoresCache();
   checkSharedFile();
+  retryDriveQueue().catch(() => {});
+  window.addEventListener('online', () => retryDriveQueue().catch(() => {}));
 
   getFirma(code).then(f => { firmaBase64 = f || null; }).catch(() => {});
 
@@ -298,6 +300,32 @@ function setupFirmaModalButtons() {
       btn.disabled = false; btn.textContent = 'Guardar firma';
     }
   });
+}
+
+// ---- Cola offline Drive ----
+async function retryDriveQueue() {
+  if (typeof driveQueue === 'undefined' || typeof uploadToDrive !== 'function') return;
+  let items;
+  try { items = await driveQueue.getAll(); } catch { return; }
+  if (!items.length) return;
+
+  for (const item of items) {
+    try {
+      const pdfBlob = new Blob([item.pdfBuf], { type: 'application/pdf' });
+      const srcFile = item.srcBuf
+        ? new File([item.srcBuf], item.srcName || 'archivo', { type: item.srcType || 'application/octet-stream' })
+        : null;
+      const folderId = await uploadToDrive(pdfBlob, item.pdfName,
+        { obra: item.obra, fecha: item.fecha, proveedor: item.proveedor, nroOC: item.nroOC },
+        srcFile
+      );
+      await driveQueue.dequeue(item.histKey);
+      if (folderId) patchHistorialEntry(item.histKey, { drive_folder_id: folderId }).catch(() => {});
+      toast(`OC ${item.nroOC} subida a Drive.`, 'success');
+    } catch (_) {
+      // Sigue sin conexión o error — se mantiene en la cola
+    }
+  }
 }
 
 // ---- Web Share Target: recibe archivo compartido desde otra app ----
@@ -1207,7 +1235,20 @@ async function handleGenerate() {
         .then(folderId => {
           if (folderId && saved) patchHistorialEntry(histKey, { drive_folder_id: folderId }).catch(() => {});
         })
-        .catch(() => toast('No se pudo subir a Drive. Se registró el error.', 'warning'))
+        .catch(async () => {
+          if (!navigator.onLine && typeof driveQueue !== 'undefined') {
+            toast('Sin conexión. Se subirá a Drive cuando haya red.', 'warning');
+            try {
+              await driveQueue.enqueue({
+                histKey, pdfBlob: blob, pdfName: fname,
+                obra: driveObra, fecha: driveFecha, proveedor: driveProv,
+                nroOC: numero, sourceFile: selectedFile
+              });
+            } catch (_) {}
+          } else {
+            toast('No se pudo subir a Drive. Se registró el error.', 'warning');
+          }
+        })
     );
   }
 }

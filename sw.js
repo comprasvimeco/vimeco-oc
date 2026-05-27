@@ -23,7 +23,8 @@ const STATIC_ASSETS = [
   BASE + '/icono_app.png',
   BASE + '/js/jspdf.umd.min.js',
   BASE + '/historial.html',
-  BASE + '/js/historial.js'
+  BASE + '/js/historial.js',
+  BASE + '/js/driveQueue.js'
 ];
 
 self.addEventListener('install', event => {
