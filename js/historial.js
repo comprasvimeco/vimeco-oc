@@ -166,11 +166,11 @@ async function regenerarPDF(oc, btn) {
         ubicacion: oc.obra           || ''
       },
       items: (oc.items || []).map(it => ({
-        descripcion:     it.descripcion     || '',
-        unidad:          it.unidad          || '',
-        cantidad:        it.cantidad        || 0,
-        precio_unitario: it.precio_unitario || 0,
-        total:           it.total           || 0
+        desc:    it.desc    || '',
+        unidad:  it.unidad  || '',
+        cant:    it.cant    || 0,
+        unitario: it.unitario || 0,
+        total:   it.total   || 0
       })),
       impuestos:       oc.impuestos      || [],
       totalLetras:     numberToWords(oc.total || 0),

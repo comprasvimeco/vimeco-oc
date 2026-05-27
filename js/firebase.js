@@ -8,31 +8,54 @@
     return FIREBASE_CONFIG.databaseURL + '/oc_counter.json';
   }
 
+  const _COUNTER_KEY = 'vimeco_oc_counter';
+
   window.readNextOCSeq = async function () {
-    const resp = await fetch(_url());
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const val = await resp.json();
-    return (val ?? _SEED) + 1;
+    try {
+      const resp = await fetch(_url());
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const val     = await resp.json();
+      const current = val ?? _SEED;
+      try { localStorage.setItem(_COUNTER_KEY, String(current)); } catch (_) {}
+      return current + 1;
+    } catch (_) {
+      const cached = parseInt(localStorage.getItem(_COUNTER_KEY) || '0', 10);
+      return (cached || _SEED) + 1;
+    }
   };
 
-  // Incremento atómico via ETag (optimistic locking)
+  // Incremento atómico via ETag (optimistic locking); fallback local si no hay red
   window.claimNextOCSeq = async function () {
     for (let i = 0; i < 5; i++) {
-      const getResp = await fetch(_url(), { headers: { 'X-Firebase-ETag': 'true' } });
+      let getResp;
+      try { getResp = await fetch(_url(), { headers: { 'X-Firebase-ETag': 'true' } }); }
+      catch (_) { break; }  // sin red → salir del loop y usar fallback local
       if (!getResp.ok) throw new Error('HTTP ' + getResp.status);
       const etag    = getResp.headers.get('ETag');
       const current = await getResp.json();
       const next    = (current ?? _SEED) + 1;
 
-      const putResp = await fetch(_url(), {
-        method:  'PUT',
-        headers: { 'Content-Type': 'application/json', 'if-match': etag },
-        body:    String(next)
-      });
-      if (putResp.status === 200) return next;
+      let putResp;
+      try {
+        putResp = await fetch(_url(), {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json', 'if-match': etag },
+          body:    String(next)
+        });
+      } catch (_) { break; }
+      if (putResp.status === 200) {
+        try { localStorage.setItem(_COUNTER_KEY, String(next)); } catch (_) {}
+        return next;
+      }
       // 412 = otro usuario actualizó el contador primero → reintento
     }
-    throw new Error('No se pudo reservar el número (5 reintentos)');
+
+    // Fallback offline: usar contador local
+    const cached = parseInt(localStorage.getItem(_COUNTER_KEY) || '0', 10);
+    if (!cached) throw new Error('Sin conexión. Conectate al menos una vez antes de generar OCs offline.');
+    const next = cached + 1;
+    try { localStorage.setItem(_COUNTER_KEY, String(next)); } catch (_) {}
+    return next;
   };
 
   window.setOCSeqTo = async function (targetSeq) {

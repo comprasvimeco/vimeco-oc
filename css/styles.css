@@ -401,7 +401,7 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-search:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
 .hist-count { font-size: .82rem; color: var(--gray-500); white-space: nowrap; }
 .hist-date-filter { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.hist-date-sep { font-size: .8rem; color: var(--gray-400); }
+.hist-date-label { font-size: .78rem; color: var(--gray-500); white-space: nowrap; }
 .hist-date-input { font-size: .8rem; padding: .28rem .45rem; border: 1px solid var(--gray-300); border-radius: var(--radius); color: var(--gray-700); background: #fff; cursor: pointer; }
 .hist-date-input::-webkit-calendar-picker-indicator { opacity: .5; cursor: pointer; }
 .hist-list { display: flex; flex-direction: column; gap: .6rem; }

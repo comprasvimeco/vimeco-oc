@@ -43,9 +43,10 @@
     <div class="hist-toolbar">
       <input type="search" id="hist-search" class="hist-search" placeholder="Buscar por proveedor, obra o N° OC…">
       <div class="hist-date-filter">
-        <input type="date" id="hist-desde" class="hist-date-input" title="Desde">
-        <span class="hist-date-sep">—</span>
-        <input type="date" id="hist-hasta" class="hist-date-input" title="Hasta">
+        <label class="hist-date-label" for="hist-desde">Desde</label>
+        <input type="date" id="hist-desde" class="hist-date-input">
+        <label class="hist-date-label" for="hist-hasta">Hasta</label>
+        <input type="date" id="hist-hasta" class="hist-date-input">
         <button class="btn btn-sm btn-outline hidden" id="btn-clear-dates" title="Limpiar fechas">✕</button>
       </div>
       <span class="hist-count" id="hist-count"></span>
