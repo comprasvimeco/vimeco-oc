@@ -50,10 +50,9 @@
       // 412 = otro usuario actualizó el contador primero → reintento
     }
 
-    // Fallback offline: usar contador local
+    // Fallback offline: usar contador cacheado si existe, sino timestamp como secuencia única
     const cached = parseInt(localStorage.getItem(_COUNTER_KEY) || '0', 10);
-    if (!cached) throw new Error('Sin conexión. Conectate al menos una vez antes de generar OCs offline.');
-    const next = cached + 1;
+    const next   = cached ? cached + 1 : Math.floor(Date.now() / 1000);
     try { localStorage.setItem(_COUNTER_KEY, String(next)); } catch (_) {}
     return next;
   };
