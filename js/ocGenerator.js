@@ -455,10 +455,10 @@ function drawFooter(doc, data, y) {
   }
   if (data._firma) {
     try {
-      const sigX = xs[2] + 3;
-      const sigY = y + 14;
-      const sigW = FTR_COLS[2] - 6;
-      const sigH = COL_H - 24;  // deja margen para la línea abajo
+      const sigH  = COL_H - 24;                          // alto disponible: 14mm
+      const sigW  = Math.min(sigH * (560 / 200), FTR_COLS[2] - 6); // mantiene ratio 2.8:1
+      const sigX  = xs[2] + (FTR_COLS[2] - sigW) / 2;  // centrado horizontal
+      const sigY  = y + 14;
       doc.addImage(data._firma, 'PNG', sigX, sigY, sigW, sigH);
     } catch (_) {}
   }

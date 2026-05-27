@@ -625,7 +625,7 @@ function applyExtractionResult(r) {
 
 async function handleExtract() {
   if (!selectedFile) return;
-  setExtractStatus('loading', 'Analizando documento con Gemini 2.5 Flash Lite…');
+  setExtractStatus('loading', 'Analizando documento con Gemini 2.5 Flash…');
   $('btn-extract').disabled = true;
 
   try {
