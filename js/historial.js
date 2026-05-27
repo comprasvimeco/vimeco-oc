@@ -53,11 +53,57 @@ function renderCards(ocs) {
         <span class="hist-total">${total}</span>
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
         <div class="hist-actions">
+          <span class="hist-attach-status hidden" style="font-size:.78rem;color:var(--gray-500);"></span>
+          <button class="btn btn-sm btn-outline btn-adjuntar" title="Adjuntar archivo a Drive">📎</button>
           <button class="btn btn-sm btn-primary btn-usar-base" title="Cargar en formulario">Usar como base</button>
         </div>
       </div>`;
 
     card.querySelector('.btn-usar-base').addEventListener('click', () => usarComoBase(oc));
+
+    const attachBtn    = card.querySelector('.btn-adjuntar');
+    const attachStatus = card.querySelector('.hist-attach-status');
+    const attachInput  = document.createElement('input');
+    attachInput.type   = 'file';
+    attachInput.accept = '.jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx';
+    attachInput.style.display = 'none';
+    card.appendChild(attachInput);
+
+    attachBtn.addEventListener('click', () => attachInput.click());
+    attachInput.addEventListener('change', async () => {
+      const file = attachInput.files[0];
+      if (!file) return;
+      attachInput.value = '';
+
+      if (typeof attachToDriveOC !== 'function') {
+        toast('Drive no disponible.', 'error');
+        return;
+      }
+
+      attachBtn.disabled = true;
+      attachStatus.textContent = '⏳ Subiendo…';
+      attachStatus.classList.remove('hidden');
+
+      try {
+        await attachToDriveOC(file, {
+          drive_folder_id: oc.drive_folder_id || null,
+          obra:      oc.obra              || '',
+          fecha:     oc.fecha             || '',
+          proveedor: oc.proveedor?.nombre || '',
+          nroOC:     oc.nroOC
+        });
+        attachStatus.textContent = '✓ Subido';
+        setTimeout(() => { attachStatus.textContent = ''; attachStatus.classList.add('hidden'); }, 3000);
+        toast(`Archivo adjuntado a OC ${oc.nroOC}.`, 'success');
+      } catch (_) {
+        attachStatus.textContent = '✕ Error';
+        setTimeout(() => { attachStatus.textContent = ''; attachStatus.classList.add('hidden'); }, 4000);
+        toast('Error al adjuntar. Se registró el error.', 'error');
+      } finally {
+        attachBtn.disabled = false;
+      }
+    });
+
     list.appendChild(card);
   });
 }

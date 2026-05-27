@@ -208,10 +208,14 @@ function setupMenu() {
   dropdown.addEventListener('click', e => e.stopPropagation());
 
   const code = sessionStorage.getItem('responsable_code');
-  if (code === '0000') $('btn-usuarios').classList.remove('hidden');
+  if (code === '0000') {
+    $('btn-usuarios').classList.remove('hidden');
+    $('btn-obras').classList.remove('hidden');
+  }
 
   $('btn-historial').addEventListener('click', () => { window.location.href = 'historial.html'; });
   $('btn-usuarios').addEventListener('click',  () => { window.location.href = 'usuarios.html'; });
+  $('btn-obras').addEventListener('click',     () => { window.location.href = 'obras.html'; });
   $('btn-logout').addEventListener('click', logout);
   $('btn-firma').addEventListener('click', () => {
     dropdown.classList.add('hidden');
@@ -326,48 +330,67 @@ async function loadLogo() {
 }
 
 // ---- Obra combo ----
-function setupObraCombo() {
-  if (typeof OBRAS === 'undefined' || !OBRAS.length) return;
-
+async function setupObraCombo() {
   const input    = $('obra');
   const arrow    = $('obra-arrow');
   const dropdown = $('obra-dropdown');
 
-  function buildOptions(filter) {
+  let obrasActivas = [];
+  let todasObras   = [];
+
+  try {
+    [obrasActivas, todasObras] = await Promise.all([getObrasActivas(), getAllObras()]);
+  } catch (e) {
+    console.warn('setupObraCombo:', e);
+  }
+
+  function selectObra(obra) {
+    input.value = obra.nombre;
+    dropdown.classList.add('hidden');
+    const lugarInput = $('lugar-entrega');
+    if (obra.lugar_entrega && (!lugarInput.value.trim() || lugarInput.dataset.autoFilled === '1')) {
+      lugarInput.value = obra.lugar_entrega;
+      lugarInput.dataset.autoFilled = '1';
+    }
+  }
+
+  function buildOptions(list) {
     dropdown.innerHTML = '';
-    const q = (filter || '').toLowerCase();
-    OBRAS
-      .filter(o => !q || o.toLowerCase().includes(q))
-      .forEach(obra => {
-        const div = document.createElement('div');
-        div.className = 'combo-option';
-        div.textContent = obra;
-        div.addEventListener('mousedown', e => {
-          e.preventDefault(); // evita que el input pierda el foco
-          input.value = obra;
-          dropdown.classList.add('hidden');
-        });
-        dropdown.appendChild(div);
-      });
+    list.forEach(obra => {
+      const div = document.createElement('div');
+      div.className = 'combo-option';
+      div.textContent = obra.nombre;
+      if (!obra.activa) {
+        div.style.color = 'var(--gray-400)';
+        div.style.fontStyle = 'italic';
+      }
+      div.addEventListener('mousedown', e => { e.preventDefault(); selectObra(obra); });
+      dropdown.appendChild(div);
+    });
   }
 
   arrow.addEventListener('click', e => {
     e.stopPropagation();
-    const isOpen = !dropdown.classList.contains('hidden');
-    if (isOpen) { dropdown.classList.add('hidden'); return; }
-    buildOptions('');
-    dropdown.classList.remove('hidden');
+    if (!dropdown.classList.contains('hidden')) { dropdown.classList.add('hidden'); return; }
+    buildOptions(obrasActivas);
+    if (dropdown.children.length) dropdown.classList.remove('hidden');
     input.focus();
   });
 
   input.addEventListener('input', () => {
-    buildOptions(input.value);
-    const hasOptions = dropdown.querySelector('.combo-option');
-    dropdown.classList.toggle('hidden', !hasOptions);
+    const q = input.value.toLowerCase();
+    if (!q) { dropdown.classList.add('hidden'); return; }
+    const filtered = todasObras.filter(o => o.nombre.toLowerCase().includes(q));
+    buildOptions(filtered);
+    dropdown.classList.toggle('hidden', !dropdown.children.length);
   });
 
   input.addEventListener('blur', () => {
     setTimeout(() => dropdown.classList.add('hidden'), 150);
+  });
+
+  $('lugar-entrega').addEventListener('input', () => {
+    delete $('lugar-entrega').dataset.autoFilled;
   });
 
   document.addEventListener('click', e => {
@@ -1110,10 +1133,11 @@ async function handleGenerate() {
     return;
   }
 
-  // Guardar en historial (no bloquea si falla)
-  saveOCToHistory(ocData, ocData._total).then(() => {
-    updateProveedoresCache();
-  }).catch(e => console.warn('saveOCToHistory:', e));
+  // Guardar en historial; una vez guardado, subir a Drive y salvar folder_id
+  const histKey   = numero.replace(/-/g, '');
+  const histSaved = saveOCToHistory(ocData, ocData._total)
+    .then(() => { updateProveedoresCache(); return true; })
+    .catch(e => { console.warn('saveOCToHistory:', e); return false; });
 
   // Compartir (solo mobile/táctil) o descargar
   const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
@@ -1143,13 +1167,18 @@ async function handleGenerate() {
   btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
   $('btn-same-provider').classList.remove('hidden');
 
-  // Subir a Drive en background
+  // Subir a Drive en background (espera historial para evitar race condition en PATCH)
   if (typeof uploadToDrive === 'function') {
     const driveObra  = ($('obra').value || '').trim() || 'Sin obra';
     const driveFecha = new Date().toISOString().slice(0, 10);
     const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
-    uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
-      .catch(() => toast('No se pudo subir a Drive. Se registró el error.', 'warning'));
+    histSaved.then(saved =>
+      uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
+        .then(folderId => {
+          if (folderId && saved) patchHistorialEntry(histKey, { drive_folder_id: folderId }).catch(() => {});
+        })
+        .catch(() => toast('No se pudo subir a Drive. Se registró el error.', 'warning'))
+    );
   }
 }
 

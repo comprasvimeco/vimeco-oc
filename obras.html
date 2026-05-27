@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Gestión de Obras</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Gestión de Obras</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline" id="btn-back">← Volver</button>
+    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<main class="app-main">
+  <div class="hist-page">
+    <div class="hist-toolbar">
+      <span style="font-weight:600;color:var(--gray-700);">Obras del sistema</span>
+      <button class="btn btn-primary btn-sm" id="btn-add-obra">+ Agregar obra</button>
+    </div>
+    <div id="obras-list" class="users-list">
+      <div class="hist-loading">Cargando obras…</div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal: Agregar / Editar obra -->
+<div class="modal-overlay hidden" id="modal-obra">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-obra-title">Agregar obra</span>
+      <button class="modal-close" id="modal-obra-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="obra-nombre">Nombre de la obra *</label>
+        <input type="text" id="obra-nombre" class="form-control" placeholder="Ej: Edificio San Martín">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label for="obra-lugar">Lugar de entrega</label>
+        <input type="text" id="obra-lugar" class="form-control" placeholder="Ej: Av. San Martín 1234, Córdoba">
+      </div>
+      <div id="modal-obra-error" class="alert alert-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-obra-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-obra-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar acción -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-confirm-title">Confirmar</span>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+      <p id="modal-confirm-msg" style="color:var(--gray-600);"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-confirm-no">Cancelar</button>
+      <button class="btn btn-primary" id="modal-confirm-yes">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/obras.js"></script>
+</body>
+</html>

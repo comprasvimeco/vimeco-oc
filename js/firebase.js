@@ -139,6 +139,60 @@
   };
 })();
 
+// ─── Gestión de Obras ───────────────────────────────
+(function () {
+  const _base = () => FIREBASE_CONFIG.databaseURL;
+
+  window.getObrasActivas = async function () {
+    const resp = await fetch(_base() + '/obras.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, o]) => o && o.nombre && o.activa)
+      .map(([key, o]) => ({ key, nombre: o.nombre, lugar_entrega: o.lugar_entrega || '' }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  };
+
+  window.getAllObras = async function () {
+    const resp = await fetch(_base() + '/obras.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, o]) => o && o.nombre)
+      .map(([key, o]) => ({ key, ...o }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  };
+
+  window.saveObra = async function (key, data) {
+    const resp = await fetch(_base() + '/obras/' + key + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.patchObra = async function (key, fields) {
+    const resp = await fetch(_base() + '/obras/' + key + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.patchHistorialEntry = async function (key, fields) {
+    const resp = await fetch(_base() + '/historial/' + key + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+})();
+
 // ─── Gestión de Usuarios ────────────────────────────
 (function () {
   const _base = () => FIREBASE_CONFIG.databaseURL;

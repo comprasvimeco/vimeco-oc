@@ -146,5 +146,25 @@
         await logDriveError(nroOC, new Error(`Archivo fuente: ${err.message}`));
       }
     }
+
+    return ocFolderId;
+  };
+
+  // Adjuntar un archivo a la carpeta Drive de una OC existente
+  window.attachToDriveOC = async function (file, { drive_folder_id, obra, fecha, proveedor, nroOC }) {
+    let token, folderId;
+    try {
+      token    = await getAccessToken();
+      folderId = drive_folder_id;
+      if (!folderId) {
+        const obraFolderId = await getOrCreateFolder(token, obra || 'Sin obra', DRIVE_CONFIG.folderId);
+        const subName      = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
+        folderId           = await getOrCreateFolder(token, subName, obraFolderId);
+      }
+      await uploadFile(token, file, file.name, file.type || 'application/octet-stream', folderId);
+    } catch (err) {
+      await logDriveError(nroOC, new Error(`Adjunto: ${err.message}`));
+      throw err;
+    }
   };
 })();
