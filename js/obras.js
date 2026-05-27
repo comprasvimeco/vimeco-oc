@@ -47,15 +47,21 @@ function renderObras(list) {
         <span class="u-badge ${o.activa ? 'u-badge-activo' : 'u-badge-inactivo'}">${o.activa ? 'Activa' : 'Inactiva'}</span>
       </div>
       <div class="user-card-actions">
-        <button class="btn btn-sm btn-outline"
-          onclick="editObra(${JSON.stringify(o.key)}, ${JSON.stringify(o.nombre)}, ${JSON.stringify(o.lugar_entrega || '')})">Editar</button>
-        <button class="btn btn-sm ${o.activa ? 'btn-danger' : 'btn-success'}"
-          onclick="toggleActiva(${JSON.stringify(o.key)}, ${o.activa}, ${JSON.stringify(o.nombre)})">
+        <button class="btn btn-sm btn-outline btn-edit-obra">Editar</button>
+        <button class="btn btn-sm ${o.activa ? 'btn-danger' : 'btn-success'} btn-toggle-obra">
           ${o.activa ? 'Desactivar' : 'Activar'}
         </button>
       </div>
     </div>
   `).join('');
+
+  container.querySelectorAll('.user-card').forEach((card, i) => {
+    const o = list[i];
+    card.querySelector('.btn-edit-obra').addEventListener('click', () =>
+      editObra(o.key, o.nombre, o.lugar_entrega || ''));
+    card.querySelector('.btn-toggle-obra').addEventListener('click', () =>
+      toggleActiva(o.key, o.activa, o.nombre));
+  });
 }
 
 async function loadObras() {

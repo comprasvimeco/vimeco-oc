@@ -48,17 +48,21 @@ function renderUsers(list) {
         <span class="u-badge ${u.passwordHash ? 'u-badge-pwd-ok' : 'u-badge-pwd-none'}">${u.passwordHash ? '🔑 Con contraseña' : '⚠ Sin contraseña'}</span>
       </div>
       <div class="user-card-actions">
-        <button class="btn btn-sm btn-outline"
-          onclick="editUser(${JSON.stringify(u.codigo)}, ${JSON.stringify(u.nombre)})">Editar</button>
-        <button class="btn btn-sm btn-secondary"
-          onclick="resetPwd(${JSON.stringify(u.codigo)}, ${JSON.stringify(u.nombre)})">Reset pwd</button>
-        <button class="btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'}"
-          onclick="toggleActivo(${JSON.stringify(u.codigo)}, ${u.activo}, ${JSON.stringify(u.nombre)})">
+        <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
+        <button class="btn btn-sm btn-secondary btn-reset-pwd">Reset pwd</button>
+        <button class="btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'} btn-toggle-user">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
       </div>
     </div>
   `).join('');
+
+  container.querySelectorAll('.user-card').forEach((card, i) => {
+    const u = list[i];
+    card.querySelector('.btn-edit-user').addEventListener('click',   () => editUser(u.codigo, u.nombre));
+    card.querySelector('.btn-reset-pwd').addEventListener('click',   () => resetPwd(u.codigo, u.nombre));
+    card.querySelector('.btn-toggle-user').addEventListener('click', () => toggleActivo(u.codigo, u.activo, u.nombre));
+  });
 }
 
 async function loadUsers() {

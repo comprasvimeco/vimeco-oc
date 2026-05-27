@@ -88,7 +88,7 @@ function renderCards(ocs) {
         await attachToDriveOC(file, {
           drive_folder_id: oc.drive_folder_id || null,
           obra:      oc.obra              || '',
-          fecha:     oc.fecha             || '',
+          fecha:     displayToISODate(oc.fecha),
           proveedor: oc.proveedor?.nombre || '',
           nroOC:     oc.nroOC
         });
@@ -106,6 +106,12 @@ function renderCards(ocs) {
 
     list.appendChild(card);
   });
+}
+
+function displayToISODate(d) {
+  // "27/05/2026" → "2026-05-27"  (locale argentina DD/MM/YYYY → ISO)
+  const p = (d || '').split('/');
+  return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : (d || '');
 }
 
 function esc(str) {
