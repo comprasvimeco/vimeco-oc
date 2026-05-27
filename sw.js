@@ -67,8 +67,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-only: Gemini API y Firebase
-  if (url.hostname === 'generativelanguage.googleapis.com' ||
+  // Network-only: Google APIs (Drive, OAuth, Gemini) y Firebase
+  if (url.hostname.endsWith('.googleapis.com') ||
       url.hostname.endsWith('.firebaseio.com')) {
     event.respondWith(fetch(event.request));
     return;
