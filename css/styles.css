@@ -462,3 +462,40 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
   .user-card { flex-direction: column; align-items: flex-start; }
   .user-card-actions { width: 100%; justify-content: flex-start; }
 }
+
+/* ---- Verification banner ---- */
+.verif-banner {
+  margin: 8px 16px;
+  padding: 10px 14px;
+  background: #fff8e1;
+  border: 1px solid #f59e0b;
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+}
+.verif-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  color: #78350f;
+}
+.verif-banner-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #92400e;
+  font-size: 1rem;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.verif-banner-list {
+  margin: 6px 0 0 0;
+  padding-left: 18px;
+  font-size: 0.83rem;
+  color: #92400e;
+}
+.verif-banner-list li { margin-bottom: 2px; }
+tr.item-row-warn td { background: #fff8e1 !important; }
+tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
+.item-card.item-row-warn { border-left: 3px solid #f59e0b !important; background: #fff8e1; }

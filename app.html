@@ -107,7 +107,7 @@
     <div class="card-body">
       <div class="form-row">
         <div class="form-group">
-          <label for="obra">Obra / Proyecto / Ubicación *</label>
+          <label for="obra">Obra / Motivo*</label>
           <div class="combo-wrap">
             <input type="text" id="obra" class="form-control combo-input" placeholder="Identificación de la obra">
             <button type="button" class="combo-arrow" id="obra-arrow" tabindex="-1">▾</button>
@@ -202,6 +202,13 @@
         <input type="text" id="iva-pct" class="iva-pct-input" value="21">
         <span class="iva-pct-label">%  →  precio neto</span>
       </div>
+    </div>
+    <div id="verif-banner" class="verif-banner hidden">
+      <div class="verif-banner-header">
+        <span>⚠️ <strong>Verificación: hay discrepancias entre el documento y los datos extraídos</strong></span>
+        <button id="verif-banner-close" class="verif-banner-close" title="Cerrar">✕</button>
+      </div>
+      <ul id="verif-banner-list" class="verif-banner-list"></ul>
     </div>
     <div class="card-body" style="padding:0;">
       <div class="items-table-wrapper">

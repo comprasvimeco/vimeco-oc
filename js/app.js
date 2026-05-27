@@ -17,14 +17,15 @@ async function refreshOCNumberDisplay() {
 }
 
 // ---- State ----
-let items        = [];
-let ivaActive    = false;
-let ivaPct       = 21;
-let selectedFile = null;
-let descuento    = { pct: null, monto: 0 };
-let noGravado    = { pct: null, monto: 0 };
-let impuestos    = [];   // [{nombre, pct, monto}]
-let firmaBase64  = null; // firma del usuario activo (cargada desde Firebase)
+let items            = [];
+let ivaActive        = false;
+let ivaPct           = 21;
+let selectedFile     = null;
+let descuento        = { pct: null, monto: 0 };
+let noGravado        = { pct: null, monto: 0 };
+let impuestos        = [];   // [{nombre, pct, monto}]
+let firmaBase64      = null; // firma del usuario activo (cargada desde Firebase)
+let verifRowWarnings = {};   // {idx: true} ítems con discrepancia post-extracción
 
 // ---- DOM shortcut ----
 const $ = id => document.getElementById(id);
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-extract').addEventListener('click', handleExtract);
   $('btn-clear-file').addEventListener('click', clearFile);
   $('btn-add-impuesto').addEventListener('click', addImpuestoRow);
+  $('verif-banner-close').addEventListener('click', hideVerifBanner);
   setupMenu();
   setupIVAToggle();
 
@@ -511,17 +513,7 @@ function applyExtractionResult(r) {
   fillIfEmpty('plazo-entrega',           r.plazo_entrega);
   fillIfEmpty('lugar-entrega',           r.lugar_entrega);
 
-  const warnings = [];
   if (r.items?.length) {
-    r.items.forEach((it, idx) => {
-      if (it.total_documento > 0) {
-        const calc = (it.cantidad || 0) * (it.precio_unitario || 0);
-        const diff = Math.abs(calc - it.total_documento) / it.total_documento;
-        if (diff > 0.01) {
-          warnings.push(`⚠️ Revisar ítem ${idx + 1}: total calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(it.total_documento)}`);
-        }
-      }
-    });
     items = r.items.map(normalizeItem);
     renderTable();
   }
@@ -554,7 +546,14 @@ function applyExtractionResult(r) {
   }
 
   recalcTotales();
-  return warnings;
+
+  const { issues, rowWarn } = verificarExtraccion(r);
+  if (issues.length) {
+    verifRowWarnings = rowWarn;
+    renderTable();
+    showVerifBanner(issues);
+  }
+  return issues;
 }
 
 async function handleExtract() {
@@ -564,12 +563,11 @@ async function handleExtract() {
 
   try {
     const r = await extractFromFile(selectedFile);
-    const warnings = applyExtractionResult(r);
+    applyExtractionResult(r);
     const impMsg = impuestos.length ? ` y ${impuestos.length} impuesto(s)` : '';
     if (r.items?.length) {
       setExtractStatus('success', `✓ Se extrajeron ${r.items.length} ítem(s)${impMsg}.`);
       toast(`Gemini extrajo ${r.items.length} ítem(s)${impMsg}.`, 'success');
-      warnings.forEach(w => toast(w, 'warning'));
     } else {
       setExtractStatus('success', '✓ Datos del proveedor completados. No se detectaron ítems.');
       toast('Datos extraídos. No se detectaron ítems — podés agregarlos manualmente.', 'warning');
@@ -610,13 +608,69 @@ function clearExtractStatus() {
   el.textContent = '';
 }
 
+// ---- Verificación post-extracción ----
+function verificarExtraccion(r) {
+  const issues  = [];
+  const rowWarn = {};
+
+  items.forEach((it, idx) => {
+    if (!it.total_documento) return;
+    const calc = roundCents((it.cantidad || 0) * (it.precio_unitario || 0));
+    const diff = Math.abs(calc - it.total_documento);
+    if (diff / it.total_documento > 0.005) {
+      const desc = it.descripcion.length > 28 ? it.descripcion.substring(0, 26) + '…' : it.descripcion;
+      issues.push(`Ítem ${idx + 1} "${desc}": calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(it.total_documento)}`);
+      rowWarn[idx] = true;
+    }
+  });
+
+  if (r.subtotal_documento) {
+    const calc = roundCents(calcSubtotal());
+    const diff = Math.abs(calc - r.subtotal_documento);
+    if (diff / r.subtotal_documento > 0.005) {
+      issues.push(`Subtotal: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(r.subtotal_documento)}`);
+    }
+  }
+
+  impuestos.forEach(imp => {
+    if (!imp.pct || !imp.monto) return;
+    const calc = roundCents(calcGravado() * imp.pct / 100);
+    const diff = Math.abs(calc - imp.monto);
+    if (diff / imp.monto > 0.01) {
+      issues.push(`${imp.nombre}: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(imp.monto)}`);
+    }
+  });
+
+  if (r.total_documento) {
+    const calc = roundCents(calcTotal());
+    const diff = Math.abs(calc - r.total_documento);
+    if (diff / r.total_documento > 0.005) {
+      issues.push(`Total: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(r.total_documento)}`);
+    }
+  }
+
+  return { issues, rowWarn };
+}
+
+function showVerifBanner(issues) {
+  $('verif-banner-list').innerHTML = issues.map(i => `<li>${i}</li>`).join('');
+  $('verif-banner').classList.remove('hidden');
+}
+
+function hideVerifBanner() {
+  $('verif-banner').classList.add('hidden');
+  verifRowWarnings = {};
+  renderTable();
+}
+
 // ---- Items table ----
 function normalizeItem(it) {
   return {
     descripcion:     String(it.descripcion || '').trim(),
     unidad:          String(it.unidad || 'u').trim(),
     cantidad:        parseFloat(it.cantidad) || 0,
-    precio_unitario: parseFloat(it.precio_unitario) || 0
+    precio_unitario: parseFloat(it.precio_unitario) || 0,
+    total_documento: parseFloat(it.total_documento) || 0
   };
 }
 
@@ -657,6 +711,7 @@ function renderTableDesktop() {
     const sub = (parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0);
     const tr  = document.createElement('tr');
     tr.dataset.idx = idx;
+    if (verifRowWarnings[idx]) tr.classList.add('item-row-warn');
     tr.innerHTML = `
       <td class="col-num text-center">${idx + 1}</td>
       <td class="col-desc">
@@ -709,7 +764,7 @@ function renderTableMobile() {
   items.forEach((item, idx) => {
     const sub  = (parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0);
     const card = document.createElement('div');
-    card.className   = 'item-card';
+    card.className   = verifRowWarnings[idx] ? 'item-card item-row-warn' : 'item-card';
     card.dataset.idx = idx;
     card.innerHTML = `
       <div class="item-card-r1">
@@ -1211,6 +1266,7 @@ function resetFormKeepProvider() {
   $('monto-nogravado').value = fmtMoneyDisplay(0);
 
   resetIVAToggle();
+  hideVerifBanner();
   clearFile();
   renderTable();
   renderImpuestos();
@@ -1239,6 +1295,7 @@ function resetForm() {
   $('monto-nogravado').value  = fmtMoneyDisplay(0);
 
   resetIVAToggle();
+  hideVerifBanner();
   clearFile();
   renderTable();
   renderImpuestos();

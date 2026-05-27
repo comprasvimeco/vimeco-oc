@@ -27,6 +27,8 @@ Estructura JSON requerida:
       "total": número_decimal_sin_moneda_ni_separadores
     }
   ],
+  "subtotal_documento": número_o_null,
+  "total_documento": número_o_null,
   "descuento": { "porcentaje": número_o_null, "monto": número_positivo_o_cero },
   "noGravado": { "monto": número_positivo_o_cero },
   "impuestos": [
@@ -59,7 +61,10 @@ Reglas importantes:
 - "descuento": si hay descuento, extraerlo como monto POSITIVO. Si tiene porcentaje explícito, completar "porcentaje". Si no hay descuento, devolver null
 - "noGravado": si hay ítems no gravados o no sujetos a IVA, extraer su monto total. Si no hay, devolver null
 - "impuestos": incluir SOLO los impuestos reales (IVA, percepciones, etc.). NO incluir Subtotal, Neto gravado, Gravado ni TOTAL — esos se calculan automáticamente. Si no hay impuestos, devolver []
-- Si el documento es completamente ilegible, devolvé items como [] e impuestos como []`;
+- Si el documento es completamente ilegible, devolvé items como [] e impuestos como []
+- PRECIO UNITARIO: si el documento tiene columna "P.Neto", "Precio Neto" o similar (precio ya con descuento aplicado), usá ese valor como "unitario". Si tiene "P.Lista" + "%Desc.", calculá el neto: P.Lista × (1 - %Desc / 100). En caso de duda, derivá "unitario" = total_linea ÷ cantidad
+- "subtotal_documento": el subtotal tal como figura en el documento (antes de impuestos), null si no aparece
+- "total_documento": el total final tal como figura en el documento, null si no aparece`;
 
 async function compressImageIfNeeded(file) {
   const LIMIT = 4 * 1024 * 1024;
@@ -179,6 +184,8 @@ function parseGeminiResponse(text) {
       precio_unitario: parseFloatSafe(it.unitario ?? it.precio_unitario),
       total_documento: parseFloatSafe(it.total)
     })),
+    subtotal_documento: parseFloatSafe(parsed.subtotal_documento) || null,
+    total_documento:    parseFloatSafe(parsed.total_documento)    || null,
     descuento: parsed.descuento ? {
       porcentaje: parseFloatSafe(parsed.descuento.porcentaje) || null,
       monto:      parseFloatSafe(parsed.descuento.monto)
