@@ -157,7 +157,16 @@
     if (codigoResponsable !== '0000') {
       ocs = ocs.filter(oc => oc.responsable?.codigo === codigoResponsable);
     }
-    return ocs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const sorted = ocs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    try { localStorage.setItem(`vimeco_hist_${codigoResponsable}`, JSON.stringify(sorted.slice(0, 5))); } catch (_) {}
+    return sorted;
+  };
+
+  window.getHistorialCached = function (codigoResponsable) {
+    try {
+      const raw = localStorage.getItem(`vimeco_hist_${codigoResponsable}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
   };
 })();
 

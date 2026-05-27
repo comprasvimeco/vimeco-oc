@@ -423,6 +423,7 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-actions { display: flex; gap: .4rem; }
 .hist-empty { text-align: center; padding: 3rem 1rem; color: var(--gray-400); font-size: .95rem; }
 .hist-loading { text-align: center; padding: 2.5rem 1rem; color: var(--gray-500); }
+.hist-offline-notice { background: #fff8e1; border: 1px solid #ffe082; border-radius: var(--radius); padding: .55rem .85rem; font-size: .82rem; color: #795548; margin-bottom: .6rem; }
 .attach-banner {
   display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem;
   background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius);

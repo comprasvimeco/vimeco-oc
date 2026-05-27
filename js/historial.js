@@ -182,8 +182,23 @@ async function regenerarPDF(oc, btn) {
     };
     const blob  = generateOCBlob(ocData);
     const fname = `OC_${oc.nroOC}_${sanitizeStr(prov.nombre || 'SinProveedor')}.pdf`;
-    const url   = URL.createObjectURL(blob);
-    const a     = document.createElement('a');
+
+    const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+    if (isMobile && navigator.canShare) {
+      const shareFile = new File([blob], fname, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [shareFile] })) {
+        try {
+          await navigator.share({ title: `OC ${oc.nroOC} — VIMECO S.A.`, files: [shareFile] });
+          toast(`PDF de OC ${oc.nroOC} compartido.`, 'success');
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return;
+          // otro error → caer al download
+        }
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
     a.href = url; a.download = fname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 100);
@@ -289,11 +304,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await checkAttachFile();
 
+  // Indicador de pendientes Drive
+  if (typeof driveQueue !== 'undefined') {
+    try {
+      const pending = await driveQueue.getAll();
+      if (pending.length > 0)
+        toast(`${pending.length} OC${pending.length > 1 ? 's' : ''} pendiente${pending.length > 1 ? 's' : ''} de subir a Drive.`, 'warning');
+    } catch (_) {}
+  }
+
   try {
     allOCs = await getHistorial(code);
     renderCards(allOCs);
   } catch (e) {
-    $('hist-list').innerHTML = '<div class="hist-empty">Error al cargar el historial. Verificá tu conexión.</div>';
+    const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;
+    if (cached && cached.length) {
+      allOCs = cached;
+      renderCards(allOCs);
+      $('hist-list').insertAdjacentHTML('afterbegin',
+        '<div class="hist-offline-notice">📴 Sin conexión — mostrando últimas 5 OC guardadas</div>');
+    } else {
+      $('hist-list').innerHTML = '<div class="hist-empty">Sin conexión y sin datos locales. Abrí el historial con red al menos una vez.</div>';
+    }
     console.error('getHistorial:', e);
   }
 });
