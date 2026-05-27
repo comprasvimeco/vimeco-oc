@@ -29,6 +29,17 @@
 
 <main class="app-main">
   <div class="hist-page">
+
+    <!-- Banner modo adjuntar (visible solo cuando llega archivo compartido) -->
+    <div id="attach-banner" class="attach-banner hidden">
+      <div>
+        <span style="font-weight:600;">📎 Modo adjuntar:</span>
+        <span id="attach-banner-filename" style="margin-left:.35rem;word-break:break-all;"></span>
+        <div style="font-size:.78rem;margin-top:.15rem;opacity:.8;">Tocá el botón 📎 en la OC donde querés guardar este archivo.</div>
+      </div>
+      <button id="btn-attach-cancel" class="btn btn-sm btn-secondary" style="flex-shrink:0;">Cancelar</button>
+    </div>
+
     <div class="hist-toolbar">
       <input type="search" id="hist-search" class="hist-search" placeholder="Buscar por proveedor, obra o N° OC…">
       <span class="hist-count" id="hist-count"></span>

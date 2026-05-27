@@ -1,6 +1,8 @@
 /* VIMECO S.A. — Historial de Órdenes de Compra */
 
 let allOCs = [];
+let attachFileReady = null; // archivo pendiente de adjuntar (modo share)
+
 const $ = id => document.getElementById(id);
 
 function toast(msg, type = 'info') {
@@ -69,39 +71,19 @@ function renderCards(ocs) {
     attachInput.style.display = 'none';
     card.appendChild(attachInput);
 
-    attachBtn.addEventListener('click', () => attachInput.click());
-    attachInput.addEventListener('change', async () => {
+    attachBtn.addEventListener('click', () => {
+      if (attachFileReady) {
+        doAttach(attachFileReady, oc, attachBtn, attachStatus, true);
+      } else {
+        attachInput.click();
+      }
+    });
+
+    attachInput.addEventListener('change', () => {
       const file = attachInput.files[0];
       if (!file) return;
       attachInput.value = '';
-
-      if (typeof attachToDriveOC !== 'function') {
-        toast('Drive no disponible.', 'error');
-        return;
-      }
-
-      attachBtn.disabled = true;
-      attachStatus.textContent = '⏳ Subiendo…';
-      attachStatus.classList.remove('hidden');
-
-      try {
-        await attachToDriveOC(file, {
-          drive_folder_id: oc.drive_folder_id || null,
-          obra:      oc.obra              || '',
-          fecha:     displayToISODate(oc.fecha),
-          proveedor: oc.proveedor?.nombre || '',
-          nroOC:     oc.nroOC
-        });
-        attachStatus.textContent = '✓ Subido';
-        setTimeout(() => { attachStatus.textContent = ''; attachStatus.classList.add('hidden'); }, 3000);
-        toast(`Archivo adjuntado a OC ${oc.nroOC}.`, 'success');
-      } catch (_) {
-        attachStatus.textContent = '✕ Error';
-        setTimeout(() => { attachStatus.textContent = ''; attachStatus.classList.add('hidden'); }, 4000);
-        toast('Error al adjuntar. Se registró el error.', 'error');
-      } finally {
-        attachBtn.disabled = false;
-      }
+      doAttach(file, oc, attachBtn, attachStatus, false);
     });
 
     list.appendChild(card);
@@ -135,6 +117,61 @@ function usarComoBase(oc) {
   window.location.href = 'app.html';
 }
 
+async function doAttach(file, oc, attachBtn, statusEl, fromShare) {
+  if (typeof attachToDriveOC !== 'function') {
+    toast('Drive no disponible.', 'error');
+    return;
+  }
+  attachBtn.disabled = true;
+  statusEl.textContent = '⏳ Subiendo…';
+  statusEl.classList.remove('hidden');
+  try {
+    await attachToDriveOC(file, {
+      drive_folder_id: oc.drive_folder_id || null,
+      obra:      oc.obra              || '',
+      fecha:     displayToISODate(oc.fecha),
+      proveedor: oc.proveedor?.nombre || '',
+      nroOC:     oc.nroOC
+    });
+    statusEl.textContent = '✓ Subido';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.classList.add('hidden'); }, 3000);
+    toast(`Archivo adjuntado a OC ${oc.nroOC}.`, 'success');
+    if (fromShare) clearAttachFile();
+  } catch (_) {
+    statusEl.textContent = '✕ Error';
+    setTimeout(() => { statusEl.textContent = ''; statusEl.classList.add('hidden'); }, 4000);
+    toast('Error al adjuntar. Se registró el error.', 'error');
+  } finally {
+    attachBtn.disabled = false;
+  }
+}
+
+async function checkAttachFile() {
+  if (!('caches' in window)) return;
+  try {
+    const cache = await caches.open('share-target');
+    const match = await cache.match('attach-file');
+    if (!match) return;
+    const blob     = await match.blob();
+    const filename = match.headers.get('X-File-Name') || 'archivo';
+    const filetype = match.headers.get('Content-Type') || blob.type;
+    attachFileReady = new File([blob], filename, { type: filetype });
+    $('attach-banner-filename').textContent = filename;
+    $('attach-banner').classList.remove('hidden');
+  } catch (e) {
+    console.warn('checkAttachFile:', e);
+  }
+}
+
+async function clearAttachFile() {
+  try {
+    const cache = await caches.open('share-target');
+    await cache.delete('attach-file');
+  } catch (_) {}
+  attachFileReady = null;
+  $('attach-banner').classList.add('hidden');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const code = sessionStorage.getItem('responsable_code') || localStorage.getItem('responsable_code');
   const name = sessionStorage.getItem('responsable_name') || localStorage.getItem('responsable_name');
@@ -156,6 +193,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('hist-search').addEventListener('input', e => {
     renderCards(filterOCs(e.target.value));
   });
+
+  $('btn-attach-cancel').addEventListener('click', clearAttachFile);
+
+  await checkAttachFile();
 
   try {
     allOCs = await getHistorial(code);

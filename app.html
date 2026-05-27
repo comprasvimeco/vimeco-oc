@@ -358,6 +358,32 @@
   </div>
 </div>
 
+<!-- ===== MODAL: Archivo compartido ===== -->
+<div class="modal-overlay hidden" id="modal-share-choice">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">Archivo recibido</span>
+    </div>
+    <div class="modal-body" style="padding:1.5rem 1.25rem;">
+      <p style="color:var(--gray-600);margin-bottom:.35rem;font-size:.82rem;word-break:break-all;">
+        <strong id="share-choice-filename"></strong>
+      </p>
+      <p style="color:var(--gray-500);margin-bottom:1.5rem;font-size:.875rem;">¿Qué querés hacer con este archivo?</p>
+      <div style="display:flex;flex-direction:column;gap:.6rem;">
+        <button class="btn btn-primary" id="btn-share-generar" style="justify-content:center;">
+          ✨ Generar OC
+        </button>
+        <button class="btn btn-outline" id="btn-share-historial" style="justify-content:center;">
+          📎 Adjuntar a una OC del Historial
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end;">
+      <button class="btn btn-secondary" id="btn-share-cancelar">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== TOAST ===== -->
 <div class="toast-container" id="toast-container"></div>
 

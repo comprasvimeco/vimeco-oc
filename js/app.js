@@ -308,13 +308,43 @@ async function checkSharedFile() {
     const match = await cache.match('shared-file');
     if (!match) return;
     await cache.delete('shared-file');
-    const blob = await match.blob();
-    const ext  = blob.type === 'application/pdf' ? '.pdf' : '.jpg';
-    handleFileSelected(new File([blob], 'compartido' + ext, { type: blob.type }));
-    toast('Archivo recibido. Usá "Extraer con Gemini" para cargar los datos.', 'success');
+    const blob     = await match.blob();
+    const origName = match.headers.get('X-File-Name') || '';
+    const ext      = blob.type === 'application/pdf' ? '.pdf' : blob.type.startsWith('image/') ? '.jpg' : '';
+    const filename = origName || ('compartido' + ext);
+    const file     = new File([blob], filename, { type: blob.type });
+    showShareChoiceModal(file);
   } catch (e) {
     console.warn('checkSharedFile:', e);
   }
+}
+
+function showShareChoiceModal(file) {
+  $('share-choice-filename').textContent = file.name;
+  $('modal-share-choice').classList.remove('hidden');
+
+  $('btn-share-generar').onclick = () => {
+    $('modal-share-choice').classList.add('hidden');
+    handleFileSelected(file);
+    toast('Archivo cargado. Usá "Extraer con Gemini" para procesar.', 'success');
+  };
+
+  $('btn-share-historial').onclick = async () => {
+    $('modal-share-choice').classList.add('hidden');
+    try {
+      const cache = await caches.open('share-target');
+      await cache.put('attach-file', new Response(file, {
+        headers: { 'X-File-Name': file.name, 'Content-Type': file.type }
+      }));
+      window.location.href = 'historial.html';
+    } catch (e) {
+      toast('Error preparando el archivo.', 'error');
+    }
+  };
+
+  $('btn-share-cancelar').onclick = () => {
+    $('modal-share-choice').classList.add('hidden');
+  };
 }
 
 // ---- Logo loader ----

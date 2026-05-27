@@ -57,7 +57,9 @@ self.addEventListener('fetch', event => {
       const file = formData.get('file');
       if (file) {
         const cache = await caches.open('share-target');
-        await cache.put('shared-file', new Response(file));
+        await cache.put('shared-file', new Response(file, {
+          headers: { 'X-File-Name': file.name || '', 'Content-Type': file.type || '' }
+        }));
       }
       return Response.redirect(BASE + '/app.html', 303);
     })());
