@@ -39,7 +39,6 @@ const PG = {
 // ─── Anchos de columna en mm ─────────────────────────
 const HDR_COLS  = [55.0, 80.0, 55.0];              // sum=190 
 const PROV_COLS = [26.0, 102.0, 22.0, 40.0];       // sum=190
-const ITM_COLS  = [95.0, 20.0, 20.0, 30.0, 25.0];  // sum=190 — DESC|UNID|CANT|PRECIO|IMP
 const FTR_COLS  = [74.0, 57.0, 59.0];              // sum=190
 
 const HDR_R1H = 20;   // fila 1 — logo + título  (ajustado a datos fiscales)
@@ -62,8 +61,9 @@ function buildOCDoc(data) {
   y += 2;
   y = drawProveedorTable(doc, data, y);
   y += 2;
-  y = drawItemsTable(doc, data.items, y);
-  y = drawTotalsTable(doc, data, y);
+  const itmColW = computeItemColWidths(doc, data.items);
+  y = drawItemsTable(doc, data.items, y, itmColW);
+  y = drawTotalsTable(doc, data, y, itmColW);
   y += 2;
   y = drawAmountInWords(doc, data.totalLetras, y);
   y += 3;
@@ -271,15 +271,50 @@ function drawProveedorTable(doc, data, y) {
 
 /* =====================================================
    3. TABLA DE ÍTEMS
-   5 columnas: DESCRIPCIÓN | UNIDAD | CANT. | P. UNITARIO | IMPORTE
-   Alto de fila variable: se ajusta si la descripción es larga.
+   Columnas UNIDAD/CANT./P.UNITARIO/IMPORTE: autofit al contenido.
+   DESCRIPCIÓN toma el espacio restante y hace wrap.
    ===================================================== */
-function drawItemsTable(doc, items, y) {
+
+function computeItemColWidths(doc, items) {
+  const PAD      = 5;   // padding izq+der por columna
+  const MIN_DESC = 55;  // mínimo para descripción
+
+  doc.setFontSize(8);
+
+  // Arranca con el ancho del header (bold)
+  doc.setFont('helvetica', 'bold');
+  const colW = [
+    0,
+    doc.getTextWidth('UNIDAD')      + PAD,
+    doc.getTextWidth('CANT.')       + PAD,
+    doc.getTextWidth('P. UNITARIO') + PAD,
+    doc.getTextWidth('IMPORTE')     + PAD
+  ];
+
+  // Expande según los datos (normal)
+  doc.setFont('helvetica', 'normal');
+  (items || []).forEach(item => {
+    const cant     = parseFloat(item.cant)    || 0;
+    const unitario = parseFloat(item.unitario) || 0;
+    const total    = parseFloat(item.total)    || cant * unitario;
+
+    colW[1] = Math.max(colW[1], doc.getTextWidth(String(item.unidad || '—'))  + PAD);
+    colW[2] = Math.max(colW[2], doc.getTextWidth(fmtQty(cant))                + PAD);
+    colW[3] = Math.max(colW[3], doc.getTextWidth(`$ ${formatARS(unitario)}`)  + PAD);
+    colW[4] = Math.max(colW[4], doc.getTextWidth(`$ ${formatARS(total)}`)     + PAD);
+  });
+
+  // Descripción recibe lo que sobra
+  colW[0] = Math.max(MIN_DESC, PG.cw - colW[1] - colW[2] - colW[3] - colW[4]);
+  return colW;
+}
+
+function drawItemsTable(doc, items, y, colW) {
   const { ml, cw } = PG;
   const HDR_H  = 8;
-  const ROW_H  = 7;    // alto mínimo de fila
-  const LINE_H = 4.5;  // alto por línea de texto
-  const xs     = buildXs(ml, ITM_COLS);
+  const ROW_H  = 7;
+  const LINE_H = 4.5;
+  const xs     = buildXs(ml, colW);
 
   const headers = [
     { label: 'DESCRIPCIÓN', align: 'left'   },
@@ -295,7 +330,7 @@ function drawItemsTable(doc, items, y) {
   doc.setFontSize(8);
   doc.setTextColor(...C.blanco);
   headers.forEach((h, i) => {
-    doc.text(h.label, textX(xs[i], ITM_COLS[i], h.align), y + HDR_H / 2 + 1.5, { align: h.align });
+    doc.text(h.label, textX(xs[i], colW[i], h.align), y + HDR_H / 2 + 1.5, { align: h.align });
   });
   setThinBorder(doc);
   doc.rect(ml, y, cw, HDR_H, 'S');
@@ -307,7 +342,7 @@ function drawItemsTable(doc, items, y) {
   doc.setFontSize(8);
   items.forEach(item => {
     const desc      = String(item.desc || '').trim() || '—';
-    const descLines = doc.splitTextToSize(desc, ITM_COLS[0] - 4);
+    const descLines = doc.splitTextToSize(desc, colW[0] - 4);
     const rowH      = Math.max(ROW_H, descLines.length * LINE_H + 3);
 
     fillRect(doc, ml, y, cw, rowH, C.blanco);
@@ -321,13 +356,11 @@ function drawItemsTable(doc, items, y) {
     const cy       = y + rowH / 2 + 1.5;
 
     doc.setTextColor(...C.negro);
-    // Descripción: alineada arriba, multilínea
     descLines.forEach((ln, li) => doc.text(ln, xs[0] + 2, y + 4.5 + li * LINE_H));
-    // Resto: centrado verticalmente
-    doc.text(String(item.unidad || '—'), textX(xs[1], ITM_COLS[1], 'center'), cy, { align: 'center' });
-    doc.text(fmtQty(cant),               textX(xs[2], ITM_COLS[2], 'center'), cy, { align: 'center' });
-    doc.text(`$ ${formatARS(unitario)}`, textX(xs[3], ITM_COLS[3], 'right'),  cy, { align: 'right'  });
-    doc.text(`$ ${formatARS(total)}`,    textX(xs[4], ITM_COLS[4], 'right'),  cy, { align: 'right'  });
+    doc.text(String(item.unidad || '—'), textX(xs[1], colW[1], 'center'), cy, { align: 'center' });
+    doc.text(fmtQty(cant),               textX(xs[2], colW[2], 'center'), cy, { align: 'center' });
+    doc.text(`$ ${formatARS(unitario)}`, textX(xs[3], colW[3], 'right'),  cy, { align: 'right'  });
+    doc.text(`$ ${formatARS(total)}`,    textX(xs[4], colW[4], 'right'),  cy, { align: 'right'  });
 
     y += rowH;
   });
@@ -341,14 +374,13 @@ function drawItemsTable(doc, items, y) {
    Fila TOTAL: fondo amarillo #E1AE3A, texto negro negrita
    Montos exactos, sin recalcular
    ===================================================== */
-function drawTotalsTable(doc, data, y) {
+function drawTotalsTable(doc, data, y, colW) {
   const { ml, cw } = PG;
   const impuestos = data.impuestos || [];
   if (!impuestos.length) return y;
 
   const ROW_H = 7.5;
-  // Label: cols 1-4 = 95+20+20+30 = 165mm; valor: col5 = 25mm
-  const LBL_W = ITM_COLS[0] + ITM_COLS[1] + ITM_COLS[2] + ITM_COLS[3];
+  const LBL_W = colW[0] + colW[1] + colW[2] + colW[3];
   const sepX  = ml + LBL_W;
 
   setThinBorder(doc);
