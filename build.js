@@ -1,13 +1,13 @@
-const fs             = require('fs');
-const { execSync }   = require('child_process');
+const fs = require('fs');
 
-// Use git commit count as version number (always increments with each push)
-const commitCount = parseInt(execSync('git rev-list --count HEAD').toString().trim(), 10);
-const version     = String(commitCount).padStart(3, '0');
+// Increment version in app.html and write back (workflow commits the result)
 let appHtml = fs.readFileSync('app.html', 'utf8');
-appHtml = appHtml.replace(/(<div class="hdr-drop-version">v)(\d+)(<\/div>)/, `$1${version}$3`);
+appHtml = appHtml.replace(/(<div class="hdr-drop-version">v)(\d+)(<\/div>)/, (_, pre, num, post) => {
+  const next = String(parseInt(num, 10) + 1).padStart(3, '0');
+  console.log(`App version bumped: v${num} → v${next}`);
+  return `${pre}${next}${post}`;
+});
 fs.writeFileSync('app.html', appHtml);
-console.log(`App version set: v${version}`);
 
 // Bump SW cache version so mobile devices detect the update
 let sw = fs.readFileSync('sw.js', 'utf8');
