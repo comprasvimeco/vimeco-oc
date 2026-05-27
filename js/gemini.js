@@ -1,16 +1,21 @@
 /* global GEMINI_API_KEY */
 
 const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 const EXTRACT_PROMPT = `Sos un asistente especializado en lectura de documentos comerciales argentinos (facturas, presupuestos, cotizaciones, remitos, órdenes de compra).
 
-El documento puede ser una foto tomada con celular, posiblemente con perspectiva, sombras, reflejos o leve distorsión. Hacé tu mejor esfuerzo para leer el contenido aunque la imagen no sea perfecta; inferí los datos por contexto cuando no sean perfectamente legibles.
+El documento puede ser una foto tomada con celular, posiblemente con perspectiva, sombras, reflejos o leve distorsión. Hacé tu mejor esfuerzo para leer el contenido aunque la imagen no sea perfecta.
 
-Analizá el documento adjunto y extraé la siguiente información. Devolvé ÚNICAMENTE un JSON válido, sin bloques de código markdown, sin texto adicional antes o después.
+PASO 1 — Antes de extraer datos, analizá la estructura del documento:
+Identificá qué columnas de precio tiene la tabla de ítems y decidí qué valor usar como precio unitario. Escribí este análisis en "estructura_precios".
+
+Devolvé ÚNICAMENTE un JSON válido, sin bloques de código markdown, sin texto adicional.
 
 Estructura JSON requerida:
 {
+  "estructura_precios": "descripción de las columnas de precio encontradas y criterio aplicado (ej: 'Tabla tiene P.Lista + %Desc + P.Neto → se usa P.Neto directamente', 'Solo tiene Precio Unit. → se usa ese valor', 'Precios incluyen IVA según encabezado')",
+  "precios_incluyen_iva": null,
   "proveedor": "nombre completo o razón social del proveedor",
   "cuit_proveedor": "CUIT del proveedor en formato XX-XXXXXXXX-X si está disponible, sino null",
   "domicilio_proveedor": "domicilio o dirección del proveedor si está disponible, sino null",
@@ -33,38 +38,48 @@ Estructura JSON requerida:
   "noGravado": { "monto": número_positivo_o_cero },
   "impuestos": [
     {
-      "nombre": "nombre del impuesto tal como aparece (ej: 'I.V.A. 21%', 'Perc. IIBB Córdoba', 'Percep. Munic. Cba')",
+      "nombre": "nombre del impuesto tal como aparece (ej: 'I.V.A. 21%', 'Perc. IIBB Córdoba')",
       "porcentaje": número_o_null,
       "monto": número_decimal_sin_moneda_ni_separadores
     }
   ]
 }
 
-FORMATO DE NÚMEROS CRÍTICO:
-- En documentos argentinos el punto es separador de miles y la coma es decimal
-- Ejemplos: 10.000 = 10000, 72,674 = 72.674, 1.114,20 = 1114.20
-- Al extraer cantidades y precios, convertir siempre al formato numérico estándar (punto decimal, sin separador de miles)
-- Si ves '10.000' como cantidad es diez mil (10000), no diez
-- Si ves '72,674' como precio unitario es 72.674 pesos, no 72674
-- Verificar que cantidad × precio unitario = importe declarado en el documento
-- Si no coincide, revisar la interpretación de los separadores
+FORMATO DE NÚMEROS — CRÍTICO:
+En documentos argentinos: PUNTO = separador de miles, COMA = decimal.
+Convertir SIEMPRE a número con punto decimal y sin separadores de miles.
 
-Reglas importantes:
-- Los precios usan formato ARGENTINO: punto como separador de miles, coma como decimal (ej: 1.500,50 → 1500.50). Convertí siempre a número decimal con punto
-- Si el documento tiene IVA discriminado, el unitario debe ser el precio NETO sin IVA
-- cant, unitario, total, porcentaje y monto son siempre numbers (no strings)
+Ejemplos (memorizar estas conversiones):
+- "5.718.571,59" → 5718571.59  (NO escribir 5718.571 ni 5718571)
+- "1.200.900,03" → 1200900.03
+- "627.774,12"  → 627774.12
+- "52.314,51"   → 52314.51
+- "10.777,00"   → 10777.0
+- "10.000"      → 10000  (diez mil, no diez)
+- "72,674"      → 72.674 (setenta y dos con decimales)
+Esta regla aplica a TODOS los campos numéricos: unitario, total, subtotal_documento, total_documento, montos de impuestos, etc.
+
+PRECIO UNITARIO — ORDEN DE PRIORIDAD (respetar este orden sin excepciones):
+1. Si existe columna "P.Neto", "Precio Neto", "Neto", "P. c/Desc." o similar → usar ese valor directamente, sin modificar
+2. Si existe "P.Lista" + "%Desc." pero NO hay columna de precio neto → calcular: P.Lista × (1 - %Desc / 100)
+3. Solo si no hay ningún precio unitario explícito en el renglón → derivar de total_linea ÷ cantidad
+NUNCA usar P.Lista si en el mismo renglón existe una columna de precio neto.
+
+DETECCIÓN DE IVA EN PRECIOS:
+- "precios_incluyen_iva": true → si los precios unitarios ya incluyen IVA (el documento lo indica explícitamente o se infiere claramente)
+- "precios_incluyen_iva": false → si el IVA está discriminado por separado al final del documento
+- "precios_incluyen_iva": null → si no es posible determinarlo
+
+Reglas generales:
+- cant, unitario, total, porcentaje, monto, subtotal_documento, total_documento son siempre numbers (no strings)
 - Si no encontrás un campo opcional, usá null (no string vacío)
 - Incluí TODOS los ítems del documento, sin excepción
-- En "items", el campo "total" es el importe total de esa línea (cant × unitario)
-- Si una descripción está parcialmente ilegible o cortada, extraé lo que puedas y agregá "..." al final
-- Para dígitos ambiguos en precios (1/7, 0/6, 3/8), elegí el que dé un precio más coherente con el contexto del ítem y el resto del documento
-- "descuento": si hay descuento, extraerlo como monto POSITIVO. Si tiene porcentaje explícito, completar "porcentaje". Si no hay descuento, devolver null
-- "noGravado": si hay ítems no gravados o no sujetos a IVA, extraer su monto total. Si no hay, devolver null
-- "impuestos": incluir SOLO los impuestos reales (IVA, percepciones, etc.). NO incluir Subtotal, Neto gravado, Gravado ni TOTAL — esos se calculan automáticamente. Si no hay impuestos, devolver []
-- Si el documento es completamente ilegible, devolvé items como [] e impuestos como []
-- PRECIO UNITARIO: si el documento tiene columna "P.Neto", "Precio Neto" o similar (precio ya con descuento aplicado), usá ese valor como "unitario". Si tiene "P.Lista" + "%Desc.", calculá el neto: P.Lista × (1 - %Desc / 100). En caso de duda, derivá "unitario" = total_linea ÷ cantidad
-- "subtotal_documento": el subtotal tal como figura en el documento (antes de impuestos), null si no aparece
-- "total_documento": el total final tal como figura en el documento, null si no aparece`;
+- El campo "total" de cada ítem es el importe de esa línea tal como figura en el documento
+- Si una descripción está parcialmente ilegible, extraé lo que puedas y agregá "..." al final
+- "descuento": monto POSITIVO si hay descuento global. Si tiene porcentaje explícito, completar "porcentaje". Si no hay descuento, devolver null
+- "noGravado": si hay ítems no gravados, extraer su monto total. Si no hay, devolver null
+- "impuestos": incluir SOLO impuestos reales (IVA, percepciones). NO incluir Subtotal, Neto gravado ni TOTAL
+- Si el documento es completamente ilegible, devolvé items: [] e impuestos: []`;
 
 async function compressImageIfNeeded(file) {
   const LIMIT = 4 * 1024 * 1024;
@@ -116,7 +131,7 @@ async function extractFromFile(file) {
     }],
     generationConfig: {
       temperature: 0.05,
-      maxOutputTokens: 4096
+      maxOutputTokens: 8192
     }
   };
 
@@ -177,6 +192,8 @@ function parseGeminiResponse(text) {
     condicion_iva_proveedor: trimOrNull(parsed.condicion_iva_proveedor),
     ref_presupuesto:        trimOrNull(parsed.ref_presupuesto),
     condicion_pago:         trimOrNull(parsed.condicion_pago),
+    estructura_precios:  trimOrNull(parsed.estructura_precios),
+    precios_incluyen_iva: parsed.precios_incluyen_iva === true ? true : parsed.precios_incluyen_iva === false ? false : null,
     items: (parsed.items || []).map(it => ({
       descripcion:     String(it.desc || it.descripcion || '').trim(),
       unidad:          String(it.unidad || 'u').trim(),

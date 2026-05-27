@@ -553,6 +553,20 @@ function applyExtractionResult(r) {
     renderTable();
     showVerifBanner(issues);
   }
+
+  // Sugerir toggle IVA si Gemini detectó precios con IVA incluido,
+  // o si el subtotal calculado es ~21% mayor al declarado en el documento
+  if (!ivaActive) {
+    const sugerirIva = r.precios_incluyen_iva === true ||
+      (r.subtotal_documento && (() => {
+        const ratio = roundCents(calcSubtotal()) / r.subtotal_documento;
+        return ratio > 1.17 && ratio < 1.25;
+      })());
+    if (sugerirIva) {
+      toast('⚠️ Los precios podrían incluir IVA — revisá el toggle "Precios con IVA incluido".', 'warning');
+    }
+  }
+
   return issues;
 }
 
