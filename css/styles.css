@@ -531,3 +531,6 @@ tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 .adj-oc-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: .15rem; }
 .adj-match-score { font-size: .75rem; color: var(--primary); letter-spacing: .08em; margin-left: auto; margin-right: .25rem; }
 .adj-manual-fallback { margin-top: .85rem; text-align: center; border-top: 1px solid var(--gray-200); padding-top: .85rem; }
+.adj-step-actions { display: flex; flex-direction: column; gap: .5rem; margin-top: 1rem; }
+.adj-step-btns { display: flex; gap: .5rem; }
+.adj-step-actions .btn-outline { background: var(--white); }

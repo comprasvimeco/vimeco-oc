@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   sessionStorage.setItem('responsable_name', name);
 
   $('hdr-name').textContent = name;
-  $('btn-back').addEventListener('click', () => history.back());
+  $('btn-back').addEventListener('click', () => { window.location.href = 'app.html'; });
   $('btn-restart').addEventListener('click', resetToStart);
   $('btn-another').addEventListener('click', resetToStart);
 
