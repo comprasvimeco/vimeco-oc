@@ -108,16 +108,21 @@ function provSimilarity(a, b) {
 function scoreMatch(extracted, oc) {
   let score = 0;
 
-  const sim = provSimilarity(extracted.proveedor, oc.proveedor?.nombre);
-  if (sim >= 0.65)      score += 3;
-  else if (sim >= 0.3)  score += 1;
-
+  // Total: factor principal
   if (extracted.total_documento && oc.total && oc.total > 0) {
     const ratio = Math.abs(extracted.total_documento - oc.total) / oc.total;
-    if (ratio <= 0.10)      score += 2;
-    else if (ratio <= 0.20) score += 1;
+    if (ratio <= 0.01)      score += 6;
+    else if (ratio <= 0.05) score += 4;
+    else if (ratio <= 0.15) score += 2;
+    else if (ratio <= 0.30) score += 1;
   }
 
+  // Proveedor
+  const sim = provSimilarity(extracted.proveedor, oc.proveedor?.nombre);
+  if (sim >= 0.65)      score += 2;
+  else if (sim >= 0.3)  score += 1;
+
+  // Referencia
   if (extracted.ref_presupuesto) {
     const ref = extracted.ref_presupuesto.toLowerCase().replace(/[^a-z0-9]/g, '');
     if (ref.length >= 3) {
@@ -127,6 +132,7 @@ function scoreMatch(extracted, oc) {
     }
   }
 
+  // Fecha reciente
   if (oc.timestamp) {
     const diffDays = Math.abs(Date.now() - oc.timestamp) / 86400000;
     if (diffDays <= 45) score += 1;
@@ -147,7 +153,7 @@ function getTopMatches(extracted, ocs) {
 
 function renderMatchCards(matches) {
   return matches.map(({ oc, score }) => {
-    const stars = score >= 6 ? '●●●' : score >= 4 ? '●●○' : '●○○';
+    const stars = score >= 7 ? '●●●' : score >= 4 ? '●●○' : '●○○';
     return `<div class="adj-oc-card">
       <div class="adj-oc-top">
         <span class="hist-nro">${esc(oc.nroOC)}</span>
