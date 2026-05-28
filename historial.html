@@ -22,6 +22,7 @@
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
+    <button class="btn btn-sm btn-outline" id="btn-adjuntar">📎 Adjuntar</button>
     <button class="btn btn-sm btn-outline" id="btn-back">← Volver</button>
     <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
   </div>
@@ -29,16 +30,6 @@
 
 <main class="app-main">
   <div class="hist-page">
-
-    <!-- Banner modo adjuntar (visible solo cuando llega archivo compartido) -->
-    <div id="attach-banner" class="attach-banner hidden">
-      <div>
-        <span style="font-weight:600;">📎 Modo adjuntar:</span>
-        <span id="attach-banner-filename" style="margin-left:.35rem;word-break:break-all;"></span>
-        <div style="font-size:.78rem;margin-top:.15rem;opacity:.8;">Tocá el botón 📎 en la OC donde querés guardar este archivo.</div>
-      </div>
-      <button id="btn-attach-cancel" class="btn btn-sm btn-secondary" style="flex-shrink:0;">Cancelar</button>
-    </div>
 
     <div class="hist-toolbar">
       <input type="search" id="hist-search" class="hist-search" placeholder="Buscar por proveedor, obra o N° OC…">
@@ -63,7 +54,6 @@
 <script src="js/logoBase64.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
-<script src="js/drive.js"></script>
 <script src="js/driveQueue.js"></script>
 <script src="js/ocGenerator.js"></script>
 <script src="js/historial.js"></script>

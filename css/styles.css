@@ -509,3 +509,25 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 tr.item-row-warn td { background: #fff8e1 !important; }
 tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 .item-card.item-row-warn { border-left: 3px solid #f59e0b !important; background: #fff8e1; }
+
+/* ===== ADJUNTAR ARCHIVO ===== */
+.adj-page { max-width: 600px; margin: 0 auto; padding: 1rem; }
+.adj-ai-toggle { margin-top: .85rem; padding: .6rem .85rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius); }
+.adj-ai-label { display: flex; align-items: center; gap: .5rem; cursor: pointer; font-size: .88rem; color: #1e40af; user-select: none; }
+.adj-ai-label input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
+.adj-extracted { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .85rem; }
+.adj-tag { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; border-radius: 999px; padding: .2rem .7rem; font-size: .82rem; font-weight: 500; }
+.adj-section-label { font-size: .78rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+.adj-no-match { font-size: .88rem; color: var(--gray-500); margin-bottom: .75rem; }
+.adj-oc-card {
+  background: var(--white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);
+  padding: .85rem 1rem; display: flex; flex-direction: column; gap: .3rem;
+  margin-bottom: .5rem; transition: box-shadow .15s;
+}
+.adj-oc-card:last-child { margin-bottom: 0; }
+.adj-oc-card:hover { box-shadow: var(--shadow); }
+.adj-oc-top { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.adj-oc-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: .15rem; }
+.adj-match-score { font-size: .75rem; color: var(--primary); letter-spacing: .08em; margin-left: auto; margin-right: .25rem; }
+.adj-manual-fallback { margin-top: .85rem; text-align: center; border-top: 1px solid var(--gray-200); padding-top: .85rem; }

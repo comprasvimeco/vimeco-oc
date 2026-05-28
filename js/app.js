@@ -216,6 +216,7 @@ function setupMenu() {
   }
 
   $('btn-historial').addEventListener('click', () => { window.location.href = 'historial.html'; });
+  $('btn-adjuntar').addEventListener('click',  () => { window.location.href = 'adjuntar.html'; });
   $('btn-usuarios').addEventListener('click',  () => { window.location.href = 'usuarios.html'; });
   $('btn-obras').addEventListener('click',     () => { window.location.href = 'obras.html'; });
   $('btn-logout').addEventListener('click', logout);

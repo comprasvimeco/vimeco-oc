@@ -24,7 +24,9 @@ const STATIC_ASSETS = [
   BASE + '/js/jspdf.umd.min.js',
   BASE + '/historial.html',
   BASE + '/js/historial.js',
-  BASE + '/js/driveQueue.js'
+  BASE + '/js/driveQueue.js',
+  BASE + '/adjuntar.html',
+  BASE + '/js/adjuntar.js'
 ];
 
 self.addEventListener('install', event => {
@@ -51,8 +53,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Web Share Target: guarda el archivo en cache y redirige a app.html
-  if (event.request.method === 'POST' && url.pathname === BASE + '/app.html') {
+  // Web Share Target: guarda el archivo en cache y redirige a adjuntar.html
+  if (event.request.method === 'POST' && url.pathname === BASE + '/adjuntar.html') {
     event.respondWith((async () => {
       const formData = await event.request.formData();
       const file = formData.get('file');
@@ -62,7 +64,7 @@ self.addEventListener('fetch', event => {
           headers: { 'X-File-Name': file.name || '', 'Content-Type': file.type || '' }
         }));
       }
-      return Response.redirect(BASE + '/app.html', 303);
+      return Response.redirect(BASE + '/adjuntar.html', 303);
     })());
     return;
   }

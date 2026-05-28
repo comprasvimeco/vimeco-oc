@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Adjuntar Archivo</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Adjuntar Archivo</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge">
+      <span id="hdr-name">—</span>
+    </div>
+    <button class="btn btn-sm btn-outline" id="btn-back">← Volver</button>
+  </div>
+</header>
+
+<main class="app-main">
+  <div class="adj-page">
+
+    <!-- Paso 1: selección de archivo -->
+    <div class="card" id="card-file">
+      <div class="card-header">
+        <span class="card-title">📎 Adjuntar documento a una OC</span>
+      </div>
+      <div class="card-body">
+        <div class="upload-zone" id="drop-zone">
+          <div class="upload-icon">📄</div>
+          <div class="upload-text"><strong>Seleccioná o arrastrá el archivo</strong></div>
+          <div class="upload-formats">PDF, JPG, PNG, WEBP · También podés compartir desde otra app</div>
+        </div>
+        <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp">
+
+        <div id="file-info" class="hidden" style="margin-top:.75rem;">
+          <div class="extract-status success" id="file-ready-msg"></div>
+        </div>
+
+        <div id="ai-toggle-wrap" class="adj-ai-toggle hidden">
+          <label class="adj-ai-label">
+            <input type="checkbox" id="use-ai" checked>
+            <span>Analizar con IA para recomendar OC automáticamente</span>
+          </label>
+        </div>
+
+        <div id="step1-actions" class="hidden" style="margin-top:1rem; display:flex; gap:.5rem;">
+          <button class="btn btn-primary" id="btn-continue" style="flex:1;">Continuar</button>
+          <button class="btn btn-secondary" id="btn-change-file">Cambiar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paso 2: análisis y resultados -->
+    <div class="card hidden" id="card-result">
+      <div class="card-header">
+        <span class="card-title" id="result-title">Resultados</span>
+        <button class="btn btn-sm btn-outline" id="btn-restart">← Otro archivo</button>
+      </div>
+      <div class="card-body" id="result-body"></div>
+    </div>
+
+    <!-- Estado: éxito -->
+    <div class="card hidden" id="card-success">
+      <div class="card-body" style="text-align:center; padding:2rem 1rem;">
+        <div style="font-size:2.5rem; margin-bottom:.75rem;">✅</div>
+        <p style="font-size:1rem; font-weight:600; color:var(--success); margin-bottom:.35rem;">Archivo subido correctamente</p>
+        <p id="success-detail" style="font-size:.85rem; color:var(--gray-500); margin-bottom:1.25rem;"></p>
+        <button class="btn btn-primary" id="btn-another">Subir otro archivo</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/adjuntar.js"></script>
+</body>
+</html>
