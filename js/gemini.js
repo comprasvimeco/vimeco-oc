@@ -3,6 +3,9 @@
 const GEMINI_ENDPOINT =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
+const GEMINI_LITE_ENDPOINT =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
+
 const EXTRACT_PROMPT = `Sos un asistente especializado en lectura de documentos comerciales argentinos (facturas, presupuestos, cotizaciones, remitos, órdenes de compra).
 
 El documento puede ser una foto tomada con celular, posiblemente con perspectiva, sombras, reflejos o leve distorsión. Hacé tu mejor esfuerzo para leer el contenido aunque la imagen no sea perfecta.
@@ -252,6 +255,65 @@ function fileToBase64(file) {
     reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
     reader.readAsDataURL(file);
   });
+}
+
+// ---- Extracción básica (proveedor + total) para matching de OC ----
+
+async function extractBasicFromFile(file) {
+  const apiKey = typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : null;
+  if (!apiKey || apiKey === 'AQUI_VA_LA_KEY') {
+    throw new Error('No hay API Key configurada.');
+  }
+
+  file = await compressImageIfNeeded(file);
+  const base64   = await fileToBase64(file);
+  const mimeType = normalizeMimeType(file.type, file.name);
+
+  const prompt = `Analizá este documento comercial (factura, remito, presupuesto, etc.) y devolvé ÚNICAMENTE este JSON sin texto adicional ni markdown:
+{
+  "proveedor": "nombre o razón social del proveedor",
+  "total": número_decimal_sin_signos_ni_separadores_de_miles
+}
+Regla para números: en documentos argentinos el punto es separador de miles y la coma es decimal.
+Ejemplos: "1.250.000,50" → 1250000.5 · "52.314,51" → 52314.51
+Si no podés determinar un campo, usá null.`;
+
+  const body = {
+    contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+    generationConfig: { temperature: 0.05, maxOutputTokens: 256 }
+  };
+
+  let response;
+  try {
+    response = await fetch(`${GEMINI_LITE_ENDPOINT}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000)
+    });
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      throw new Error('Gemini tardó demasiado. Intentá con Asignar manualmente.');
+    }
+    throw err;
+  }
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || `HTTP ${response.status}`);
+  }
+
+  const data    = await response.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let clean = rawText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  const s = clean.indexOf('{'), e = clean.lastIndexOf('}');
+  if (s === -1 || e === -1) throw new Error('Respuesta inesperada de Gemini.');
+
+  const parsed = JSON.parse(clean.slice(s, e + 1));
+  return {
+    proveedor:       trimOrNull(parsed.proveedor),
+    total_documento: parseFloatSafe(parsed.total) || null
+  };
 }
 
 // ---- Voice extraction ----

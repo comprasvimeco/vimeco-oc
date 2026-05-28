@@ -120,16 +120,6 @@ function scoreMatch(extracted, oc) {
   if (sim >= 0.65)      score += 2;
   else if (sim >= 0.3)  score += 1;
 
-  // Referencia
-  if (extracted.ref_presupuesto) {
-    const ref = extracted.ref_presupuesto.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (ref.length >= 3) {
-      const provRef   = (oc.proveedor?.ref || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const itemsText = (oc.items || []).map(i => i.desc || i.descripcion || '').join(' ').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (provRef.includes(ref) || itemsText.includes(ref)) score += 2;
-    }
-  }
-
   // Fecha reciente
   if (oc.timestamp) {
     const diffDays = Math.abs(Date.now() - oc.timestamp) / 86400000;
@@ -221,9 +211,8 @@ function showAIResults(extracted, matches) {
   $('result-title').textContent = 'Resultados del análisis';
 
   let html = '<div class="adj-extracted">';
-  if (extracted.proveedor)        html += `<span class="adj-tag">🏢 ${esc(extracted.proveedor)}</span>`;
-  if (extracted.total_documento)  html += `<span class="adj-tag">💰 $${fmtMoney(extracted.total_documento)}</span>`;
-  if (extracted.ref_presupuesto)  html += `<span class="adj-tag">🔖 Ref: ${esc(extracted.ref_presupuesto)}</span>`;
+  if (extracted.proveedor)       html += `<span class="adj-tag">🏢 ${esc(extracted.proveedor)}</span>`;
+  if (extracted.total_documento) html += `<span class="adj-tag">💰 $${fmtMoney(extracted.total_documento)}</span>`;
   html += '</div>';
 
   if (matches.length === 0) {
@@ -337,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('result-title').textContent = 'Analizando con IA…';
     $('result-body').innerHTML    = `<div class="extract-status loading"><div class="spinner"></div> Gemini está analizando el documento…</div>`;
     try {
-      const extracted = await extractFromFile(currentFile);
+      const extracted = await extractBasicFromFile(currentFile);
       showAIResults(extracted, getTopMatches(extracted, allOCs));
     } catch (e) {
       $('result-title').textContent = 'No se pudo analizar';
