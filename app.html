@@ -29,13 +29,13 @@
       <span id="hdr-name">—</span>
     </div>
     <div class="hdr-menu-wrap">
-      <button class="btn btn-sm btn-outline" id="btn-menu" title="Menú">☰</button>
+      <button class="btn btn-sm btn-outline" id="btn-menu" title="Menú"><svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <div class="hdr-dropdown hidden" id="hdr-dropdown">
-        <button class="hdr-drop-item" id="btn-historial">📋 Historial</button>
-        <button class="hdr-drop-item" id="btn-adjuntar">📎 Adjuntar Archivo</button>
-        <button class="hdr-drop-item hidden" id="btn-usuarios">👥 Usuarios</button>
-        <button class="hdr-drop-item hidden" id="btn-obras">🏗 Obras</button>
-        <button class="hdr-drop-item" id="btn-firma">✍ Mi firma</button>
+        <button class="hdr-drop-item" id="btn-historial"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Historial</button>
+        <button class="hdr-drop-item" id="btn-adjuntar"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar Archivo</button>
+        <button class="hdr-drop-item hidden" id="btn-usuarios"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Usuarios</button>
+        <button class="hdr-drop-item hidden" id="btn-obras"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Obras</button>
+        <button class="hdr-drop-item" id="btn-firma"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Mi firma</button>
         <div class="hdr-drop-sep"></div>
         <button class="hdr-drop-item hdr-drop-danger" id="btn-logout">Salir</button>
         <div class="hdr-drop-version">v057</div>
@@ -66,24 +66,24 @@
         <span class="step-badge">1</span>
         Importar Documento con IA <span class="step-optional">(opcional)</span>
       </span>
-      <button class="btn btn-sm btn-secondary hidden" id="btn-clear-file">✕ Quitar</button>
+      <button class="btn btn-sm btn-secondary hidden" id="btn-clear-file"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Quitar</button>
     </div>
     <div class="card-body" id="drop-zone">
       <input type="file" id="file-input"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
       <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
       <div class="import-buttons">
         <button class="btn import-btn" id="btn-upload-file">
-          <span class="import-btn-icon">📁</span>
+          <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
           <span class="import-btn-label">Subir archivo</span>
           <span class="import-btn-sub">JPG · PNG · PDF · WEBP</span>
         </button>
         <button class="btn import-btn" id="btn-camera" style="display:none">
-          <span class="import-btn-icon">📷</span>
+          <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
           <span class="import-btn-label">Sacar foto</span>
           <span class="import-btn-sub">Cámara del dispositivo</span>
         </button>
         <button class="btn import-btn" id="btn-voice">
-          <span class="import-btn-icon">🎤</span>
+          <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
           <span class="import-btn-label">Dictar datos</span>
           <span class="import-btn-sub">Reconocimiento de voz</span>
         </button>
@@ -91,7 +91,8 @@
       <div class="upload-filename hidden" id="upload-filename"></div>
       <div class="extract-bar">
         <button class="btn btn-primary" id="btn-extract" disabled>
-          ✨ Extraer datos con Gemini
+          <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Extraer datos con Gemini
         </button>
         <div id="extract-status" class="extract-status hidden"></div>
       </div>
@@ -207,8 +208,8 @@
     </div>
     <div id="verif-banner" class="verif-banner hidden">
       <div class="verif-banner-header">
-        <span>⚠️ <strong>Verificación: hay discrepancias entre el documento y los datos extraídos</strong></span>
-        <button id="verif-banner-close" class="verif-banner-close" title="Cerrar">✕</button>
+        <span><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>Verificación: hay discrepancias entre el documento y los datos extraídos</strong></span>
+        <button id="verif-banner-close" class="verif-banner-close" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <ul id="verif-banner-list" class="verif-banner-list"></ul>
     </div>
@@ -231,7 +232,7 @@
       </div>
       <div id="items-cards"></div>
       <div class="empty-state" id="empty-state">
-        <div class="empty-icon">📋</div>
+        <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>
         <p>Usá <strong>Importar con IA</strong> o hacé clic en <strong>+ Agregar ítem</strong>.</p>
       </div>
     </div>
@@ -297,10 +298,11 @@
   <!-- Generate bar -->
   <div class="generate-bar">
     <button class="btn btn-secondary" id="btn-clear-form">Limpiar formulario</button>
-    <button class="btn btn-outline btn-sm hidden" id="btn-same-provider">↺ Mismo proveedor</button>
-    <button class="btn btn-outline" id="btn-preview">👁 Vista previa</button>
+    <button class="btn btn-outline btn-sm hidden" id="btn-same-provider"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Mismo proveedor</button>
+    <button class="btn btn-outline" id="btn-preview"><svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Vista previa</button>
     <button class="btn btn-success btn-generate" id="btn-generate">
-      🖨 Generar PDF — Orden de Compra
+      <svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Generar PDF — Orden de Compra
     </button>
   </div>
 
@@ -312,12 +314,12 @@
   <div class="modal modal--xl">
     <div class="modal-header">
       <span class="modal-title" id="preview-title">Vista previa</span>
-      <button class="modal-close" id="modal-preview-close">✕</button>
+      <button class="modal-close" id="modal-preview-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="modal-body" id="preview-body"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="modal-preview-close2">Cerrar</button>
-      <button class="btn btn-success" id="modal-preview-generate">🖨 Generar y descargar</button>
+      <button class="btn btn-success" id="modal-preview-generate"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Generar y descargar</button>
     </div>
   </div>
 </div>
@@ -327,7 +329,7 @@
   <div class="modal">
     <div class="modal-header">
       <span class="modal-title">Mi Firma</span>
-      <button class="modal-close" id="modal-firma-close">✕</button>
+      <button class="modal-close" id="modal-firma-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="modal-body">
       <p class="firma-hint-top">Dibujá tu firma. Se guardará y podrás incluirla en futuras OC.</p>
@@ -354,7 +356,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="btn-firma-sin">Sin firma</button>
-      <button class="btn btn-primary"   id="btn-firma-con">✍ Con firma</button>
+      <button class="btn btn-primary"   id="btn-firma-con"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Con firma</button>
     </div>
   </div>
 </div>
@@ -372,10 +374,10 @@
       <p style="color:var(--gray-500);margin-bottom:1.5rem;font-size:.875rem;">¿Qué querés hacer con este archivo?</p>
       <div style="display:flex;flex-direction:column;gap:.6rem;">
         <button class="btn btn-primary" id="btn-share-generar" style="justify-content:center;">
-          ✨ Generar OC
+          <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generar OC
         </button>
         <button class="btn btn-outline" id="btn-share-adjuntar" style="justify-content:center;">
-          📎 Adjuntar a una OC
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar a una OC
         </button>
       </div>
     </div>
@@ -389,18 +391,13 @@
 <div class="toast-container" id="toast-container"></div>
 
 <!-- ===== UPDATE BANNER ===== -->
-<div id="update-banner" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:1100;
-  background:#1a3a5c;color:#fff;padding:.65rem 1rem;align-items:center;
-  justify-content:space-between;gap:.75rem;font-size:.87rem;box-shadow:0 2px 8px rgba(0,0,0,.25);">
-  <span>✨ Nueva versión disponible</span>
-  <button onclick="window.location.reload()"
-    style="background:#fff;color:#1a3a5c;border:none;border-radius:6px;
-    padding:.3rem .8rem;font-weight:700;cursor:pointer;font-size:.85rem;">
-    Actualizar
-  </button>
+<div id="update-banner" class="update-banner">
+  <span><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible</span>
+  <button class="update-banner-btn" onclick="window.location.reload()">Actualizar</button>
 </div>
 
 <!-- ===== SCRIPTS ===== -->
+<script src="js/icons.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>

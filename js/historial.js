@@ -56,7 +56,7 @@ function renderCards(ocs) {
         <span class="hist-total">${total}</span>
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
         <div class="hist-actions">
-          ${canRegen ? '<button class="btn btn-sm btn-outline btn-regenerar" title="Regenerar y descargar PDF">🖨</button>' : ''}
+          ${canRegen ? `<button class="btn btn-sm btn-outline btn-regenerar" title="Regenerar y descargar PDF">${icSvg('print')}</button>` : ''}
           <button class="btn btn-sm btn-primary btn-usar-base" title="Cargar en formulario">Usar como base</button>
         </div>
       </div>`;
@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       allOCs = cached;
       renderCards(allOCs);
       $('hist-list').insertAdjacentHTML('afterbegin',
-        '<div class="hist-offline-notice">📴 Sin conexión — mostrando últimas 5 OC guardadas</div>');
+        `<div class="hist-offline-notice">${icSvg('wifi0')} Sin conexión — mostrando últimas 5 OC guardadas</div>`);
     } else {
       $('hist-list').innerHTML = '<div class="hist-empty">Sin conexión y sin datos locales. Abrí el historial con red al menos una vez.</div>';
     }

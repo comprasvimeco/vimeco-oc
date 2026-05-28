@@ -39,7 +39,7 @@ function displayToISODate(d) {
 function setFile(file) {
   currentFile = file;
   $('import-zone').classList.add('hidden');
-  $('file-ready-msg').textContent = `✓ ${file.name}  (${(file.size / 1024).toFixed(0)} KB)`;
+  $('file-ready-msg').innerHTML = `${icSvg('check')} ${esc(file.name)} &nbsp;(${(file.size / 1024).toFixed(0)} KB)`;
   $('file-info').classList.remove('hidden');
   $('step1-actions').classList.remove('hidden');
 }
@@ -204,8 +204,8 @@ function showAIResults(extracted, matches) {
   $('result-title').textContent = 'Resultados del análisis';
 
   let html = '<div class="adj-extracted">';
-  if (extracted.proveedor)       html += `<span class="adj-tag">🏢 ${esc(extracted.proveedor)}</span>`;
-  if (extracted.total_documento) html += `<span class="adj-tag">💰 $${fmtMoney(extracted.total_documento)}</span>`;
+  if (extracted.proveedor)       html += `<span class="adj-tag">${icSvg('building')} ${esc(extracted.proveedor)}</span>`;
+  if (extracted.total_documento) html += `<span class="adj-tag">${icSvg('dollar')} $${fmtMoney(extracted.total_documento)}</span>`;
   html += '</div>';
 
   if (matches.length === 0) {

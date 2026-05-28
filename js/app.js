@@ -823,7 +823,7 @@ function renderTableDesktop() {
       </td>
       <td class="col-subtotal text-right">${fmtMoneyDisplay(sub)}</td>
       <td class="col-actions text-center">
-        <button class="btn btn-icon btn-danger btn-sm btn-del" title="Eliminar">✕</button>
+        <button class="btn btn-icon btn-danger btn-sm btn-del" title="Eliminar">${icSvg('x')}</button>
       </td>`;
     tbody.appendChild(tr);
   });
@@ -864,7 +864,7 @@ function renderTableMobile() {
     card.innerHTML = `
       <div class="item-card-r1">
         <input type="text" class="item-card-desc" value="${esc(item.descripcion)}" placeholder="Descripción del ítem...">
-        <button class="btn btn-icon btn-danger btn-sm btn-del" title="Eliminar">✕</button>
+        <button class="btn btn-icon btn-danger btn-sm btn-del" title="Eliminar">${icSvg('x')}</button>
       </div>
       <div class="item-card-fields">
         <div class="item-card-col item-card-col--unit">
@@ -1029,7 +1029,7 @@ function renderImpuestos() {
         <input type="text" class="text-right num-input imp-monto" value="${fmtMoneyDisplay(imp.monto)}" placeholder="0,00">
       </td>
       <td class="text-center">
-        <button class="btn btn-icon btn-danger btn-sm btn-del-imp" title="Eliminar">✕</button>
+        <button class="btn btn-icon btn-danger btn-sm btn-del-imp" title="Eliminar">${icSvg('x')}</button>
       </td>`;
     tbody.appendChild(tr);
 
@@ -1173,7 +1173,7 @@ async function handleGenerate() {
   } catch (err) {
     toast(`Error N° OC: ${err.message}`, 'error');
     btn.disabled = false;
-    btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
+    btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
     return;
   }
 
@@ -1187,7 +1187,7 @@ async function handleGenerate() {
     toast(`Error al generar el PDF: ${err.message}`, 'error');
     console.error(err);
     btn.disabled = false;
-    btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
+    btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
     return;
   }
 
@@ -1222,7 +1222,7 @@ async function handleGenerate() {
   refreshOCNumberDisplay();
   toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada.`, 'success');
   btn.disabled = false;
-  btn.innerHTML = '🖨 Generar PDF — Orden de Compra';
+  btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
   $('btn-same-provider').classList.remove('hidden');
 
   // Subir a Drive en background (espera historial para evitar race condition en PATCH)

@@ -25,7 +25,7 @@
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <button class="btn btn-sm btn-outline" id="btn-back">← Volver</button>
+    <button class="btn btn-sm btn-outline" id="btn-back"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver</button>
   </div>
 </header>
 
@@ -35,7 +35,7 @@
     <!-- Paso 1: selección de archivo -->
     <div class="card" id="card-file">
       <div class="card-header">
-        <span class="card-title">📎 Adjuntar documento a una OC</span>
+        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar documento a una OC</span>
       </div>
       <div class="card-body">
         <div id="import-zone">
@@ -43,12 +43,12 @@
           <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
           <div class="import-buttons">
             <button class="btn import-btn" id="btn-select-file">
-              <span class="import-btn-icon">📁</span>
+              <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
               <span class="import-btn-label">Seleccionar archivo</span>
               <span class="import-btn-sub">PDF · JPG · PNG · WEBP</span>
             </button>
             <button class="btn import-btn hidden" id="btn-camera">
-              <span class="import-btn-icon">📷</span>
+              <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
               <span class="import-btn-label">Cámara</span>
               <span class="import-btn-sub">Sacar foto</span>
             </button>
@@ -61,7 +61,7 @@
 
         <div id="step1-actions" class="adj-step-actions hidden">
           <div class="adj-step-btns">
-            <button class="btn btn-primary" id="btn-use-ai" style="flex:1;">✨ Buscar con IA</button>
+            <button class="btn btn-primary" id="btn-use-ai" style="flex:1;"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Buscar con IA</button>
             <button class="btn btn-outline" id="btn-use-manual" style="flex:1;">Asignar manualmente</button>
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-change-file" style="align-self:flex-end;">Cambiar archivo</button>
@@ -73,7 +73,7 @@
     <div class="card hidden" id="card-result">
       <div class="card-header">
         <span class="card-title" id="result-title">Resultados</span>
-        <button class="btn btn-sm btn-outline" id="btn-restart">← Otro archivo</button>
+        <button class="btn btn-sm btn-outline" id="btn-restart"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Otro archivo</button>
       </div>
       <div class="card-body" id="result-body"></div>
     </div>
@@ -81,7 +81,7 @@
     <!-- Estado: éxito -->
     <div class="card hidden" id="card-success">
       <div class="card-body" style="text-align:center; padding:2rem 1rem;">
-        <div style="font-size:2.5rem; margin-bottom:.75rem;">✅</div>
+        <div class="adj-success-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
         <p style="font-size:1rem; font-weight:600; color:var(--success); margin-bottom:.35rem;">Archivo subido correctamente</p>
         <p id="success-detail" style="font-size:.85rem; color:var(--gray-500); margin-bottom:1.25rem;"></p>
         <button class="btn btn-primary" id="btn-another">Subir otro archivo</button>
@@ -93,6 +93,7 @@
 
 <div class="toast-container" id="toast-container"></div>
 
+<script src="js/icons.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>
