@@ -53,9 +53,9 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Web Share Target: maneja POST a adjuntar.html (nuevo) y app.html (compatibilidad)
+  // Web Share Target: guarda el archivo en cache y redirige a app.html
   if (event.request.method === 'POST' &&
-      (url.pathname === BASE + '/adjuntar.html' || url.pathname === BASE + '/app.html')) {
+      (url.pathname === BASE + '/app.html' || url.pathname === BASE + '/adjuntar.html')) {
     event.respondWith((async () => {
       const formData = await event.request.formData();
       const file = formData.get('file');
@@ -65,7 +65,7 @@ self.addEventListener('fetch', event => {
           headers: { 'X-File-Name': file.name || '', 'Content-Type': file.type || '' }
         }));
       }
-      return Response.redirect(BASE + '/adjuntar.html', 303);
+      return Response.redirect(BASE + '/app.html', 303);
     })());
     return;
   }

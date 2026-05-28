@@ -336,7 +336,7 @@ async function checkSharedFile() {
     const cache = await caches.open('share-target');
     const match = await cache.match('shared-file');
     if (!match) return;
-    await cache.delete('shared-file');
+    // No borrar todavía: el modal decide qué hacer con él
     const blob     = await match.blob();
     const origName = match.headers.get('X-File-Name') || '';
     const ext      = blob.type === 'application/pdf' ? '.pdf' : blob.type.startsWith('image/') ? '.jpg' : '';
@@ -348,31 +348,30 @@ async function checkSharedFile() {
   }
 }
 
+async function deleteSharedFile() {
+  try { const c = await caches.open('share-target'); await c.delete('shared-file'); } catch (_) {}
+}
+
 function showShareChoiceModal(file) {
   $('share-choice-filename').textContent = file.name;
   $('modal-share-choice').classList.remove('hidden');
 
   $('btn-share-generar').onclick = () => {
     $('modal-share-choice').classList.add('hidden');
+    deleteSharedFile();
     handleFileSelected(file);
     toast('Archivo cargado. Usá "Extraer con Gemini" para procesar.', 'success');
   };
 
-  $('btn-share-historial').onclick = async () => {
+  $('btn-share-adjuntar').onclick = () => {
     $('modal-share-choice').classList.add('hidden');
-    try {
-      const cache = await caches.open('share-target');
-      await cache.put('attach-file', new Response(file, {
-        headers: { 'X-File-Name': file.name, 'Content-Type': file.type }
-      }));
-      window.location.href = 'historial.html';
-    } catch (e) {
-      toast('Error preparando el archivo.', 'error');
-    }
+    // El archivo queda en cache como 'shared-file'; adjuntar.js lo leerá
+    window.location.href = 'adjuntar.html';
   };
 
   $('btn-share-cancelar').onclick = () => {
     $('modal-share-choice').classList.add('hidden');
+    deleteSharedFile();
   };
 }
 
