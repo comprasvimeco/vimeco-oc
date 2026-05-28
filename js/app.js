@@ -360,7 +360,7 @@ function showShareChoiceModal(file) {
     $('modal-share-choice').classList.add('hidden');
     deleteSharedFile();
     handleFileSelected(file);
-    toast('Archivo cargado. Usá "Extraer con Gemini" para procesar.', 'success');
+    toast('Archivo cargado. Usá "Extraer con IA" para procesar.', 'success');
   };
 
   $('btn-share-adjuntar').onclick = () => {
@@ -653,7 +653,7 @@ function applyExtractionResult(r) {
 
 async function handleExtract() {
   if (!selectedFile) return;
-  setExtractStatus('loading', 'Analizando documento con Gemini 2.5 Flash…');
+  setExtractStatus('loading', 'Analizando documento con IA…');
   $('btn-extract').disabled = true;
 
   try {
@@ -662,7 +662,7 @@ async function handleExtract() {
     const impMsg = impuestos.length ? ` y ${impuestos.length} impuesto(s)` : '';
     if (r.items?.length) {
       setExtractStatus('success', `✓ Se extrajeron ${r.items.length} ítem(s)${impMsg}.`);
-      toast(`Gemini extrajo ${r.items.length} ítem(s)${impMsg}.`, 'success');
+      toast(`IA extrajo ${r.items.length} ítem(s)${impMsg}.`, 'success');
     } else {
       setExtractStatus('success', '✓ Datos del proveedor completados. No se detectaron ítems.');
       toast('Datos extraídos. No se detectaron ítems — podés agregarlos manualmente.', 'warning');

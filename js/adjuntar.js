@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('card-file').classList.add('hidden');
     $('card-result').classList.remove('hidden');
     $('result-title').textContent = 'Analizando con IA…';
-    $('result-body').innerHTML    = `<div class="extract-status loading"><div class="spinner"></div> Gemini está analizando el documento…</div>`;
+    $('result-body').innerHTML    = `<div class="extract-status loading"><div class="spinner"></div> Analizando el documento…</div>`;
     try {
       const extracted = await extractBasicFromFile(currentFile);
       showAIResults(extracted, getTopMatches(extracted, allOCs));

@@ -21,7 +21,7 @@ window.toggleVoiceRecording = async function(btn) {
   _chunks    = [];
   _recording = true;
 
-  btn.innerHTML = '<span class="import-btn-icon">' + icSvg('stop') + '</span><span class="import-btn-label">Detener</span><span class="import-btn-sub">Grabando…</span>';
+  btn.innerHTML = '<span class="import-btn-icon">' + icSvg('stop') + '</span><span class="import-btn-label">Detener</span>';
   btn.classList.add('recording');
 
   _recorder.addEventListener('dataavailable', e => {
@@ -31,7 +31,7 @@ window.toggleVoiceRecording = async function(btn) {
   _recorder.addEventListener('stop', async () => {
     _recording = false;
     stream.getTracks().forEach(t => t.stop());
-    btn.innerHTML = '<span class="import-btn-icon">' + icSvg('mic') + '</span><span class="import-btn-label">Dictar datos</span><span class="import-btn-sub">Reconocimiento de voz</span>';
+    btn.innerHTML = '<span class="import-btn-icon">' + icSvg('mic') + '</span><span class="import-btn-label">Dictar datos</span>';
     btn.classList.remove('recording');
 
     const blob   = new Blob(_chunks, { type: mimeType });
