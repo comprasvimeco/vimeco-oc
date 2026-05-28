@@ -38,26 +38,19 @@ function displayToISODate(d) {
 
 function setFile(file) {
   currentFile = file;
-  const zone = $('drop-zone');
-  zone.classList.add('has-file');
-  zone.querySelector('.upload-icon').textContent    = '📄';
-  zone.querySelector('.upload-text').innerHTML      = `<strong>${esc(file.name)}</strong>`;
-  zone.querySelector('.upload-formats').textContent = `${(file.size / 1024).toFixed(0)} KB`;
-  $('file-ready-msg').textContent = `✓ ${file.name}`;
+  $('import-zone').classList.add('hidden');
+  $('file-ready-msg').textContent = `✓ ${file.name}  (${(file.size / 1024).toFixed(0)} KB)`;
   $('file-info').classList.remove('hidden');
   $('step1-actions').classList.remove('hidden');
 }
 
 function resetZone() {
   currentFile = null;
-  const zone = $('drop-zone');
-  zone.classList.remove('has-file');
-  zone.querySelector('.upload-icon').textContent    = '📄';
-  zone.querySelector('.upload-text').innerHTML      = '<strong>Seleccioná o arrastrá el archivo</strong>';
-  zone.querySelector('.upload-formats').textContent = 'PDF, JPG, PNG, WEBP · También podés compartir desde otra app';
+  $('import-zone').classList.remove('hidden');
   $('file-info').classList.add('hidden');
   $('step1-actions').classList.add('hidden');
-  $('file-input').value = '';
+  $('file-input').value    = '';
+  $('camera-input').value  = '';
 }
 
 async function checkShareFile() {
@@ -302,18 +295,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sharedFile = await checkShareFile();
   if (sharedFile) setFile(sharedFile);
 
-  // Drop zone
-  const dropZone  = $('drop-zone');
-  const fileInput = $('file-input');
+  // Botones de selección
+  const fileInput   = $('file-input');
+  const cameraInput = $('camera-input');
 
-  dropZone.addEventListener('click', () => { if (!currentFile) fileInput.click(); });
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+  if ('ontouchstart' in window || window.innerWidth <= 768) {
+    $('btn-camera').classList.remove('hidden');
+  }
 
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
+  $('btn-select-file').addEventListener('click', () => fileInput.click());
+  $('btn-camera').addEventListener('click', () => cameraInput.click());
+
+  fileInput.addEventListener('change',   () => { if (fileInput.files[0])   setFile(fileInput.files[0]); });
+  cameraInput.addEventListener('change', () => { if (cameraInput.files[0]) setFile(cameraInput.files[0]); });
+
+  // Drag & drop (desktop)
+  const importZone = $('import-zone');
+  importZone.addEventListener('dragover', e => { e.preventDefault(); importZone.classList.add('drag-over'); });
+  importZone.addEventListener('dragleave', () => importZone.classList.remove('drag-over'));
+  importZone.addEventListener('drop', e => {
     e.preventDefault();
-    dropZone.classList.remove('drag-over');
+    importZone.classList.remove('drag-over');
     if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
   });
 

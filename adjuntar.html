@@ -38,12 +38,22 @@
         <span class="card-title">📎 Adjuntar documento a una OC</span>
       </div>
       <div class="card-body">
-        <div class="upload-zone" id="drop-zone">
-          <div class="upload-icon">📄</div>
-          <div class="upload-text"><strong>Seleccioná o arrastrá el archivo</strong></div>
-          <div class="upload-formats">PDF, JPG, PNG, WEBP · También podés compartir desde otra app</div>
+        <div id="import-zone">
+          <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp">
+          <input type="file" id="camera-input" accept="image/*" capture="environment">
+          <div class="import-buttons">
+            <button class="btn import-btn" id="btn-select-file">
+              <span class="import-btn-icon">📁</span>
+              <span class="import-btn-label">Seleccionar archivo</span>
+              <span class="import-btn-sub">PDF · JPG · PNG · WEBP</span>
+            </button>
+            <button class="btn import-btn hidden" id="btn-camera">
+              <span class="import-btn-icon">📷</span>
+              <span class="import-btn-label">Cámara</span>
+              <span class="import-btn-sub">Sacar foto</span>
+            </button>
+          </div>
         </div>
-        <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp">
 
         <div id="file-info" class="hidden" style="margin-top:.75rem;">
           <div class="extract-status success" id="file-ready-msg"></div>
