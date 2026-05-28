@@ -45,7 +45,6 @@ function setFile(file) {
   zone.querySelector('.upload-formats').textContent = `${(file.size / 1024).toFixed(0)} KB`;
   $('file-ready-msg').textContent = `✓ ${file.name}`;
   $('file-info').classList.remove('hidden');
-  $('ai-toggle-wrap').classList.remove('hidden');
   $('step1-actions').classList.remove('hidden');
 }
 
@@ -57,7 +56,6 @@ function resetZone() {
   zone.querySelector('.upload-text').innerHTML      = '<strong>Seleccioná o arrastrá el archivo</strong>';
   zone.querySelector('.upload-formats').textContent = 'PDF, JPG, PNG, WEBP · También podés compartir desde otra app';
   $('file-info').classList.add('hidden');
-  $('ai-toggle-wrap').classList.add('hidden');
   $('step1-actions').classList.add('hidden');
   $('file-input').value = '';
 }
@@ -332,22 +330,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('btn-change-file').addEventListener('click', resetZone);
 
-  // Continuar
-  $('btn-continue').addEventListener('click', async () => {
+  $('btn-use-ai').addEventListener('click', async () => {
     if (!currentFile) return;
-    const useAI = $('use-ai').checked;
-
     $('card-file').classList.add('hidden');
     $('card-result').classList.remove('hidden');
-
-    if (!useAI) {
-      showManualMode();
-      return;
-    }
-
     $('result-title').textContent = 'Analizando con IA…';
     $('result-body').innerHTML    = `<div class="extract-status loading"><div class="spinner"></div> Gemini está analizando el documento…</div>`;
-
     try {
       const extracted = await extractFromFile(currentFile);
       showAIResults(extracted, getTopMatches(extracted, allOCs));
@@ -358,5 +346,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderManualListHTML(allOCs);
       bindButtons();
     }
+  });
+
+  $('btn-use-manual').addEventListener('click', () => {
+    if (!currentFile) return;
+    $('card-file').classList.add('hidden');
+    $('card-result').classList.remove('hidden');
+    showManualMode();
   });
 });
