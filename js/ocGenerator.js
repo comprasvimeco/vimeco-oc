@@ -381,8 +381,20 @@ function drawTotalsTable(doc, data, y, colW) {
   if (!impuestos.length) return y;
 
   const ROW_H = 7.5;
-  const LBL_W = colW[0] + colW[1] + colW[2] + colW[3];
-  const sepX  = ml + LBL_W;
+
+  // Calcular el ancho real del monto más ancho a su fuente correspondiente
+  let maxAmtW = 0;
+  impuestos.forEach(imp => {
+    const isTotal = imp.nombre.trim().toUpperCase() === 'TOTAL';
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(isTotal ? 9.5 : 8.5);
+    const w = doc.getTextWidth(`$ ${formatARS(imp.monto)}`);
+    if (w > maxAmtW) maxAmtW = w;
+  });
+  // sepX: max entre la posición natural de las columnas y lo necesario para el monto
+  const naturalSepX = ml + colW[0] + colW[1] + colW[2] + colW[3];
+  const minSepX     = ml + cw - maxAmtW - 6; // 3mm margen a cada lado
+  const sepX        = Math.min(naturalSepX, minSepX);
 
   setThinBorder(doc);
   impuestos.forEach((imp, i) => {
