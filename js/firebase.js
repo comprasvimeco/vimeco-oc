@@ -283,9 +283,17 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
+  async function _fbFetch(url, opts) {
+    const resp = await fetch(url, opts);
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      throw new Error(`HTTP ${resp.status} — ${body.substring(0, 120)}`);
+    }
+    return resp;
+  }
+
   window.getCajaMovimientos = async function (userId) {
-    const resp = await fetch(_base() + '/cajas/' + userId + '/movimientos.json');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const resp = await _fbFetch(_base() + '/cajas/' + userId + '/movimientos.json');
     const data = await resp.json();
     if (!data) return [];
     return Object.entries(data)
@@ -295,36 +303,32 @@
 
   window.saveCajaMovimiento = async function (userId, movimiento) {
     const key  = _genKey();
-    const resp = await fetch(_base() + '/cajas/' + userId + '/movimientos/' + key + '.json', {
+    await _fbFetch(_base() + '/cajas/' + userId + '/movimientos/' + key + '.json', {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ ...movimiento, timestamp: Date.now() })
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
     return key;
   };
 
   window.deleteCajaMovimiento = async function (userId, key) {
-    const resp = await fetch(_base() + '/cajas/' + userId + '/movimientos/' + key + '.json', {
+    await _fbFetch(_base() + '/cajas/' + userId + '/movimientos/' + key + '.json', {
       method: 'DELETE'
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 
   window.getCategoriasCaja = async function () {
-    const resp = await fetch(_base() + '/categorias_caja.json');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const resp = await _fbFetch(_base() + '/categorias_caja.json');
     const data = await resp.json();
     if (!data) return [];
     return Array.isArray(data) ? data.filter(Boolean) : Object.values(data).filter(Boolean);
   };
 
   window.saveCategoriasCaja = async function (categorias) {
-    const resp = await fetch(_base() + '/categorias_caja.json', {
+    await _fbFetch(_base() + '/categorias_caja.json', {
       method:  'PUT',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(categorias)
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 })();

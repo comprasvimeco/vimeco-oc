@@ -132,8 +132,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeRecargaModal();
         showToast('Recarga registrada', 'success');
         loadMovimientos();
-      } catch (_) {
-        errorEl.textContent = 'Error al guardar. Intentá de nuevo.';
+      } catch (err) {
+        errorEl.textContent = 'Error al guardar: ' + (err.message || err);
         errorEl.classList.remove('hidden');
       }
       btn.disabled = false;
@@ -156,9 +156,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       movimientos = await getCajaMovimientos(targetCodigo);
-    } catch (_) {
+    } catch (err) {
       movimientos = [];
-      showToast('Error al cargar movimientos', 'error');
+      showToast('Error al cargar movimientos: ' + (err.message || err), 'error');
     }
 
     elLoad.style.display = 'none';
@@ -418,8 +418,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeGastoModal();
       showToast('Gasto registrado', 'success');
       loadMovimientos();
-    } catch (_) {
-      errorEl.textContent = 'Error al guardar. Intentá de nuevo.';
+    } catch (err) {
+      errorEl.textContent = 'Error al guardar: ' + (err.message || err);
       errorEl.classList.remove('hidden');
     }
 
