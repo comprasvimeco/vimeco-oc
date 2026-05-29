@@ -516,6 +516,122 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // ─── Exportar Excel ──────────────────────────────────
+  document.getElementById('btn-exportar-excel').addEventListener('click', exportarExcel);
+
+  async function exportarExcel() {
+    const btn = document.getElementById('btn-exportar-excel');
+    btn.disabled = true;
+    btn.textContent = 'Generando…';
+
+    // Lazy-load SheetJS solo cuando se necesita
+    if (!window.XLSX) {
+      try {
+        await new Promise((resolve, reject) => {
+          const s    = document.createElement('script');
+          s.src      = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+          s.onload  = resolve;
+          s.onerror = () => reject(new Error('No se pudo cargar la librería de Excel. Verificá tu conexión.'));
+          document.head.appendChild(s);
+        });
+      } catch (err) {
+        showToast(err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Exportar Excel';
+        return;
+      }
+    }
+
+    const MESES = ['', 'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const mesFilter    = document.getElementById('filter-mes').value;
+    const filtered     = mesFilter ? movimientos.filter(m => m.fecha?.startsWith(mesFilter)) : movimientos;
+    const periodoLabel = mesFilter
+      ? (() => { const [y, m] = mesFilter.split('-'); return `${MESES[parseInt(m, 10)]} ${y}`; })()
+      : 'Todos los movimientos';
+
+    // ─── Datos para la hoja ─────────────────────────────
+    const rows = [];
+
+    // Encabezado
+    rows.push(['VIMECO S.A. — Caja Chica']);
+    rows.push([`Usuario: ${targetNombre}`]);
+    rows.push([`Período: ${periodoLabel}`]);
+    rows.push([`Generado: ${new Date().toLocaleDateString('es-AR')}`]);
+    rows.push([]);
+
+    // Balance acumulado (siempre sobre total histórico)
+    const totalIngresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
+    const totalGastos   = movimientos.filter(m => m.tipo === 'gasto').reduce((s, m)  => s + (m.monto || 0), 0);
+    rows.push(['BALANCE ACUMULADO']);
+    rows.push(['Ingresos totales', totalIngresos]);
+    rows.push(['Gastos totales',   totalGastos]);
+    rows.push(['Saldo actual',     totalIngresos - totalGastos]);
+    rows.push([]);
+
+    // Gastos por categoría (período filtrado)
+    const gastosFiltrados = filtered.filter(m => m.tipo === 'gasto');
+    const porCategoria    = {};
+    gastosFiltrados.forEach(m => {
+      const c = m.categoria || 'Sin categoría';
+      porCategoria[c] = (porCategoria[c] || 0) + (m.monto || 0);
+    });
+    const ingresosFiltrados = filtered.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
+    const gastosTotalFiltrado = gastosFiltrados.reduce((s, m) => s + (m.monto || 0), 0);
+
+    rows.push([`RESUMEN DEL PERÍODO — ${periodoLabel}`]);
+    rows.push(['Ingresos del período', ingresosFiltrados]);
+    rows.push([]);
+    rows.push(['GASTOS POR CATEGORÍA']);
+    rows.push(['Categoría', 'Monto ($)']);
+    Object.entries(porCategoria)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([cat, monto]) => rows.push([cat, monto]));
+    rows.push(['TOTAL GASTOS', gastosTotalFiltrado]);
+    rows.push([]);
+
+    // Detalle de movimientos
+    rows.push([`DETALLE DE MOVIMIENTOS — ${periodoLabel}`]);
+    rows.push(['Fecha', 'Tipo', 'Categoría', 'Proveedor', 'Descripción', 'Monto ($)']);
+    filtered.forEach(m => {
+      rows.push([
+        m.fecha        || '',
+        m.tipo === 'ingreso' ? 'Ingreso' : 'Gasto',
+        m.categoria    || '',
+        m.proveedor    || '',
+        m.descripcion  || '',
+        m.tipo === 'ingreso' ? (m.monto || 0) : -(m.monto || 0)
+      ]);
+    });
+
+    // ─── Crear libro y hoja ──────────────────────────────
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Ancho de columnas
+    ws['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 18 }, { wch: 28 }, { wch: 38 }, { wch: 15 }];
+
+    // Negrita en filas de título/sección (filas impares de sección)
+    const boldRows = [0, 5, 15, rows.length - filtered.length - 2]; // títulos principales
+    boldRows.forEach(r => {
+      const cellAddr = XLSX.utils.encode_cell({ r, c: 0 });
+      if (ws[cellAddr]) {
+        if (!ws[cellAddr].s) ws[cellAddr].s = {};
+        ws[cellAddr].s.font = { bold: true };
+      }
+    });
+
+    const sheetName = periodoLabel === 'Todos los movimientos' ? 'Caja Chica' : periodoLabel.substring(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    // ─── Descargar ───────────────────────────────────────
+    const safeName  = targetNombre.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+    const safePeriod = periodoLabel.replace(/\s+/g, '_');
+    XLSX.writeFile(wb, `Caja_${safeName}_${safePeriod}.xlsx`);
+
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Exportar Excel';
+  }
+
   // ─── Helper: parse monto ─────────────────────────────
   function parseMonto(str) {
     if (!str) return 0;
