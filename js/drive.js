@@ -178,24 +178,53 @@
       ? await getOrCreateFolder(token, tipo === 'foto' ? 'Fotos' : 'Archivos', mesFolder)
       : mesFolder;
 
-    const resp = await (async () => {
-      const boundary = 'vimeco_' + Date.now();
-      const mimeType = file.type || 'application/octet-stream';
-      const meta     = JSON.stringify({ name: file.name, parents: [typeFolder], mimeType });
-      const enc      = new TextEncoder();
-      const pre      = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
-      const post     = enc.encode(`\r\n--${boundary}--`);
-      const content  = new Uint8Array(await file.arrayBuffer());
-      const body     = new Uint8Array(pre.length + content.length + post.length);
-      body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
-      return fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+    const mimeType = file.type || 'application/octet-stream';
+
+    // Para planilla: buscar si ya existe y hacer PATCH (actualizar) en vez de crear
+    if (tipo === 'planilla') {
+      const q = `name=${JSON.stringify(file.name)} and '${typeFolder}' in parents and trashed=false`;
+      const search = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-    })();
+      if (search.ok) {
+        const { files } = await search.json();
+        if (files?.length) {
+          // Actualizar contenido del archivo existente
+          const existingId = files[0].id;
+          const boundary   = 'vimeco_' + Date.now();
+          const meta       = JSON.stringify({ name: file.name, mimeType });
+          const enc        = new TextEncoder();
+          const pre        = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+          const post       = enc.encode(`\r\n--${boundary}--`);
+          const content    = new Uint8Array(await file.arrayBuffer());
+          const body       = new Uint8Array(pre.length + content.length + post.length);
+          body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
+          const upd = await fetch(
+            `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart&fields=id`,
+            { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+          );
+          if (!upd.ok) throw new Error(`Update planilla (${upd.status})`);
+          return { fileId: (await upd.json()).id };
+        }
+      }
+    }
+
+    // Crear nuevo archivo
+    const boundary = 'vimeco_' + Date.now();
+    const meta     = JSON.stringify({ name: file.name, parents: [typeFolder], mimeType });
+    const enc      = new TextEncoder();
+    const pre      = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    const post     = enc.encode(`\r\n--${boundary}--`);
+    const content  = new Uint8Array(await file.arrayBuffer());
+    const body     = new Uint8Array(pre.length + content.length + post.length);
+    body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
+    const resp = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+    );
     if (!resp.ok) throw new Error(`Upload caja (${resp.status})`);
-    const { id } = await resp.json();
-    return { fileId: id };
+    return { fileId: (await resp.json()).id };
   };
 
   // Adjuntar un archivo a la carpeta Drive de una OC existente
