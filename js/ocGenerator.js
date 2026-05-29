@@ -97,18 +97,31 @@ function drawHeader(doc, data, y) {
   const x0     = ml;
   const x1     = x0 + HDR_COLS[0];
   const x2     = x1 + HDR_COLS[1];
+
+  // Fila opcional de observaciones (altura dinámica)
+  const obs     = (data.observaciones || '').trim();
+  const LABEL_W = 28;
+  let obsLines  = [];
+  let HDR_OBS   = 0;
+  if (obs) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    obsLines = doc.splitTextToSize(obs, PG.cw - LABEL_W - 4);
+    HDR_OBS  = Math.max(7, obsLines.length * 4.2 + 4);
+  }
+
   const totalH = HDR_R1H + HDR_R2H;
 
-  // Fondo gris claro — todo el header
-  fillRect(doc, x0, y, PG.cw, totalH, C.gris);
+  // Fondo gris claro — todo el header (incluye fila obs si existe)
+  fillRect(doc, x0, y, PG.cw, totalH + HDR_OBS, C.gris);
 
   // Relleno azul para bloque N° (sin borde propio)
   fillRect(doc, x2, y + HDR_R1H, HDR_COLS[2], HDR_R2H, C.azul);
 
   // Borde exterior del header + línea vertical divisoria
   setThinBorder(doc);
-  doc.rect(x0, y, PG.cw, totalH, 'S');
-  doc.line(x2, y, x2, y + totalH);
+  doc.rect(x0, y, PG.cw, totalH + HDR_OBS, 'S');
+  doc.line(x2, y, x2, y + totalH + HDR_OBS);
 
   // Caja para datos fiscales (col3 fila1)
   doc.rect(x2, y, HDR_COLS[2], HDR_R1H, 'S');
@@ -194,7 +207,22 @@ function drawHeader(doc, data, y) {
   doc.setTextColor(...C.blanco);
   doc.text(`N° ${data.nroOC}`, midC3, y + HDR_R1H + HDR_R2H / 2 + 2, { align: 'center' });
 
-  return y + totalH;
+  // ── Fila observaciones (solo si hay contenido) ────────
+  if (obs) {
+    const oy  = y + totalH;
+    const ty  = oy + 4;
+    // Línea horizontal divisoria
+    doc.line(x0, oy, x0 + PG.cw, oy);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.azul);
+    doc.text('Observaciones:', x0 + 2, ty);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.negro);
+    obsLines.forEach((ln, i) => doc.text(ln, x0 + LABEL_W, ty + i * 4.2));
+  }
+
+  return y + totalH + HDR_OBS;
 }
 
 /* =====================================================

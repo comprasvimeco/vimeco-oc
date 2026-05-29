@@ -1205,6 +1205,7 @@ function buildOCData(numero, firma = null) {
       unitario: it.precio_unitario,
       total:    roundCents((parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0))
     })),
+    observaciones: $('observaciones').value.trim() || '',
     impuestos:   pdfTotals,
     totalLetras: numberToWords(total),
     _total:      total,
