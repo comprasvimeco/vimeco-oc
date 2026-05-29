@@ -98,30 +98,18 @@ function drawHeader(doc, data, y) {
   const x1     = x0 + HDR_COLS[0];
   const x2     = x1 + HDR_COLS[1];
 
-  // Fila opcional de observaciones (altura dinámica)
-  const obs     = (data.observaciones || '').trim();
-  const LABEL_W = 28;
-  let obsLines  = [];
-  let HDR_OBS   = 0;
-  if (obs) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    obsLines = doc.splitTextToSize(obs, PG.cw - LABEL_W - 4);
-    HDR_OBS  = Math.max(7, obsLines.length * 4.2 + 4);
-  }
-
   const totalH = HDR_R1H + HDR_R2H;
 
-  // Fondo gris claro — todo el header (incluye fila obs si existe)
-  fillRect(doc, x0, y, PG.cw, totalH + HDR_OBS, C.gris);
+  // Fondo gris claro — todo el header
+  fillRect(doc, x0, y, PG.cw, totalH, C.gris);
 
   // Relleno azul para bloque N° (sin borde propio)
   fillRect(doc, x2, y + HDR_R1H, HDR_COLS[2], HDR_R2H, C.azul);
 
   // Borde exterior del header + línea vertical divisoria
   setThinBorder(doc);
-  doc.rect(x0, y, PG.cw, totalH + HDR_OBS, 'S');
-  doc.line(x2, y, x2, y + totalH + HDR_OBS);
+  doc.rect(x0, y, PG.cw, totalH, 'S');
+  doc.line(x2, y, x2, y + totalH);
 
   // Caja para datos fiscales (col3 fila1)
   doc.rect(x2, y, HDR_COLS[2], HDR_R1H, 'S');
@@ -207,22 +195,7 @@ function drawHeader(doc, data, y) {
   doc.setTextColor(...C.blanco);
   doc.text(`N° ${data.nroOC}`, midC3, y + HDR_R1H + HDR_R2H / 2 + 2, { align: 'center' });
 
-  // ── Fila observaciones (solo si hay contenido) ────────
-  if (obs) {
-    const oy  = y + totalH;
-    const ty  = oy + 4;
-    // Línea horizontal divisoria
-    doc.line(x0, oy, x0 + PG.cw, oy);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C.azul);
-    doc.text('Observaciones:', x0 + 2, ty);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...C.negro);
-    obsLines.forEach((ln, i) => doc.text(ln, x0 + LABEL_W, ty + i * 4.2));
-  }
-
-  return y + totalH + HDR_OBS;
+  return y + totalH;
 }
 
 /* =====================================================
@@ -294,8 +267,30 @@ function drawProveedorTable(doc, data, y) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...C.negro);
   ubicLines.forEach((ln, i) => doc.text(ln, xs[1] + 1.5, ry + 4.5 + i * LINE_H));
+  ry += R4H;
 
-  return ry + R4H;
+  // Fila Observaciones (solo si hay contenido)
+  const obs = (data.observaciones || '').trim();
+  if (obs) {
+    const obsW     = PROV_COLS[1] + PROV_COLS[2] + PROV_COLS[3];
+    const obsLines = doc.splitTextToSize(obs, obsW - 3);
+    const OBS_H    = Math.max(MIN_H, obsLines.length * LINE_H + 5);
+
+    fillRect(doc, xs[0], ry, PROV_COLS[0], OBS_H, C.fondoLogo);
+    fillRect(doc, xs[1], ry, obsW,          OBS_H, C.blanco);
+    doc.rect(xs[0], ry, fullW, OBS_H, 'S');
+    doc.line(xs[1], ry, xs[1], ry + OBS_H);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.azul);
+    doc.text('Observaciones:', xs[0] + 1.5, ry + 4.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.negro);
+    obsLines.forEach((ln, i) => doc.text(ln, xs[1] + 1.5, ry + 4.5 + i * LINE_H));
+    ry += OBS_H;
+  }
+
+  return ry;
 }
 
 /* =====================================================
@@ -475,32 +470,41 @@ function drawAmountInWords(doc, totalLetras, y) {
    ===================================================== */
 function drawFooter(doc, data, y) {
   const { ml, w } = PG;
-  const COL_H = 38;
-  const xs    = buildXs(ml, FTR_COLS);
+  const xs        = buildXs(ml, FTR_COLS);
+  const LH        = 4.2;   // line height
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+
+  // Pre-calcular líneas de cada ítem de col1 para altura dinámica
+  const col1Items = [
+    { label: 'Condiciones de Pago:', value: data.proveedor.pago  || '—' },
+    { label: 'Plazo de entrega:',    value: data.proveedor.plazo || '—' },
+    { label: 'Lugar de entrega:',    value: data.proveedor.lugar || '—' }
+  ].map(item => ({
+    ...item,
+    lines: doc.splitTextToSize(item.value, FTR_COLS[0] - 5)
+  }));
+
+  // Altura total necesaria para texto de col1 + 16mm para firmas
+  let col1TextH = 4;
+  col1Items.forEach(({ lines }) => { col1TextH += LH + lines.length * LH + 2; });
+  const COL_H = Math.max(38, col1TextH + 16);
 
   FTR_COLS.forEach((cw_col, i) => fillRect(doc, xs[i], y, cw_col, COL_H, C.blanco));
   setThinBorder(doc);
   FTR_COLS.forEach((cw_col, i) => doc.rect(xs[i], y, cw_col, COL_H, 'S'));
 
-  doc.setFontSize(7.5);
-
-  // Col 1 — Condiciones de pago / Plazo / Lugar de entrega
-  const col1Items = [
-    { label: 'Condiciones de Pago:', value: data.proveedor.pago  || '—' },
-    { label: 'Plazo de entrega:',    value: data.proveedor.plazo || '—' },
-    { label: 'Lugar de entrega:',    value: data.proveedor.lugar || '—' }
-  ];
-  col1Items.forEach(({ label, value }, i) => {
-    const ly = y + 5.5 + i * 10.5;
+  // Col 1 — multi-línea con posicionamiento acumulativo
+  let iy = y + 4;
+  col1Items.forEach(({ label, lines }) => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...C.azul);
-    doc.text(label, xs[0] + 2.5, ly);
+    doc.text(label, xs[0] + 2.5, iy);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...C.negro);
-    doc.text(
-      doc.splitTextToSize(value, FTR_COLS[0] - 5)[0],
-      xs[0] + 2.5, ly + 4.5
-    );
+    lines.forEach((ln, li) => doc.text(ln, xs[0] + 2.5, iy + LH + li * LH));
+    iy += LH + lines.length * LH + 2;
   });
 
   // Col 2 — Conformidad del proveedor
