@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (s.codigo && s.nombre) {
         sessionStorage.setItem('responsable_code', s.codigo);
         sessionStorage.setItem('responsable_name', s.nombre);
-        window.location.href = 'app.html';
+        window.location.href = 'menu.html';
         return;
       }
     } catch (_) {}
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('responsable_name', nombre);
     sessionStorage.setItem('responsable_code', codigo);
     sessionStorage.setItem('responsable_name', nombre);
-    window.location.href = 'app.html';
+    window.location.href = 'menu.html';
   }
 
   // Cargar usuarios desde Firebase

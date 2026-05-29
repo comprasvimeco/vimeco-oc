@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Caja Chica</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="app-header">
+  <div class="header-brand">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Caja Chica</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge">
+      <span id="hdr-name">—</span>
+    </div>
+    <div class="hdr-menu-wrap">
+      <button class="btn btn-sm btn-outline" id="btn-menu" title="Menú">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="hdr-dropdown hidden" id="hdr-dropdown">
+        <button class="hdr-drop-item" id="btn-inicio">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Inicio
+        </button>
+        <button class="hdr-drop-item hidden" id="btn-categorias">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Categorías
+        </button>
+        <div class="hdr-drop-sep"></div>
+        <button class="hdr-drop-item hdr-drop-danger" id="btn-logout">Salir</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="app-main">
+
+  <!-- Admin: selector de usuario -->
+  <div class="card hidden" id="admin-selector-card">
+    <div class="card-body" style="padding:.75rem 1.25rem;">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div class="form-group" style="margin:0;flex:1;min-width:200px;">
+          <label for="select-usuario" style="margin-bottom:.3rem;">Ver caja de:</label>
+          <select id="select-usuario" class="form-control"></select>
+        </div>
+        <button class="btn btn-primary" id="btn-recarga" style="margin-top:1.3rem;white-space:nowrap;">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Hacer Recarga
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Balance card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+        Saldo
+      </span>
+      <span id="saldo-usuario-nombre" style="font-size:.82rem;color:var(--gray-400);"></span>
+    </div>
+    <div class="card-body">
+      <div class="caja-saldo-grid">
+        <div class="caja-saldo-item caja-saldo-ingreso">
+          <div class="caja-saldo-label">Ingresos</div>
+          <div class="caja-saldo-value" id="val-ingresos">$ 0,00</div>
+        </div>
+        <div class="caja-saldo-item caja-saldo-gasto">
+          <div class="caja-saldo-label">Gastos</div>
+          <div class="caja-saldo-value" id="val-gastos">$ 0,00</div>
+        </div>
+        <div class="caja-saldo-item caja-saldo-total">
+          <div class="caja-saldo-label">Saldo</div>
+          <div class="caja-saldo-value" id="val-saldo">$ 0,00</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter + action bar -->
+  <div class="caja-action-bar">
+    <select id="filter-mes" class="form-control" style="width:auto;min-width:160px;">
+      <option value="">Todos los movimientos</option>
+    </select>
+    <button class="btn btn-success" id="btn-nuevo-gasto">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Registrar Gasto
+    </button>
+  </div>
+
+  <!-- Movements -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Historial
+      </span>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <div id="movimientos-loading" class="empty-state" style="display:none;">
+        <div class="spinner" style="width:24px;height:24px;margin:0 auto .5rem;"></div>
+        <p>Cargando…</p>
+      </div>
+      <div id="movimientos-empty" class="empty-state" style="display:none;">
+        <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg></div>
+        <p>No hay movimientos registrados.</p>
+      </div>
+      <!-- Tabla desktop -->
+      <div class="caja-table-wrap" id="movimientos-table-wrap" style="display:none;">
+        <table class="caja-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Categoría</th>
+              <th>Proveedor / Detalle</th>
+              <th>Descripción</th>
+              <th class="text-right">Monto</th>
+              <th style="width:60px;"></th>
+            </tr>
+          </thead>
+          <tbody id="movimientos-tbody"></tbody>
+        </table>
+      </div>
+      <!-- Cards mobile -->
+      <div id="movimientos-cards" style="display:none;padding:.75rem;"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ===== MODAL: Nuevo Gasto ===== -->
+<div class="modal-overlay hidden" id="modal-gasto">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Registrar Gasto</span>
+      <button class="modal-close" id="modal-gasto-close">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Comprobante opcional -->
+      <div style="margin-bottom:1.1rem;">
+        <label style="display:block;font-size:.82rem;font-weight:600;color:var(--gray-600);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em;">Comprobante <span style="font-weight:400;text-transform:none;color:var(--gray-400);">(opcional)</span></label>
+        <input type="file" id="gasto-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
+        <input type="file" id="gasto-camera" accept="image/*" capture="environment"  style="display:none">
+        <div class="import-buttons" style="margin-bottom:.5rem;">
+          <button type="button" class="btn import-btn" id="btn-gasto-archivo">
+            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
+            <span class="import-btn-label">Subir archivo</span>
+          </button>
+          <button type="button" class="btn import-btn" id="btn-gasto-camera" style="display:none">
+            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+            <span class="import-btn-label">Sacar foto</span>
+          </button>
+          <button type="button" class="btn import-btn" id="btn-gasto-analizar" disabled>
+            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+            <span class="import-btn-label">Analizar con IA</span>
+          </button>
+        </div>
+        <div id="gasto-file-name" class="upload-filename hidden"></div>
+        <div id="gasto-extract-status" class="extract-status hidden"></div>
+      </div>
+
+      <!-- Campos -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="gasto-categoria">Categoría *</label>
+          <select id="gasto-categoria" class="form-control">
+            <option value="">— Seleccioná —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="gasto-fecha">Fecha *</label>
+          <input type="date" id="gasto-fecha" class="form-control">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="gasto-proveedor">Proveedor</label>
+        <input type="text" id="gasto-proveedor" class="form-control" placeholder="Nombre del comercio o proveedor">
+      </div>
+      <div class="form-group">
+        <label for="gasto-descripcion">Descripción *</label>
+        <input type="text" id="gasto-descripcion" class="form-control" placeholder="¿Qué se compró o pagó?">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="gasto-monto">Monto *</label>
+        <input type="text" id="gasto-monto" class="form-control" placeholder="0,00" inputmode="decimal">
+      </div>
+      <div id="gasto-error" class="alert alert-error hidden" style="margin-top:.75rem;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-gasto-cancelar">Cancelar</button>
+      <button class="btn btn-success" id="btn-gasto-guardar">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Guardar Gasto
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Recarga (admin) ===== -->
+<div class="modal-overlay hidden" id="modal-recarga">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">Hacer Recarga</span>
+      <button class="modal-close" id="modal-recarga-close">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="recarga-descripcion">Descripción</label>
+        <input type="text" id="recarga-descripcion" class="form-control" placeholder="Ej: Recarga mayo 2026">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="recarga-monto">Monto *</label>
+        <input type="text" id="recarga-monto" class="form-control" placeholder="0,00" inputmode="decimal">
+      </div>
+      <div id="recarga-error" class="alert alert-error hidden" style="margin-top:.75rem;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-recarga-cancelar">Cancelar</button>
+      <button class="btn btn-primary" id="btn-recarga-guardar">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Confirmar Recarga
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Categorías (admin) ===== -->
+<div class="modal-overlay hidden" id="modal-categorias">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Gestionar Categorías</span>
+      <button class="modal-close" id="modal-categorias-close">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="categorias-list" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem;"></div>
+      <div style="display:flex;gap:.5rem;">
+        <input type="text" id="nueva-categoria" class="form-control" placeholder="Nueva categoría…">
+        <button class="btn btn-primary" id="btn-agregar-categoria" style="white-space:nowrap;">Agregar</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-categorias-cancelar">Cerrar</button>
+      <button class="btn btn-success" id="btn-categorias-guardar">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ===== UPDATE BANNER ===== -->
+<div id="update-banner" class="update-banner">
+  <span><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible</span>
+  <button class="update-banner-btn" onclick="window.location.reload()">Actualizar</button>
+</div>
+
+<script src="js/icons.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/caja.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'SW_UPDATED' && hadController) {
+        document.getElementById('update-banner').style.display = 'flex';
+      }
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
+      }
+    });
+  }
+</script>
+</body>
+</html>

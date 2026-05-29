@@ -279,6 +279,7 @@ function setupMenu() {
     $('btn-obras').classList.remove('hidden');
   }
 
+  $('btn-inicio').addEventListener('click',    () => { window.location.href = 'menu.html'; });
   $('btn-historial').addEventListener('click', () => { window.location.href = 'historial.html'; });
   $('btn-adjuntar').addEventListener('click',  () => { window.location.href = 'adjuntar.html'; });
   $('btn-usuarios').addEventListener('click',  () => { window.location.href = 'usuarios.html'; });

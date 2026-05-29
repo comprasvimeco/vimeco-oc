@@ -150,6 +150,51 @@
     return ocFolderId;
   };
 
+  // Estructura Caja: Cajas → {userName} → {YYYY-MM} → Fotos|Archivos → archivo
+  window.uploadToCajaDrive = async function (file, { userId, userName, fecha, tipo }) {
+    const token = await getAccessToken();
+
+    // Leer o crear carpeta raíz "Cajas" (id guardado en Firebase)
+    let cajasId;
+    try {
+      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/cajasId.json');
+      if (r.ok) cajasId = await r.json();
+    } catch (_) {}
+
+    if (!cajasId) {
+      cajasId = await getOrCreateFolder(token, 'Cajas', DRIVE_CONFIG.folderId);
+      fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/cajasId.json', {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(cajasId)
+      }).catch(() => {});
+    }
+
+    const mes       = fecha ? fecha.substring(0, 7) : new Date().toISOString().substring(0, 7);
+    const userFolder = await getOrCreateFolder(token, userName || userId, cajasId);
+    const mesFolder  = await getOrCreateFolder(token, mes, userFolder);
+    const typeFolder = await getOrCreateFolder(token, tipo === 'foto' ? 'Fotos' : 'Archivos', mesFolder);
+
+    const resp = await (async () => {
+      const boundary = 'vimeco_' + Date.now();
+      const mimeType = file.type || 'application/octet-stream';
+      const meta     = JSON.stringify({ name: file.name, parents: [typeFolder], mimeType });
+      const enc      = new TextEncoder();
+      const pre      = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+      const post     = enc.encode(`\r\n--${boundary}--`);
+      const content  = new Uint8Array(await file.arrayBuffer());
+      const body     = new Uint8Array(pre.length + content.length + post.length);
+      body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
+      return fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+      );
+    })();
+    if (!resp.ok) throw new Error(`Upload caja (${resp.status})`);
+    const { id } = await resp.json();
+    return { fileId: id };
+  };
+
   // Adjuntar un archivo a la carpeta Drive de una OC existente
   window.attachToDriveOC = async function (file, { drive_folder_id, obra, fecha, proveedor, nroOC }) {
     let token, folderId;

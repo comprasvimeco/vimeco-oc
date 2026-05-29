@@ -316,6 +316,70 @@ Si no podés determinar un campo, usá null.`;
   };
 }
 
+// ---- Ticket / expense extraction (caja chica) ----
+
+const TICKET_PROMPT = `Analizás un ticket, factura o comprobante de gasto de Argentina. Extraé los datos clave.
+Devolvé ÚNICAMENTE un JSON válido, sin markdown ni texto adicional:
+
+{
+  "proveedor": "nombre del comercio o vendedor, o null",
+  "descripcion": "descripción breve de qué se compró o pagó, o null",
+  "fecha": "fecha en formato YYYY-MM-DD, o null",
+  "monto_total": número_total_del_comprobante,
+  "categoria_sugerida": "una de: Materiales, Combustible, Herramientas, Alimentación, Transporte, Servicios, Otros"
+}
+
+FORMATO NUMÉRICO: en documentos argentinos el punto es separador de miles y la coma es decimal.
+Ejemplos: "1.250,50" → 1250.5 · "52.314,51" → 52314.51
+Si no podés determinar un campo, usá null. monto_total debe ser el importe final total.`;
+
+async function extractFromTicket(file) {
+  const apiKey = typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : null;
+  if (!apiKey || apiKey === 'AQUI_VA_LA_KEY') throw new Error('No hay API Key configurada.');
+
+  file = await compressImageIfNeeded(file);
+  const base64   = await fileToBase64(file);
+  const mimeType = normalizeMimeType(file.type, file.name);
+
+  const body = {
+    contents: [{ parts: [{ text: TICKET_PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+    generationConfig: { temperature: 0.05, maxOutputTokens: 512 }
+  };
+
+  let response;
+  try {
+    response = await fetch(`${GEMINI_LITE_ENDPOINT}?key=${apiKey}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(30000)
+    });
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') throw new Error('Gemini tardó demasiado. Intentá de nuevo.');
+    throw err;
+  }
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || `HTTP ${response.status}`);
+  }
+
+  const data    = await response.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let clean = rawText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  const s = clean.indexOf('{'), e = clean.lastIndexOf('}');
+  if (s === -1 || e === -1) throw new Error('Respuesta inesperada de Gemini.');
+
+  const parsed = JSON.parse(clean.slice(s, e + 1));
+  return {
+    proveedor:          trimOrNull(parsed.proveedor),
+    descripcion:        trimOrNull(parsed.descripcion),
+    fecha:              trimOrNull(parsed.fecha),
+    monto_total:        parseFloatSafe(parsed.monto_total) || null,
+    categoria_sugerida: trimOrNull(parsed.categoria_sugerida)
+  };
+}
+
 // ---- Voice extraction ----
 
 const VOICE_PROMPT = `Sos un asistente especializado en registrar órdenes de compra para la empresa VIMECO S.A.

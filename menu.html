@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Sistema</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Sistema de Gestión</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge">
+      <span id="hdr-name">—</span>
+    </div>
+    <button class="btn btn-sm btn-outline" id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<main class="app-main menu-main">
+  <p class="menu-welcome">Bienvenido/a, <strong id="menu-nombre">—</strong>. ¿Qué querés hacer?</p>
+  <div class="menu-grid">
+    <a href="app.html" class="menu-card">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 6 2 18 2 18 9"/>
+          <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+      </div>
+      <div class="menu-card-title">Órdenes de Compra</div>
+      <div class="menu-card-sub">Generar y gestionar OC</div>
+    </a>
+    <a href="caja.html" class="menu-card" id="menu-card-caja">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="7" width="20" height="14" rx="2"/>
+          <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+        </svg>
+      </div>
+      <div class="menu-card-title">Caja Chica</div>
+      <div class="menu-card-sub">Registro de gastos e ingresos</div>
+    </a>
+  </div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script>
+  const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch(_) { return null; } })();
+  if (!_s?.codigo) {
+    window.location.href = 'index.html';
+  } else {
+    document.getElementById('hdr-name').textContent = _s.nombre;
+    document.getElementById('menu-nombre').textContent = _s.nombre;
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      localStorage.removeItem('vimeco_session');
+      window.location.href = 'index.html';
+    });
+    // Caja visible solo para admin mientras está en desarrollo
+    if (_s.codigo !== '0000') {
+      document.getElementById('menu-card-caja').style.display = 'none';
+    }
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
+  }
+</script>
+</body>
+</html>

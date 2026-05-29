@@ -575,3 +575,80 @@ tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
   padding: .3rem .8rem; font-weight: 700; cursor: pointer; font-size: .85rem;
   white-space: nowrap;
 }
+
+/* ===== MENU HOME ===== */
+.menu-main { max-width: 680px; margin: 2rem auto; }
+.menu-welcome { text-align: center; color: var(--gray-600); font-size: .95rem; margin-bottom: 1.5rem; }
+.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.menu-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .75rem; padding: 2.5rem 1.5rem;
+  background: var(--white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); border: 2px solid var(--gray-200);
+  text-decoration: none; color: var(--gray-700);
+  transition: all .18s; cursor: pointer;
+}
+.menu-card:hover { border-color: var(--primary); background: #f0f5ff; transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.menu-card-icon {
+  width: 68px; height: 68px; border-radius: 50%;
+  background: var(--primary); display: flex; align-items: center; justify-content: center;
+  transition: background .18s;
+}
+.menu-card:hover .menu-card-icon { background: var(--primary-light); }
+.menu-card-icon svg { width: 34px; height: 34px; stroke: white; fill: none; }
+.menu-card-title { font-size: 1.1rem; font-weight: 700; color: var(--primary); }
+.menu-card-sub   { font-size: .82rem; color: var(--gray-500); text-align: center; }
+@media (max-width: 500px) {
+  .menu-grid { grid-template-columns: 1fr; }
+  .menu-card { padding: 1.75rem 1.25rem; flex-direction: row; gap: 1rem; text-align: left; }
+  .menu-card-icon { width: 52px; height: 52px; flex-shrink: 0; }
+  .menu-card-icon svg { width: 26px; height: 26px; }
+  .menu-card-sub { text-align: left; }
+}
+
+/* ===== CAJA CHICA ===== */
+.caja-action-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+}
+
+.caja-saldo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.caja-saldo-item { text-align: center; padding: .85rem; border-radius: var(--radius); }
+.caja-saldo-ingreso { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.caja-saldo-gasto   { background: #fef2f2; border: 1px solid #fecaca; }
+.caja-saldo-total   { background: var(--gray-100); border: 1px solid var(--gray-200); }
+.caja-saldo-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); margin-bottom: .35rem; }
+.caja-saldo-value { font-size: 1.05rem; font-weight: 800; font-family: 'Courier New', monospace; }
+.caja-saldo-ingreso .caja-saldo-value { color: var(--success); }
+.caja-saldo-gasto   .caja-saldo-value { color: var(--danger); }
+.caja-saldo-total   .caja-saldo-value { color: var(--primary); }
+@media (max-width: 420px) {
+  .caja-saldo-grid { grid-template-columns: 1fr; gap: .5rem; }
+  .caja-saldo-item { display: flex; align-items: center; justify-content: space-between; padding: .6rem .85rem; text-align: left; }
+  .caja-saldo-label { margin-bottom: 0; }
+}
+
+.caja-table-wrap { overflow-x: auto; }
+.caja-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.caja-table th { background: var(--primary); color: var(--white); padding: .55rem .75rem; text-align: left; font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.caja-table th.text-right { text-align: right; }
+.caja-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
+.caja-table tr:last-child td { border-bottom: none; }
+.caja-table tr:nth-child(even) td { background: var(--gray-100); }
+.caja-table tr:hover td { background: #eff6ff; }
+
+.caja-badge { display: inline-block; padding: .15rem .5rem; border-radius: 20px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.caja-badge-ingreso { background: #dcfce7; color: #166534; }
+.caja-badge-gasto   { background: #fee2e2; color: #991b1b; }
+
+.caja-mov-card { background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .9rem; margin-bottom: .6rem; box-shadow: var(--shadow-sm); }
+.caja-mov-card:last-child { margin-bottom: 0; }
+.caja-mov-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: .4rem; }
+.caja-mov-monto { font-size: 1rem; font-weight: 800; font-family: 'Courier New', monospace; }
+.caja-mov-desc { font-size: .9rem; font-weight: 600; color: var(--gray-700); margin-bottom: .15rem; }
+.caja-mov-prov { font-size: .78rem; color: var(--gray-500); margin-bottom: .4rem; }
+.caja-mov-foot { display: flex; align-items: center; justify-content: space-between; }
+.caja-mov-fecha { font-size: .75rem; color: var(--gray-400); }
+.caja-cat-tag { display: inline-block; margin-left: .3rem; padding: .1rem .4rem; background: var(--gray-200); border-radius: 4px; font-size: .68rem; color: var(--gray-600); }
+
+.btn-xs { padding: .2rem .4rem; font-size: .74rem; }

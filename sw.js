@@ -5,7 +5,9 @@ const BASE = '/vimeco-oc';
 
 const STATIC_ASSETS = [
   BASE + '/index.html',
+  BASE + '/menu.html',
   BASE + '/app.html',
+  BASE + '/caja.html',
   BASE + '/css/styles.css',
   BASE + '/js/auth.js',
   BASE + '/js/app.js',
@@ -29,7 +31,8 @@ const STATIC_ASSETS = [
   BASE + '/js/driveQueue.js',
   BASE + '/adjuntar.html',
   BASE + '/js/adjuntar.js',
-  BASE + '/js/icons.js'
+  BASE + '/js/icons.js',
+  BASE + '/js/caja.js'
 ];
 
 self.addEventListener('install', event => {
