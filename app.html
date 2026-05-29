@@ -402,8 +402,8 @@
 
 <!-- ===== UPDATE BANNER ===== -->
 <div id="update-banner" class="update-banner">
-  <span><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible</span>
-  <button class="update-banner-btn" onclick="window.location.reload()">Actualizar</button>
+  <span id="update-banner-msg"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible</span>
+  <button class="update-banner-btn" id="update-banner-btn" onclick="window.location.reload()">Actualizar</button>
 </div>
 
 <!-- ===== SCRIPTS ===== -->
@@ -422,7 +422,37 @@
     navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
     navigator.serviceWorker.addEventListener('message', e => {
       if (e.data && e.data.type === 'SW_UPDATED' && hadController) {
-        document.getElementById('update-banner').style.display = 'flex';
+        const banner     = document.getElementById('update-banner');
+        const msgEl      = document.getElementById('update-banner-msg');
+        const btnEl      = document.getElementById('update-banner-btn');
+        const standalone = window.matchMedia('(display-mode: standalone)').matches;
+        banner.style.display = 'flex';
+
+        if (standalone) {
+          // En modo instalado: countdown de 8 segundos y recarga automática
+          let secs = 8;
+          msgEl.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión — actualizando en <strong id="uc">${secs}s</strong>`;
+          btnEl.textContent = 'Actualizar ya';
+          const iv = setInterval(() => {
+            secs--;
+            const uc = document.getElementById('uc');
+            if (uc) uc.textContent = secs + 's';
+            if (secs <= 0) { clearInterval(iv); window.location.reload(); }
+          }, 1000);
+          // Permitir cancelar el countdown haciendo click en cualquier parte de la app
+          document.addEventListener('pointerdown', () => {
+            clearInterval(iv);
+            msgEl.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible`;
+            btnEl.textContent = 'Actualizar';
+          }, { once: true });
+        }
+      }
+    });
+
+    // Forzar chequeo de actualizaciones al volver a enfocar la ventana
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
       }
     });
   }

@@ -21,6 +21,8 @@ const STATIC_ASSETS = [
   BASE + '/js/usuarios.js',
   BASE + '/manifest.json',
   BASE + '/icono_app.png',
+  BASE + '/icons/icon-192.png',
+  BASE + '/icons/icon-512.png',
   BASE + '/js/jspdf.umd.min.js',
   BASE + '/historial.html',
   BASE + '/js/historial.js',
