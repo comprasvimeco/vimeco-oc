@@ -107,6 +107,9 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .oc-number-display { display: flex; align-items: center; gap: 1rem; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .6rem 1rem; }
 .oc-number-label { font-size: .75rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; }
 .oc-number-value { font-size: 1.1rem; font-weight: 700; color: var(--primary); font-family: 'Courier New', monospace; letter-spacing: .05em; }
+.oc-number-value.oc-number-manual { color: var(--warning); }
+.oc-number-input { font-size: 1rem; font-weight: 700; color: var(--primary); font-family: 'Courier New', monospace; letter-spacing: .05em; border: 1.5px solid var(--primary-light); border-radius: var(--radius); padding: .15rem .5rem; width: 12rem; background: white; }
+.oc-number-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
 
 /* ===== UPLOAD ZONE ===== */
 .upload-zone { border: 2px dashed var(--gray-300); border-radius: var(--radius-lg); padding: 2rem 1.5rem; text-align: center; cursor: pointer; transition: all .2s; background: var(--gray-100); }

@@ -8,12 +8,74 @@ function getOCBranch()       { return sessionStorage.getItem('responsable_code')
 function formatOCNumber(seq) { return `${getOCBranch()}-${String(seq).padStart(8, '0')}`; }
 
 async function refreshOCNumberDisplay() {
+  if (manualOCNumber) return; // no sobreescribir si hay número manual
   try {
     const seq = await readNextOCSeq();
     $('oc-number-display').textContent = formatOCNumber(seq);
   } catch {
     $('oc-number-display').textContent = '—';
   }
+}
+
+function clearManualOCNumber() {
+  manualOCNumber = null;
+  $('oc-number-display').classList.remove('oc-number-manual');
+  $('btn-clear-oc-number').classList.add('hidden');
+  refreshOCNumberDisplay();
+}
+
+function setupOCNumberEdit() {
+  const display  = $('oc-number-display');
+  const input    = $('oc-number-input');
+  const btnEdit  = $('btn-edit-oc-number');
+  const btnClear = $('btn-clear-oc-number');
+  let   editing  = false;
+
+  function startEdit() {
+    if (editing) return;
+    editing = true;
+    input.value = manualOCNumber || (display.textContent !== '—' ? display.textContent : '');
+    display.classList.add('hidden');
+    input.classList.remove('hidden');
+    btnEdit.classList.add('hidden');
+    btnClear.classList.add('hidden');
+    input.focus();
+    input.select();
+  }
+
+  function confirmEdit() {
+    if (!editing) return;
+    editing = false;
+    const val = input.value.trim();
+    input.classList.add('hidden');
+    display.classList.remove('hidden');
+    btnEdit.classList.remove('hidden');
+    if (val) {
+      manualOCNumber = val;
+      display.textContent = val;
+      display.classList.add('oc-number-manual');
+      btnClear.classList.remove('hidden');
+    } else {
+      clearManualOCNumber();
+    }
+  }
+
+  function cancelEdit() {
+    if (!editing) return;
+    editing = false;
+    input.classList.add('hidden');
+    display.classList.remove('hidden');
+    btnEdit.classList.remove('hidden');
+    if (manualOCNumber) btnClear.classList.remove('hidden');
+  }
+
+  btnEdit.addEventListener('click', startEdit);
+  btnClear.addEventListener('click', clearManualOCNumber);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); confirmEdit(); }
+    if (e.key === 'Escape') { cancelEdit(); }
+  });
+  input.addEventListener('blur', confirmEdit);
 }
 
 // ---- State ----
@@ -26,6 +88,7 @@ let noGravado        = { pct: null, monto: 0 };
 let impuestos        = [];   // [{nombre, pct, monto}]
 let firmaBase64      = null; // firma del usuario activo (cargada desde Firebase)
 let verifRowWarnings = {};   // {idx: true} ítems con discrepancia post-extracción
+let manualOCNumber   = null; // número de OC ingresado manualmente
 
 // ---- DOM shortcut ----
 const $ = id => document.getElementById(id);
@@ -109,6 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupImportButtons();
   setupObraCombo();
   setupProveedorCombo();
+  setupOCNumberEdit();
   renderTable();
   renderImpuestos();
   recalcTotales();
@@ -1175,9 +1239,16 @@ async function handleGenerate() {
 
   let numero;
   try {
-    if (typeof window.claimNextOCSeq !== 'function')
-      throw new Error('Firebase no cargó — recargá la página (F5).');
-    numero = formatOCNumber(await window.claimNextOCSeq());
+    if (manualOCNumber) {
+      numero = manualOCNumber;
+      manualOCNumber = null;
+      $('oc-number-display').classList.remove('oc-number-manual');
+      $('btn-clear-oc-number').classList.add('hidden');
+    } else {
+      if (typeof window.claimNextOCSeq !== 'function')
+        throw new Error('Firebase no cargó — recargá la página (F5).');
+      numero = formatOCNumber(await window.claimNextOCSeq());
+    }
   } catch (err) {
     toast(`Error N° OC: ${err.message}`, 'error');
     btn.disabled = false;
@@ -1269,11 +1340,15 @@ async function handlePreview() {
   btn.disabled = true;
 
   let numero;
-  try {
-    const seq = await readNextOCSeq();
-    numero = formatOCNumber(seq);
-  } catch {
-    numero = '????-????????';
+  if (manualOCNumber) {
+    numero = manualOCNumber;
+  } else {
+    try {
+      const seq = await readNextOCSeq();
+      numero = formatOCNumber(seq);
+    } catch {
+      numero = '????-????????';
+    }
   }
 
   const ocData = buildOCData(numero);
@@ -1422,6 +1497,7 @@ function resetForm() {
   resetIVAToggle();
   hideVerifBanner();
   clearFile();
+  clearManualOCNumber();
   renderTable();
   renderImpuestos();
   recalcTotales();
