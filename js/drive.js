@@ -170,10 +170,13 @@
       }).catch(() => {});
     }
 
-    const mes       = fecha ? fecha.substring(0, 7) : new Date().toISOString().substring(0, 7);
+    const mes        = fecha ? fecha.substring(0, 7) : new Date().toISOString().substring(0, 7);
     const userFolder = await getOrCreateFolder(token, userName || userId, cajasId);
     const mesFolder  = await getOrCreateFolder(token, mes, userFolder);
-    const typeFolder = await getOrCreateFolder(token, tipo === 'foto' ? 'Fotos' : 'Archivos', mesFolder);
+    // tipo 'planilla' → sube directo a la carpeta del mes; 'foto'/'archivo' → subcarpeta
+    const typeFolder = (tipo === 'foto' || tipo === 'archivo')
+      ? await getOrCreateFolder(token, tipo === 'foto' ? 'Fotos' : 'Archivos', mesFolder)
+      : mesFolder;
 
     const resp = await (async () => {
       const boundary = 'vimeco_' + Date.now();

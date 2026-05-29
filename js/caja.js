@@ -623,10 +623,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sheetName = periodoLabel === 'Todos los movimientos' ? 'Caja Chica' : periodoLabel.substring(0, 31);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-    // ─── Descargar ───────────────────────────────────────
-    const safeName  = targetNombre.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+    // ─── Descargar localmente ────────────────────────────
+    const safeName   = targetNombre.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
     const safePeriod = periodoLabel.replace(/\s+/g, '_');
-    XLSX.writeFile(wb, `Caja_${safeName}_${safePeriod}.xlsx`);
+    const fileName   = `Caja_${safeName}_${safePeriod}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    // ─── Subir a Drive ───────────────────────────────────
+    if (typeof uploadToCajaDrive === 'function') {
+      btn.textContent = 'Subiendo a Drive…';
+      try {
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob  = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const file  = new File([blob], fileName, { type: blob.type });
+        const fechaDrive = mesFilter ? mesFilter + '-01' : new Date().toISOString().split('T')[0];
+        await uploadToCajaDrive(file, {
+          userId:   targetCodigo,
+          userName: targetNombre,
+          fecha:    fechaDrive,
+          tipo:     'planilla'
+        });
+        showToast('Planilla guardada en Drive', 'success');
+      } catch (_) {
+        showToast('Descargado localmente — no se pudo subir a Drive', 'warning');
+      }
+    }
 
     btn.disabled = false;
     btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Exportar Excel';
