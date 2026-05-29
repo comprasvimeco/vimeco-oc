@@ -212,9 +212,10 @@ function drawProveedorTable(doc, data, y) {
   doc.setFontSize(8.5);
 
   const rows = [
-    ['Proveedor:',  p.nombre    || '—', 'CUIT N°:', p.cuit     || '—'],
-    ['Domicilio:',  p.domicilio || '—', 'I.V.A.:',  p.iva      || '—'],
-    ['Teléfonos:',  p.telefonos || '—', 'Ref.:',    p.ref      || '—']
+    ['Razón Social:', p.nombre    || '—', 'CUIT N°:',  p.cuit     || '—'],
+    ['Nombre:',       p.nombre_contacto || '—', 'Contacto:', p.contacto || '—'],
+    ['Domicilio:',    p.domicilio || '—', 'I.V.A.:',   p.iva      || '—'],
+    ['Teléfonos:',    p.telefonos || '—', 'Ref.:',     p.ref      || '—']
   ];
 
   let ry = y;
@@ -261,7 +262,7 @@ function drawProveedorTable(doc, data, y) {
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...C.azul);
-  doc.text('Ubicación /\nMotivo:', xs[0] + 1.5, ry + 4.5, { lineHeightFactor: 1.4 });
+  doc.text('Obra /\nMotivo:', xs[0] + 1.5, ry + 4.5, { lineHeightFactor: 1.4 });
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...C.negro);
   ubicLines.forEach((ln, i) => doc.text(ln, xs[1] + 1.5, ry + 4.5 + i * LINE_H));

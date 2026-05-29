@@ -483,11 +483,13 @@ function setupProveedorCombo() {
   const dropdown = $('proveedor-dropdown');
 
   function fillProveedor(p) {
-    $('proveedor').value               = p.nombre       || '';
-    $('cuit-proveedor').value          = p.cuit         || '';
-    $('domicilio-proveedor').value     = p.domicilio    || '';
-    $('telefonos-proveedor').value     = p.telefonos    || '';
-    $('condicion-iva-proveedor').value = p.condicionIVA || '';
+    $('proveedor').value               = p.nombre          || '';
+    $('cuit-proveedor').value          = p.cuit            || '';
+    $('nombre-proveedor').value        = p.nombre_contacto || '';
+    $('contacto-proveedor').value      = p.contacto        || '';
+    $('domicilio-proveedor').value     = p.domicilio       || '';
+    $('telefonos-proveedor').value     = p.telefonos       || '';
+    $('condicion-iva-proveedor').value = p.condicionIVA    || '';
   }
 
   function buildOptions(query) {
@@ -1080,11 +1082,15 @@ function addImpuestoRow() {
 
 // ---- PDF Generation ----
 function validateOCForm() {
-  const proveedor = $('proveedor').value.trim();
-  const obra      = $('obra').value.trim();
-  if (!proveedor) { toast('Ingresá el nombre del proveedor.', 'error'); $('proveedor').focus(); return false; }
-  if (!obra)      { toast('Ingresá la obra / proyecto.', 'error'); $('obra').focus(); return false; }
-  if (!items.length) { toast('Agregá al menos un ítem a la orden.', 'error'); return false; }
+  const proveedor     = $('proveedor').value.trim();
+  const cuit          = $('cuit-proveedor').value.trim();
+  const condicionPago = $('condicion-pago').value.trim();
+  const obra          = $('obra').value.trim();
+  if (!proveedor)     { toast('Ingresá la razón social del proveedor.', 'error'); $('proveedor').focus(); return false; }
+  if (!cuit)          { toast('Ingresá el CUIT del proveedor.', 'error'); $('cuit-proveedor').focus(); return false; }
+  if (!condicionPago) { toast('Ingresá la condición de pago.', 'error'); $('condicion-pago').focus(); return false; }
+  if (!obra)          { toast('Ingresá la obra / proyecto.', 'error'); $('obra').focus(); return false; }
+  if (!items.length)  { toast('Agregá al menos un ítem a la orden.', 'error'); return false; }
   if (items.some(it => !it.descripcion.trim())) { toast('Completá la descripción de todos los ítems.', 'error'); return false; }
   return true;
 }
@@ -1114,16 +1120,18 @@ function buildOCData(numero, firma = null) {
     fecha:    formatDateDisplay(new Date()),
     ejecutor: sessionStorage.getItem('responsable_name'),
     proveedor: {
-      nombre:    proveedor,
-      cuit:      $('cuit-proveedor').value.trim()          || '—',
-      domicilio: $('domicilio-proveedor').value.trim()     || '—',
-      iva:       $('condicion-iva-proveedor').value.trim() || '—',
-      telefonos: $('telefonos-proveedor').value.trim()     || '—',
-      ref:       $('ref-presupuesto').value.trim()         || '—',
-      ubicacion: obra,
-      pago:      $('condicion-pago').value.trim()   || '—',
-      plazo:     $('plazo-entrega').value.trim()    || '—',
-      lugar:     $('lugar-entrega').value.trim()    || '—'
+      nombre:           proveedor,
+      cuit:             $('cuit-proveedor').value.trim()          || '—',
+      nombre_contacto:  $('nombre-proveedor').value.trim()        || '—',
+      contacto:         $('contacto-proveedor').value.trim()      || '—',
+      domicilio:        $('domicilio-proveedor').value.trim()     || '—',
+      iva:              $('condicion-iva-proveedor').value.trim() || '—',
+      telefonos:        $('telefonos-proveedor').value.trim()     || '—',
+      ref:              $('ref-presupuesto').value.trim()         || '—',
+      ubicacion:        obra,
+      pago:             $('condicion-pago').value.trim()   || '—',
+      plazo:            $('plazo-entrega').value.trim()    || '—',
+      lugar:            $('lugar-entrega').value.trim()    || '—'
     },
     items: items.map(it => ({
       desc:     it.descripcion || '—',
@@ -1322,11 +1330,13 @@ function closePreview() {
 // ---- Cargar OC como base (desde historial) ----
 function loadOCBase(oc) {
   const prov = oc.proveedor || {};
-  $('proveedor').value               = prov.nombre       || '';
-  $('cuit-proveedor').value          = prov.cuit         || '';
-  $('domicilio-proveedor').value     = prov.domicilio    || '';
-  $('telefonos-proveedor').value     = prov.telefonos    || '';
-  $('condicion-iva-proveedor').value = prov.condicionIVA || 'Resp. Inscripto';
+  $('proveedor').value               = prov.nombre          || '';
+  $('cuit-proveedor').value          = prov.cuit            || '';
+  $('nombre-proveedor').value        = prov.nombre_contacto || '';
+  $('contacto-proveedor').value      = prov.contacto        || '';
+  $('domicilio-proveedor').value     = prov.domicilio       || '';
+  $('telefonos-proveedor').value     = prov.telefonos       || '';
+  $('condicion-iva-proveedor').value = prov.condicionIVA    || 'Resp. Inscripto';
   $('ref-presupuesto').value         = '';
   $('obra').value                    = oc.obra           || '';
   $('condicion-pago').value          = oc.condicionPago  || '';
@@ -1393,7 +1403,8 @@ function resetFormKeepProvider() {
 
 // ---- Reset ----
 function resetForm() {
-  ['proveedor','cuit-proveedor','domicilio-proveedor','telefonos-proveedor',
+  ['proveedor','cuit-proveedor','nombre-proveedor','contacto-proveedor',
+   'domicilio-proveedor','telefonos-proveedor',
    'ref-presupuesto','obra','condicion-pago','plazo-entrega','lugar-entrega','observaciones']
     .forEach(id => { $(id).value = ''; });
   $('condicion-iva-proveedor').value = 'Resp. Inscripto';
