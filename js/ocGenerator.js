@@ -486,10 +486,10 @@ function drawFooter(doc, data, y) {
     lines: doc.splitTextToSize(item.value, FTR_COLS[0] - 5)
   }));
 
-  // Altura total necesaria para texto de col1 + 16mm para firmas
+  // Altura necesaria: acumulado de ítems + margen mínimo para área de firmas
   let col1TextH = 4;
   col1Items.forEach(({ lines }) => { col1TextH += LH + lines.length * LH + 2; });
-  const COL_H = Math.max(38, col1TextH + 16);
+  const COL_H = Math.max(38, col1TextH + 3);
 
   FTR_COLS.forEach((cw_col, i) => fillRect(doc, xs[i], y, cw_col, COL_H, C.blanco));
   setThinBorder(doc);
