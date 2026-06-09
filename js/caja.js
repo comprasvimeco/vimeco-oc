@@ -131,7 +131,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         closeRecargaModal();
         showToast('Recarga registrada', 'success');
-        loadMovimientos();
+        await loadMovimientos();
+        sincronizarExcel();
       } catch (err) {
         errorEl.textContent = 'Error al guardar: ' + (err.message || err);
         errorEl.classList.remove('hidden');
@@ -291,7 +292,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await deleteCajaMovimiento(targetCodigo, key);
       showToast('Movimiento eliminado', 'success');
-      loadMovimientos();
+      await loadMovimientos();
+      sincronizarExcel();
     } catch (_) {
       showToast('Error al eliminar', 'error');
     }
@@ -417,7 +419,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       await saveCajaMovimiento(targetCodigo, mov);
       closeGastoModal();
       showToast('Gasto registrado', 'success');
-      loadMovimientos();
+      await loadMovimientos();
+      sincronizarExcel();
     } catch (err) {
       errorEl.textContent = 'Error al guardar: ' + (err.message || err);
       errorEl.classList.remove('hidden');
@@ -516,141 +519,207 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ─── Exportar Excel ──────────────────────────────────
-  document.getElementById('btn-exportar-excel').addEventListener('click', exportarExcel);
+  // ─── Sincronizar Excel con Drive (se llama automáticamente tras cada movimiento) ──
+  async function sincronizarExcel() {
+    if (typeof uploadToCajaDrive !== 'function') return;
 
-  async function exportarExcel() {
-    const btn = document.getElementById('btn-exportar-excel');
-    btn.disabled = true;
-    btn.textContent = 'Generando…';
-
-    // Lazy-load SheetJS solo cuando se necesita
     if (!window.XLSX) {
       try {
         await new Promise((resolve, reject) => {
-          const s    = document.createElement('script');
-          s.src      = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+          const s   = document.createElement('script');
+          s.src     = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
           s.onload  = resolve;
-          s.onerror = () => reject(new Error('No se pudo cargar la librería de Excel. Verificá tu conexión.'));
+          s.onerror = reject;
           document.head.appendChild(s);
         });
-      } catch (err) {
-        showToast(err.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Exportar Excel';
-        return;
-      }
+      } catch (_) { return; }
     }
 
-    const MESES = ['', 'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    const mesFilter    = document.getElementById('filter-mes').value;
-    const filtered     = mesFilter ? movimientos.filter(m => m.fecha?.startsWith(mesFilter)) : movimientos;
-    const periodoLabel = mesFilter
-      ? (() => { const [y, m] = mesFilter.split('-'); return `${MESES[parseInt(m, 10)]} ${y}`; })()
-      : 'Todos los movimientos';
+    const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const hoy       = new Date();
+    const mesActual = hoy.toISOString().substring(0, 7);
+    const [yr, mo]  = mesActual.split('-');
+    const periodo   = `${MESES[parseInt(mo, 10)]} ${yr}`;
 
-    // ─── Datos para la hoja ─────────────────────────────
+    const filtered       = movimientos.filter(mv => mv.fecha?.startsWith(mesActual));
+    const gastosFilt     = filtered.filter(mv => mv.tipo === 'gasto');
+    const porCategoria   = {};
+    gastosFilt.forEach(mv => {
+      const c = mv.categoria || 'Sin categoría';
+      porCategoria[c] = (porCategoria[c] || 0) + (mv.monto || 0);
+    });
+    const cats    = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
+    const numCats = cats.length;
+
+    // ─── Índices de filas (0-based) ─────────────────────
+    const R_TITLE    = 0;
+    const R_USER     = 1;
+    const R_PERIODO  = 2;
+    const R_GEN      = 3;
+    const R_RESUMEN  = 5;
+    const R_INGR     = 6;
+    const R_GAST     = 7;
+    const R_SALDO    = 8;
+    const R_CAT_TTL  = 10;
+    const R_CAT_HDR  = 11;
+    const R_CAT_D0   = 12;
+    const R_CAT_TOT  = 12 + numCats;
+    const R_DET_TTL  = 14 + numCats;
+    const R_DET_HDR  = 15 + numCats;
+    const R_DET_D0   = 16 + numCats;
+
+    // Filas Excel 1-based para fórmulas
+    const XF = (r) => r + 1;
+    const detFirst = XF(R_DET_D0);
+    const detLast  = XF(R_DET_D0 + filtered.length - 1);
+    const hasData  = filtered.length > 0;
+
+    const dr = (col) => hasData ? `$${col}$${detFirst}:$${col}$${detLast}` : `$${col}$${detFirst}:$${col}$${detFirst}`;
+    const sumif = (typeVal, col) => hasData
+      ? `SUMIF(${dr('B')},"${typeVal}",${dr(col)})`
+      : '0';
+
+    const valIngr  = filtered.filter(mv => mv.tipo === 'ingreso').reduce((s, mv) => s + (mv.monto || 0), 0);
+    const valGast  = gastosFilt.reduce((s, mv) => s + (mv.monto || 0), 0);
+    const f = (v, formula) => ({ t: 'n', v, f: formula });
+
+    // ─── Filas ──────────────────────────────────────────
+    const E = ['', '', '', '', '', ''];
     const rows = [];
-
-    // Encabezado
-    rows.push(['VIMECO S.A. — Caja Chica']);
-    rows.push([`Usuario: ${targetNombre}`]);
-    rows.push([`Período: ${periodoLabel}`]);
-    rows.push([`Generado: ${new Date().toLocaleDateString('es-AR')}`]);
-    rows.push([]);
-
-    // Balance acumulado (siempre sobre total histórico)
-    const totalIngresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
-    const totalGastos   = movimientos.filter(m => m.tipo === 'gasto').reduce((s, m)  => s + (m.monto || 0), 0);
-    rows.push(['BALANCE ACUMULADO']);
-    rows.push(['Ingresos totales', totalIngresos]);
-    rows.push(['Gastos totales',   totalGastos]);
-    rows.push(['Saldo actual',     totalIngresos - totalGastos]);
-    rows.push([]);
-
-    // Gastos por categoría (período filtrado)
-    const gastosFiltrados = filtered.filter(m => m.tipo === 'gasto');
-    const porCategoria    = {};
-    gastosFiltrados.forEach(m => {
-      const c = m.categoria || 'Sin categoría';
-      porCategoria[c] = (porCategoria[c] || 0) + (m.monto || 0);
+    rows[R_TITLE]   = [`VIMECO S.A. — Caja Chica`, ...E.slice(1)];
+    rows[R_USER]    = [`Usuario: ${targetNombre}`,  ...E.slice(1)];
+    rows[R_PERIODO] = [`Período: ${periodo}`,        ...E.slice(1)];
+    rows[R_GEN]     = [`Generado: ${hoy.toLocaleDateString('es-AR')}`, ...E.slice(1)];
+    rows[4]         = [...E];
+    rows[R_RESUMEN] = [`RESUMEN — ${periodo}`, ...E.slice(1)];
+    rows[R_INGR]    = ['Ingresos',  f(valIngr,        sumif('Ingreso', 'F')),          '', '', '', ''];
+    rows[R_GAST]    = ['Gastos',    f(valGast,         hasData ? `ABS(${sumif('Gasto','F')})` : '0'), '', '', '', ''];
+    rows[R_SALDO]   = ['Saldo',     f(valIngr-valGast, `B${XF(R_INGR)}-B${XF(R_GAST)}`), '', '', '', ''];
+    rows[9]         = [...E];
+    rows[R_CAT_TTL] = [`GASTOS POR CATEGORÍA`, ...E.slice(1)];
+    rows[R_CAT_HDR] = ['Categoría', 'Monto ($)', '', '', '', ''];
+    cats.forEach(([cat, val], i) => {
+      const fCat = hasData ? `ABS(SUMIF(${dr('C')},"${cat.replace(/"/g,'""')}",${dr('F')}))` : '0';
+      rows[R_CAT_D0 + i] = [cat, f(val, fCat), '', '', '', ''];
     });
-    const ingresosFiltrados = filtered.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
-    const gastosTotalFiltrado = gastosFiltrados.reduce((s, m) => s + (m.monto || 0), 0);
-
-    rows.push([`RESUMEN DEL PERÍODO — ${periodoLabel}`]);
-    rows.push(['Ingresos del período', ingresosFiltrados]);
-    rows.push([]);
-    rows.push(['GASTOS POR CATEGORÍA']);
-    rows.push(['Categoría', 'Monto ($)']);
-    Object.entries(porCategoria)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([cat, monto]) => rows.push([cat, monto]));
-    rows.push(['TOTAL GASTOS', gastosTotalFiltrado]);
-    rows.push([]);
-
-    // Detalle de movimientos
-    rows.push([`DETALLE DE MOVIMIENTOS — ${periodoLabel}`]);
-    rows.push(['Fecha', 'Tipo', 'Categoría', 'Proveedor', 'Descripción', 'Monto ($)']);
-    filtered.forEach(m => {
-      rows.push([
-        m.fecha        || '',
-        m.tipo === 'ingreso' ? 'Ingreso' : 'Gasto',
-        m.categoria    || '',
-        m.proveedor    || '',
-        m.descripcion  || '',
-        m.tipo === 'ingreso' ? (m.monto || 0) : -(m.monto || 0)
-      ]);
+    const catSumFormula = numCats > 0 ? `SUM(B${XF(R_CAT_D0)}:B${XF(R_CAT_D0 + numCats - 1)})` : '0';
+    rows[R_CAT_TOT] = ['TOTAL GASTOS', f(valGast, catSumFormula), '', '', '', ''];
+    rows[13 + numCats] = [...E];
+    rows[R_DET_TTL] = [`DETALLE — ${periodo}`, ...E.slice(1)];
+    rows[R_DET_HDR] = ['Fecha', 'Tipo', 'Categoría', 'Proveedor', 'Descripción', 'Monto ($)'];
+    filtered.forEach((mv, i) => {
+      rows[R_DET_D0 + i] = [
+        mv.fecha       || '',
+        mv.tipo === 'ingreso' ? 'Ingreso' : 'Gasto',
+        mv.categoria   || '',
+        mv.proveedor   || '',
+        mv.descripcion || '',
+        mv.tipo === 'ingreso' ? (mv.monto || 0) : -(mv.monto || 0)
+      ];
     });
 
-    // ─── Crear libro y hoja ──────────────────────────────
+    // ─── Libro ──────────────────────────────────────────
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
 
-    // Ancho de columnas
-    ws['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 18 }, { wch: 28 }, { wch: 38 }, { wch: 15 }];
+    ws['!cols'] = [{ wch: 32 }, { wch: 14 }, { wch: 18 }, { wch: 26 }, { wch: 36 }, { wch: 14 }];
 
-    // Negrita en filas de título/sección (filas impares de sección)
-    const boldRows = [0, 5, 15, rows.length - filtered.length - 2]; // títulos principales
-    boldRows.forEach(r => {
-      const cellAddr = XLSX.utils.encode_cell({ r, c: 0 });
-      if (ws[cellAddr]) {
-        if (!ws[cellAddr].s) ws[cellAddr].s = {};
-        ws[cellAddr].s.font = { bold: true };
-      }
+    ws['!merges'] = [
+      R_TITLE, R_USER, R_PERIODO, R_GEN, R_RESUMEN, R_CAT_TTL, R_DET_TTL
+    ].map(r => ({ s: { r, c: 0 }, e: { r, c: 5 } }));
+
+    ws['!rows'] = [];
+    ws['!rows'][R_TITLE]   = { hpt: 22 };
+    ws['!rows'][R_RESUMEN] = ws['!rows'][R_CAT_TTL] = ws['!rows'][R_DET_TTL] = { hpt: 18 };
+
+    // ─── Estilos ─────────────────────────────────────────
+    const BLUE   = '1A3A5C';
+    const MBLUE  = '2D5F8A';
+    const LBLUE  = 'D6E4F0';
+    const TEAL   = '3A78B5';
+    const WHITE  = 'FFFFFF';
+    const LGRAY  = 'F5F7FA';
+    const YELW   = 'FFFDE7';
+    const GREEN  = '1B5E20';
+    const RED    = 'B71C1C';
+    const BORD   = 'B0BEC5';
+
+    const solid = (rgb) => ({ patternType: 'solid', fgColor: { rgb } });
+    const thin  = () => ({ top: b, bottom: b, left: b, right: b });
+    const b     = { style: 'thin', color: { rgb: BORD } };
+
+    function cs(r, c, s) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      ws[addr].s = s;
+    }
+    function csRow(r, ncols, s) { for (let c = 0; c < ncols; c++) cs(r, c, s); }
+
+    const FMT = '#,##0.00';
+    const numStyle = (bg, color, bold = false) => ({
+      font: { bold, sz: 10, color: { rgb: color } },
+      fill: solid(bg),
+      border: thin(),
+      numFmt: FMT,
+      alignment: { horizontal: 'right' }
+    });
+    const lblStyle = (bg, bold = false) => ({
+      font: { bold, sz: 10, color: { rgb: '333333' } },
+      fill: solid(bg),
+      border: thin()
     });
 
-    const sheetName = periodoLabel === 'Todos los movimientos' ? 'Caja Chica' : periodoLabel.substring(0, 31);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    // Título principal
+    cs(R_TITLE, 0, { font: { bold: true, sz: 14, color: { rgb: WHITE } }, fill: solid(BLUE), alignment: { horizontal: 'center', vertical: 'center' } });
+    // Subheader
+    [R_USER, R_PERIODO, R_GEN].forEach(r =>
+      cs(r, 0, { font: { sz: 10, color: { rgb: WHITE } }, fill: solid(MBLUE) })
+    );
+    // Secciones
+    [R_RESUMEN, R_CAT_TTL, R_DET_TTL].forEach(r =>
+      cs(r, 0, { font: { bold: true, sz: 11, color: { rgb: WHITE } }, fill: solid(MBLUE) })
+    );
+    // Resumen
+    cs(R_INGR,  0, lblStyle(LGRAY));  cs(R_INGR,  1, numStyle(LGRAY, GREEN));
+    cs(R_GAST,  0, lblStyle(LGRAY));  cs(R_GAST,  1, numStyle(LGRAY, RED));
+    cs(R_SALDO, 0, lblStyle(LBLUE, true)); cs(R_SALDO, 1, numStyle(LBLUE, BLUE, true));
+    // Cabecera tabla categorías
+    [0, 1].forEach(c => cs(R_CAT_HDR, c, { font: { bold: true, sz: 10, color: { rgb: WHITE } }, fill: solid(TEAL), border: thin(), alignment: { horizontal: c === 1 ? 'right' : 'left' } }));
+    // Filas categorías
+    cats.forEach((_, i) => {
+      const bg = i % 2 === 0 ? WHITE : LGRAY;
+      cs(R_CAT_D0 + i, 0, lblStyle(bg));
+      cs(R_CAT_D0 + i, 1, numStyle(bg, RED));
+    });
+    // Total categorías
+    cs(R_CAT_TOT, 0, { font: { bold: true, sz: 10, color: { rgb: RED } }, fill: solid(YELW), border: thin() });
+    cs(R_CAT_TOT, 1, numStyle(YELW, RED, true));
+    // Cabecera tabla detalle
+    for (let c = 0; c < 6; c++)
+      cs(R_DET_HDR, c, { font: { bold: true, sz: 10, color: { rgb: WHITE } }, fill: solid(TEAL), border: thin(), alignment: { horizontal: c === 5 ? 'right' : 'left' } });
+    // Filas detalle
+    filtered.forEach((mv, i) => {
+      const bg = i % 2 === 0 ? WHITE : LGRAY;
+      const isI = mv.tipo === 'ingreso';
+      for (let c = 0; c < 6; c++)
+        cs(R_DET_D0 + i, c, c === 5
+          ? numStyle(bg, isI ? GREEN : RED)
+          : { font: { sz: 10, color: { rgb: '333333' } }, fill: solid(bg), border: thin() });
+    });
 
-    // ─── Descargar localmente ────────────────────────────
-    const safeName   = targetNombre.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-    const safePeriod = periodoLabel.replace(/\s+/g, '_');
-    const fileName   = `Caja_${safeName}_${safePeriod}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    XLSX.utils.book_append_sheet(wb, ws, periodo.substring(0, 31));
 
-    // ─── Subir a Drive ───────────────────────────────────
-    if (typeof uploadToCajaDrive === 'function') {
-      btn.textContent = 'Subiendo a Drive…';
-      try {
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob  = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const file  = new File([blob], fileName, { type: blob.type });
-        const fechaDrive = mesFilter ? mesFilter + '-01' : new Date().toISOString().split('T')[0];
-        await uploadToCajaDrive(file, {
-          userId:   targetCodigo,
-          userName: targetNombre,
-          fecha:    fechaDrive,
-          tipo:     'planilla'
-        });
-        showToast('Planilla guardada en Drive', 'success');
-      } catch (_) {
-        showToast('Descargado localmente — no se pudo subir a Drive', 'warning');
-      }
-    }
-
-    btn.disabled = false;
-    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Exportar Excel';
+    // ─── Subir a Drive silenciosamente ──────────────────
+    try {
+      const wbout  = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+      const blob   = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const safe   = targetNombre.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+      const fname  = `Caja_${safe}_${periodo.replace(/\s+/g, '_')}.xlsx`;
+      await uploadToCajaDrive(new File([blob], fname, { type: blob.type }), {
+        userId: targetCodigo, userName: targetNombre,
+        fecha: mesActual + '-01', tipo: 'planilla'
+      });
+    } catch (_) {}
   }
 
   // ─── Helper: parse monto ─────────────────────────────
