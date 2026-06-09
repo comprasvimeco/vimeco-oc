@@ -380,12 +380,13 @@ async function retryDriveQueue() {
       const srcFile = item.srcBuf
         ? new File([item.srcBuf], item.srcName || 'archivo', { type: item.srcType || 'application/octet-stream' })
         : null;
-      const folderId = await uploadToDrive(pdfBlob, item.pdfName,
+      const { obrasFolderId, proveedoresFolderId } = await uploadToDrive(pdfBlob, item.pdfName,
         { obra: item.obra, fecha: item.fecha, proveedor: item.proveedor, nroOC: item.nroOC },
         srcFile
       );
       await driveQueue.dequeue(item.histKey);
-      if (folderId) patchHistorialEntry(item.histKey, { drive_folder_id: folderId }).catch(() => {});
+      if (obrasFolderId || proveedoresFolderId)
+        patchHistorialEntry(item.histKey, { drive_folder_obras_id: obrasFolderId, drive_folder_proveedores_id: proveedoresFolderId }).catch(() => {});
       toast(`OC ${item.nroOC} subida a Drive.`, 'success');
     } catch (_) {
       // Sigue sin conexión o error — se mantiene en la cola
@@ -1312,8 +1313,9 @@ async function handleGenerate() {
     const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
     histSaved.then(saved =>
       uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
-        .then(folderId => {
-          if (folderId && saved) patchHistorialEntry(histKey, { drive_folder_id: folderId }).catch(() => {});
+        .then(({ obrasFolderId, proveedoresFolderId }) => {
+          if (saved && (obrasFolderId || proveedoresFolderId))
+            patchHistorialEntry(histKey, { drive_folder_obras_id: obrasFolderId, drive_folder_proveedores_id: proveedoresFolderId }).catch(() => {});
         })
         .catch(async () => {
           if (!navigator.onLine && typeof driveQueue !== 'undefined') {

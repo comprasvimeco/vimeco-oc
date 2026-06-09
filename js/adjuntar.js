@@ -242,7 +242,9 @@ async function doAttach(file, oc, btn) {
   btn.textContent = '⏳ Subiendo…';
   try {
     await attachToDriveOC(file, {
-      drive_folder_id: oc.drive_folder_id || null,
+      drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
+      drive_folder_proveedores_id: oc.drive_folder_proveedores_id || null,
+      drive_folder_id:             oc.drive_folder_id             || null,
       obra:      oc.obra              || '',
       fecha:     displayToISODate(oc.fecha),
       proveedor: oc.proveedor?.nombre || '',

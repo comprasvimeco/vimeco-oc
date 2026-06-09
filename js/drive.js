@@ -109,45 +109,97 @@
     } catch (_) {}
   }
 
-  // Estructura: COMPRAS → Obra → "YYYY-MM-DD | Proveedor" → PDF [+ archivo fuente]
+  // Cache en memoria de los IDs de las carpetas raíz OBRAS y PROVEEDORES
+  let _obrasId, _proveedoresId;
+
+  async function getObrasRootId(token) {
+    if (_obrasId) return _obrasId;
+    try {
+      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/obrasId.json');
+      if (r.ok) { const v = await r.json(); if (v) { _obrasId = v; return v; } }
+    } catch (_) {}
+    _obrasId = await getOrCreateFolder(token, 'OBRAS', DRIVE_CONFIG.folderId);
+    fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/obrasId.json', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_obrasId)
+    }).catch(() => {});
+    return _obrasId;
+  }
+
+  async function getProveedoresRootId(token) {
+    if (_proveedoresId) return _proveedoresId;
+    try {
+      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/proveedoresId.json');
+      if (r.ok) { const v = await r.json(); if (v) { _proveedoresId = v; return v; } }
+    } catch (_) {}
+    _proveedoresId = await getOrCreateFolder(token, 'PROVEEDORES', DRIVE_CONFIG.folderId);
+    fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/proveedoresId.json', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_proveedoresId)
+    }).catch(() => {});
+    return _proveedoresId;
+  }
+
+  // Estructura:
+  //   COMPRAS/OBRAS/{Obra}/{YYYY-MM-DD | Proveedor}/
+  //   COMPRAS/PROVEEDORES/{Proveedor}/{YYYY-MM-DD | Proveedor}/
   window.uploadToDrive = async function (pdfBlob, pdfName, { obra, fecha, proveedor, nroOC }, sourceFile) {
-    let token, ocFolderId;
+    let token, obrasFolderId, proveedoresFolderId;
 
     try {
       token = await getAccessToken();
-      const obraFolderId = await getOrCreateFolder(token, obra || 'Sin obra', DRIVE_CONFIG.folderId);
-      const subName      = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
-      ocFolderId         = await getOrCreateFolder(token, subName, obraFolderId);
+      const subName = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
+
+      const [obrasRootId, proveedoresRootId] = await Promise.all([
+        getObrasRootId(token),
+        getProveedoresRootId(token)
+      ]);
+      const [obraParentId, provParentId] = await Promise.all([
+        getOrCreateFolder(token, obra || 'Sin obra',           obrasRootId),
+        getOrCreateFolder(token, proveedor || 'Sin proveedor', proveedoresRootId)
+      ]);
+      [obrasFolderId, proveedoresFolderId] = await Promise.all([
+        getOrCreateFolder(token, subName, obraParentId),
+        getOrCreateFolder(token, subName, provParentId)
+      ]);
     } catch (err) {
       await logDriveError(nroOC, err);
       throw err;
     }
 
-    // Subir PDF
-    try {
-      await uploadFile(token, pdfBlob, pdfName, 'application/pdf', ocFolderId);
-    } catch (err) {
-      await logDriveError(nroOC, new Error(`PDF: ${err.message}`));
-      try {
-        const marker = new Blob(
-          [`Error al subir PDF\nOC: ${nroOC}\nFecha: ${new Date().toISOString()}\nError: ${err.message}`],
-          { type: 'text/plain' }
-        );
-        await uploadFile(token, marker, '_ERROR_PDF.txt', 'text/plain', ocFolderId);
-      } catch (_) {}
-      throw err;
-    }
-
-    // Subir archivo fuente (best-effort, no lanza error)
-    if (sourceFile) {
-      try {
-        await uploadFile(token, sourceFile, sourceFile.name, sourceFile.type || 'application/octet-stream', ocFolderId);
-      } catch (err) {
-        await logDriveError(nroOC, new Error(`Archivo fuente: ${err.message}`));
+    // Subir PDF a ambas carpetas en paralelo
+    const pdfResults = await Promise.allSettled([
+      uploadFile(token, pdfBlob, pdfName, 'application/pdf', obrasFolderId),
+      uploadFile(token, pdfBlob, pdfName, 'application/pdf', proveedoresFolderId)
+    ]);
+    for (const [i, res] of pdfResults.entries()) {
+      if (res.status === 'rejected') {
+        const label = i === 0 ? 'OBRAS' : 'PROVEEDORES';
+        const fid   = i === 0 ? obrasFolderId : proveedoresFolderId;
+        await logDriveError(nroOC, new Error(`PDF ${label}: ${res.reason?.message}`));
+        try {
+          const marker = new Blob(
+            [`Error al subir PDF\nOC: ${nroOC}\nFecha: ${new Date().toISOString()}\nError: ${res.reason?.message}`],
+            { type: 'text/plain' }
+          );
+          await uploadFile(token, marker, '_ERROR_PDF.txt', 'text/plain', fid);
+        } catch (_) {}
       }
     }
+    if (pdfResults.every(r => r.status === 'rejected')) throw pdfResults[0].reason;
 
-    return ocFolderId;
+    // Subir archivo fuente a ambas carpetas (best-effort)
+    if (sourceFile) {
+      Promise.allSettled([
+        uploadFile(token, sourceFile, sourceFile.name, sourceFile.type || 'application/octet-stream', obrasFolderId),
+        uploadFile(token, sourceFile, sourceFile.name, sourceFile.type || 'application/octet-stream', proveedoresFolderId)
+      ]).then(results => results.forEach((r, i) => {
+        if (r.status === 'rejected')
+          logDriveError(nroOC, new Error(`Fuente ${i === 0 ? 'OBRAS' : 'PROVEEDORES'}: ${r.reason?.message}`));
+      })).catch(() => {});
+    }
+
+    return { obrasFolderId, proveedoresFolderId };
   };
 
   // Estructura Caja: Cajas → {userName} → {YYYY-MM} → Fotos|Archivos → archivo
@@ -162,7 +214,7 @@
     } catch (_) {}
 
     if (!cajasId) {
-      cajasId = await getOrCreateFolder(token, 'Cajas', DRIVE_CONFIG.folderId);
+      cajasId = await getOrCreateFolder(token, 'CAJAS', DRIVE_CONFIG.folderId);
       fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/cajasId.json', {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -227,18 +279,29 @@
     return { fileId: (await resp.json()).id };
   };
 
-  // Adjuntar un archivo a la carpeta Drive de una OC existente
-  window.attachToDriveOC = async function (file, { drive_folder_id, obra, fecha, proveedor, nroOC }) {
-    let token, folderId;
+  // Adjuntar un archivo a las carpetas Drive de una OC existente
+  window.attachToDriveOC = async function (file, { drive_folder_obras_id, drive_folder_proveedores_id, drive_folder_id, obra, fecha, proveedor, nroOC }) {
     try {
-      token    = await getAccessToken();
-      folderId = drive_folder_id;
-      if (!folderId) {
-        const obraFolderId = await getOrCreateFolder(token, obra || 'Sin obra', DRIVE_CONFIG.folderId);
-        const subName      = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
-        folderId           = await getOrCreateFolder(token, subName, obraFolderId);
+      const token = await getAccessToken();
+      const mime  = file.type || 'application/octet-stream';
+
+      // Compatibilidad con OC antiguas que tienen un solo drive_folder_id
+      if (!drive_folder_obras_id && !drive_folder_proveedores_id) {
+        let folderId = drive_folder_id;
+        if (!folderId) {
+          const obraFolderId = await getOrCreateFolder(token, obra || 'Sin obra', DRIVE_CONFIG.folderId);
+          const subName      = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
+          folderId           = await getOrCreateFolder(token, subName, obraFolderId);
+        }
+        await uploadFile(token, file, file.name, mime, folderId);
+        return;
       }
-      await uploadFile(token, file, file.name, file.type || 'application/octet-stream', folderId);
+
+      // OC nueva: subir a ambas carpetas en paralelo
+      const uploads = [];
+      if (drive_folder_obras_id)       uploads.push(uploadFile(token, file, file.name, mime, drive_folder_obras_id));
+      if (drive_folder_proveedores_id) uploads.push(uploadFile(token, file, file.name, mime, drive_folder_proveedores_id));
+      await Promise.all(uploads);
     } catch (err) {
       await logDriveError(nroOC, new Error(`Adjunto: ${err.message}`));
       throw err;
