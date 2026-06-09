@@ -61,12 +61,17 @@
     </div>
   </div>
 
+  <!-- Month selector -->
+  <div class="caja-action-bar" style="margin-bottom:.5rem;">
+    <select id="filter-mes" class="form-control" style="width:auto;min-width:180px;font-weight:600;"></select>
+  </div>
+
   <!-- Balance card -->
   <div class="card">
     <div class="card-header">
       <span class="card-title">
         <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
-        Saldo
+        Saldo del mes
       </span>
       <span id="saldo-usuario-nombre" style="font-size:.82rem;color:var(--gray-400);"></span>
     </div>
@@ -88,17 +93,13 @@
     </div>
   </div>
 
-  <!-- Filter + action bar -->
+  <!-- Action bar -->
   <div class="caja-action-bar">
-    <select id="filter-mes" class="form-control" style="width:auto;min-width:160px;">
-      <option value="">Todos los movimientos</option>
-    </select>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-      <button class="btn btn-success" id="btn-nuevo-gasto">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Registrar Gasto
-      </button>
-    </div>
+    <div></div>
+    <button class="btn btn-success" id="btn-nuevo-gasto">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Registrar Gasto
+    </button>
   </div>
 
   <!-- Movements -->
@@ -224,12 +225,16 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label for="recarga-descripcion">Descripción</label>
-        <input type="text" id="recarga-descripcion" class="form-control" placeholder="Ej: Recarga mayo 2026">
+        <label for="recarga-mes">Mes *</label>
+        <select id="recarga-mes" class="form-control"></select>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
+      <div class="form-group">
         <label for="recarga-monto">Monto *</label>
         <input type="text" id="recarga-monto" class="form-control" placeholder="0,00" inputmode="decimal">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="recarga-comentario">Comentario <span style="font-weight:400;color:var(--gray-400)">(opcional)</span></label>
+        <input type="text" id="recarga-comentario" class="form-control" placeholder="Ej: Viaje a obra norte">
       </div>
       <div id="recarga-error" class="alert alert-error hidden" style="margin-top:.75rem;"></div>
     </div>
@@ -272,12 +277,6 @@
 <!-- ===== TOAST ===== -->
 <div class="toast-container" id="toast-container"></div>
 
-<!-- ===== UPDATE BANNER ===== -->
-<div id="update-banner" class="update-banner">
-  <span><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible</span>
-  <button class="update-banner-btn" onclick="window.location.reload()">Actualizar</button>
-</div>
-
 <script src="js/icons.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
@@ -286,25 +285,12 @@
 <script src="js/caja.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
-
-    let bannerShown = false;
-    function showUpdateBanner() {
-      if (!hadController || bannerShown) return;
-      bannerShown = true;
-      document.getElementById('update-banner').style.display = 'flex';
-    }
-
-    navigator.serviceWorker.addEventListener('controllerchange', showUpdateBanner);
-    navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data && e.data.type === 'SW_UPDATED') showUpdateBanner();
-    });
-
+    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' })
+      .then(reg => reg.update()).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible')
         navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
-      }
     });
   }
 </script>

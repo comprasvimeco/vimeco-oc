@@ -110,8 +110,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-recarga-guardar').addEventListener('click', async () => {
       const errorEl    = document.getElementById('recarga-error');
-      const descripcion = document.getElementById('recarga-descripcion').value.trim();
+      const mesRecarga  = document.getElementById('recarga-mes').value;
+      const comentario  = document.getElementById('recarga-comentario').value.trim();
       const monto       = parseMonto(document.getElementById('recarga-monto').value);
+      const MESES_R = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const [ry, rm]  = mesRecarga.split('-');
+      const labelMes  = `Recarga ${MESES_R[parseInt(rm, 10)]} ${ry}`;
+      const descripcion = comentario ? `${labelMes} — ${comentario}` : labelMes;
       errorEl.classList.add('hidden');
 
       if (!monto || monto <= 0) {
@@ -125,8 +130,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         await saveCajaMovimiento(targetCodigo, {
           tipo:        'ingreso',
-          descripcion: descripcion || 'Recarga',
-          fecha:       new Date().toISOString().split('T')[0],
+          descripcion,
+          fecha:       mesRecarga + '-01',
           monto
         });
         closeRecargaModal();
@@ -164,11 +169,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     elLoad.style.display = 'none';
 
-    // Rebuild month filter
-    const meses = [...new Set(movimientos.map(m => m.fecha?.substring(0, 7)).filter(Boolean))].sort().reverse();
+    // Rebuild month filter (always month-based, no "todos")
+    const mesActualDefault = new Date().toISOString().substring(0, 7);
+    const mesesData = [...new Set(movimientos.map(m => m.fecha?.substring(0, 7)).filter(Boolean))];
+    if (!mesesData.includes(mesActualDefault)) mesesData.push(mesActualDefault);
+    const meses = mesesData.sort().reverse();
     const prevFilter = document.getElementById('filter-mes').value;
     const filterSel  = document.getElementById('filter-mes');
-    filterSel.innerHTML = '<option value="">Todos los movimientos</option>';
+    filterSel.innerHTML = '';
     const MESES = ['', 'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     meses.forEach(mes => {
       const [y, m] = mes.split('-');
@@ -177,7 +185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       o.textContent = `${MESES[parseInt(m, 10)]} ${y}`;
       filterSel.appendChild(o);
     });
-    if (prevFilter) filterSel.value = prevFilter;
+    filterSel.value = prevFilter && meses.includes(prevFilter) ? prevFilter : mesActualDefault;
 
     renderMovimientos();
   }
@@ -186,9 +194,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const mesFilter = document.getElementById('filter-mes').value;
     const filtered  = mesFilter ? movimientos.filter(m => m.fecha?.startsWith(mesFilter)) : movimientos;
 
-    // Balance always from full history
-    const totalIngresos = movimientos.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
-    const totalGastos   = movimientos.filter(m => m.tipo === 'gasto').reduce((s, m)  => s + (m.monto || 0), 0);
+    // Balance del mes seleccionado
+    const totalIngresos = filtered.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
+    const totalGastos   = filtered.filter(m => m.tipo === 'gasto').reduce((s, m)  => s + (m.monto || 0), 0);
     const saldo         = totalIngresos - totalGastos;
 
     document.getElementById('val-ingresos').textContent = fmtMonto(totalIngresos);
@@ -432,8 +440,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── Recarga modal ───────────────────────────────────
   function openRecargaModal() {
-    document.getElementById('recarga-descripcion').value = '';
-    document.getElementById('recarga-monto').value       = '';
+    const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const sel = document.getElementById('recarga-mes');
+    sel.innerHTML = '';
+    const now = new Date();
+    for (let i = 0; i < 13; i++) {
+      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const val = d.toISOString().substring(0, 7);
+      const [y, m] = val.split('-');
+      const o = document.createElement('option');
+      o.value = val;
+      o.textContent = `${MESES[parseInt(m, 10)]} ${y}`;
+      if (i === 0) o.selected = true;
+      sel.appendChild(o);
+    }
+    document.getElementById('recarga-monto').value      = '';
+    document.getElementById('recarga-comentario').value = '';
     document.getElementById('recarga-error').classList.add('hidden');
     document.getElementById('modal-recarga').classList.remove('hidden');
   }

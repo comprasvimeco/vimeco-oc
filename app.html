@@ -400,12 +400,6 @@
 <!-- ===== TOAST ===== -->
 <div class="toast-container" id="toast-container"></div>
 
-<!-- ===== UPDATE BANNER ===== -->
-<div id="update-banner" class="update-banner">
-  <span id="update-banner-msg"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible</span>
-  <button class="update-banner-btn" id="update-banner-btn" onclick="window.location.reload()">Actualizar</button>
-</div>
-
 <!-- ===== SCRIPTS ===== -->
 <script src="js/icons.js"></script>
 <script src="js/config.js"></script>
@@ -418,46 +412,12 @@
 <script src="js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
-
-    let bannerShown = false;
-    function showUpdateBanner() {
-      if (!hadController || bannerShown) return;
-      bannerShown = true;
-      const banner     = document.getElementById('update-banner');
-      const msgEl      = document.getElementById('update-banner-msg');
-      const btnEl      = document.getElementById('update-banner-btn');
-      const standalone = window.matchMedia('(display-mode: standalone)').matches;
-      banner.style.display = 'flex';
-
-      if (standalone) {
-        let secs = 8;
-        msgEl.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión — actualizando en <strong id="uc">${secs}s</strong>`;
-        btnEl.textContent = 'Actualizar ya';
-        const iv = setInterval(() => {
-          secs--;
-          const uc = document.getElementById('uc');
-          if (uc) uc.textContent = secs + 's';
-          if (secs <= 0) { clearInterval(iv); window.location.reload(); }
-        }, 1000);
-        document.addEventListener('pointerdown', () => {
-          clearInterval(iv);
-          msgEl.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Nueva versión disponible`;
-          btnEl.textContent = 'Actualizar';
-        }, { once: true });
-      }
-    }
-
-    navigator.serviceWorker.addEventListener('controllerchange', showUpdateBanner);
-    navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data && e.data.type === 'SW_UPDATED') showUpdateBanner();
-    });
-
+    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' })
+      .then(reg => reg.update()).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible')
         navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
-      }
     });
   }
 </script>
