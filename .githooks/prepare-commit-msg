@@ -1,0 +1,33 @@
+#!/bin/sh
+# Auto-inserta el número de versión deployada en mensajes de commit convencionales.
+# Formato resultante: "feat: v081 descripción"
+#
+# Instalación (una vez por clon):
+#   git config core.hooksPath .githooks
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"
+
+# No modificar merges, squashes ni commits de CI
+[ "$COMMIT_SOURCE" = "merge" ]  && exit 0
+[ "$COMMIT_SOURCE" = "squash" ] && exit 0
+
+MSG=$(cat "$COMMIT_MSG_FILE")
+
+# No modificar si ya tiene versión o es un bump del CI
+echo "$MSG" | grep -qE '[[:space:]]v[0-9]{3}[[:space:]]' && exit 0
+echo "$MSG" | grep -q '\[skip ci\]'                       && exit 0
+
+# Leer versión actual de app.html (la que el CI va a incrementar)
+CURRENT=$(grep -o 'hdr-drop-version">v[0-9]*' app.html 2>/dev/null | grep -o '[0-9]*$')
+[ -z "$CURRENT" ] && exit 0
+
+# Próxima versión (la que va a quedar deployada)
+NEXT=$(printf "%03d" $((10#$CURRENT + 1)))
+
+# Insertar "vNNN " después del prefijo convencional "type: " en la primera línea
+NEW_MSG=$(printf '%s' "$MSG" | sed "1s/^\([a-z][a-z!]*: \)/\1v${NEXT} /")
+
+[ "$NEW_MSG" = "$MSG" ] && exit 0
+
+printf '%s' "$NEW_MSG" > "$COMMIT_MSG_FILE"
