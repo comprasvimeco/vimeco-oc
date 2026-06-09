@@ -282,26 +282,39 @@
   // Adjuntar un archivo a las carpetas Drive de una OC existente
   window.attachToDriveOC = async function (file, { drive_folder_obras_id, drive_folder_proveedores_id, drive_folder_id, obra, fecha, proveedor, nroOC }) {
     try {
-      const token = await getAccessToken();
-      const mime  = file.type || 'application/octet-stream';
+      const token   = await getAccessToken();
+      const mime    = file.type || 'application/octet-stream';
+      const subName = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
 
-      // Compatibilidad con OC antiguas que tienen un solo drive_folder_id
-      if (!drive_folder_obras_id && !drive_folder_proveedores_id) {
-        let folderId = drive_folder_id;
-        if (!folderId) {
-          const obraFolderId = await getOrCreateFolder(token, obra || 'Sin obra', DRIVE_CONFIG.folderId);
-          const subName      = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
-          folderId           = await getOrCreateFolder(token, subName, obraFolderId);
-        }
-        await uploadFile(token, file, file.name, mime, folderId);
+      // OC pre-reorganización: tiene solo drive_folder_id apuntando a COMPRAS/{obra}/...
+      if (!drive_folder_obras_id && !drive_folder_proveedores_id && drive_folder_id) {
+        await uploadFile(token, file, file.name, mime, drive_folder_id);
         return;
       }
 
-      // OC nueva: subir a ambas carpetas en paralelo
-      const uploads = [];
-      if (drive_folder_obras_id)       uploads.push(uploadFile(token, file, file.name, mime, drive_folder_obras_id));
-      if (drive_folder_proveedores_id) uploads.push(uploadFile(token, file, file.name, mime, drive_folder_proveedores_id));
-      await Promise.all(uploads);
+      // Resolver IDs: usar los guardados o reconstruir bajo OBRAS/PROVEEDORES
+      let obrasFid = drive_folder_obras_id;
+      let provsFid = drive_folder_proveedores_id;
+
+      if (!obrasFid || !provsFid) {
+        const [obrasRoot, provsRoot] = await Promise.all([
+          getObrasRootId(token),
+          getProveedoresRootId(token)
+        ]);
+        if (!obrasFid) {
+          const parent = await getOrCreateFolder(token, obra || 'Sin obra', obrasRoot);
+          obrasFid = await getOrCreateFolder(token, subName, parent);
+        }
+        if (!provsFid) {
+          const parent = await getOrCreateFolder(token, proveedor || 'Sin proveedor', provsRoot);
+          provsFid = await getOrCreateFolder(token, subName, parent);
+        }
+      }
+
+      await Promise.all([
+        uploadFile(token, file, file.name, mime, obrasFid),
+        uploadFile(token, file, file.name, mime, provsFid)
+      ]);
     } catch (err) {
       await logDriveError(nroOC, new Error(`Adjunto: ${err.message}`));
       throw err;
