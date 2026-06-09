@@ -292,11 +292,19 @@
   if ('serviceWorker' in navigator) {
     const hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
+
+    let bannerShown = false;
+    function showUpdateBanner() {
+      if (!hadController || bannerShown) return;
+      bannerShown = true;
+      document.getElementById('update-banner').style.display = 'flex';
+    }
+
+    navigator.serviceWorker.addEventListener('controllerchange', showUpdateBanner);
     navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data && e.data.type === 'SW_UPDATED' && hadController) {
-        document.getElementById('update-banner').style.display = 'flex';
-      }
+      if (e.data && e.data.type === 'SW_UPDATED') showUpdateBanner();
     });
+
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
