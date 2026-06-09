@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeRecargaModal();
         showToast('Recarga registrada', 'success');
         await loadMovimientos();
-        sincronizarExcel();
+        sincronizarExcel(mesRecarga);
       } catch (err) {
         errorEl.textContent = 'Error al guardar: ' + (err.message || err);
         errorEl.classList.remove('hidden');
@@ -297,11 +297,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function confirmDelete(key) {
     if (!confirm('¿Eliminar este movimiento?')) return;
+    const mesMov = movimientos.find(m => m.key === key)?.fecha?.substring(0, 7);
     try {
       await deleteCajaMovimiento(targetCodigo, key);
       showToast('Movimiento eliminado', 'success');
       await loadMovimientos();
-      sincronizarExcel();
+      sincronizarExcel(mesMov);
     } catch (_) {
       showToast('Error al eliminar', 'error');
     }
@@ -411,7 +412,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (gastoFile && typeof uploadToCajaDrive === 'function') {
       try {
-        const res = await uploadToCajaDrive(gastoFile, {
+        const ext      = gastoFile.name.includes('.') ? gastoFile.name.split('.').pop().toLowerCase() : 'jpg';
+        const safeCat  = (categoria || 'sin-categoria').replace(/[^\wáéíóúÁÉÍÓÚüÜñÑ]/g, '-').replace(/-+/g, '-');
+        const safeDesc = (descripcion || '').replace(/[^\wáéíóúÁÉÍÓÚüÜñÑ\s]/g, '').trim().replace(/\s+/g, '-').substring(0, 50);
+        const montoStr = monto.toFixed(2).replace('.', ',');
+        const photoName = [fecha, safeCat, montoStr, safeDesc].filter(Boolean).join('_') + '.' + ext;
+        const uploadFile = new File([gastoFile], photoName, { type: gastoFile.type });
+        const res = await uploadToCajaDrive(uploadFile, {
           userId:   targetCodigo,
           userName: targetNombre,
           fecha,
@@ -428,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeGastoModal();
       showToast('Gasto registrado', 'success');
       await loadMovimientos();
-      sincronizarExcel();
+      sincronizarExcel(fecha.substring(0, 7));
     } catch (err) {
       errorEl.textContent = 'Error al guardar: ' + (err.message || err);
       errorEl.classList.remove('hidden');
@@ -542,7 +549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ─── Sincronizar Excel con Drive (se llama automáticamente tras cada movimiento) ──
-  async function sincronizarExcel() {
+  async function sincronizarExcel(mes) {
     if (typeof uploadToCajaDrive !== 'function') return;
 
     if (!window.XLSX) {
@@ -559,7 +566,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const hoy       = new Date();
-    const mesActual = hoy.toISOString().substring(0, 7);
+    const mesActual = mes || hoy.toISOString().substring(0, 7);
     const [yr, mo]  = mesActual.split('-');
     const periodo   = `${MESES[parseInt(mo, 10)]} ${yr}`;
 
@@ -654,28 +661,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     ws['!rows'][R_TITLE]   = { hpt: 22 };
     ws['!rows'][R_RESUMEN] = ws['!rows'][R_CAT_TTL] = ws['!rows'][R_DET_TTL] = { hpt: 18 };
 
-    // ─── Estilos ─────────────────────────────────────────
-    const BLUE   = '1A3A5C';
-    const MBLUE  = '2D5F8A';
-    const LBLUE  = 'D6E4F0';
-    const TEAL   = '3A78B5';
-    const WHITE  = 'FFFFFF';
-    const LGRAY  = 'F5F7FA';
-    const YELW   = 'FFFDE7';
-    const GREEN  = '1B5E20';
-    const RED    = 'B71C1C';
-    const BORD   = 'B0BEC5';
+    // ─── Estilos (colores en ARGB de 8 chars requerido por xlsx) ────────────────
+    const a    = h => 'FF' + h;
+    const BLUE  = a('1A3A5C');
+    const MBLUE = a('2D5F8A');
+    const LBLUE = a('D6E4F0');
+    const TEAL  = a('3A78B5');
+    const WHITE = a('FFFFFF');
+    const LGRAY = a('F5F7FA');
+    const YELW  = a('FFFDE7');
+    const GREEN = a('1B5E20');
+    const RED   = a('B71C1C');
+    const BORD  = a('B0BEC5');
 
-    const solid = (rgb) => ({ patternType: 'solid', fgColor: { rgb } });
-    const thin  = () => ({ top: b, bottom: b, left: b, right: b });
+    const solid = (rgb) => ({ patternType: 'solid', fgColor: { rgb }, bgColor: { indexed: 64 } });
     const b     = { style: 'thin', color: { rgb: BORD } };
+    const thin  = () => ({ top: b, bottom: b, left: b, right: b });
 
     function cs(r, c, s) {
       const addr = XLSX.utils.encode_cell({ r, c });
       if (!ws[addr]) ws[addr] = { t: 's', v: '' };
       ws[addr].s = s;
     }
-    function csRow(r, ncols, s) { for (let c = 0; c < ncols; c++) cs(r, c, s); }
 
     const FMT = '#,##0.00';
     const numStyle = (bg, color, bold = false) => ({
@@ -739,7 +746,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const fname  = `Caja_${safe}_${periodo.replace(/\s+/g, '_')}.xlsx`;
       await uploadToCajaDrive(new File([blob], fname, { type: blob.type }), {
         userId: targetCodigo, userName: targetNombre,
-        fecha: mesActual + '-01', tipo: 'planilla'
+        fecha: mesActual + '-01', tipo: 'planilla'   // mesActual ya es el mes correcto
       });
     } catch (_) {}
   }
