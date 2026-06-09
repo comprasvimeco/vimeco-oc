@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('hdr-dropdown').classList.toggle('hidden');
   });
   document.addEventListener('click', () => document.getElementById('hdr-dropdown').classList.add('hidden'));
-  document.getElementById('btn-inicio').addEventListener('click', () => { window.location.href = 'menu.html'; });
+
   document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('vimeco_session');
     window.location.href = 'index.html';
