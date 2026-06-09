@@ -326,7 +326,7 @@ Devolvé ÚNICAMENTE un JSON válido, sin markdown ni texto adicional:
   "descripcion": "descripción breve de qué se compró o pagó, o null",
   "fecha": "fecha en formato YYYY-MM-DD, o null",
   "monto_total": número_total_del_comprobante,
-  "categoria_sugerida": "una de: Materiales, Combustible, Herramientas, Alimentación, Transporte, Servicios, Otros"
+  "categoria_sugerida": "una de: Viaticos, Peajes, Combustibles, Repuestos, Oficina, Herramientas, Pasajes, Inspección, Equipos, Otras"
 }
 
 FORMATO NUMÉRICO: en documentos argentinos el punto es separador de miles y la coma es decimal.

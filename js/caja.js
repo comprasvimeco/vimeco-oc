@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (_) { categorias = []; }
 
     if (!categorias.length) {
-      categorias = ['Materiales', 'Combustible', 'Herramientas', 'Alimentación', 'Transporte', 'Servicios', 'Otros'];
+      categorias = ['Viaticos', 'Peajes', 'Combustibles', 'Repuestos', 'Oficina', 'Herramientas', 'Pasajes', 'Inspección', 'Equipos', 'Otras'];
       try { await saveCategoriasCaja(categorias); } catch (_) {}
     }
 
