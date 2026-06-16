@@ -39,29 +39,41 @@ function renderUsers(list) {
     container.innerHTML = '<div class="hist-empty">No hay usuarios cargados.</div>';
     return;
   }
-  container.innerHTML = list.map(u => `
+  container.innerHTML = list.map(u => {
+    const esAdmin = u.codigo === '0000';
+    const cajaBadge = esAdmin
+      ? '<span class="u-badge u-badge-activo">🧮 Caja (admin)</span>'
+      : `<span class="u-badge ${u.caja ? 'u-badge-activo' : 'u-badge-inactivo'}">${u.caja ? '🧮 Caja' : '🧮 Sin caja'}</span>`;
+    const cajaBtn = esAdmin
+      ? ''
+      : `<button class="btn btn-sm ${u.caja ? 'btn-warning' : 'btn-success'} btn-toggle-caja">${u.caja ? 'Quitar caja' : 'Dar caja'}</button>`;
+    return `
     <div class="user-card ${u.activo ? '' : 'user-card--inactive'}">
       <div class="user-card-info">
         <span class="user-card-code">${esc(u.codigo)}</span>
         <span class="user-card-name">${esc(u.nombre)}</span>
         <span class="u-badge ${u.activo ? 'u-badge-activo' : 'u-badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
         <span class="u-badge ${u.passwordHash ? 'u-badge-pwd-ok' : 'u-badge-pwd-none'}">${u.passwordHash ? '🔑 Con contraseña' : '⚠ Sin contraseña'}</span>
+        ${cajaBadge}
       </div>
       <div class="user-card-actions">
         <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
         <button class="btn btn-sm btn-secondary btn-reset-pwd">Reset pwd</button>
+        ${cajaBtn}
         <button class="btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'} btn-toggle-user">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   container.querySelectorAll('.user-card').forEach((card, i) => {
     const u = list[i];
     card.querySelector('.btn-edit-user').addEventListener('click',   () => editUser(u.codigo, u.nombre));
     card.querySelector('.btn-reset-pwd').addEventListener('click',   () => resetPwd(u.codigo, u.nombre));
     card.querySelector('.btn-toggle-user').addEventListener('click', () => toggleActivo(u.codigo, u.activo, u.nombre));
+    card.querySelector('.btn-toggle-caja')?.addEventListener('click', () => toggleCaja(u.codigo, u.caja, u.nombre));
   });
 }
 
@@ -159,6 +171,23 @@ window.resetPwd = async function (codigo, nombre) {
     await loadUsers();
   } catch (_) {
     showToast('Error al resetear la contraseña.', 'error');
+  }
+};
+
+window.toggleCaja = async function (codigo, enabled, nombre) {
+  const ok = await showConfirm(
+    enabled ? 'Quitar acceso a Caja' : 'Habilitar Caja',
+    enabled
+      ? `¿Quitar el acceso a Caja Chica de ${nombre}?`
+      : `¿Habilitar Caja Chica para ${nombre}? Podrá registrar ingresos y egresos de su propia caja.`
+  );
+  if (!ok) return;
+  try {
+    await patchUsuario(codigo, { caja: !enabled });
+    showToast(`Caja ${enabled ? 'deshabilitada' : 'habilitada'} para ${nombre}.`);
+    await loadUsers();
+  } catch (_) {
+    showToast('Error al actualizar el permiso de Caja.', 'error');
   }
 };
 

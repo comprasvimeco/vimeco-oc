@@ -1,17 +1,24 @@
 /* global getCajaMovimientos, saveCajaMovimiento, deleteCajaMovimiento,
           patchCajaMovimiento, getCategoriasCaja, saveCategoriasCaja,
-          getAllUsuarios, uploadToCajaDrive */
+          getAllUsuarios, getUsuario, uploadToCajaDrive */
 
 document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── Auth ────────────────────────────────────────────
   const session = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch(_) { return null; } })();
   if (!session?.codigo) { window.location.href = 'index.html'; return; }
-  if (session.codigo !== '0000') { window.location.href = 'menu.html'; return; }
 
   const userCodigo = session.codigo;
   const userNombre = session.nombre;
-  const isAdmin    = true;
+  const isAdmin    = userCodigo === '0000';
+
+  // El admin (0000) siempre entra; los demás necesitan el permiso `caja` habilitado
+  if (!isAdmin) {
+    try {
+      const u = await getUsuario(userCodigo);
+      if (!u || !u.caja) { window.location.href = 'menu.html'; return; }
+    } catch (_) { window.location.href = 'menu.html'; return; }
+  }
 
   let targetCodigo = userCodigo;
   let targetNombre = userNombre;
@@ -98,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ─── Admin setup ─────────────────────────────────────
+  // ─── Admin: selector de usuario ──────────────────────
   if (isAdmin) {
     document.getElementById('admin-selector-card').classList.remove('hidden');
 
@@ -121,7 +128,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       targetNombre = sel.options[sel.selectedIndex].textContent.replace(/ \(\w+\)$/, '');
       loadMovimientos();
     });
+  }
 
+  // ─── Ingreso (recarga): disponible para admin y usuarios habilitados ─
+  {
     document.getElementById('btn-nuevo-ingreso').addEventListener('click', () => openRecargaModal());
     document.getElementById('modal-recarga-close').addEventListener('click', closeRecargaModal);
     document.getElementById('btn-recarga-cancelar').addEventListener('click', closeRecargaModal);

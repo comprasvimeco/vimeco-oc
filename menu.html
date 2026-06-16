@@ -67,9 +67,17 @@
       localStorage.removeItem('vimeco_session');
       window.location.href = 'index.html';
     });
-    // Caja visible solo para admin mientras está en desarrollo
-    if (_s.codigo !== '0000') {
-      document.getElementById('menu-card-caja').style.display = 'none';
+    // Caja: visible para el admin (0000) o para usuarios con el permiso habilitado.
+    const cajaCard = document.getElementById('menu-card-caja');
+    if (_s.codigo === '0000') {
+      cajaCard.style.display = '';
+    } else {
+      cajaCard.style.display = 'none';
+      if (typeof getUsuario === 'function') {
+        getUsuario(_s.codigo)
+          .then(u => { if (u && u.caja) cajaCard.style.display = ''; })
+          .catch(() => {});
+      }
     }
   }
 
