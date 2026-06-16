@@ -23,10 +23,29 @@
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
   --radius: 6px;
   --radius-lg: 10px;
+
+  /* ===== GLASS / GRADIENT DESIGN SYSTEM ===== */
+  --accent-2: #38bdf8;            /* cyan vivo  */
+  --accent-3: #6366f1;            /* indigo     */
+  --grad-app-bg: radial-gradient(1200px 700px at 12% -10%, #2557a722 0%, transparent 55%),
+                 radial-gradient(1000px 600px at 110% 0%, #38bdf81f 0%, transparent 50%),
+                 linear-gradient(160deg, #eef2f8 0%, #e7edf6 45%, #eaf1fb 100%);
+  --grad-header: linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 120%);
+  --grad-accent: linear-gradient(120deg, var(--primary-light), var(--accent-2));
+  --grad-gold:   linear-gradient(120deg, #c8a852, #e6c878);
+  --glass-bg: rgba(255,255,255,.62);
+  --glass-bg-strong: rgba(255,255,255,.82);
+  --glass-border: rgba(255,255,255,.7);
+  --glass-blur: 16px;
+  --shadow-glass: 0 8px 30px -8px rgba(26,58,92,.28), 0 2px 8px -2px rgba(26,58,92,.12);
+  --shadow-glow: 0 12px 40px -10px rgba(37,87,167,.45);
+  --ease-spring: cubic-bezier(.22,1,.36,1);
 }
 
 html { font-size: 15px; }
 body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--gray-100); color: var(--gray-700); line-height: 1.5; min-height: 100vh; }
+/* App pages (no login) get the gradient backdrop */
+body:not(.login-page) { background: var(--grad-app-bg); background-attachment: fixed; }
 
 /* ===== LOGIN PAGE ===== */
 .login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%); }
@@ -81,7 +100,8 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .alert-warning { background: #fffbeb; color: #92400e; border-color: var(--warning); }
 
 /* ===== APP LAYOUT ===== */
-.app-header { background: var(--primary); color: var(--white); padding: 0 1.5rem; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100; }
+.app-header { background: var(--grad-header); color: var(--white); padding: 0 1.5rem; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 6px 24px -8px rgba(26,58,92,.55); position: sticky; top: 0; z-index: 100; }
+.app-header::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--grad-gold); opacity: .85; }
 .app-header .btn-outline { border-color: rgba(255,255,255,.55); color: var(--white); }
 .app-header .btn-outline:hover { background: rgba(255,255,255,.15); border-color: var(--white); }
 .header-brand { display: flex; align-items: center; gap: .85rem; }
@@ -578,8 +598,10 @@ tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 
 /* ===== MENU HOME ===== */
 .menu-main { max-width: 680px; margin: 2rem auto; }
+.menu-main:has(.menu-grid-3) { max-width: 860px; }
 .menu-welcome { text-align: center; color: var(--gray-600); font-size: .95rem; margin-bottom: 1.5rem; }
 .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.menu-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .menu-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: .75rem; padding: 2.5rem 1.5rem;
@@ -652,3 +674,120 @@ tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 .caja-cat-tag { display: inline-block; margin-left: .3rem; padding: .1rem .4rem; background: var(--gray-200); border-radius: 4px; font-size: .68rem; color: var(--gray-600); }
 
 .btn-xs { padding: .2rem .4rem; font-size: .74rem; }
+
+/* ======================================================================
+   GLASS REDESIGN  —  superficies translúcidas, gradientes y animaciones
+   ====================================================================== */
+
+/* ---- Keyframes ---- */
+@keyframes fadeInUp   { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn     { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn      { 0% { opacity: 0; transform: scale(.92) translateY(8px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes floatBlob  { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(20px,-18px) scale(1.06); } }
+@keyframes shimmer    { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* ---- Page enter transition (todas las páginas de app) ---- */
+body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both; }
+
+/* ---- Glass utility ---- */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--glass-bg-strong); }
+}
+
+/* ---- Re-skin de tarjetas existentes a glass ---- */
+.card {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  animation: fadeInUp .4s var(--ease-spring) both;
+}
+.card-header { background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0)); border-bottom: 1px solid rgba(26,58,92,.08); }
+
+/* ---- Modales con entrada animada y blur de fondo ---- */
+.modal-overlay { background: rgba(15,30,50,.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fadeIn .2s ease both; }
+.modal { box-shadow: var(--shadow-glow); animation: popIn .28s var(--ease-spring) both; }
+
+/* ---- Botones: brillo y elevación ---- */
+.btn { position: relative; overflow: hidden; box-shadow: 0 2px 6px -2px rgba(26,58,92,.3); transition: transform .15s var(--ease-spring), box-shadow .2s, background .15s, filter .15s; }
+.btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--shadow-glow); filter: brightness(1.04); }
+.btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+.btn-primary { background: var(--grad-header); }
+.btn-success { background: linear-gradient(120deg, #15803d, #22c55e); }
+.btn-danger  { background: linear-gradient(120deg, #b91c1c, #ef4444); }
+
+/* ---- Menú / submenú: tarjetas glass con realce ---- */
+.menu-card {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  transition: transform .22s var(--ease-spring), box-shadow .22s, border-color .22s;
+  animation: fadeInUp .45s var(--ease-spring) both;
+  position: relative; overflow: hidden;
+}
+.menu-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--grad-accent); opacity: 0; transition: opacity .22s; }
+.menu-card:hover { transform: translateY(-6px) scale(1.015); background: var(--glass-bg-strong); border-color: rgba(37,87,167,.4); box-shadow: var(--shadow-glow); }
+.menu-card:hover::before { opacity: 1; }
+.menu-card:nth-child(2) { animation-delay: .07s; }
+.menu-card:nth-child(3) { animation-delay: .14s; }
+.menu-card-icon { background: var(--grad-header); box-shadow: 0 6px 16px -6px rgba(37,87,167,.7); }
+.menu-card:hover .menu-card-icon { background: var(--grad-accent); transform: scale(1.06) rotate(-3deg); transition: transform .22s var(--ease-spring), background .22s; }
+.menu-welcome { color: var(--gray-700); }
+
+/* ---- CAJA: barra de mes (chip arriba a la derecha) ---- */
+.caja-topbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 1rem; }
+.caja-mes-chip { display: inline-flex; align-items: center; padding: .45rem 2rem .45rem 1rem; border-radius: 999px; font-weight: 700; font-size: .9rem; color: var(--primary-dark); background-color: var(--glass-bg-strong); border: 1px solid var(--glass-border); box-shadow: var(--shadow-glass); cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231a3a5c' stroke-width='1.7' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .85rem center; }
+.caja-mes-chip:focus { outline: none; box-shadow: var(--shadow-glow); }
+
+/* ---- CAJA: tarjeta hero del saldo ---- */
+.caja-hero { text-align: center; padding: 2rem 1.5rem 1.75rem; margin-bottom: 1.25rem; border-radius: var(--radius-lg); position: relative; overflow: hidden;
+  background: var(--grad-header); color: #fff; box-shadow: var(--shadow-glow); animation: fadeInUp .4s var(--ease-spring) both; }
+.caja-hero::before { content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(56,189,248,.45), transparent 70%); top: -120px; right: -60px; animation: floatBlob 9s ease-in-out infinite; pointer-events: none; }
+.caja-hero::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--grad-gold); }
+.caja-hero-label { font-size: .72rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: .35rem; }
+.caja-hero-saldo { font-size: clamp(2.4rem, 9vw, 3.6rem); font-weight: 800; font-family: 'Courier New', monospace; line-height: 1.05; letter-spacing: .01em; text-shadow: 0 2px 12px rgba(0,0,0,.25); }
+.caja-hero-saldo.neg { color: #fecaca; }
+
+/* ---- CAJA: 3 líneas resumen (excedente / ingresos / egresos) ---- */
+.caja-resumen { max-width: 460px; margin: 1.25rem auto 0; display: flex; flex-direction: column; gap: .55rem; }
+.caja-resumen-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: .95rem; padding: .55rem .9rem; border-radius: var(--radius); background: var(--glass-bg-strong); border: 1px solid var(--glass-border); box-shadow: var(--shadow-glass); }
+.caja-resumen-label { display: flex; align-items: center; gap: .5rem; color: var(--gray-600); font-weight: 600; }
+.caja-resumen-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.caja-resumen-dot.exc { background: var(--accent-3); }
+.caja-resumen-dot.ing { background: var(--success); }
+.caja-resumen-dot.egr { background: var(--danger); }
+.caja-resumen-val { font-family: 'Courier New', monospace; font-weight: 800; }
+.caja-resumen-row.is-ing .caja-resumen-val { color: var(--success); }
+.caja-resumen-row.is-egr .caja-resumen-val { color: var(--danger); }
+.caja-resumen-row.is-exc .caja-resumen-val { color: var(--primary); }
+
+/* ---- CAJA: botones ingreso / egreso ---- */
+.caja-botonera { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; max-width: 460px; margin: 1.25rem auto; }
+.caja-botonera .btn { padding: .9rem 1rem; font-size: .95rem; border-radius: var(--radius-lg); }
+@media (max-width: 380px) { .caja-botonera { grid-template-columns: 1fr; } }
+
+/* ---- Separador con título (Historial) ---- */
+.caja-hist-sep { display: flex; align-items: center; gap: .9rem; margin: 1.5rem 0 1rem; color: var(--primary); font-weight: 700; font-size: .82rem; text-transform: uppercase; letter-spacing: .1em; }
+.caja-hist-sep::before, .caja-hist-sep::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(26,58,92,.25), transparent); }
+
+/* ---- Movement cards re-skin glass ---- */
+.caja-mov-card { background: var(--glass-bg-strong); border: 1px solid var(--glass-border); box-shadow: var(--shadow-glass); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: transform .15s var(--ease-spring), box-shadow .2s; }
+.caja-mov-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-glow); }
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  .caja-hero::before { animation: none; }
+}

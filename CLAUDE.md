@@ -43,6 +43,14 @@ IDs de OBRAS/PROVEEDORES/CAJAS se cachean en Firebase `/drive_config/`.
 ## Caja Chica — lógica por mes
 
 - Todo filtrado por mes (sin opción "Todos los movimientos")
-- Saldo = ingresos del mes - gastos del mes (no acumulado histórico)
+- **Saldo = Excedente anterior + Ingresos del mes − Egresos del mes** (con arrastre acumulado).
+  El "Excedente anterior" es el neto de todos los movimientos de meses previos al seleccionado.
+- El Excel sincronizado a Drive refleja el mismo cálculo (fila "Excedente anterior" + saldo acumulado)
 - Excel se sincroniza automáticamente a Drive tras cada movimiento
-- Recargas almacenan fecha como primer día del mes seleccionado
+- Recargas (Ingresos) almacenan fecha como primer día del mes seleccionado
+
+## Navegación
+
+- `menu.html` (raíz) → dos secciones: **Compras** (`compras.html`) y **Caja** (`caja.html`)
+- `compras.html` → submenú: Órdenes de Compra (`app.html`), Adjuntar (`adjuntar.html`), Historial (`historial.html`)
+- El logo/header de las páginas de Compras vuelve a `compras.html`; el de Caja vuelve a `menu.html`

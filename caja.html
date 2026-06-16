@@ -48,68 +48,55 @@
   <!-- Admin: selector de usuario -->
   <div class="card hidden" id="admin-selector-card">
     <div class="card-body" style="padding:.75rem 1.25rem;">
-      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-        <div class="form-group" style="margin:0;flex:1;min-width:200px;">
-          <label for="select-usuario" style="margin-bottom:.3rem;">Ver caja de:</label>
-          <select id="select-usuario" class="form-control"></select>
-        </div>
-        <button class="btn btn-primary" id="btn-recarga" style="margin-top:1.3rem;white-space:nowrap;">
-          <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Hacer Recarga
-        </button>
+      <div class="form-group" style="margin:0;">
+        <label for="select-usuario" style="margin-bottom:.3rem;">Ver caja de:</label>
+        <select id="select-usuario" class="form-control"></select>
       </div>
     </div>
   </div>
 
-  <!-- Month selector -->
-  <div class="caja-action-bar" style="margin-bottom:.5rem;">
-    <select id="filter-mes" class="form-control" style="width:auto;min-width:180px;font-weight:600;"></select>
+  <!-- Month chip (top-right) -->
+  <div class="caja-topbar">
+    <select id="filter-mes" class="caja-mes-chip"></select>
   </div>
 
-  <!-- Balance card -->
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
-        Saldo del mes
-      </span>
-      <span id="saldo-usuario-nombre" style="font-size:.82rem;color:var(--gray-400);"></span>
+  <!-- Hero: saldo grande -->
+  <div class="caja-hero">
+    <div class="caja-hero-label">Saldo <span id="saldo-usuario-nombre"></span></div>
+    <div class="caja-hero-saldo" id="val-saldo">$ 0,00</div>
+  </div>
+
+  <!-- Resumen: excedente / ingresos / egresos -->
+  <div class="caja-resumen">
+    <div class="caja-resumen-row is-exc">
+      <span class="caja-resumen-label"><span class="caja-resumen-dot exc"></span> Excedente anterior</span>
+      <span class="caja-resumen-val" id="val-excedente">$ 0,00</span>
     </div>
-    <div class="card-body">
-      <div class="caja-saldo-grid">
-        <div class="caja-saldo-item caja-saldo-ingreso">
-          <div class="caja-saldo-label">Ingresos</div>
-          <div class="caja-saldo-value" id="val-ingresos">$ 0,00</div>
-        </div>
-        <div class="caja-saldo-item caja-saldo-gasto">
-          <div class="caja-saldo-label">Gastos</div>
-          <div class="caja-saldo-value" id="val-gastos">$ 0,00</div>
-        </div>
-        <div class="caja-saldo-item caja-saldo-total">
-          <div class="caja-saldo-label">Saldo</div>
-          <div class="caja-saldo-value" id="val-saldo">$ 0,00</div>
-        </div>
-      </div>
+    <div class="caja-resumen-row is-ing">
+      <span class="caja-resumen-label"><span class="caja-resumen-dot ing"></span> Ingresos</span>
+      <span class="caja-resumen-val" id="val-ingresos">$ 0,00</span>
+    </div>
+    <div class="caja-resumen-row is-egr">
+      <span class="caja-resumen-label"><span class="caja-resumen-dot egr"></span> Egresos</span>
+      <span class="caja-resumen-val" id="val-gastos">$ 0,00</span>
     </div>
   </div>
 
-  <!-- Action bar -->
-  <div class="caja-action-bar">
-    <div></div>
-    <button class="btn btn-success" id="btn-nuevo-gasto">
+  <!-- Botonera: + Ingreso / - Egreso -->
+  <div class="caja-botonera">
+    <button class="btn btn-primary" id="btn-nuevo-ingreso">
       <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Registrar Gasto
+      Ingreso
+    </button>
+    <button class="btn btn-danger" id="btn-nuevo-gasto">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Egreso
     </button>
   </div>
 
-  <!-- Movements -->
+  <!-- Historial -->
+  <div class="caja-hist-sep">Historial</div>
   <div class="card">
-    <div class="card-header">
-      <span class="card-title">
-        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Historial
-      </span>
-    </div>
     <div class="card-body" style="padding:0;">
       <div id="movimientos-loading" class="empty-state" style="display:none;">
         <div class="spinner" style="width:24px;height:24px;margin:0 auto .5rem;"></div>
@@ -147,7 +134,7 @@
 <div class="modal-overlay hidden" id="modal-gasto">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">Registrar Gasto</span>
+      <span class="modal-title">Registrar Egreso</span>
       <button class="modal-close" id="modal-gasto-close">
         <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -208,7 +195,7 @@
       <button class="btn btn-secondary" id="btn-gasto-cancelar">Cancelar</button>
       <button class="btn btn-success" id="btn-gasto-guardar">
         <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        Guardar Gasto
+        Guardar Egreso
       </button>
     </div>
   </div>
@@ -218,7 +205,7 @@
 <div class="modal-overlay hidden" id="modal-recarga">
   <div class="modal modal--sm">
     <div class="modal-header">
-      <span class="modal-title">Hacer Recarga</span>
+      <span class="modal-title">Registrar Ingreso</span>
       <button class="modal-close" id="modal-recarga-close">
         <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -242,7 +229,7 @@
       <button class="btn btn-secondary" id="btn-recarga-cancelar">Cancelar</button>
       <button class="btn btn-primary" id="btn-recarga-guardar">
         <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Confirmar Recarga
+        Confirmar Ingreso
       </button>
     </div>
   </div>

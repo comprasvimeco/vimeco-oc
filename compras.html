@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIMECO S.A. — Sistema</title>
+  <title>VIMECO S.A. — Compras</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" type="image/png" href="icono_app.png">
   <link rel="manifest" href="manifest.json">
@@ -15,11 +15,11 @@
 <body>
 
 <header class="app-header">
-  <div class="header-brand">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='menu.html'">
     <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
       onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
     <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
-    <span class="header-title">Sistema de Gestión</span>
+    <span class="header-title">Compras</span>
   </div>
   <div class="header-user">
     <div class="user-badge">
@@ -30,28 +30,37 @@
 </header>
 
 <main class="app-main menu-main">
-  <p class="menu-welcome">Bienvenido/a, <strong id="menu-nombre">—</strong>. ¿Qué querés hacer?</p>
-  <div class="menu-grid">
-    <a href="compras.html" class="menu-card">
+  <p class="menu-welcome">Compras — ¿qué querés hacer?</p>
+  <div class="menu-grid menu-grid-3">
+    <a href="app.html" class="menu-card">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="9" cy="21" r="1"/>
-          <circle cx="20" cy="21" r="1"/>
-          <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
+          <polyline points="6 9 6 2 18 2 18 9"/>
+          <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
         </svg>
       </div>
-      <div class="menu-card-title">Compras</div>
-      <div class="menu-card-sub">Órdenes, adjuntos e historial</div>
+      <div class="menu-card-title">Órdenes de Compra</div>
+      <div class="menu-card-sub">Generar una nueva OC</div>
     </a>
-    <a href="caja.html" class="menu-card" id="menu-card-caja">
+    <a href="adjuntar.html" class="menu-card">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="7" width="20" height="14" rx="2"/>
-          <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
         </svg>
       </div>
-      <div class="menu-card-title">Caja Chica</div>
-      <div class="menu-card-sub">Registro de gastos e ingresos</div>
+      <div class="menu-card-title">Adjuntar Archivo</div>
+      <div class="menu-card-sub">Sumar comprobantes a una OC</div>
+    </a>
+    <a href="historial.html" class="menu-card">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <div class="menu-card-title">Historial</div>
+      <div class="menu-card-sub">Ver órdenes generadas</div>
     </a>
   </div>
 </main>
@@ -64,15 +73,10 @@
     window.location.href = 'index.html';
   } else {
     document.getElementById('hdr-name').textContent = _s.nombre;
-    document.getElementById('menu-nombre').textContent = _s.nombre;
     document.getElementById('btn-logout').addEventListener('click', () => {
       localStorage.removeItem('vimeco_session');
       window.location.href = 'index.html';
     });
-    // Caja visible solo para admin mientras está en desarrollo
-    if (_s.codigo !== '0000') {
-      document.getElementById('menu-card-caja').style.display = 'none';
-    }
   }
 
   if ('serviceWorker' in navigator) {

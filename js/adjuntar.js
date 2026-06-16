@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   sessionStorage.setItem('responsable_name', name);
 
   $('hdr-name').textContent = name;
-  $('btn-back').addEventListener('click', () => { window.location.href = 'app.html'; });
+  $('btn-back').addEventListener('click', () => { window.location.href = 'compras.html'; });
   $('btn-restart').addEventListener('click', resetToStart);
   $('btn-another').addEventListener('click', resetToStart);
 

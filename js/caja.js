@@ -40,6 +40,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${d}/${m}/${y}`;
   }
 
+  // Anima un número desde su valor actual hasta `to` (con formato de monto)
+  const _countTimers = new WeakMap();
+  function countUp(el, to) {
+    if (!el) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const from = el._cuVal || 0;
+    if (reduce || from === to) { el.textContent = fmtMonto(to); el._cuVal = to; return; }
+    if (_countTimers.has(el)) cancelAnimationFrame(_countTimers.get(el));
+    const dur = 650, t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);          // easeOutCubic
+      el.textContent = fmtMonto(from + (to - from) * eased);
+      if (p < 1) { _countTimers.set(el, requestAnimationFrame(step)); }
+      else { el.textContent = fmtMonto(to); el._cuVal = to; }
+    };
+    _countTimers.set(el, requestAnimationFrame(step));
+  }
+
   // ─── Header ──────────────────────────────────────────
   document.getElementById('hdr-name').textContent = userNombre;
 
@@ -103,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadMovimientos();
     });
 
-    document.getElementById('btn-recarga').addEventListener('click', openRecargaModal);
+    document.getElementById('btn-nuevo-ingreso').addEventListener('click', openRecargaModal);
     document.getElementById('modal-recarga-close').addEventListener('click', closeRecargaModal);
     document.getElementById('btn-recarga-cancelar').addEventListener('click', closeRecargaModal);
     document.getElementById('modal-recarga').addEventListener('click', e => { if (e.target === e.currentTarget) closeRecargaModal(); });
@@ -194,16 +213,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const mesFilter = document.getElementById('filter-mes').value;
     const filtered  = mesFilter ? movimientos.filter(m => m.fecha?.startsWith(mesFilter)) : movimientos;
 
-    // Balance del mes seleccionado
+    // Balance del mes seleccionado (con arrastre acumulado)
     const totalIngresos = filtered.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
     const totalGastos   = filtered.filter(m => m.tipo === 'gasto').reduce((s, m)  => s + (m.monto || 0), 0);
-    const saldo         = totalIngresos - totalGastos;
+    // Excedente anterior = neto de TODOS los movimientos de meses previos al seleccionado
+    const excedente = mesFilter
+      ? movimientos
+          .filter(m => m.fecha && m.fecha.substring(0, 7) < mesFilter)
+          .reduce((s, m) => s + (m.tipo === 'ingreso' ? (m.monto || 0) : -(m.monto || 0)), 0)
+      : 0;
+    const saldo = excedente + totalIngresos - totalGastos;
 
-    document.getElementById('val-ingresos').textContent = fmtMonto(totalIngresos);
-    document.getElementById('val-gastos').textContent   = fmtMonto(totalGastos);
+    countUp(document.getElementById('val-excedente'), excedente);
+    countUp(document.getElementById('val-ingresos'), totalIngresos);
+    countUp(document.getElementById('val-gastos'),   totalGastos);
     const valSaldoEl = document.getElementById('val-saldo');
-    valSaldoEl.textContent = fmtMonto(saldo);
-    valSaldoEl.style.color = saldo >= 0 ? 'var(--success)' : 'var(--danger)';
+    countUp(valSaldoEl, saldo);
+    valSaldoEl.classList.toggle('neg', saldo < 0);
 
     const elEmpty = document.getElementById('movimientos-empty');
     const elTable = document.getElementById('movimientos-table-wrap');
@@ -442,7 +468,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     btn.disabled = false;
-    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Guardar Gasto';
+    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Guardar Egreso';
   });
 
   // ─── Recarga modal ───────────────────────────────────
@@ -589,16 +615,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const R_PERIODO  = 2;
     const R_GEN      = 3;
     const R_RESUMEN  = 5;
-    const R_INGR     = 6;
-    const R_GAST     = 7;
-    const R_SALDO    = 8;
-    const R_CAT_TTL  = 10;
-    const R_CAT_HDR  = 11;
-    const R_CAT_D0   = 12;
-    const R_CAT_TOT  = 12 + numCats;
-    const R_DET_TTL  = 14 + numCats;
-    const R_DET_HDR  = 15 + numCats;
-    const R_DET_D0   = 16 + numCats;
+    const R_EXC      = 6;
+    const R_INGR     = 7;
+    const R_GAST     = 8;
+    const R_SALDO    = 9;
+    const R_CAT_TTL  = 11;
+    const R_CAT_HDR  = 12;
+    const R_CAT_D0   = 13;
+    const R_CAT_TOT  = 13 + numCats;
+    const R_DET_TTL  = 15 + numCats;
+    const R_DET_HDR  = 16 + numCats;
+    const R_DET_D0   = 17 + numCats;
 
     // Filas Excel 1-based para fórmulas
     const XF = (r) => r + 1;
@@ -613,6 +640,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const valIngr  = filtered.filter(mv => mv.tipo === 'ingreso').reduce((s, mv) => s + (mv.monto || 0), 0);
     const valGast  = gastosFilt.reduce((s, mv) => s + (mv.monto || 0), 0);
+    // Excedente anterior = neto de meses previos al período exportado
+    const valExc   = movimientos
+      .filter(mv => mv.fecha && mv.fecha.substring(0, 7) < mesActual)
+      .reduce((s, mv) => s + (mv.tipo === 'ingreso' ? (mv.monto || 0) : -(mv.monto || 0)), 0);
     const f = (v, formula) => ({ t: 'n', v, f: formula });
 
     // ─── Filas ──────────────────────────────────────────
@@ -624,10 +655,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     rows[R_GEN]     = [`Generado: ${hoy.toLocaleDateString('es-AR')}`, ...E.slice(1)];
     rows[4]         = [...E];
     rows[R_RESUMEN] = [`RESUMEN — ${periodo}`, ...E.slice(1)];
+    rows[R_EXC]     = ['Excedente anterior', valExc, '', '', '', ''];
     rows[R_INGR]    = ['Ingresos',  f(valIngr,        sumif('Ingreso', 'F')),          '', '', '', ''];
     rows[R_GAST]    = ['Gastos',    f(valGast,         hasData ? `ABS(${sumif('Gasto','F')})` : '0'), '', '', '', ''];
-    rows[R_SALDO]   = ['Saldo',     f(valIngr-valGast, `B${XF(R_INGR)}-B${XF(R_GAST)}`), '', '', '', ''];
-    rows[9]         = [...E];
+    rows[R_SALDO]   = ['Saldo',     f(valExc+valIngr-valGast, `B${XF(R_EXC)}+B${XF(R_INGR)}-B${XF(R_GAST)}`), '', '', '', ''];
+    rows[10]        = [...E];
     rows[R_CAT_TTL] = [`GASTOS POR CATEGORÍA`, ...E.slice(1)];
     rows[R_CAT_HDR] = ['Categoría', 'Monto ($)', '', '', '', ''];
     cats.forEach(([cat, val], i) => {
@@ -636,7 +668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     const catSumFormula = numCats > 0 ? `SUM(B${XF(R_CAT_D0)}:B${XF(R_CAT_D0 + numCats - 1)})` : '0';
     rows[R_CAT_TOT] = ['TOTAL GASTOS', f(valGast, catSumFormula), '', '', '', ''];
-    rows[13 + numCats] = [...E];
+    rows[14 + numCats] = [...E];
     rows[R_DET_TTL] = [`DETALLE — ${periodo}`, ...E.slice(1)];
     rows[R_DET_HDR] = ['Fecha', 'Tipo', 'Categoría', 'Proveedor', 'Descripción', 'Monto ($)'];
     filtered.forEach((mv, i) => {
@@ -712,6 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       cs(r, 0, { font: { bold: true, sz: 11, color: { rgb: WHITE } }, fill: solid(MBLUE) })
     );
     // Resumen
+    cs(R_EXC,   0, lblStyle(LGRAY));  cs(R_EXC,   1, numStyle(LGRAY, BLUE));
     cs(R_INGR,  0, lblStyle(LGRAY));  cs(R_INGR,  1, numStyle(LGRAY, GREEN));
     cs(R_GAST,  0, lblStyle(LGRAY));  cs(R_GAST,  1, numStyle(LGRAY, RED));
     cs(R_SALDO, 0, lblStyle(LBLUE, true)); cs(R_SALDO, 1, numStyle(LBLUE, BLUE, true));

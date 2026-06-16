@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('hdr-name').textContent = name;
 
   $('btn-adjuntar').addEventListener('click', () => { window.location.href = 'adjuntar.html'; });
-  $('btn-back').addEventListener('click',    () => { window.location.href = 'app.html'; });
+  $('btn-back').addEventListener('click',    () => { window.location.href = 'compras.html'; });
   $('btn-logout').addEventListener('click',  () => {
     sessionStorage.clear();
     localStorage.removeItem('responsable_code');
