@@ -1,6 +1,6 @@
 /* global getCajaMovimientos, saveCajaMovimiento, deleteCajaMovimiento,
-          getCategoriasCaja, saveCategoriasCaja, getAllUsuarios,
-          extractFromTicket, uploadToCajaDrive */
+          patchCajaMovimiento, getCategoriasCaja, saveCategoriasCaja,
+          getAllUsuarios, uploadToCajaDrive */
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadMovimientos();
     });
 
-    document.getElementById('btn-nuevo-ingreso').addEventListener('click', openRecargaModal);
+    document.getElementById('btn-nuevo-ingreso').addEventListener('click', () => openRecargaModal());
     document.getElementById('modal-recarga-close').addEventListener('click', closeRecargaModal);
     document.getElementById('btn-recarga-cancelar').addEventListener('click', closeRecargaModal);
     document.getElementById('modal-recarga').addEventListener('click', e => { if (e.target === e.currentTarget) closeRecargaModal(); });
@@ -146,17 +146,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const btn = document.getElementById('btn-recarga-guardar');
       btn.disabled = true;
+      const mov = { tipo: 'ingreso', descripcion, fecha: mesRecarga + '-01', monto };
       try {
-        await saveCajaMovimiento(targetCodigo, {
-          tipo:        'ingreso',
-          descripcion,
-          fecha:       mesRecarga + '-01',
-          monto
-        });
-        closeRecargaModal();
-        showToast('Recarga registrada', 'success');
-        await loadMovimientos();
-        sincronizarExcel(mesRecarga);
+        if (editIngreso) {
+          const prevMes = editIngreso.fecha?.substring(0, 7);
+          await patchCajaMovimiento(targetCodigo, editIngreso.key, mov);
+          closeRecargaModal();
+          showToast('Ingreso actualizado', 'success');
+          await loadMovimientos();
+          sincronizarExcel(mesRecarga);
+          if (prevMes && prevMes !== mesRecarga) sincronizarExcel(prevMes);
+        } else {
+          await saveCajaMovimiento(targetCodigo, mov);
+          closeRecargaModal();
+          showToast('Ingreso registrado', 'success');
+          await loadMovimientos();
+          sincronizarExcel(mesRecarga);
+        }
       } catch (err) {
         errorEl.textContent = 'Error al guardar: ' + (err.message || err);
         errorEl.classList.remove('hidden');
@@ -176,8 +182,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     elEmpty.style.display = 'none';
     elTable.style.display = 'none';
     elCards.style.display = 'none';
-
-    document.getElementById('saldo-usuario-nombre').textContent = isAdmin ? targetNombre : '';
 
     try {
       movimientos = await getCajaMovimientos(targetCodigo);
@@ -268,9 +272,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `<button class="btn btn-xs btn-secondary btn-del" data-key="${key}" title="Eliminar"><svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`;
   }
 
-  function attachDeleteListeners(container) {
+  function editBtn(key) {
+    if (!canDelete()) return '';
+    return `<button class="btn btn-xs btn-secondary btn-edit" data-key="${key}" title="Editar"><svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`;
+  }
+
+  function openEdit(key) {
+    const m = movimientos.find(x => x.key === key);
+    if (!m) return;
+    if (m.tipo === 'ingreso') openRecargaModal(m);
+    else openGastoModal(m);
+  }
+
+  function attachRowListeners(container) {
     container.querySelectorAll('.btn-del').forEach(btn => {
       btn.addEventListener('click', () => confirmDelete(btn.dataset.key));
+    });
+    container.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', () => openEdit(btn.dataset.key));
     });
   }
 
@@ -287,11 +306,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>${m.proveedor || '—'}</td>
         <td>${m.descripcion || '—'}</td>
         <td class="text-right" style="font-weight:700;color:${isIngreso ? 'var(--success)' : 'var(--danger)'};">${isIngreso ? '+' : '-'}${fmtMonto(m.monto || 0)}</td>
-        <td style="text-align:center;white-space:nowrap;">${driveLink(m)} ${deleteBtn(m.key)}</td>
+        <td style="text-align:center;white-space:nowrap;">${driveLink(m)} ${editBtn(m.key)} ${deleteBtn(m.key)}</td>
       `;
       tbody.appendChild(tr);
     });
-    attachDeleteListeners(tbody);
+    attachRowListeners(tbody);
   }
 
   function renderCards(data) {
@@ -313,12 +332,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         ${m.proveedor ? `<div class="caja-mov-prov">${m.proveedor}</div>` : ''}
         <div class="caja-mov-foot">
           <span class="caja-mov-fecha">${fmtFecha(m.fecha)}</span>
-          <div style="display:flex;gap:4px;">${driveLink(m)} ${deleteBtn(m.key)}</div>
+          <div style="display:flex;gap:4px;">${driveLink(m)} ${editBtn(m.key)} ${deleteBtn(m.key)}</div>
         </div>
       `;
       container.appendChild(div);
     });
-    attachDeleteListeners(container);
+    attachRowListeners(container);
   }
 
   async function confirmDelete(key) {
@@ -337,22 +356,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('filter-mes').addEventListener('change', renderMovimientos);
   window.addEventListener('resize', renderMovimientos);
 
-  // ─── Gasto modal ─────────────────────────────────────
-  let gastoFile = null;
+  // ─── Gasto (Egreso) modal ────────────────────────────
+  let gastoFile  = null;
+  let editGasto  = null;   // movimiento en edición (o null al crear)
 
-  function openGastoModal() {
+  function openGastoModal(mov) {
+    editGasto = mov || null;
     gastoFile = null;
     document.getElementById('gasto-file').value        = '';
     document.getElementById('gasto-camera').value      = '';
     document.getElementById('gasto-file-name').classList.add('hidden');
-    document.getElementById('gasto-extract-status').classList.add('hidden');
-    document.getElementById('btn-gasto-analizar').disabled = true;
-    document.getElementById('gasto-categoria').value   = '';
-    document.getElementById('gasto-fecha').value       = new Date().toISOString().split('T')[0];
-    document.getElementById('gasto-proveedor').value   = '';
-    document.getElementById('gasto-descripcion').value = '';
-    document.getElementById('gasto-monto').value       = '';
+    document.getElementById('gasto-categoria').value   = mov?.categoria   || '';
+    document.getElementById('gasto-fecha').value       = mov?.fecha       || new Date().toISOString().split('T')[0];
+    document.getElementById('gasto-proveedor').value   = mov?.proveedor   || '';
+    document.getElementById('gasto-descripcion').value = mov?.descripcion || '';
+    document.getElementById('gasto-monto').value       = mov ? String(mov.monto ?? '').replace('.', ',') : '';
     document.getElementById('gasto-error').classList.add('hidden');
+    document.getElementById('modal-gasto-title').textContent = mov ? 'Editar Egreso' : 'Registrar Egreso';
     if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
       document.getElementById('btn-gasto-camera').style.display = '';
     }
@@ -362,9 +382,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function closeGastoModal() {
     document.getElementById('modal-gasto').classList.add('hidden');
     gastoFile = null;
+    editGasto = null;
   }
 
-  document.getElementById('btn-nuevo-gasto').addEventListener('click', openGastoModal);
+  document.getElementById('btn-nuevo-gasto').addEventListener('click', () => openGastoModal());
   document.getElementById('modal-gasto-close').addEventListener('click', closeGastoModal);
   document.getElementById('btn-gasto-cancelar').addEventListener('click', closeGastoModal);
   document.getElementById('modal-gasto').addEventListener('click', e => { if (e.target === e.currentTarget) closeGastoModal(); });
@@ -378,42 +399,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const nameEl = document.getElementById('gasto-file-name');
     nameEl.textContent = file.name;
     nameEl.classList.remove('hidden');
-    document.getElementById('btn-gasto-analizar').disabled = false;
-    document.getElementById('gasto-extract-status').classList.add('hidden');
   }
 
   document.getElementById('gasto-file').addEventListener('change',   e => handleFileSelected(e.target.files[0]));
   document.getElementById('gasto-camera').addEventListener('change', e => handleFileSelected(e.target.files[0]));
-
-  document.getElementById('btn-gasto-analizar').addEventListener('click', async () => {
-    if (!gastoFile) return;
-    const statusEl = document.getElementById('gasto-extract-status');
-    const btn      = document.getElementById('btn-gasto-analizar');
-    btn.disabled = true;
-    statusEl.className = 'extract-status loading';
-    statusEl.classList.remove('hidden');
-    statusEl.innerHTML = '<div class="spinner"></div> Analizando comprobante…';
-
-    try {
-      const r = await extractFromTicket(gastoFile);
-      if (r.proveedor)   document.getElementById('gasto-proveedor').value   = r.proveedor;
-      if (r.descripcion) document.getElementById('gasto-descripcion').value = r.descripcion;
-      if (r.fecha)       document.getElementById('gasto-fecha').value       = r.fecha;
-      if (r.monto_total) document.getElementById('gasto-monto').value       = r.monto_total.toFixed(2).replace('.', ',');
-      if (r.categoria_sugerida) {
-        const sel = document.getElementById('gasto-categoria');
-        for (const opt of sel.options) {
-          if (opt.value.toLowerCase() === r.categoria_sugerida.toLowerCase()) { sel.value = opt.value; break; }
-        }
-      }
-      statusEl.className = 'extract-status success';
-      statusEl.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Datos extraídos — revisá y confirmá.';
-    } catch (err) {
-      statusEl.className = 'extract-status error';
-      statusEl.textContent = 'Error al analizar: ' + (err.message || 'Intentá de nuevo');
-    }
-    btn.disabled = false;
-  });
 
   document.getElementById('btn-gasto-guardar').addEventListener('click', async () => {
     const errorEl     = document.getElementById('gasto-error');
@@ -457,11 +446,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      await saveCajaMovimiento(targetCodigo, mov);
-      closeGastoModal();
-      showToast('Gasto registrado', 'success');
-      await loadMovimientos();
-      sincronizarExcel(fecha.substring(0, 7));
+      if (editGasto) {
+        const prevMes = editGasto.fecha?.substring(0, 7);
+        // Si no se cargó comprobante nuevo, conservar el anterior
+        if (!mov.driveFileId && editGasto.driveFileId) mov.driveFileId = editGasto.driveFileId;
+        await patchCajaMovimiento(targetCodigo, editGasto.key, mov);
+        closeGastoModal();
+        showToast('Egreso actualizado', 'success');
+        await loadMovimientos();
+        sincronizarExcel(fecha.substring(0, 7));
+        if (prevMes && prevMes !== fecha.substring(0, 7)) sincronizarExcel(prevMes);
+      } else {
+        await saveCajaMovimiento(targetCodigo, mov);
+        closeGastoModal();
+        showToast('Egreso registrado', 'success');
+        await loadMovimientos();
+        sincronizarExcel(fecha.substring(0, 7));
+      }
     } catch (err) {
       errorEl.textContent = 'Error al guardar: ' + (err.message || err);
       errorEl.classList.remove('hidden');
@@ -471,30 +472,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Guardar Egreso';
   });
 
-  // ─── Recarga modal ───────────────────────────────────
-  function openRecargaModal() {
-    const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  // ─── Recarga (Ingreso) modal ─────────────────────────
+  let editIngreso = null;   // movimiento en edición (o null al crear)
+
+  const MESES_LBL = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  function openRecargaModal(mov) {
+    editIngreso = mov || null;
     const sel = document.getElementById('recarga-mes');
     sel.innerHTML = '';
     const now = new Date();
+    const meses = [];
     for (let i = 0; i < 13; i++) {
-      const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const val = d.toISOString().substring(0, 7);
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      meses.push(d.toISOString().substring(0, 7));
+    }
+    const editMes = mov?.fecha?.substring(0, 7);
+    if (editMes && !meses.includes(editMes)) meses.push(editMes);
+    meses.sort().reverse();
+    meses.forEach((val, idx) => {
       const [y, m] = val.split('-');
       const o = document.createElement('option');
       o.value = val;
-      o.textContent = `${MESES[parseInt(m, 10)]} ${y}`;
-      if (i === 0) o.selected = true;
+      o.textContent = `${MESES_LBL[parseInt(m, 10)]} ${y}`;
+      o.selected = editMes ? (val === editMes) : (idx === 0);
       sel.appendChild(o);
+    });
+    // Comentario: lo que sigue al "Recarga {Mes} {Año} — " si existe
+    let comentario = '';
+    if (mov?.descripcion) {
+      const parts = mov.descripcion.split(' — ');
+      if (parts.length > 1) comentario = parts.slice(1).join(' — ');
     }
-    document.getElementById('recarga-monto').value      = '';
-    document.getElementById('recarga-comentario').value = '';
+    document.getElementById('recarga-monto').value      = mov ? String(mov.monto ?? '').replace('.', ',') : '';
+    document.getElementById('recarga-comentario').value = comentario;
     document.getElementById('recarga-error').classList.add('hidden');
+    document.getElementById('modal-recarga-title').textContent = mov ? 'Editar Ingreso' : 'Registrar Ingreso';
     document.getElementById('modal-recarga').classList.remove('hidden');
   }
 
   function closeRecargaModal() {
     document.getElementById('modal-recarga').classList.add('hidden');
+    editIngreso = null;
   }
 
   // ─── Categorías modal (admin) ─────────────────────────

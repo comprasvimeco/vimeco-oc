@@ -2,6 +2,7 @@
 
 let currentFile = null;
 let allOCs      = [];
+let pendingOC   = null;   // OC elegida para adjuntar manualmente (vista principal)
 
 const $ = id => document.getElementById(id);
 
@@ -174,6 +175,72 @@ function renderManualListHTML(ocs) {
   <div id="adj-oc-list">${renderOCListItems(ocs)}</div>`;
 }
 
+// ---- Vista principal: lista de OC con adjuntar manual (elige archivo al tocar) ----
+
+function renderPrimaryListItems(ocs) {
+  if (!ocs.length) return '<div class="hist-empty">No hay OC en el historial.</div>';
+  return ocs.map(oc => `<div class="adj-oc-card">
+    <div class="adj-oc-top">
+      <span class="hist-nro">${esc(oc.nroOC)}</span>
+      <span class="hist-fecha">${esc(oc.fecha || '')}</span>
+    </div>
+    <div class="hist-proveedor">${esc(oc.proveedor?.nombre || '—')}</div>
+    <div class="hist-obra">${esc(oc.obra || '—')}</div>
+    <div class="adj-oc-bottom">
+      <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
+      <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar</button>
+    </div>
+  </div>`).join('');
+}
+
+function renderPrimaryList(filter = '') {
+  const q    = filter.toLowerCase().trim();
+  const list = q
+    ? allOCs.filter(oc =>
+        (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
+        (oc.obra || '').toLowerCase().includes(q) ||
+        (oc.nroOC || '').toLowerCase().includes(q))
+    : allOCs;
+  $('adj-oc-list-main').innerHTML = renderPrimaryListItems(list);
+  bindPickButtons();
+}
+
+function bindPickButtons() {
+  document.querySelectorAll('.btn-attach-pick').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingOC = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
+      const mf = $('manual-file');
+      mf.value = '';
+      mf.click();
+    });
+  });
+}
+
+async function doAttachPick(file, oc) {
+  if (!file || !oc) return;
+  const btn = document.querySelector(`.btn-attach-pick[data-nro="${oc.nroOC}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Subiendo…'; }
+  try {
+    await attachToDriveOC(file, {
+      drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
+      drive_folder_proveedores_id: oc.drive_folder_proveedores_id || null,
+      drive_folder_id:             oc.drive_folder_id             || null,
+      obra:      oc.obra              || '',
+      fecha:     displayToISODate(oc.fecha),
+      proveedor: oc.proveedor?.nombre || '',
+      nroOC:     oc.nroOC
+    });
+    await clearShareFile();
+    toast(`Archivo adjuntado a OC ${oc.nroOC}`, 'success');
+    if (btn) { btn.textContent = '✓ Adjuntado'; }
+  } catch (e) {
+    console.error('doAttachPick:', e);
+    toast('Error al subir el archivo a Drive.', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Adjuntar'; }
+  }
+  pendingOC = null;
+}
+
 function bindButtons() {
   document.querySelectorAll('.btn-adj-attach').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -285,17 +352,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-restart').addEventListener('click', resetToStart);
   $('btn-another').addEventListener('click', resetToStart);
 
-  // Cargar historial en segundo plano
+  // Cargar historial y renderizar la lista principal
   getHistorial(code)
-    .then(ocs => { allOCs = ocs; })
+    .then(ocs => { allOCs = ocs; renderPrimaryList($('adj-search-main').value); })
     .catch(() => {
       const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;
       if (cached) allOCs = cached;
+      renderPrimaryList($('adj-search-main').value);
     });
 
-  // Archivo compartido por share target
+  // Buscador de la lista principal
+  $('adj-search-main').addEventListener('input', e => renderPrimaryList(e.target.value));
+
+  // Adjuntar manual: archivo elegido tras tocar "Adjuntar" en una OC
+  $('manual-file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f && pendingOC) doAttachPick(f, pendingOC);
+  });
+
+  // Toggle del flujo IA (secundario)
+  $('btn-toggle-ai').addEventListener('click', () => {
+    $('card-file').classList.remove('hidden');
+    $('card-file').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('btn-close-ai').addEventListener('click', () => {
+    $('card-file').classList.add('hidden');
+    $('card-result').classList.add('hidden');
+    $('card-success').classList.add('hidden');
+    resetZone();
+  });
+
+  // Archivo compartido por share target → abre el flujo IA con el archivo cargado
   const sharedFile = await checkShareFile();
-  if (sharedFile) setFile(sharedFile);
+  if (sharedFile) { $('card-file').classList.remove('hidden'); setFile(sharedFile); }
 
   // Botones de selección
   const fileInput   = $('file-input');

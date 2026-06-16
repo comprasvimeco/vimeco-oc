@@ -317,6 +317,14 @@
     });
   };
 
+  window.patchCajaMovimiento = async function (userId, key, fields) {
+    await _fbFetch(_base() + '/cajas/' + userId + '/movimientos/' + key + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+  };
+
   window.getCategoriasCaja = async function () {
     const resp = await _fbFetch(_base() + '/categorias_caja.json');
     const data = await resp.json();
