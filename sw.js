@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   BASE + '/index.html',
   BASE + '/menu.html',
   BASE + '/compras.html',
+  BASE + '/administracion.html',
   BASE + '/app.html',
   BASE + '/caja.html',
   BASE + '/css/styles.css',

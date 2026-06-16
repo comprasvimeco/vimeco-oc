@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
   sessionStorage.setItem('responsable_name', name);
 
   $('hdr-name').textContent = name;
-  $('btn-back').addEventListener('click', () => { window.location.href = 'app.html'; });
+  $('btn-back').addEventListener('click', () => { window.location.href = 'administracion.html'; });
   $('btn-logout').addEventListener('click', () => {
     sessionStorage.clear();
     localStorage.removeItem('responsable_code');
