@@ -227,8 +227,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (_) {}
   }
 
+  let isAdmin = code === '0000';
+  if (!isAdmin) {
+    try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
+  }
+
   try {
-    allOCs = await getHistorial(code);
+    allOCs = await getHistorial(code, isAdmin);
     renderCards(allOCs);
   } catch (e) {
     const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;

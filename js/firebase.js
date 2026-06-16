@@ -148,13 +148,14 @@
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 
-  window.getHistorial = async function (codigoResponsable) {
+  window.getHistorial = async function (codigoResponsable, isAdmin = false) {
     const resp = await fetch(_base() + '/historial.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     if (!data) return [];
     let ocs = Object.values(data).filter(oc => oc && oc.nroOC);
-    if (codigoResponsable !== '0000') {
+    // El super-admin (0000) y los usuarios con permiso admin ven todas las OC.
+    if (codigoResponsable !== '0000' && !isAdmin) {
       ocs = ocs.filter(oc => oc.responsable?.codigo === codigoResponsable);
     }
     const sorted = ocs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));

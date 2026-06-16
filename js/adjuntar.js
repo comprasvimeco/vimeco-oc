@@ -352,8 +352,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-restart').addEventListener('click', resetToStart);
   $('btn-another').addEventListener('click', resetToStart);
 
-  // Cargar historial y renderizar la lista principal
-  getHistorial(code)
+  // Cargar historial y renderizar la lista principal.
+  // El super-admin (0000) y los usuarios admin ven todas las OC.
+  let isAdmin = code === '0000';
+  if (!isAdmin) {
+    try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
+  }
+  getHistorial(code, isAdmin)
     .then(ocs => { allOCs = ocs; renderPrimaryList($('adj-search-main').value); })
     .catch(() => {
       const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;
