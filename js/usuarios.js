@@ -40,13 +40,19 @@ function renderUsers(list) {
     return;
   }
   container.innerHTML = list.map(u => {
-    const esAdmin = u.codigo === '0000';
-    const cajaBadge = esAdmin
+    const esSuper = u.codigo === '0000';
+    const cajaBadge = esSuper
       ? '<span class="u-badge u-badge-activo">🧮 Caja (admin)</span>'
       : `<span class="u-badge ${u.caja ? 'u-badge-activo' : 'u-badge-inactivo'}">${u.caja ? '🧮 Caja' : '🧮 Sin caja'}</span>`;
-    const cajaBtn = esAdmin
+    const adminBadge = esSuper
+      ? '<span class="u-badge u-badge-activo">⚙️ Admin (super)</span>'
+      : (u.admin ? '<span class="u-badge u-badge-activo">⚙️ Admin</span>' : '');
+    const cajaBtn = esSuper
       ? ''
       : `<button class="btn btn-sm ${u.caja ? 'btn-warning' : 'btn-success'} btn-toggle-caja">${u.caja ? 'Quitar caja' : 'Dar caja'}</button>`;
+    const adminBtn = esSuper
+      ? ''
+      : `<button class="btn btn-sm ${u.admin ? 'btn-warning' : 'btn-success'} btn-toggle-admin">${u.admin ? 'Quitar admin' : 'Dar admin'}</button>`;
     return `
     <div class="user-card ${u.activo ? '' : 'user-card--inactive'}">
       <div class="user-card-info">
@@ -55,11 +61,13 @@ function renderUsers(list) {
         <span class="u-badge ${u.activo ? 'u-badge-activo' : 'u-badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
         <span class="u-badge ${u.passwordHash ? 'u-badge-pwd-ok' : 'u-badge-pwd-none'}">${u.passwordHash ? '🔑 Con contraseña' : '⚠ Sin contraseña'}</span>
         ${cajaBadge}
+        ${adminBadge}
       </div>
       <div class="user-card-actions">
         <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
         <button class="btn btn-sm btn-secondary btn-reset-pwd">Reset pwd</button>
         ${cajaBtn}
+        ${adminBtn}
         <button class="btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'} btn-toggle-user">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
@@ -73,7 +81,8 @@ function renderUsers(list) {
     card.querySelector('.btn-edit-user').addEventListener('click',   () => editUser(u.codigo, u.nombre));
     card.querySelector('.btn-reset-pwd').addEventListener('click',   () => resetPwd(u.codigo, u.nombre));
     card.querySelector('.btn-toggle-user').addEventListener('click', () => toggleActivo(u.codigo, u.activo, u.nombre));
-    card.querySelector('.btn-toggle-caja')?.addEventListener('click', () => toggleCaja(u.codigo, u.caja, u.nombre));
+    card.querySelector('.btn-toggle-caja')?.addEventListener('click',  () => toggleCaja(u.codigo, u.caja, u.nombre));
+    card.querySelector('.btn-toggle-admin')?.addEventListener('click', () => toggleAdmin(u.codigo, u.admin, u.nombre));
   });
 }
 
@@ -171,6 +180,23 @@ window.resetPwd = async function (codigo, nombre) {
     await loadUsers();
   } catch (_) {
     showToast('Error al resetear la contraseña.', 'error');
+  }
+};
+
+window.toggleAdmin = async function (codigo, enabled, nombre) {
+  const ok = await showConfirm(
+    enabled ? 'Quitar admin' : 'Dar admin',
+    enabled
+      ? `¿Quitar los permisos de administrador a ${nombre}?`
+      : `¿Dar permisos de administrador a ${nombre}? Tendrá las funciones de admin (incluida la gestión completa de Caja de todos los usuarios), salvo el menú de Administración.`
+  );
+  if (!ok) return;
+  try {
+    await patchUsuario(codigo, { admin: !enabled });
+    showToast(`Admin ${enabled ? 'quitado' : 'otorgado'} a ${nombre}.`);
+    await loadUsers();
+  } catch (_) {
+    showToast('Error al actualizar el permiso de admin.', 'error');
   }
 };
 

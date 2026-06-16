@@ -10,13 +10,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const userCodigo = session.codigo;
   const userNombre = session.nombre;
-  const isAdmin    = userCodigo === '0000';
+  let   isAdmin    = userCodigo === '0000';
 
-  // El admin (0000) siempre entra; los demás necesitan el permiso `caja` habilitado
+  // El super-admin (0000) siempre entra. Los demás: con permiso `admin` entran
+  // como admin; con permiso `caja` entran a su propia caja; sin ninguno, fuera.
   if (!isAdmin) {
     try {
       const u = await getUsuario(userCodigo);
-      if (!u || !u.caja) { window.location.href = 'menu.html'; return; }
+      if (u && u.admin) isAdmin = true;
+      if (!isAdmin && !(u && u.caja)) { window.location.href = 'menu.html'; return; }
     } catch (_) { window.location.href = 'menu.html'; return; }
   }
 

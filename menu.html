@@ -76,12 +76,12 @@
       localStorage.removeItem('vimeco_session');
       window.location.href = 'index.html';
     });
-    // Administración: solo admin (0000).
+    // Administración: solo super-admin (0000).
     if (_s.codigo === '0000') {
       document.getElementById('menu-card-admin').style.display = '';
     }
 
-    // Caja: visible para el admin (0000) o para usuarios con el permiso habilitado.
+    // Caja: visible para 0000, o para usuarios con permiso `caja` o `admin`.
     const cajaCard = document.getElementById('menu-card-caja');
     if (_s.codigo === '0000') {
       cajaCard.style.display = '';
@@ -89,7 +89,7 @@
       cajaCard.style.display = 'none';
       if (typeof getUsuario === 'function') {
         getUsuario(_s.codigo)
-          .then(u => { if (u && u.caja) cajaCard.style.display = ''; })
+          .then(u => { if (u && (u.caja || u.admin)) cajaCard.style.display = ''; })
           .catch(() => {});
       }
     }
