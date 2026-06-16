@@ -77,7 +77,13 @@
   }
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' }).catch(() => {});
+    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' })
+      .then(reg => reg.update()).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible')
+        navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
+    });
   }
 </script>
 </body>
