@@ -76,10 +76,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-only: Google APIs (Drive, OAuth, Gemini) y Firebase
+  // Network-only: Google APIs (Drive, OAuth, Gemini) y Firebase.
+  // No se llama a event.respondWith(): así el navegador maneja la request
+  // nativamente sin pasar por el SW. Re-hacer fetch(event.request) acá
+  // rompe en iOS/Safari con bodies binarios (multipart de subida a Drive),
+  // tirando "TypeError: Load failed".
   if (url.hostname.endsWith('.googleapis.com') ||
       url.hostname.endsWith('.firebaseio.com')) {
-    event.respondWith(fetch(event.request));
     return;
   }
 
