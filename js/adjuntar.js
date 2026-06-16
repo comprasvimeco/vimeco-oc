@@ -3,6 +3,7 @@
 let currentFile = null;
 let allOCs      = [];
 let pendingOC   = null;   // OC elegida para adjuntar manualmente (vista principal)
+let viewerIsAdmin = false; // 0000 o usuario con permiso admin
 
 const $ = id => document.getElementById(id);
 
@@ -186,6 +187,7 @@ function renderPrimaryListItems(ocs) {
     </div>
     <div class="hist-proveedor">${esc(oc.proveedor?.nombre || '—')}</div>
     <div class="hist-obra">${esc(oc.obra || '—')}</div>
+    ${viewerIsAdmin && oc.responsable?.nombre ? `<div class="hist-obra" style="color:var(--gray-500);font-size:.78rem;">por ${esc(oc.responsable.nombre)}</div>` : ''}
     <div class="adj-oc-bottom">
       <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
       <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar</button>
@@ -358,6 +360,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!isAdmin) {
     try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
   }
+  viewerIsAdmin = isAdmin;
   getHistorial(code, isAdmin)
     .then(ocs => { allOCs = ocs; renderPrimaryList($('adj-search-main').value); })
     .catch(() => {

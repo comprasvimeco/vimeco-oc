@@ -1,6 +1,7 @@
 /* VIMECO S.A. — Historial de Órdenes de Compra */
 
 let allOCs = [];
+let viewerIsAdmin = false;   // 0000 o usuario con permiso admin
 
 const $ = id => document.getElementById(id);
 
@@ -23,7 +24,7 @@ function fmtMoney(n) {
 }
 
 function renderCards(ocs) {
-  const isAdmin = (sessionStorage.getItem('responsable_code') || '') === '0000';
+  const isAdmin = viewerIsAdmin;
   const list = $('hist-list');
 
   $('hist-count').textContent = ocs.length === 0 ? '' : `${ocs.length} orden${ocs.length !== 1 ? 'es' : ''}`;
@@ -231,6 +232,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!isAdmin) {
     try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
   }
+  viewerIsAdmin = isAdmin;
 
   try {
     allOCs = await getHistorial(code, isAdmin);
