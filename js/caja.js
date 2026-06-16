@@ -556,7 +556,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         await new Promise((resolve, reject) => {
           const s   = document.createElement('script');
-          s.src     = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+          // xlsx-js-style: fork de SheetJS Community Edition que sí escribe estilos
+          // (fills/fonts/borders) al generar el .xlsx — la edición community pura
+          // ignora la propiedad `s` de cada celda al exportar.
+          s.src     = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
           s.onload  = resolve;
           s.onerror = reject;
           document.head.appendChild(s);
