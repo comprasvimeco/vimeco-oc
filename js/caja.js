@@ -486,6 +486,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('btn-gasto-quitar').addEventListener('click', clearGastoFile);
 
+  // Lightbox: tocar el preview abre la imagen completa (sin editor)
+  const lightbox = document.getElementById('img-lightbox');
+  function openLightbox(src) {
+    document.getElementById('img-lightbox-img').src = src;
+    lightbox.classList.remove('hidden');
+  }
+  function closeLightbox() {
+    lightbox.classList.add('hidden');
+    document.getElementById('img-lightbox-img').removeAttribute('src');
+  }
+  document.getElementById('gasto-preview-img').addEventListener('click', () => {
+    if (gastoPreviewUrl) openLightbox(gastoPreviewUrl);
+  });
+  lightbox.addEventListener('click', closeLightbox);
+  document.getElementById('img-lightbox-close').addEventListener('click', closeLightbox);
+
   document.getElementById('btn-gasto-guardar').addEventListener('click', async () => {
     const errorEl     = document.getElementById('gasto-error');
     errorEl.classList.add('hidden');

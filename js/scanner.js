@@ -181,6 +181,10 @@
         cv.GaussianBlur(gray, bg, new cv.Size(0, 0), sigma, sigma, cv.BORDER_REPLICATE);
         cv.divide(gray, bg, gray, 255);          // donde imagen≈fondo → 255 (blanco)
         cv.normalize(gray, gray, 0, 255, cv.NORM_MINMAX); // estira el rango restante
+        // Realce de nitidez (unsharp mask) para que el trazo se lea mejor
+        const rs = Math.max(1, Math.max(gray.cols, gray.rows) / 900);
+        cv.GaussianBlur(gray, bg, new cv.Size(0, 0), rs, rs, cv.BORDER_REPLICATE);
+        cv.addWeighted(gray, 1.6, bg, -0.6, 0, gray);
         bg.delete();
       }
 

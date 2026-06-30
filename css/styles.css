@@ -815,8 +815,24 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
 .scan-preview img {
   max-width: 100%; max-height: 220px; align-self: flex-start;
   border-radius: var(--radius); border: 1.5px solid var(--gray-300);
-  box-shadow: var(--shadow); background: var(--gray-100);
+  box-shadow: var(--shadow); background: var(--gray-100); cursor: zoom-in;
 }
+
+/* Lightbox: imagen completa al tocar el preview */
+.img-lightbox {
+  position: fixed; inset: 0; z-index: 1300;
+  background: rgba(0,0,0,.92);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem; cursor: zoom-out;
+}
+.img-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; }
+.img-lightbox-close {
+  position: absolute; top: calc(.75rem + env(safe-area-inset-top)); right: .75rem;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(255,255,255,.12); border: none; color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.img-lightbox-close .icon { width: 22px; height: 22px; }
 .scan-preview-actions { display: flex; gap: .5rem; }
 .btn-sm { padding: .4rem .75rem; font-size: .8rem; }
 
