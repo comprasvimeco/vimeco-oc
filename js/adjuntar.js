@@ -218,12 +218,28 @@ function bindPickButtons() {
   });
 }
 
+// Registra un adjunto en el feed de Novedades (best-effort).
+function logAdjuntoActivity(oc, file, folderId) {
+  if (typeof logActivity !== 'function') return;
+  const fid = folderId || oc.drive_folder_obras_id || oc.drive_folder_proveedores_id || oc.drive_folder_id || '';
+  logActivity({
+    tipo:    'adjunto',
+    usuario: {
+      codigo: sessionStorage.getItem('responsable_code') || '',
+      nombre: sessionStorage.getItem('responsable_name') || ''
+    },
+    titulo:   `Adjunto en OC ${oc.nroOC} — ${oc.proveedor?.nombre || 'Sin proveedor'}`,
+    detalle:  `${file.name} · ${oc.obra || 'Sin obra'}`,
+    driveUrl: fid ? `https://drive.google.com/drive/folders/${fid}` : ''
+  });
+}
+
 async function doAttachPick(file, oc) {
   if (!file || !oc) return;
   const btn = document.querySelector(`.btn-attach-pick[data-nro="${oc.nroOC}"]`);
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Subiendo…'; }
   try {
-    await attachToDriveOC(file, {
+    const res = await attachToDriveOC(file, {
       drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
       drive_folder_proveedores_id: oc.drive_folder_proveedores_id || null,
       drive_folder_id:             oc.drive_folder_id             || null,
@@ -232,6 +248,7 @@ async function doAttachPick(file, oc) {
       proveedor: oc.proveedor?.nombre || '',
       nroOC:     oc.nroOC
     });
+    logAdjuntoActivity(oc, file, res?.folderId);
     await clearShareFile();
     toast(`Archivo adjuntado a OC ${oc.nroOC}`, 'success');
     if (btn) { btn.textContent = '✓ Adjuntado'; }
@@ -310,7 +327,7 @@ async function doAttach(file, oc, btn) {
   btn.disabled    = true;
   btn.textContent = '⏳ Subiendo…';
   try {
-    await attachToDriveOC(file, {
+    const res = await attachToDriveOC(file, {
       drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
       drive_folder_proveedores_id: oc.drive_folder_proveedores_id || null,
       drive_folder_id:             oc.drive_folder_id             || null,
@@ -319,6 +336,7 @@ async function doAttach(file, oc, btn) {
       proveedor: oc.proveedor?.nombre || '',
       nroOC:     oc.nroOC
     });
+    logAdjuntoActivity(oc, file, res?.folderId);
     await clearShareFile();
     $('card-result').classList.add('hidden');
     $('success-detail').textContent = `${file.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;

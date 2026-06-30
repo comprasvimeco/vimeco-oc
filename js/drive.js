@@ -289,7 +289,7 @@
       // OC pre-reorganización: tiene solo drive_folder_id apuntando a COMPRAS/{obra}/...
       if (!drive_folder_obras_id && !drive_folder_proveedores_id && drive_folder_id) {
         await uploadFile(token, file, file.name, mime, drive_folder_id);
-        return;
+        return { folderId: drive_folder_id };
       }
 
       // Resolver IDs: usar los guardados o reconstruir bajo OBRAS/PROVEEDORES
@@ -315,6 +315,7 @@
         uploadFile(token, file, file.name, mime, obrasFid),
         uploadFile(token, file, file.name, mime, provsFid)
       ]);
+      return { folderId: obrasFid || provsFid };
     } catch (err) {
       await logDriveError(nroOC, new Error(`Adjunto: ${err.message}`));
       throw err;

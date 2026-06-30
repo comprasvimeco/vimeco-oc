@@ -49,6 +49,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${d}/${m}/${y}`;
   }
 
+  // Registra un movimiento de caja en el feed de Novedades (best-effort).
+  function logCajaActivity(mov, fileId) {
+    if (typeof logActivity !== 'function') return;
+    const label  = mov.tipo === 'ingreso' ? 'Ingreso' : 'Egreso';
+    const cuenta = targetCodigo !== userCodigo ? ` (caja de ${targetNombre})` : '';
+    logActivity({
+      tipo:    'caja',
+      usuario: { codigo: userCodigo, nombre: userNombre },
+      titulo:   `${label} de caja — ${fmtMonto(mov.monto || 0)}${cuenta}`,
+      detalle:  [mov.categoria, mov.descripcion].filter(Boolean).join(' · ') || '—',
+      driveUrl: fileId ? `https://drive.google.com/file/d/${fileId}/view` : ''
+    });
+  }
+
   // Anima un número desde su valor actual hasta `to` (con formato de monto)
   const _countTimers = new WeakMap();
   function countUp(el, to) {
@@ -170,6 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (prevMes && prevMes !== mesRecarga) sincronizarExcel(prevMes);
         } else {
           await saveCajaMovimiento(targetCodigo, mov);
+          logCajaActivity(mov);
           closeRecargaModal();
           showToast('Ingreso registrado', 'success');
           await loadMovimientos();
@@ -470,6 +485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (prevMes && prevMes !== fecha.substring(0, 7)) sincronizarExcel(prevMes);
       } else {
         await saveCajaMovimiento(targetCodigo, mov);
+        logCajaActivity(mov, mov.driveFileId);
         closeGastoModal();
         showToast('Egreso registrado', 'success');
         await loadMovimientos();

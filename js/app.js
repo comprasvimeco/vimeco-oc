@@ -357,6 +357,23 @@ function setupFirmaModalButtons() {
   });
 }
 
+// ---- Feed de actividad ----
+// Registra la creación de una OC en el feed de Novedades (best-effort).
+function logOCActivity(nroOC, proveedor, obra, total, folderId) {
+  if (typeof logActivity !== 'function') return;
+  const monto = (parseFloat(total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  logActivity({
+    tipo:    'oc',
+    usuario: {
+      codigo: sessionStorage.getItem('responsable_code') || '',
+      nombre: sessionStorage.getItem('responsable_name') || ''
+    },
+    titulo:   `OC ${nroOC} — ${proveedor || 'Sin proveedor'}`,
+    detalle:  `${obra || 'Sin obra'} · $ ${monto}`,
+    driveUrl: folderId ? `https://drive.google.com/drive/folders/${folderId}` : ''
+  });
+}
+
 // ---- Cola offline Drive ----
 async function retryDriveQueue() {
   if (typeof driveQueue === 'undefined' || typeof uploadToDrive !== 'function') return;
@@ -377,6 +394,7 @@ async function retryDriveQueue() {
       await driveQueue.dequeue(item.histKey);
       if (obrasFolderId || proveedoresFolderId)
         patchHistorialEntry(item.histKey, { drive_folder_obras_id: obrasFolderId, drive_folder_proveedores_id: proveedoresFolderId }).catch(() => {});
+      logOCActivity(item.nroOC, item.proveedor, item.obra, item.total, obrasFolderId || proveedoresFolderId);
       toast(`OC ${item.nroOC} subida a Drive.`, 'success');
     } catch (_) {
       // Sigue sin conexión o error — se mantiene en la cola
@@ -1306,6 +1324,7 @@ async function handleGenerate() {
         .then(({ obrasFolderId, proveedoresFolderId }) => {
           if (saved && (obrasFolderId || proveedoresFolderId))
             patchHistorialEntry(histKey, { drive_folder_obras_id: obrasFolderId, drive_folder_proveedores_id: proveedoresFolderId }).catch(() => {});
+          logOCActivity(numero, driveProv, driveObra, ocData._total, obrasFolderId || proveedoresFolderId);
         })
         .catch(async () => {
           if (!navigator.onLine && typeof driveQueue !== 'undefined') {
@@ -1314,7 +1333,7 @@ async function handleGenerate() {
               await driveQueue.enqueue({
                 histKey, pdfBlob: blob, pdfName: fname,
                 obra: driveObra, fecha: driveFecha, proveedor: driveProv,
-                nroOC: numero, sourceFile: selectedFile
+                nroOC: numero, total: ocData._total, sourceFile: selectedFile
               });
             } catch (_) {}
           } else {

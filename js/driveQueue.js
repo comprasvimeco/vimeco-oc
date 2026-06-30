@@ -16,14 +16,14 @@
   }
 
   window.driveQueue = {
-    async enqueue({ histKey, pdfBlob, pdfName, obra, fecha, proveedor, nroOC, sourceFile }) {
+    async enqueue({ histKey, pdfBlob, pdfName, obra, fecha, proveedor, nroOC, total, sourceFile }) {
       const db     = await openDB();
       const pdfBuf = await pdfBlob.arrayBuffer();
       const srcBuf = sourceFile ? await sourceFile.arrayBuffer() : null;
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE, 'readwrite');
         tx.objectStore(STORE).put({
-          histKey, pdfBuf, pdfName, obra, fecha, proveedor, nroOC,
+          histKey, pdfBuf, pdfName, obra, fecha, proveedor, nroOC, total,
           srcBuf,
           srcName:   sourceFile?.name || null,
           srcType:   sourceFile?.type || null,

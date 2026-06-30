@@ -341,3 +341,36 @@
     });
   };
 })();
+
+// ─── Feed de Actividad (Novedades para admins) ───────
+(function () {
+  const _base = () => FIREBASE_CONFIG.databaseURL;
+
+  // Registra un evento de actividad. Best-effort: nunca debe romper el flujo
+  // que lo invoca (si falla la red, se descarta silenciosamente).
+  // evento = { tipo:'oc'|'adjunto'|'caja', usuario:{codigo,nombre}, titulo, detalle, driveUrl }
+  window.logActivity = function (evento) {
+    try {
+      const body = JSON.stringify({ ...evento, timestamp: evento.timestamp || Date.now() });
+      // POST → Firebase genera una push-key única, evitando colisiones
+      return fetch(_base() + '/actividad.json', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body
+      }).catch(() => {});
+    } catch (_) { return Promise.resolve(); }
+  };
+
+  // Devuelve los eventos de los últimos `dias` días, más recientes primero.
+  window.getActividad = async function (dias = 7) {
+    const resp = await fetch(_base() + '/actividad.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    const desde = Date.now() - dias * 86400000;
+    return Object.entries(data)
+      .map(([key, e]) => ({ key, ...e }))
+      .filter(e => e && (e.timestamp || 0) >= desde)
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  };
+})();

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Novedades</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <style>
+    .act-banner {
+      background: #fffae6; border: 1px solid #f5d97a; color: #7a5b00;
+      border-radius: var(--radius); padding: .6rem .85rem; margin-bottom: .9rem;
+      font-size: .88rem; font-weight: 600;
+    }
+    .act-filters { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .25rem; }
+    .act-filter {
+      border: 1px solid var(--gray-300); background: #fff; color: var(--gray-600);
+      border-radius: 999px; padding: .35rem .85rem; font-size: .82rem; cursor: pointer;
+    }
+    .act-filter.active { background: var(--primary, #1a3a5c); color: #fff; border-color: var(--primary, #1a3a5c); }
+    .act-day {
+      font-size: .78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; color: var(--gray-500); margin: 1.1rem .15rem .45rem;
+    }
+    .act-day:first-of-type { margin-top: .3rem; }
+    .act-card { padding: .7rem .85rem; }
+    .act-card-new { border-left: 3px solid var(--primary, #1a3a5c); }
+    .act-row { display: flex; align-items: center; gap: .7rem; }
+    .act-badge {
+      display: inline-flex; align-items: center; gap: .3rem; flex: 0 0 auto;
+      font-size: .72rem; font-weight: 700; padding: .25rem .5rem; border-radius: 6px;
+      white-space: nowrap;
+    }
+    .act-badge .icon { width: 13px; height: 13px; }
+    .act-t-oc      { background: #e6f0fb; color: #1a3a5c; }
+    .act-t-adjunto { background: #e9f7ee; color: #1b6b3a; }
+    .act-t-caja    { background: #fdeede; color: #8a4b00; }
+    .act-body { flex: 1 1 auto; min-width: 0; }
+    .act-title {
+      font-weight: 600; font-size: .92rem; color: var(--gray-800);
+      display: flex; align-items: center; gap: .4rem;
+    }
+    .act-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary, #1a3a5c); flex: 0 0 auto; }
+    .act-detalle { font-size: .82rem; color: var(--gray-600); margin-top: .1rem; }
+    .act-meta { font-size: .74rem; color: var(--gray-500); margin-top: .15rem; }
+    .act-drive { flex: 0 0 auto; white-space: nowrap; }
+    .act-nodrive { flex: 0 0 auto; font-size: .74rem; color: var(--gray-400); font-style: italic; }
+    @media (max-width: 560px) {
+      .act-row { flex-wrap: wrap; }
+      .act-drive, .act-nodrive { margin-left: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='compras.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Novedades</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge">
+      <span id="hdr-name">—</span>
+    </div>
+    <button class="btn btn-sm btn-outline" id="btn-back"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver</button>
+    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<main class="app-main">
+  <div class="hist-page">
+
+    <div id="act-banner" class="act-banner hidden"></div>
+
+    <div class="hist-toolbar">
+      <div class="act-filters">
+        <button class="act-filter active" data-filter="all">Todas</button>
+        <button class="act-filter" data-filter="oc">Órdenes de Compra</button>
+        <button class="act-filter" data-filter="adjunto">Adjuntos</button>
+        <button class="act-filter" data-filter="caja">Caja</button>
+      </div>
+      <span class="hist-count" id="act-count"></span>
+    </div>
+
+    <div id="act-list" class="hist-list">
+      <div class="hist-loading">Cargando novedades…</div>
+    </div>
+  </div>
+</main>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/actividad.js"></script>
+</body>
+</html>
