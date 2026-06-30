@@ -530,9 +530,26 @@ async function setupObraCombo() {
 }
 
 // ---- Caché y autocompletado de proveedores ----
+// Une la base maestra (/proveedores_base, prioritaria) con los proveedores
+// vistos en OC (/proveedores). Excluye inactivos de las sugerencias.
+async function buildProveedoresCache() {
+  const [seen, base] = await Promise.all([
+    getProveedores().catch(() => []),
+    (typeof getProveedoresBase === 'function' ? getProveedoresBase() : Promise.resolve([])).catch(() => [])
+  ]);
+  const keyOf = p => {
+    const d = (p.cuit || '').replace(/\D/g, '');
+    return d.length >= 10 ? 'c' + d : 'n' + (p.nombre || '').toLowerCase();
+  };
+  const byKey = new Map();
+  seen.forEach(p => { if (p && p.nombre) byKey.set(keyOf(p), p); });
+  base.forEach(p => { if (p && p.nombre && !p.inactivo) byKey.set(keyOf(p), p); }); // la base pisa
+  return [...byKey.values()];
+}
+
 async function loadProveedoresCache() {
   try {
-    const lista = await getProveedores();
+    const lista = await buildProveedoresCache();
     sessionStorage.setItem('proveedores_cache', JSON.stringify(lista));
   } catch (e) {
     console.warn('loadProveedoresCache:', e);
@@ -541,9 +558,31 @@ async function loadProveedoresCache() {
 
 async function updateProveedoresCache() {
   try {
-    const lista = await getProveedores();
+    const lista = await buildProveedoresCache();
     sessionStorage.setItem('proveedores_cache', JSON.stringify(lista));
   } catch (_) {}
+}
+
+// Busca el proveedor en la base por CUIT y, si existe, sus datos tienen
+// prioridad (incluido el código interno). Devuelve true si lo encontró.
+async function enrichFromBase(opts = {}) {
+  if (typeof getProveedorBaseByCuit !== 'function') return false;
+  const cuit = $('cuit-proveedor').value.trim();
+  if (cuit.replace(/\D/g, '').length < 10) return false;
+  let p = null;
+  try { p = await getProveedorBaseByCuit(cuit); } catch (_) {}
+  if (!p) {
+    if (opts.notify) toast('Proveedor no está en la base — sin código interno.', 'warning');
+    return false;
+  }
+  if (p.nombre)       $('proveedor').value               = p.nombre;
+  $('codigo-interno-proveedor').value = p.codigoInterno || '';
+  if (p.domicilio)    $('domicilio-proveedor').value     = p.domicilio;
+  if (p.telefonos)    $('telefonos-proveedor').value     = p.telefonos;
+  if (p.condicionIVA) $('condicion-iva-proveedor').value = p.condicionIVA;
+  if (p.condicionPago && !$('condicion-pago').value) $('condicion-pago').value = p.condicionPago;
+  if (opts.notify) toast('Proveedor en base — código ' + (p.codigoInterno || '—') + '.', 'success');
+  return true;
 }
 
 function getCachedProveedores() {
@@ -556,13 +595,14 @@ function setupProveedorCombo() {
   const dropdown = $('proveedor-dropdown');
 
   function fillProveedor(p) {
-    $('proveedor').value               = p.nombre          || '';
-    $('cuit-proveedor').value          = p.cuit            || '';
-    $('nombre-proveedor').value        = p.nombre_contacto || '';
-    $('contacto-proveedor').value      = p.contacto        || '';
-    $('domicilio-proveedor').value     = p.domicilio       || '';
-    $('telefonos-proveedor').value     = p.telefonos       || '';
-    $('condicion-iva-proveedor').value = p.condicionIVA    || '';
+    $('proveedor').value                = p.nombre          || '';
+    $('cuit-proveedor').value           = p.cuit            || '';
+    $('nombre-proveedor').value         = p.nombre_contacto || '';
+    $('codigo-interno-proveedor').value = p.codigoInterno   || '';
+    $('domicilio-proveedor').value      = p.domicilio       || '';
+    $('telefonos-proveedor').value      = p.telefonos       || '';
+    $('condicion-iva-proveedor').value  = p.condicionIVA    || '';
+    if (p.condicionPago) $('condicion-pago').value = p.condicionPago;
   }
 
   function buildOptions(query) {
@@ -595,6 +635,9 @@ function setupProveedorCombo() {
   document.addEventListener('click', e => {
     if (!e.target.closest('#proveedor-wrap')) dropdown.classList.add('hidden');
   });
+
+  // Al tipear/pegar un CUIT, buscarlo en la base maestra (prioridad de base)
+  $('cuit-proveedor').addEventListener('change', () => enrichFromBase({ notify: true }));
 }
 
 // ---- Import buttons ----
@@ -734,6 +777,7 @@ async function handleExtract() {
   try {
     const r = await extractFromFile(selectedFile);
     applyExtractionResult(r);
+    await enrichFromBase({ notify: true });   // la base maestra tiene prioridad
     const impMsg = impuestos.length ? ` y ${impuestos.length} impuesto(s)` : '';
     if (r.items?.length) {
       setExtractStatus('success', `✓ Se extrajeron ${r.items.length} ítem(s)${impMsg}.`);
@@ -1195,8 +1239,8 @@ function buildOCData(numero, firma = null) {
     proveedor: {
       nombre:           proveedor,
       cuit:             $('cuit-proveedor').value.trim()          || '—',
+      codigoInterno:    $('codigo-interno-proveedor').value.trim() || '',
       nombre_contacto:  $('nombre-proveedor').value.trim()        || '—',
-      contacto:         $('contacto-proveedor').value.trim()      || '—',
       domicilio:        $('domicilio-proveedor').value.trim()     || '—',
       iva:              $('condicion-iva-proveedor').value.trim() || '—',
       telefonos:        $('telefonos-proveedor').value.trim()     || '—',
@@ -1417,11 +1461,11 @@ function closePreview() {
 // ---- Cargar OC como base (desde historial) ----
 function loadOCBase(oc) {
   const prov = oc.proveedor || {};
-  $('proveedor').value               = prov.nombre          || '';
-  $('cuit-proveedor').value          = prov.cuit            || '';
-  $('nombre-proveedor').value        = prov.nombre_contacto || '';
-  $('contacto-proveedor').value      = prov.contacto        || '';
-  $('domicilio-proveedor').value     = prov.domicilio       || '';
+  $('proveedor').value                = prov.nombre          || '';
+  $('cuit-proveedor').value           = prov.cuit            || '';
+  $('nombre-proveedor').value         = prov.nombre_contacto || '';
+  $('codigo-interno-proveedor').value = prov.codigoInterno   || '';
+  $('domicilio-proveedor').value      = prov.domicilio       || '';
   $('telefonos-proveedor').value     = prov.telefonos       || '';
   $('condicion-iva-proveedor').value = prov.condicionIVA    || 'Resp. Inscripto';
   $('ref-presupuesto').value         = '';
@@ -1490,7 +1534,7 @@ function resetFormKeepProvider() {
 
 // ---- Reset ----
 function resetForm() {
-  ['proveedor','cuit-proveedor','nombre-proveedor','contacto-proveedor',
+  ['proveedor','cuit-proveedor','nombre-proveedor','codigo-interno-proveedor',
    'domicilio-proveedor','telefonos-proveedor',
    'ref-presupuesto','obra','condicion-pago','plazo-entrega','lugar-entrega','observaciones']
     .forEach(id => { $(id).value = ''; });

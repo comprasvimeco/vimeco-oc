@@ -93,6 +93,7 @@
       proveedor: {
         nombre:      prov.nombre,
         cuit:        clean(prov.cuit),
+        codigoInterno: clean(prov.codigoInterno),
         domicilio:   clean(prov.domicilio),
         telefonos:   clean(prov.telefonos),
         condicionIVA: clean(prov.iva),
@@ -131,6 +132,29 @@
     const data = await resp.json();
     if (!data) return [];
     return Object.values(data).filter(p => p && p.nombre);
+  };
+
+  // Base maestra de proveedores (importada del ERP) — solo lectura desde la app.
+  // Defensiva: si el nodo no existe o no hay permiso, devuelve [] y la app sigue igual.
+  window.getProveedoresBase = async function () {
+    try {
+      const resp = await fetch(_base() + '/proveedores_base.json');
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      if (!data) return [];
+      return Object.values(data).filter(p => p && p.nombre);
+    } catch (_) { return []; }
+  };
+
+  // Busca un proveedor en la base por CUIT (normalizado a dígitos). null si no está.
+  window.getProveedorBaseByCuit = async function (cuit) {
+    const dig = (cuit || '').replace(/\D/g, '');
+    if (dig.length < 10) return null;
+    try {
+      const resp = await fetch(_base() + '/proveedores_base/cuit_' + dig + '.json');
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (_) { return null; }
   };
 
   window.getFirma = async function (codigo) {

@@ -131,6 +131,7 @@ async function regenerarPDF(oc, btn) {
       proveedor: {
         nombre:    prov.nombre       || '',
         cuit:      prov.cuit         || '',
+        codigoInterno: prov.codigoInterno || '',
         domicilio: prov.domicilio    || '',
         telefonos: prov.telefonos    || '',
         iva:       prov.condicionIVA || '',

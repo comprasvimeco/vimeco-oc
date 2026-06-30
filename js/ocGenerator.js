@@ -214,7 +214,7 @@ function drawProveedorTable(doc, data, y) {
 
   const rows = [
     ['Razón Social:', p.nombre    || '—', 'CUIT N°:',  p.cuit     || '—'],
-    ['Nombre:',       p.nombre_contacto || '—', 'Contacto:', p.contacto || '—'],
+    ['Nombre:',       p.nombre_contacto || '—', 'Cód. Interno:', p.codigoInterno || '—'],
     ['Domicilio:',    p.domicilio || '—', 'I.V.A.:',   p.iva      || '—'],
     ['Teléfonos:',    p.telefonos || '—', 'Ref.:',     p.ref      || '—']
   ];
