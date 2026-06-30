@@ -563,25 +563,81 @@ async function updateProveedoresCache() {
   } catch (_) {}
 }
 
-// Busca el proveedor en la base por CUIT y, si existe, sus datos tienen
-// prioridad (incluido el código interno). Devuelve true si lo encontró.
-async function enrichFromBase(opts = {}) {
-  if (typeof getProveedorBaseByCuit !== 'function') return false;
-  const cuit = $('cuit-proveedor').value.trim();
-  if (cuit.replace(/\D/g, '').length < 10) return false;
-  let p = null;
-  try { p = await getProveedorBaseByCuit(cuit); } catch (_) {}
-  if (!p) {
-    if (opts.notify) toast('Proveedor no está en la base — sin código interno.', 'warning');
-    return false;
+// Normaliza razón social para comparar (quita S.A./S.R.L., puntuación, etc.)
+function normalizeProvName(s) {
+  return (s || '').toLowerCase()
+    .replace(/\b(s\.a\.|s\.r\.l\.|s\.a\.s\.|s\.a|s\.r\.l|sa|srl|sas)\b/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Similitud de nombres 0..1. 1 = idéntico; 0.9 = uno contiene al otro
+// (con largo mínimo para evitar falsos por nombres genéricos cortos).
+function provSimilarity(a, b) {
+  const na = normalizeProvName(a), nb = normalizeProvName(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  if ((na.includes(nb) || nb.includes(na)) && Math.min(na.length, nb.length) >= 5) return 0.9;
+  const wa = na.split(' ').filter(w => w.length > 2);
+  const wb = nb.split(' ').filter(w => w.length > 2);
+  if (!wa.length || !wb.length) return 0;
+  const overlap = wa.filter(w => wb.some(x => x.includes(w) || w.includes(x)));
+  return overlap.length / Math.max(wa.length, wb.length);
+}
+
+// Mejor coincidencia por nombre en la caché (base + vistos). Umbral 0.9 para
+// auto-aplicar y no arrastrar un proveedor equivocado.
+function findProveedorByName(nombre) {
+  if (!nombre) return null;
+  let best = null, bestScore = 0;
+  for (const p of getCachedProveedores()) {
+    const s = provSimilarity(nombre, p.nombre);
+    if (s > bestScore) { bestScore = s; best = p; }
   }
+  return bestScore >= 0.9 ? best : null;
+}
+
+// Aplica los datos de la base al formulario (la base tiene prioridad).
+function applyProveedorBase(p) {
   if (p.nombre)       $('proveedor').value               = p.nombre;
+  if (p.cuit)         $('cuit-proveedor').value          = p.cuit;   // completa CUIT faltante
   $('codigo-interno-proveedor').value = p.codigoInterno || '';
   if (p.domicilio)    $('domicilio-proveedor').value     = p.domicilio;
   if (p.telefonos)    $('telefonos-proveedor').value     = p.telefonos;
   if (p.condicionIVA) $('condicion-iva-proveedor').value = p.condicionIVA;
   if (p.condicionPago && !$('condicion-pago').value) $('condicion-pago').value = p.condicionPago;
-  if (opts.notify) toast('Proveedor en base — código ' + (p.codigoInterno || '—') + '.', 'success');
+}
+
+// Cruza con la base: 1°) por CUIT (confiable), 2°) por nombre (presupuestos
+// sin CUIT). Si ninguno coincide, queda como "no cargado". Devuelve true si matcheó.
+async function enrichFromBase(opts = {}) {
+  if (typeof getProveedorBaseByCuit !== 'function') return false;
+  const cuit   = $('cuit-proveedor').value.trim();
+  const nombre = $('proveedor').value.trim();
+
+  let p = null, via = '';
+  if (cuit.replace(/\D/g, '').length >= 10) {
+    try { p = await getProveedorBaseByCuit(cuit); } catch (_) {}
+    if (p) via = 'cuit';
+  }
+  if (!p) {                       // sin CUIT o CUIT no cargado → probar por nombre
+    p = findProveedorByName(nombre);
+    if (p) via = 'nombre';
+  }
+
+  if (!p) {
+    if (opts.notify) toast('Proveedor no está en la base — sin código interno.', 'warning');
+    return false;
+  }
+
+  applyProveedorBase(p);
+  if (opts.notify) {
+    if (via === 'cuit')
+      toast('Proveedor en base — código ' + (p.codigoInterno || '—') + '.', 'success');
+    else
+      toast('Coincidencia por nombre: ' + (p.nombre || '') + ' (código ' + (p.codigoInterno || '—') + '). Verificá que sea correcto.', 'warning');
+  }
   return true;
 }
 
