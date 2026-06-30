@@ -25,8 +25,10 @@
       letter-spacing: .04em; color: var(--gray-500); margin: 1.1rem .15rem .45rem;
     }
     .act-day:first-of-type { margin-top: .3rem; }
-    .act-card { padding: .7rem .85rem; }
-    .act-card-new { border-left: 3px solid var(--primary, #1a3a5c); }
+    .act-card { padding: .7rem .85rem; transition: background .2s; }
+    .act-card-unseen { border-left: 3px solid var(--primary, #1a3a5c); }
+    .act-card-seen { background: #eef7f1; }
+    .act-card-seen .act-title, .act-card-seen .act-detalle { color: var(--gray-500); }
     .act-row { display: flex; align-items: center; gap: .7rem; }
     .act-badge {
       display: inline-flex; align-items: center; gap: .3rem; flex: 0 0 auto;
@@ -42,21 +44,27 @@
       font-weight: 600; font-size: .92rem; color: var(--gray-800);
       display: flex; align-items: center; gap: .4rem;
     }
-    .act-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary, #1a3a5c); flex: 0 0 auto; }
     .act-detalle { font-size: .82rem; color: var(--gray-600); margin-top: .1rem; }
     .act-meta { font-size: .74rem; color: var(--gray-500); margin-top: .15rem; }
-    .act-drive { flex: 0 0 auto; white-space: nowrap; }
-    .act-nodrive { flex: 0 0 auto; font-size: .74rem; color: var(--gray-400); font-style: italic; }
+    .act-actions { flex: 0 0 auto; display: flex; flex-direction: column; gap: .35rem; align-items: stretch; }
+    .act-drive { white-space: nowrap; text-align: center; }
+    .act-mark { white-space: nowrap; }
+    .act-seen-label {
+      display: inline-flex; align-items: center; justify-content: center; gap: .25rem;
+      font-size: .74rem; font-weight: 700; color: #1b6b3a;
+    }
+    .act-seen-label .icon { width: 13px; height: 13px; }
+    .act-nodrive { font-size: .74rem; color: var(--gray-400); font-style: italic; text-align: center; }
     @media (max-width: 560px) {
       .act-row { flex-wrap: wrap; }
-      .act-drive, .act-nodrive { margin-left: auto; }
+      .act-actions { flex-direction: row; margin-left: auto; align-items: center; }
     }
   </style>
 </head>
 <body>
 
 <header class="app-header">
-  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='compras.html'">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='menu.html'">
     <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
       onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
     <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
