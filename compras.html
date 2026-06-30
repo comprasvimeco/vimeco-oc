@@ -11,15 +11,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
-  <style>
-    #card-novedades .menu-card-icon { position: relative; }
-    .menu-card-badge {
-      position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px;
-      padding: 0 5px; border-radius: 999px; background: #d64545; color: #fff;
-      font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,.25);
-    }
-  </style>
 </head>
 <body>
 
@@ -68,16 +59,6 @@
       </div>
       <div class="menu-card-title">Historial</div>
     </a>
-    <a href="actividad.html" class="menu-card hidden" id="card-novedades">
-      <div class="menu-card-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 01-3.46 0"/>
-        </svg>
-        <span id="novedades-badge" class="menu-card-badge hidden"></span>
-      </div>
-      <div class="menu-card-title">Novedades</div>
-    </a>
   </div>
 </main>
 
@@ -93,26 +74,6 @@
       localStorage.removeItem('vimeco_session');
       window.location.href = 'index.html';
     });
-
-    // Novedades: visible sólo para admins, con badge de operaciones no vistas
-    (async () => {
-      let isAdmin = _s.codigo === '0000';
-      if (!isAdmin) {
-        try { const u = await getUsuario(_s.codigo); isAdmin = !!(u && u.admin); } catch (_) {}
-      }
-      if (!isAdmin) return;
-      document.getElementById('card-novedades').classList.remove('hidden');
-      try {
-        const eventos  = await getActividad(7);
-        const lastSeen = parseInt(localStorage.getItem(`vimeco_actividad_seen_${_s.codigo}`) || '0', 10);
-        const nuevos   = eventos.filter(e => (e.timestamp || 0) > lastSeen).length;
-        if (nuevos > 0) {
-          const b = document.getElementById('novedades-badge');
-          b.textContent = nuevos > 99 ? '99+' : String(nuevos);
-          b.classList.remove('hidden');
-        }
-      } catch (_) {}
-    })();
   }
 
   if ('serviceWorker' in navigator) {

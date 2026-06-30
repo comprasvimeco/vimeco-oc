@@ -6,8 +6,8 @@ const RETENTION_DAYS = 7;
 
 let allEvents     = [];
 let currentFilter = 'all';
-let seenKey       = 'vimeco_actividad_seen';
-let lastSeen      = 0;
+let seenKey       = 'vimeco_actividad_vistas';
+let seen          = new Set();   // claves de eventos marcados como vistos
 
 function esc(str) {
   return String(str || '')
@@ -42,6 +42,32 @@ function fmtHora(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Persiste las vistas, podando claves que ya no están en el feed actual.
+function persistSeen() {
+  const validas = new Set(allEvents.map(e => e.key));
+  const arr = [...seen].filter(k => validas.has(k));
+  seen = new Set(arr);
+  try { localStorage.setItem(seenKey, JSON.stringify(arr)); } catch (_) {}
+}
+
+function marcarVista(key) {
+  if (seen.has(key)) return;
+  seen.add(key);
+  persistSeen();
+  render();
+}
+
+function updateBanner() {
+  const sinVer = allEvents.filter(e => !seen.has(e.key)).length;
+  const banner = $('act-banner');
+  if (sinVer > 0) {
+    banner.textContent = `${sinVer} novedad${sinVer !== 1 ? 'es' : ''} sin ver`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
 function render() {
   const list   = $('act-list');
   const events = currentFilter === 'all'
@@ -51,6 +77,8 @@ function render() {
   $('act-count').textContent = events.length
     ? `${events.length} operación${events.length !== 1 ? 'es' : ''}`
     : '';
+
+  updateBanner();
 
   if (!events.length) {
     list.innerHTML = '<div class="hist-empty">No hay operaciones en los últimos 7 días.</div>';
@@ -65,25 +93,34 @@ function render() {
       html += `<div class="act-day">${esc(dayLabel(e.timestamp))}</div>`;
       lastDay = dk;
     }
-    const meta  = tipoMeta(e.tipo);
-    const isNew = (e.timestamp || 0) > lastSeen;
-    const drive = e.driveUrl
-      ? `<a class="btn btn-sm btn-primary act-drive" href="${esc(e.driveUrl)}" target="_blank" rel="noopener">Abrir en Drive</a>`
+    const meta   = tipoMeta(e.tipo);
+    const vista  = seen.has(e.key);
+    const drive  = e.driveUrl
+      ? `<a class="btn btn-sm btn-primary act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener">Abrir en Drive</a>`
       : '<span class="act-nodrive">sin link</span>';
+    const accion = vista
+      ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
+      : `<button class="btn btn-sm btn-outline act-mark" data-key="${esc(e.key)}">Marcar vista</button>`;
     html += `
-      <div class="hist-card act-card${isNew ? ' act-card-new' : ''}">
+      <div class="hist-card act-card ${vista ? 'act-card-seen' : 'act-card-unseen'}">
         <div class="act-row">
           <span class="act-badge ${meta.cls}">${icSvg(meta.icon)} ${meta.label}</span>
           <div class="act-body">
-            <div class="act-title">${isNew ? '<span class="act-dot" title="Nuevo"></span>' : ''}${esc(e.titulo)}</div>
+            <div class="act-title">${esc(e.titulo)}</div>
             <div class="act-detalle">${esc(e.detalle)}</div>
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
           </div>
-          ${drive}
+          <div class="act-actions">${drive}${accion}</div>
         </div>
       </div>`;
   });
   list.innerHTML = html;
+
+  // Abrir en Drive también marca como vista (sin frenar la apertura del link)
+  list.querySelectorAll('.act-drive').forEach(a =>
+    a.addEventListener('click', () => marcarVista(a.dataset.key)));
+  list.querySelectorAll('.act-mark').forEach(b =>
+    b.addEventListener('click', () => marcarVista(b.dataset.key)));
 }
 
 function setFilter(f) {
@@ -102,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = name || '';
 
-  $('btn-back').addEventListener('click', () => { window.location.href = 'compras.html'; });
+  $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
   $('btn-logout').addEventListener('click', () => {
     sessionStorage.clear();
     localStorage.removeItem('responsable_code');
@@ -116,10 +153,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!isAdmin) {
     try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
   }
-  if (!isAdmin) { window.location.href = 'compras.html'; return; }
+  if (!isAdmin) { window.location.href = 'menu.html'; return; }
 
-  seenKey  = `vimeco_actividad_seen_${code}`;
-  lastSeen = parseInt(localStorage.getItem(seenKey) || '0', 10);
+  seenKey = `vimeco_actividad_vistas_${code}`;
+  try { seen = new Set(JSON.parse(localStorage.getItem(seenKey) || '[]')); } catch (_) { seen = new Set(); }
 
   document.querySelectorAll('.act-filter').forEach(b =>
     b.addEventListener('click', () => setFilter(b.dataset.filter)));
@@ -132,17 +169,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  const nuevos = allEvents.filter(e => (e.timestamp || 0) > lastSeen).length;
-  if (nuevos > 0) {
-    const banner = $('act-banner');
-    banner.textContent = `${nuevos} operación${nuevos !== 1 ? 'es' : ''} nueva${nuevos !== 1 ? 's' : ''} desde tu última visita`;
-    banner.classList.remove('hidden');
-  }
-
   render();
-
-  // Marcar como visto: guardar el timestamp del evento más reciente
-  if (allEvents.length) {
-    localStorage.setItem(seenKey, String(allEvents[0].timestamp || Date.now()));
-  }
 });

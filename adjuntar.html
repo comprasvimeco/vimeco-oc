@@ -32,18 +32,6 @@
 <main class="app-main">
   <div class="adj-page">
 
-    <!-- Vista principal: lista de OC con adjuntar manual -->
-    <div class="card" id="card-list">
-      <div class="card-header">
-        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar a una OC</span>
-        <button class="btn btn-sm btn-outline" id="btn-toggle-ai"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Buscar con IA</button>
-      </div>
-      <div class="card-body">
-        <input type="search" id="adj-search-main" class="form-control" placeholder="Buscar por proveedor, obra o N° OC…" style="margin-bottom:.85rem;">
-        <div id="adj-oc-list-main"><div class="hist-empty">Cargando OC…</div></div>
-      </div>
-    </div>
-
     <!-- Selección de archivo (flujo IA, secundario, oculto) -->
     <div class="card hidden" id="card-file">
       <div class="card-header">
@@ -96,6 +84,18 @@
         <p style="font-size:1rem; font-weight:600; color:var(--success); margin-bottom:.35rem;">Archivo subido correctamente</p>
         <p id="success-detail" style="font-size:.85rem; color:var(--gray-500); margin-bottom:1.25rem;"></p>
         <button class="btn btn-primary" id="btn-another">Subir otro archivo</button>
+      </div>
+    </div>
+
+    <!-- Vista principal: lista de OC con adjuntar manual -->
+    <div class="card" id="card-list">
+      <div class="card-header">
+        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar a una OC</span>
+        <button class="btn btn-sm btn-outline" id="btn-toggle-ai"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Buscar con IA</button>
+      </div>
+      <div class="card-body">
+        <input type="search" id="adj-search-main" class="form-control" placeholder="Buscar por proveedor, obra o N° OC…" style="margin-bottom:.85rem;">
+        <div id="adj-oc-list-main"><div class="hist-empty">Cargando OC…</div></div>
       </div>
     </div>
 

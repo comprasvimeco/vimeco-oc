@@ -173,6 +173,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupObraCombo();
   setupProveedorCombo();
   setupOCNumberEdit();
+  setupOCAccordion();
   renderTable();
   renderImpuestos();
   recalcTotales();
@@ -694,6 +695,61 @@ function setupProveedorCombo() {
 
   // Al tipear/pegar un CUIT, buscarlo en la base maestra (prioridad de base)
   $('cuit-proveedor').addEventListener('change', () => enrichFromBase({ notify: true }));
+}
+
+// ---- Acordeón de secciones (solo mobile) ----
+let _ocSections   = [];
+let _ocWasMobile  = null;
+
+function isMobileViewport() {
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function setupOCAccordion() {
+  _ocSections = [...document.querySelectorAll('.oc-section')];
+  _ocSections.forEach(sec => {
+    const header = sec.querySelector('.card-header');
+    const title  = sec.querySelector('.card-title');
+    if (title && !title.querySelector('.oc-chevron')) {
+      const chev = document.createElement('span');
+      chev.className   = 'oc-chevron';
+      chev.textContent = '▾';
+      title.insertBefore(chev, title.firstChild);
+    }
+    header.addEventListener('click', e => {
+      if (!isMobileViewport()) return;
+      if (e.target.closest('button, input, a, label')) return; // no togglear con controles
+      if (sec.classList.contains('collapsed')) openOCSection(sec);
+      else sec.classList.add('collapsed');
+    });
+  });
+  applyOCViewport();
+  window.addEventListener('resize', applyOCViewport);
+}
+
+// Acordeón: abre la indicada y cierra las demás.
+function openOCSection(sec) {
+  _ocSections.forEach(s => s.classList.add('collapsed'));
+  sec.classList.remove('collapsed');
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Re-aplica el estado solo al cruzar el breakpoint (no en cada resize de mobile).
+function applyOCViewport() {
+  const m = isMobileViewport();
+  if (m === _ocWasMobile) return;
+  _ocWasMobile = m;
+  if (m) _ocSections.forEach((s, i) => s.classList.toggle('collapsed', i !== 0));
+  else   _ocSections.forEach(s => s.classList.remove('collapsed'));
+}
+
+// Abre la sección que contiene un campo y lo enfoca (para la validación).
+function revealAndFocus(id) {
+  const el = $(id);
+  if (!el) return;
+  const sec = el.closest('.oc-section');
+  if (sec && isMobileViewport() && sec.classList.contains('collapsed')) openOCSection(sec);
+  el.focus();
 }
 
 // ---- Import buttons ----
@@ -1259,10 +1315,10 @@ function validateOCForm() {
   const cuit          = $('cuit-proveedor').value.trim();
   const condicionPago = $('condicion-pago').value.trim();
   const obra          = $('obra').value.trim();
-  if (!proveedor)     { toast('Ingresá la razón social del proveedor.', 'error'); $('proveedor').focus(); return false; }
-  if (!cuit)          { toast('Ingresá el CUIT del proveedor.', 'error'); $('cuit-proveedor').focus(); return false; }
-  if (!condicionPago) { toast('Ingresá la condición de pago.', 'error'); $('condicion-pago').focus(); return false; }
-  if (!obra)          { toast('Ingresá la obra / proyecto.', 'error'); $('obra').focus(); return false; }
+  if (!proveedor)     { toast('Ingresá la razón social del proveedor.', 'error'); revealAndFocus('proveedor'); return false; }
+  if (!cuit)          { toast('Ingresá el CUIT del proveedor.', 'error'); revealAndFocus('cuit-proveedor'); return false; }
+  if (!condicionPago) { toast('Ingresá la condición de pago.', 'error'); revealAndFocus('condicion-pago'); return false; }
+  if (!obra)          { toast('Ingresá la obra / proyecto.', 'error'); revealAndFocus('obra'); return false; }
   if (!items.length)  { toast('Agregá al menos un ítem a la orden.', 'error'); return false; }
   if (items.some(it => !it.descripcion.trim())) { toast('Completá la descripción de todos los ítems.', 'error'); return false; }
   return true;

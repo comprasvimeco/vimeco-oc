@@ -793,3 +793,16 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
   .caja-hero::before { animation: none; }
 }
+
+/* ---- Acordeón de secciones en la OC (solo mobile) ---- */
+.oc-chevron { display: none; }
+@media (max-width: 768px) {
+  .oc-section > .card-header { cursor: pointer; user-select: none; }
+  .oc-chevron {
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-right: .45rem; font-size: .8rem; color: var(--gray-500);
+    transition: transform .2s ease;
+  }
+  .oc-section.collapsed .oc-chevron { transform: rotate(-90deg); }
+  .oc-section.collapsed > *:not(.card-header) { display: none !important; }
+}

@@ -11,6 +11,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    #menu-card-novedades .menu-card-icon { position: relative; }
+    .menu-card-badge {
+      position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px;
+      padding: 0 5px; border-radius: 999px; background: #d64545; color: #fff;
+      font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    }
+  </style>
 </head>
 <body>
 
@@ -51,6 +60,16 @@
       </div>
       <div class="menu-card-title">Caja</div>
     </a>
+    <a href="actividad.html" class="menu-card" id="menu-card-novedades" style="display:none">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 01-3.46 0"/>
+        </svg>
+        <span id="novedades-badge" class="menu-card-badge hidden"></span>
+      </div>
+      <div class="menu-card-title">Novedades</div>
+    </a>
     <a href="administracion.html" class="menu-card" id="menu-card-admin" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -81,15 +100,36 @@
       document.getElementById('menu-card-admin').style.display = '';
     }
 
+    // Novedades: visible para admins (0000 o permiso `admin`), con badge de no vistas.
+    const novCard = document.getElementById('menu-card-novedades');
+    function revealNovedades() {
+      novCard.style.display = '';
+      if (typeof getActividad !== 'function') return;
+      getActividad(7).then(evs => {
+        let seen = [];
+        try { seen = JSON.parse(localStorage.getItem('vimeco_actividad_vistas_' + _s.codigo) || '[]'); } catch (_) {}
+        const nuevos = evs.filter(e => !seen.includes(e.key)).length;
+        if (nuevos > 0) {
+          const b = document.getElementById('novedades-badge');
+          b.textContent = nuevos > 99 ? '99+' : String(nuevos);
+          b.classList.remove('hidden');
+        }
+      }).catch(() => {});
+    }
+
     // Caja: visible para 0000, o para usuarios con permiso `caja` o `admin`.
     const cajaCard = document.getElementById('menu-card-caja');
     if (_s.codigo === '0000') {
       cajaCard.style.display = '';
+      revealNovedades();
     } else {
       cajaCard.style.display = 'none';
       if (typeof getUsuario === 'function') {
         getUsuario(_s.codigo)
-          .then(u => { if (u && (u.caja || u.admin)) cajaCard.style.display = ''; })
+          .then(u => {
+            if (u && (u.caja || u.admin)) cajaCard.style.display = '';
+            if (u && u.admin) revealNovedades();
+          })
           .catch(() => {});
       }
     }
