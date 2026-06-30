@@ -388,9 +388,11 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
   border: 1px solid var(--gray-300); border-left: none;
   border-radius: 0 var(--radius) var(--radius) 0;
   background: var(--gray-100); color: var(--gray-500);
-  padding: 0 .6rem; cursor: pointer; font-size: .85rem;
+  padding: 0 .7rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
   transition: background .15s;
 }
+.combo-arrow svg { width: 16px; height: 16px; display: block; }
 .combo-arrow:hover { background: var(--gray-200); color: var(--primary); }
 .combo-dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
@@ -796,11 +798,12 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
 
 /* ---- Acordeón de secciones en la OC (solo mobile) ---- */
 .oc-chevron { display: none; }
+.oc-chevron svg { width: 17px; height: 17px; display: block; }
 @media (max-width: 768px) {
   .oc-section > .card-header { cursor: pointer; user-select: none; }
   .oc-chevron {
     display: inline-flex; align-items: center; justify-content: center;
-    margin-right: .45rem; font-size: .8rem; color: var(--gray-500);
+    margin-right: .5rem; color: var(--primary, #1a3a5c);
     transition: transform .2s ease;
   }
   .oc-section.collapsed .oc-chevron { transform: rotate(-90deg); }

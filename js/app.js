@@ -506,7 +506,9 @@ async function setupObraCombo() {
     if (!dropdown.classList.contains('hidden')) { dropdown.classList.add('hidden'); return; }
     buildOptions(obrasActivas);
     if (dropdown.children.length) dropdown.classList.remove('hidden');
-    input.focus();
+    // En táctil NO enfocar: el teclado taparía el desplegable. En desktop sí, para poder filtrar.
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (!isTouch) input.focus();
   });
 
   input.addEventListener('input', () => {
@@ -712,8 +714,8 @@ function setupOCAccordion() {
     const title  = sec.querySelector('.card-title');
     if (title && !title.querySelector('.oc-chevron')) {
       const chev = document.createElement('span');
-      chev.className   = 'oc-chevron';
-      chev.textContent = '▾';
+      chev.className = 'oc-chevron';
+      chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg>';
       title.insertBefore(chev, title.firstChild);
     }
     header.addEventListener('click', e => {
