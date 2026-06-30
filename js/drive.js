@@ -64,6 +64,8 @@
     return (await c.json()).id;
   }
 
+  function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
   async function uploadFile(token, blob, name, mimeType, folderId) {
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify({ name, parents: [folderId], mimeType });
@@ -80,18 +82,29 @@
     body.set(content, pre.length);
     body.set(post, pre.length + content.length);
 
-    const resp = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-      {
-        method:  'POST',
-        headers: {
-          Authorization:  `Bearer ${token}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`
-        },
-        body
+    const url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+    // Reintentos con backoff: en móvil la subida falla a veces por cortes de red
+    // transitorios ("Load failed") o respuestas 5xx/429. Reintentar las absorbe.
+    let lastErr;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt > 0) await _sleep(600 * attempt);   // 0, 600, 1200, 1800 ms
+      try {
+        const resp = await fetch(url, {
+          method:  'POST',
+          headers: {
+            Authorization:  `Bearer ${token}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`
+          },
+          body
+        });
+        if (resp.ok) return;
+        lastErr = new Error(`Upload (${resp.status})`);
+        if (resp.status < 500 && resp.status !== 429) break;  // 4xx no transitorio → no reintentar
+      } catch (e) {
+        lastErr = e;   // error de red ("Load failed") → reintentar
       }
-    );
-    if (!resp.ok) throw new Error(`Upload (${resp.status}): ${await resp.text()}`);
+    }
+    throw lastErr;
   }
 
   async function logDriveError(nroOC, error) {
