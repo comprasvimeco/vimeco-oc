@@ -171,6 +171,19 @@
         state.corners = fallback;
       }
 
+      // Normaliza la iluminación de un canal de grises IN PLACE:
+      // divide por una estimación del fondo (blur grande) → papel blanco parejo,
+      // sin bandas ni sombras, conservando trazos. Luego un leve estiramiento.
+      function flattenIllum(gray) {
+        const cv = window.cv;
+        const bg = new cv.Mat();
+        const sigma = Math.max(3, Math.max(gray.cols, gray.rows) / 20);
+        cv.GaussianBlur(gray, bg, new cv.Size(0, 0), sigma, sigma, cv.BORDER_REPLICATE);
+        cv.divide(gray, bg, gray, 255);          // donde imagen≈fondo → 255 (blanco)
+        cv.normalize(gray, gray, 0, 255, cv.NORM_MINMAX); // estira el rango restante
+        bg.delete();
+      }
+
       // —— Filtro OpenCV sobre un canvas; devuelve canvas filtrado (puede lanzar) ——
       function applyFilter(srcCanvas, filter) {
         const cv = window.cv;
@@ -180,11 +193,15 @@
         try {
           if (filter === 'gray') {
             cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+            flattenIllum(dst);
           } else if (filter === 'bw') {
             cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+            flattenIllum(dst);
+            const block = Math.max(15, (Math.round(Math.min(dst.cols, dst.rows) / 24) | 1));
             cv.adaptiveThreshold(dst, dst, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                 cv.THRESH_BINARY, 15, 10);
+                                 cv.THRESH_BINARY, block, 12);
           } else {
+            // Color: normalizar iluminación en la luminancia, conservar el color
             const rgb = new cv.Mat();
             cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
             const ycc = new cv.Mat();
@@ -194,7 +211,7 @@
             const y  = chans.get(0);
             const cr = chans.get(1);
             const cb = chans.get(2);
-            cv.equalizeHist(y, y);
+            flattenIllum(y);
             const merged = new cv.MatVector();
             merged.push_back(y); merged.push_back(cr); merged.push_back(cb);
             cv.merge(merged, ycc);
