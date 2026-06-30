@@ -1,0 +1,2 @@
+# Librerías vendorizadas: no convertir line endings (archivos generados)
+js/vendor/** -text

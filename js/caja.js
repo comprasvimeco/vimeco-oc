@@ -384,15 +384,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('resize', renderMovimientos);
 
   // ─── Gasto (Egreso) modal ────────────────────────────
-  let gastoFile  = null;
-  let editGasto  = null;   // movimiento en edición (o null al crear)
+  let gastoFile       = null;
+  let editGasto       = null;   // movimiento en edición (o null al crear)
+  let lastCameraFile  = null;   // última foto cruda de cámara (para re-escanear)
+  let gastoPreviewUrl = null;   // objectURL del preview actual
 
   function openGastoModal(mov) {
     editGasto = mov || null;
-    gastoFile = null;
-    document.getElementById('gasto-file').value        = '';
-    document.getElementById('gasto-camera').value      = '';
-    document.getElementById('gasto-file-name').classList.add('hidden');
+    clearGastoFile();
     document.getElementById('gasto-categoria').value   = mov?.categoria   || '';
     document.getElementById('gasto-fecha').value       = mov?.fecha       || new Date().toISOString().split('T')[0];
     document.getElementById('gasto-proveedor').value   = mov?.proveedor   || '';
@@ -408,7 +407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function closeGastoModal() {
     document.getElementById('modal-gasto').classList.add('hidden');
-    gastoFile = null;
+    clearGastoFile();
     editGasto = null;
   }
 
@@ -420,16 +419,72 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-gasto-archivo').addEventListener('click', () => document.getElementById('gasto-file').click());
   document.getElementById('btn-gasto-camera').addEventListener('click', () => document.getElementById('gasto-camera').click());
 
-  function handleFileSelected(file) {
-    if (!file) return;
+  function setGastoFile(file, withPreview) {
     gastoFile = file;
     const nameEl = document.getElementById('gasto-file-name');
-    nameEl.textContent = file.name;
-    nameEl.classList.remove('hidden');
+    const prevEl = document.getElementById('gasto-preview');
+    const imgEl  = document.getElementById('gasto-preview-img');
+    if (gastoPreviewUrl) { URL.revokeObjectURL(gastoPreviewUrl); gastoPreviewUrl = null; }
+    if (withPreview && file.type.startsWith('image/')) {
+      gastoPreviewUrl = URL.createObjectURL(file);
+      imgEl.src = gastoPreviewUrl;
+      prevEl.classList.remove('hidden');
+      nameEl.classList.add('hidden');
+    } else {
+      nameEl.textContent = file.name;
+      nameEl.classList.remove('hidden');
+      prevEl.classList.add('hidden');
+    }
+  }
+
+  function clearGastoFile() {
+    gastoFile      = null;
+    lastCameraFile = null;
+    if (gastoPreviewUrl) { URL.revokeObjectURL(gastoPreviewUrl); gastoPreviewUrl = null; }
+    document.getElementById('gasto-file').value   = '';
+    document.getElementById('gasto-camera').value = '';
+    document.getElementById('gasto-file-name').classList.add('hidden');
+    document.getElementById('gasto-preview').classList.add('hidden');
+  }
+
+  // Archivo subido (galería/PDF): se usa tal cual, sin escáner.
+  function handleFileSelected(file) {
+    if (!file) return;
+    setGastoFile(file, false);
+  }
+
+  // Foto de cámara: pasa por el escáner antes de adjuntar.
+  async function handleCameraSelected(file) {
+    if (!file) return;
+    document.getElementById('gasto-camera').value = '';
+    if (file.type.startsWith('image/') && typeof openScanner === 'function') {
+      lastCameraFile = file;
+      try {
+        const scanned = await openScanner(file);
+        if (scanned) setGastoFile(scanned, true);   // null = cancelado: no cambia nada
+      } catch (_) {
+        // Escáner no disponible (p. ej. sin conexión la 1ª vez): adjuntar foto original.
+        setGastoFile(file, false);
+        showToast('Escáner no disponible; se adjuntó la foto original', 'warning');
+      }
+    } else {
+      setGastoFile(file, false);
+    }
   }
 
   document.getElementById('gasto-file').addEventListener('change',   e => handleFileSelected(e.target.files[0]));
-  document.getElementById('gasto-camera').addEventListener('change', e => handleFileSelected(e.target.files[0]));
+  document.getElementById('gasto-camera').addEventListener('change', e => handleCameraSelected(e.target.files[0]));
+
+  document.getElementById('btn-gasto-rescan').addEventListener('click', async () => {
+    if (!lastCameraFile || typeof openScanner !== 'function') return;
+    try {
+      const scanned = await openScanner(lastCameraFile);
+      if (scanned) setGastoFile(scanned, true);
+    } catch (_) {
+      showToast('Escáner no disponible', 'warning');
+    }
+  });
+  document.getElementById('btn-gasto-quitar').addEventListener('click', clearGastoFile);
 
   document.getElementById('btn-gasto-guardar').addEventListener('click', async () => {
     const errorEl     = document.getElementById('gasto-error');

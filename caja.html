@@ -156,6 +156,20 @@
           </button>
         </div>
         <div id="gasto-file-name" class="upload-filename hidden"></div>
+        <!-- Preview del comprobante escaneado -->
+        <div id="gasto-preview" class="scan-preview hidden">
+          <img id="gasto-preview-img" alt="Comprobante">
+          <div class="scan-preview-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-gasto-rescan">
+              <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              Re-escanear
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-gasto-quitar">
+              <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Quitar
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Campos -->
@@ -255,6 +269,41 @@
   </div>
 </div>
 
+<!-- ===== EDITOR DE ESCANEO ===== -->
+<div id="scan-editor" class="scan-editor hidden">
+  <div class="scan-area">
+    <div class="scan-stage" id="scan-stage">
+      <canvas id="scan-canvas"></canvas>
+      <canvas id="scan-quad"></canvas>
+      <div class="scan-handle" data-corner="tl"></div>
+      <div class="scan-handle" data-corner="tr"></div>
+      <div class="scan-handle" data-corner="br"></div>
+      <div class="scan-handle" data-corner="bl"></div>
+    </div>
+  </div>
+  <div class="scan-loading hidden" id="scan-loading">
+    <div class="scan-spinner"></div>
+    <span id="scan-loading-text">Cargando escáner…</span>
+  </div>
+  <div class="scan-toolbar">
+    <div class="scan-filters">
+      <button type="button" class="scan-chip active" data-filter="color">Color</button>
+      <button type="button" class="scan-chip" data-filter="gray">Grises</button>
+      <button type="button" class="scan-chip" data-filter="bw">B&amp;N</button>
+    </div>
+    <div class="scan-actions">
+      <button type="button" class="scan-btn" id="scan-rotate" title="Rotar">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      </button>
+      <button type="button" class="scan-btn" id="scan-cancel">Cancelar</button>
+      <button type="button" class="scan-btn primary" id="scan-done">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Listo
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== TOAST ===== -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -263,6 +312,7 @@
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>
 <script src="js/gemini.js"></script>
+<script src="js/scanner.js"></script>
 <script src="js/caja.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
