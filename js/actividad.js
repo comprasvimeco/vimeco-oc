@@ -8,11 +8,35 @@ let allEvents     = [];
 let currentFilter = 'all';
 let seenKey       = 'vimeco_actividad_vistas';
 let seen          = new Set();   // claves de eventos marcados como vistos
+let isSuper       = false;       // solo Administración (código 0000) puede borrar
 
 function esc(str) {
   return String(str || '')
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function showToast(msg, type = 'success') {
+  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${esc(msg)}</span>`;
+  $('toast-container').appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0'; el.style.transition = 'opacity .3s';
+    setTimeout(() => el.remove(), 300);
+  }, 4000);
+}
+
+function showConfirm(title, msg) {
+  return new Promise(resolve => {
+    $('modal-confirm-title').textContent = title;
+    $('modal-confirm-msg').textContent   = msg;
+    const modal = $('modal-confirm');
+    modal.classList.remove('hidden');
+    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
+    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
+  });
 }
 
 function tipoMeta(tipo) {
@@ -101,6 +125,9 @@ function render() {
     const accion = vista
       ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
       : `<button class="btn btn-sm btn-outline act-mark" data-key="${esc(e.key)}">Marcar vista</button>`;
+    const borrar = isSuper
+      ? `<button class="btn btn-sm btn-danger act-del" data-key="${esc(e.key)}">Borrar</button>`
+      : '';
     html += `
       <div class="hist-card act-card ${vista ? 'act-card-seen' : 'act-card-unseen'}">
         <div class="act-row">
@@ -110,7 +137,7 @@ function render() {
             <div class="act-detalle">${esc(e.detalle)}</div>
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
           </div>
-          <div class="act-actions">${drive}${accion}</div>
+          <div class="act-actions">${drive}${accion}${borrar}</div>
         </div>
       </div>`;
   });
@@ -121,6 +148,26 @@ function render() {
     a.addEventListener('click', () => marcarVista(a.dataset.key)));
   list.querySelectorAll('.act-mark').forEach(b =>
     b.addEventListener('click', () => marcarVista(b.dataset.key)));
+  list.querySelectorAll('.act-del').forEach(b =>
+    b.addEventListener('click', () => borrarNovedad(b.dataset.key)));
+}
+
+async function borrarNovedad(key) {
+  const ev = allEvents.find(e => e.key === key);
+  const ok = await showConfirm(
+    'Borrar novedad',
+    `¿Borrar esta novedad para todos? "${ev?.titulo || ''}". Esta acción no se puede deshacer.`
+  );
+  if (!ok) return;
+  try {
+    await deleteActividad(key);
+    allEvents = allEvents.filter(e => e.key !== key);
+    persistSeen();
+    render();
+    showToast('Novedad borrada.');
+  } catch (_) {
+    showToast('Error al borrar la novedad.', 'error');
+  }
 }
 
 function setFilter(f) {
@@ -154,6 +201,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
   }
   if (!isAdmin) { window.location.href = 'menu.html'; return; }
+
+  // Solo Administración (super-admin 0000) puede borrar novedades para todos.
+  isSuper = code === '0000';
 
   seenKey = `vimeco_actividad_vistas_${code}`;
   try { seen = new Set(JSON.parse(localStorage.getItem(seenKey) || '[]')); } catch (_) { seen = new Set(); }

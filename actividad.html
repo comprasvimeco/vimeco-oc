@@ -100,6 +100,20 @@
   </div>
 </main>
 
+<!-- Modal: Confirmar acción -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal modal--sm">
+    <div class="modal-header"><span class="modal-title" id="modal-confirm-title">Confirmar</span></div>
+    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+      <p id="modal-confirm-msg" style="color:var(--gray-600);"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-confirm-no">Cancelar</button>
+      <button class="btn btn-danger" id="modal-confirm-yes">Borrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <script src="js/icons.js"></script>

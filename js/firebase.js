@@ -385,6 +385,12 @@
     } catch (_) { return Promise.resolve(); }
   };
 
+  // Borra un evento de actividad (solo Administración). Afecta a todos.
+  window.deleteActividad = async function (key) {
+    const resp = await fetch(_base() + '/actividad/' + key + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
   // Devuelve los eventos de los últimos `dias` días, más recientes primero.
   window.getActividad = async function (dias = 7) {
     const resp = await fetch(_base() + '/actividad.json');
