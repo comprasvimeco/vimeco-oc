@@ -9,8 +9,14 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .cfg-section { background:#fff; border:1px solid var(--gray-200); border-radius:12px; padding:1rem 1.25rem; margin-bottom:1rem; }
-    .cfg-section h2 { font-size:1rem; color:var(--gray-700); margin:0 0 .75rem; }
+    .sec-card { background:#fff; border:1px solid var(--gray-200); border-radius:12px; margin-bottom:1rem; overflow:hidden; }
+    .sec-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.85rem 1rem; cursor:pointer; user-select:none; }
+    .sec-head h2 { font-size:1rem; color:var(--gray-700); margin:0; }
+    .sec-head .chev { transition:transform .2s; color:var(--gray-400); }
+    .sec-card.collapsed .chev { transform:rotate(-90deg); }
+    .sec-card.collapsed .sec-body { display:none; }
+    .sec-body { padding:0 1rem 1rem; }
+
     .chip-list { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem; }
     .chip { display:inline-flex; align-items:center; gap:.4rem; background:var(--gray-100); border:1px solid var(--gray-200);
             border-radius:999px; padding:.3rem .75rem; font-size:.9rem; }
@@ -21,6 +27,23 @@
     .fer-item:last-child { border-bottom:none; }
     .fer-fecha { font-weight:600; color:var(--gray-700); min-width:110px; }
     .fer-nombre { flex:1; color:var(--gray-600); }
+
+    /* Padrón */
+    .pad-tools { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem; }
+    .pad-tools input { flex:1; min-width:160px; }
+    .pad-item { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; padding:.6rem .25rem; border-bottom:1px solid var(--gray-100); }
+    .pad-item:last-child { border-bottom:none; }
+    .pad-item.inactivo { opacity:.55; }
+    .pad-avatar { width:40px; height:40px; border-radius:50%; background:var(--gray-100); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; font-weight:600; color:var(--gray-500); }
+    .pad-avatar img { width:100%; height:100%; object-fit:cover; }
+    .pad-info { flex:1 1 55%; min-width:0; }
+    .pad-name { font-weight:600; color:var(--gray-800); }
+    .pad-meta { font-size:.8rem; color:var(--gray-500); }
+    .pad-cat { display:inline-block; background:var(--gray-100); border-radius:999px; padding:.1rem .5rem; font-size:.72rem; color:var(--gray-600); }
+    .pad-actions { display:flex; gap:.4rem; flex-shrink:0; margin-left:auto; }
+    @media (max-width:600px) { .pad-actions { width:100%; margin-left:0; } .pad-actions .btn { flex:1; } }
+    .dni-preview { margin-top:.4rem; }
+    .dni-preview img { max-width:100%; max-height:150px; border-radius:8px; border:1px solid var(--gray-200); }
   </style>
 </head>
 <body>
@@ -40,21 +63,25 @@
 </header>
 
 <main class="app-main">
-  <div class="hist-page">
 
-    <!-- Categorías -->
-    <div class="cfg-section">
-      <h2>Categorías de personal</h2>
+  <!-- Categorías -->
+  <div class="sec-card" id="cat-card">
+    <div class="sec-head"><h2>Categorías de personal</h2>
+      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="sec-body">
       <div id="cat-list" class="chip-list"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
       <div class="cfg-row">
         <input type="text" id="cat-input" class="form-control" placeholder="Ej: Oficial" style="flex:1;min-width:160px;">
         <button class="btn btn-primary btn-sm" id="cat-add">+ Agregar</button>
       </div>
     </div>
+  </div>
 
-    <!-- Feriados -->
-    <div class="cfg-section">
-      <h2>Feriados</h2>
+  <!-- Feriados -->
+  <div class="sec-card collapsed" id="fer-card">
+    <div class="sec-head"><h2>Feriados</h2>
+      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="sec-body">
       <div id="fer-list" style="margin-bottom:.75rem;"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
       <div class="cfg-row">
         <input type="date" id="fer-fecha" class="form-control" style="min-width:150px;">
@@ -62,9 +89,64 @@
         <button class="btn btn-primary btn-sm" id="fer-add">+ Agregar</button>
       </div>
     </div>
-
   </div>
+
+  <!-- Padrón -->
+  <div class="sec-card collapsed" id="pad-card">
+    <div class="sec-head"><h2>Padrón de personal <span id="pad-count" style="color:var(--gray-400);font-weight:400;"></span></h2>
+      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="sec-body">
+      <div class="pad-tools">
+        <input type="text" id="pad-search" class="form-control" placeholder="Buscar por nombre o DNI…">
+        <button class="btn btn-primary btn-sm" id="pad-add">+ Agregar</button>
+      </div>
+      <div id="pad-list"><div class="hist-loading">Cargando padrón…</div></div>
+    </div>
+  </div>
+
 </main>
+
+<!-- Modal: Agregar / Editar personal (padrón) -->
+<div class="modal-overlay hidden" id="modal-personal">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-personal-title">Agregar al padrón</span>
+      <button class="modal-close" id="modal-personal-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:.75rem;">
+        <div class="form-group" style="flex:1"><label for="p-nombre">Nombre *</label>
+          <input type="text" id="p-nombre" class="form-control" placeholder="Juan"></div>
+        <div class="form-group" style="flex:1"><label for="p-apellido">Apellido *</label>
+          <input type="text" id="p-apellido" class="form-control" placeholder="Pérez"></div>
+      </div>
+      <div style="display:flex;gap:.75rem;">
+        <div class="form-group" style="flex:1"><label for="p-dni">DNI</label>
+          <input type="text" id="p-dni" class="form-control" inputmode="numeric" placeholder="30123456"></div>
+        <div class="form-group" style="flex:1"><label for="p-categoria">Categoría</label>
+          <select id="p-categoria" class="form-control"></select></div>
+      </div>
+      <label style="font-size:.9rem;color:var(--gray-700);font-weight:500;">Foto del DNI</label>
+      <div style="display:flex;gap:.75rem;margin-top:.35rem;">
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label for="p-foto-frente" style="font-size:.78rem;color:var(--gray-500);">Frente</label>
+          <input type="file" id="p-foto-frente" class="form-control" accept="image/*">
+          <div class="dni-preview" id="p-foto-frente-preview"></div>
+        </div>
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label for="p-foto-dorso" style="font-size:.78rem;color:var(--gray-500);">Dorso</label>
+          <input type="file" id="p-foto-dorso" class="form-control" accept="image/*">
+          <div class="dni-preview" id="p-foto-dorso-preview"></div>
+        </div>
+      </div>
+      <div id="modal-personal-error" class="alert alert-error hidden" style="margin-top:.75rem"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-personal-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-personal-save">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal: Confirmar acción -->
 <div class="modal-overlay hidden" id="modal-confirm">
@@ -84,6 +166,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
+<script src="js/drive.js"></script>
 <script src="js/personal-config.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* VIMECO S.A. — Personal: configuración de categorías y feriados (solo Admin) */
+/* VIMECO S.A. — Personal: configuración (categorías, feriados y padrón) — solo Admin */
 
 const $ = id => document.getElementById(id);
 
@@ -100,7 +100,7 @@ function renderFeriados() {
 }
 
 async function addFeriado() {
-  const fecha  = $('fer-fecha').value;       // YYYY-MM-DD
+  const fecha  = $('fer-fecha').value;
   const nombre = $('fer-nombre').value.trim();
   if (!fecha)  { showToast('Elegí una fecha.', 'warning'); return; }
   if (!nombre) { showToast('Ingresá el nombre del feriado.', 'warning'); return; }
@@ -121,6 +121,193 @@ async function removeFeriado(fecha) {
   catch (_) { showToast('Error al guardar.', 'error'); }
 }
 
+// ───────────── Padrón ─────────────
+let allPersonal = [];
+let obrasMap    = {};   // { obraKey: nombre }
+let editingId   = null;
+let fotoFrente  = null;
+let fotoDorso   = null;
+
+function dniFrente(p) { return p.fotoDniFrente || p.fotoDniUrl || ''; }
+
+function obrasDe(p) {
+  const keys = Object.keys(p.obras || {}).filter(k => p.obras[k]);
+  const nombres = keys.map(k => obrasMap[k] || k);
+  return nombres;
+}
+
+function renderPadron() {
+  const q = ($('pad-search').value || '').trim().toLowerCase();
+  const list = allPersonal.filter(p => {
+    if (!q) return true;
+    return (`${p.apellido} ${p.nombre}`.toLowerCase().includes(q)) ||
+           String(p.dni || '').includes(q);
+  });
+  $('pad-count').textContent = allPersonal.length ? `(${allPersonal.length})` : '';
+
+  const cont = $('pad-list');
+  if (!allPersonal.length) {
+    cont.innerHTML = '<div class="hist-empty">El padrón está vacío. Agregá personal acá o desde una obra.</div>';
+    return;
+  }
+  if (!list.length) {
+    cont.innerHTML = '<div class="hist-empty">Sin resultados para la búsqueda.</div>';
+    return;
+  }
+
+  cont.innerHTML = list.map(p => {
+    const ini   = (((p.apellido || '')[0] || '') + ((p.nombre || '')[0] || '')).toUpperCase();
+    const front = dniFrente(p);
+    const av = front
+      ? `<div class="pad-avatar"><a href="${esc(front)}" target="_blank" rel="noopener"><img src="${esc(front)}" alt="DNI" onerror="this.parentNode.textContent='${esc(ini)}'"></a></div>`
+      : `<div class="pad-avatar">${esc(ini) || '👷'}</div>`;
+    const obras = obrasDe(p);
+    const obrasTxt = obras.length ? obras.join(', ') : 'sin obra';
+    return `
+      <div class="pad-item ${p.activo === false ? 'inactivo' : ''}" data-id="${esc(p.id)}">
+        ${av}
+        <div class="pad-info">
+          <div class="pad-name">${esc(p.apellido)}, ${esc(p.nombre)} ${p.activo === false ? '<span style="font-size:.72rem;color:#b91c1c">(inactivo)</span>' : ''}</div>
+          <div class="pad-meta">
+            ${p.categoria ? `<span class="pad-cat">${esc(p.categoria)}</span> ` : ''}
+            ${p.dni ? `DNI ${esc(p.dni)}` : 'sin DNI'} · Obras: ${esc(obrasTxt)}
+          </div>
+        </div>
+        <div class="pad-actions">
+          <button class="btn btn-sm btn-outline btn-edit-p">Editar</button>
+          <button class="btn btn-sm ${p.activo === false ? 'btn-success' : 'btn-danger'} btn-toggle-p">${p.activo === false ? 'Activar' : 'Desactivar'}</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  cont.querySelectorAll('.pad-item').forEach(item => {
+    const id = item.dataset.id;
+    item.querySelector('.btn-edit-p').addEventListener('click',   () => openEditPersonal(id));
+    item.querySelector('.btn-toggle-p').addEventListener('click', () => toggleActivo(id));
+  });
+}
+
+async function loadPadron() {
+  try {
+    const [personal, obras] = await Promise.all([getPersonal(), getAllObras()]);
+    allPersonal = personal;
+    obrasMap = {};
+    obras.forEach(o => { obrasMap[o.key] = o.nombre; });
+    renderPadron();
+  } catch (_) {
+    $('pad-list').innerHTML = '<div class="hist-empty">Error al cargar el padrón.</div>';
+  }
+}
+
+function fillCategorias(selected) {
+  const sel = $('p-categoria');
+  const opts = ['<option value="">— Sin categoría —</option>'];
+  const cats = categorias.slice();
+  if (selected && !cats.includes(selected)) cats.push(selected);
+  cats.forEach(c => opts.push(`<option value="${esc(c)}" ${c === selected ? 'selected' : ''}>${esc(c)}</option>`));
+  sel.innerHTML = opts.join('');
+}
+
+function setPreview(elId, url) {
+  $(elId).innerHTML = url ? `<img src="${esc(url)}" alt="DNI">` : '';
+}
+
+function openAddPersonal() {
+  editingId = null; fotoFrente = null; fotoDorso = null;
+  $('modal-personal-title').textContent = 'Agregar al padrón';
+  $('modal-personal-error').classList.add('hidden');
+  $('p-nombre').value = ''; $('p-apellido').value = ''; $('p-dni').value = '';
+  $('p-foto-frente').value = ''; $('p-foto-dorso').value = '';
+  fillCategorias('');
+  setPreview('p-foto-frente-preview', '');
+  setPreview('p-foto-dorso-preview', '');
+  $('modal-personal').classList.remove('hidden');
+  setTimeout(() => $('p-nombre').focus(), 50);
+}
+
+function openEditPersonal(id) {
+  const p = allPersonal.find(x => x.id === id);
+  if (!p) return;
+  editingId = id; fotoFrente = null; fotoDorso = null;
+  $('modal-personal-title').textContent = 'Editar personal';
+  $('modal-personal-error').classList.add('hidden');
+  $('p-nombre').value = p.nombre || ''; $('p-apellido').value = p.apellido || ''; $('p-dni').value = p.dni || '';
+  $('p-foto-frente').value = ''; $('p-foto-dorso').value = '';
+  fillCategorias(p.categoria || '');
+  setPreview('p-foto-frente-preview', dniFrente(p));
+  setPreview('p-foto-dorso-preview', p.fotoDniDorso || '');
+  $('modal-personal').classList.remove('hidden');
+  setTimeout(() => $('p-nombre').focus(), 50);
+}
+
+async function savePersonalModal() {
+  const nombre   = $('p-nombre').value.trim();
+  const apellido = $('p-apellido').value.trim();
+  const dni      = $('p-dni').value.trim();
+  const categoria = $('p-categoria').value;
+  const errEl    = $('modal-personal-error');
+
+  if (!nombre || !apellido) {
+    errEl.textContent = 'Nombre y apellido son requeridos.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const saveBtn = $('modal-personal-save');
+  saveBtn.disabled = true; saveBtn.textContent = 'Guardando…';
+
+  try {
+    let id = editingId;
+    if (editingId) {
+      await patchPersonal(editingId, { nombre, apellido, dni, categoria });
+    } else {
+      id = await savePersonal({ nombre, apellido, dni, categoria, activo: true, fotoDniFrente: '', fotoDniDorso: '', obras: {} });
+    }
+
+    if (fotoFrente || fotoDorso) {
+      saveBtn.textContent = 'Subiendo fotos…';
+      const label = `${apellido} ${nombre} - ${dni || 'sin dni'}`.substring(0, 100);
+      const patch = {};
+      try {
+        if (fotoFrente) { const { url } = await uploadDniToDrive(fotoFrente, { label, lado: 'frente' }); patch.fotoDniFrente = url; patch.fotoDniUrl = url; }
+        if (fotoDorso)  { const { url } = await uploadDniToDrive(fotoDorso,  { label, lado: 'dorso'  }); patch.fotoDniDorso = url; }
+        if (Object.keys(patch).length) await patchPersonal(id, patch);
+      } catch (_) {
+        if (Object.keys(patch).length) { try { await patchPersonal(id, patch); } catch (_) {} }
+        showToast('Se guardó, pero alguna foto del DNI no se pudo subir.', 'warning');
+      }
+    }
+
+    $('modal-personal').classList.add('hidden');
+    showToast(editingId ? 'Personal actualizado.' : 'Personal agregado.');
+    await loadPadron();
+  } catch (_) {
+    errEl.textContent = 'Error al guardar. Intentá de nuevo.';
+    errEl.classList.remove('hidden');
+  } finally {
+    saveBtn.disabled = false; saveBtn.textContent = 'Guardar';
+  }
+}
+
+async function toggleActivo(id) {
+  const p = allPersonal.find(x => x.id === id);
+  if (!p) return;
+  const activar = p.activo === false;
+  const ok = await showConfirm(
+    activar ? 'Activar personal' : 'Desactivar personal',
+    activar ? `¿Activar a ${p.apellido}, ${p.nombre}?`
+            : `¿Desactivar a ${p.apellido}, ${p.nombre}? Quedará en el padrón pero marcado como inactivo.`
+  );
+  if (!ok) return;
+  try {
+    await patchPersonal(id, { activo: activar });
+    showToast(activar ? 'Personal activado.' : 'Personal desactivado.');
+    await loadPadron();
+  } catch (_) {
+    showToast('Error al actualizar.', 'error');
+  }
+}
+
 // ───────────── Init ─────────────
 document.addEventListener('DOMContentLoaded', async () => {
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch (_) { return null; } })();
@@ -135,10 +322,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'index.html';
   });
 
+  // Colapsar/expandir secciones
+  document.querySelectorAll('.sec-head').forEach(head => {
+    head.addEventListener('click', () => head.closest('.sec-card').classList.toggle('collapsed'));
+  });
+
+  // Categorías / Feriados
   $('cat-add').addEventListener('click', addCategoria);
   $('cat-input').addEventListener('keydown', e => { if (e.key === 'Enter') addCategoria(); });
   $('fer-add').addEventListener('click', addFeriado);
   $('fer-nombre').addEventListener('keydown', e => { if (e.key === 'Enter') addFeriado(); });
+
+  // Padrón
+  $('pad-search').addEventListener('input', renderPadron);
+  $('pad-add').addEventListener('click', openAddPersonal);
+  $('modal-personal-close').addEventListener('click',  () => $('modal-personal').classList.add('hidden'));
+  $('modal-personal-cancel').addEventListener('click', () => $('modal-personal').classList.add('hidden'));
+  $('modal-personal-save').addEventListener('click', savePersonalModal);
+  $('p-foto-frente').addEventListener('change', e => {
+    fotoFrente = e.target.files[0] || null;
+    if (fotoFrente) setPreview('p-foto-frente-preview', URL.createObjectURL(fotoFrente));
+  });
+  $('p-foto-dorso').addEventListener('change', e => {
+    fotoDorso = e.target.files[0] || null;
+    if (fotoDorso) setPreview('p-foto-dorso-preview', URL.createObjectURL(fotoDorso));
+  });
 
   try {
     [categorias, feriados] = await Promise.all([getCategoriasPersonal(), getFeriados()]);
@@ -148,4 +356,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   renderCategorias();
   renderFeriados();
+  loadPadron();
 });
