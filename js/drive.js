@@ -292,6 +292,71 @@
     return { fileId: (await resp.json()).id };
   };
 
+  // Estructura Personal: PERSONAL → Padron → {label} → dni.{ext}
+  // label = "Apellido Nombre - DNI". Devuelve { fileId, url } (link de vista).
+  window.uploadDniToDrive = async function (file, { label }) {
+    const token = await getAccessToken();
+
+    // Raíz PERSONAL (id cacheado en Firebase)
+    let personalRootId;
+    try {
+      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalRootId.json');
+      if (r.ok) personalRootId = await r.json();
+    } catch (_) {}
+    if (!personalRootId) {
+      personalRootId = await getOrCreateFolder(token, 'PERSONAL', DRIVE_CONFIG.folderId);
+      fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalRootId.json', {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(personalRootId)
+      }).catch(() => {});
+    }
+
+    const padronId     = await getOrCreateFolder(token, 'Padron', personalRootId);
+    const personFolder = await getOrCreateFolder(token, label || 'Sin nombre', padronId);
+
+    const mimeType = file.type || 'application/octet-stream';
+    const ext      = (file.name && file.name.includes('.')) ? file.name.split('.').pop().toLowerCase() : 'jpg';
+    const fname    = 'dni.' + ext;
+
+    // Si ya hay un dni.* en la carpeta, lo reemplazamos (PATCH) en vez de duplicar
+    let existingId = null;
+    try {
+      const q = `'${personFolder}' in parents and name contains 'dni' and trashed=false`;
+      const search = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (search.ok) {
+        const { files } = await search.json();
+        if (files?.length) existingId = files[0].id;
+      }
+    } catch (_) {}
+
+    const boundary = 'vimeco_' + Date.now();
+    const meta     = JSON.stringify(existingId
+      ? { name: fname, mimeType }
+      : { name: fname, parents: [personFolder], mimeType });
+    const enc     = new TextEncoder();
+    const pre     = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    const post    = enc.encode(`\r\n--${boundary}--`);
+    const content = new Uint8Array(await file.arrayBuffer());
+    const body    = new Uint8Array(pre.length + content.length + post.length);
+    body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
+
+    const upUrl = existingId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart&fields=id`
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+    const resp = await fetch(upUrl, {
+      method:  existingId ? 'PATCH' : 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body
+    });
+    if (!resp.ok) throw new Error(`Upload DNI (${resp.status})`);
+    const fileId = (await resp.json()).id;
+    return { fileId, url: `https://drive.google.com/file/d/${fileId}/view` };
+  };
+
   // Adjuntar un archivo a las carpetas Drive de una OC existente
   window.attachToDriveOC = async function (file, { drive_folder_obras_id, drive_folder_proveedores_id, drive_folder_id, obra, fecha, proveedor, nroOC }) {
     try {

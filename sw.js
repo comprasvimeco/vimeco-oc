@@ -37,7 +37,13 @@ const STATIC_ASSETS = [
   BASE + '/js/caja.js',
   BASE + '/js/scanner.js',
   BASE + '/actividad.html',
-  BASE + '/js/actividad.js'
+  BASE + '/js/actividad.js',
+  BASE + '/personal-config.html',
+  BASE + '/js/personal-config.js',
+  BASE + '/personal.html',
+  BASE + '/js/personal.js',
+  BASE + '/personal-obra.html',
+  BASE + '/js/personal-obra.js'
 ];
 
 self.addEventListener('install', event => {

@@ -47,6 +47,12 @@ function renderUsers(list) {
     const adminBadge = esSuper
       ? '<span class="u-badge u-badge-activo">⚙️ Admin (super)</span>'
       : (u.admin ? '<span class="u-badge u-badge-activo">⚙️ Admin</span>' : '');
+    const jefeBadge = (!esSuper && u.jefeObra)
+      ? '<span class="u-badge u-badge-activo">👷 Jefe de Obra</span>'
+      : '';
+    const jefeBtn = esSuper
+      ? ''
+      : `<button class="btn btn-sm ${u.jefeObra ? 'btn-warning' : 'btn-success'} btn-toggle-jefe">${u.jefeObra ? 'Quitar jefe' : 'Dar jefe'}</button>`;
     const cajaBtn = esSuper
       ? ''
       : `<button class="btn btn-sm ${u.caja ? 'btn-warning' : 'btn-success'} btn-toggle-caja">${u.caja ? 'Quitar caja' : 'Dar caja'}</button>`;
@@ -62,12 +68,14 @@ function renderUsers(list) {
         <span class="u-badge ${u.passwordHash ? 'u-badge-pwd-ok' : 'u-badge-pwd-none'}">${u.passwordHash ? '🔑 Con contraseña' : '⚠ Sin contraseña'}</span>
         ${cajaBadge}
         ${adminBadge}
+        ${jefeBadge}
       </div>
       <div class="user-card-actions">
         <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
         <button class="btn btn-sm btn-secondary btn-reset-pwd">Reset pwd</button>
         ${cajaBtn}
         ${adminBtn}
+        ${jefeBtn}
         <button class="btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'} btn-toggle-user">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
@@ -83,6 +91,7 @@ function renderUsers(list) {
     card.querySelector('.btn-toggle-user').addEventListener('click', () => toggleActivo(u.codigo, u.activo, u.nombre));
     card.querySelector('.btn-toggle-caja')?.addEventListener('click',  () => toggleCaja(u.codigo, u.caja, u.nombre));
     card.querySelector('.btn-toggle-admin')?.addEventListener('click', () => toggleAdmin(u.codigo, u.admin, u.nombre));
+    card.querySelector('.btn-toggle-jefe')?.addEventListener('click',  () => toggleJefe(u.codigo, u.jefeObra, u.nombre));
   });
 }
 
@@ -197,6 +206,23 @@ window.toggleAdmin = async function (codigo, enabled, nombre) {
     await loadUsers();
   } catch (_) {
     showToast('Error al actualizar el permiso de admin.', 'error');
+  }
+};
+
+window.toggleJefe = async function (codigo, enabled, nombre) {
+  const ok = await showConfirm(
+    enabled ? 'Quitar Jefe de Obra' : 'Dar Jefe de Obra',
+    enabled
+      ? `¿Quitar el rol de Jefe de Obra a ${nombre}? Dejará de ver el módulo Personal.`
+      : `¿Dar el rol de Jefe de Obra a ${nombre}? Podrá gestionar la cuadrilla y los partes de las obras que se le asignen.`
+  );
+  if (!ok) return;
+  try {
+    await patchUsuario(codigo, { jefeObra: !enabled });
+    showToast(`Jefe de Obra ${enabled ? 'quitado' : 'otorgado'} a ${nombre}.`);
+    await loadUsers();
+  } catch (_) {
+    showToast('Error al actualizar el rol de Jefe de Obra.', 'error');
   }
 };
 

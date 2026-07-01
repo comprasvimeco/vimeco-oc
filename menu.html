@@ -60,6 +60,17 @@
       </div>
       <div class="menu-card-title">Caja</div>
     </a>
+    <a href="personal.html" class="menu-card" id="menu-card-personal" style="display:none">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+          <path d="M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+      </div>
+      <div class="menu-card-title">Personal</div>
+    </a>
     <a href="actividad.html" class="menu-card" id="menu-card-novedades" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -100,6 +111,9 @@
       document.getElementById('menu-card-admin').style.display = '';
     }
 
+    // Personal: visible para 0000, admins o jefes de obra.
+    const personalCard = document.getElementById('menu-card-personal');
+
     // Novedades: visible para admins (0000 o permiso `admin`), con badge de no vistas.
     const novCard = document.getElementById('menu-card-novedades');
     function revealNovedades() {
@@ -121,6 +135,7 @@
     const cajaCard = document.getElementById('menu-card-caja');
     if (_s.codigo === '0000') {
       cajaCard.style.display = '';
+      personalCard.style.display = '';
       revealNovedades();
     } else {
       cajaCard.style.display = 'none';
@@ -128,6 +143,7 @@
         getUsuario(_s.codigo)
           .then(u => {
             if (u && (u.caja || u.admin)) cajaCard.style.display = '';
+            if (u && (u.admin || u.jefeObra)) personalCard.style.display = '';
             if (u && u.admin) revealNovedades();
           })
           .catch(() => {});

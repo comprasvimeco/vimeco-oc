@@ -32,6 +32,39 @@ function esc(s) {
 }
 
 let allObras = [];
+let allJefes = [];  // usuarios con rol jefeObra
+
+async function loadJefes() {
+  try {
+    const usuarios = await getAllUsuarios();
+    allJefes = usuarios
+      .filter(u => u.jefeObra && u.activo)
+      .map(u => ({ codigo: u.codigo, nombre: u.nombre }));
+  } catch (_) {
+    allJefes = [];
+  }
+}
+
+function renderJefesChecklist(seleccionados) {
+  const cont = $('obra-jefes-list');
+  const sel = seleccionados || {};
+  if (!allJefes.length) {
+    cont.innerHTML = '<span style="color:var(--gray-500);font-size:.85rem;">No hay usuarios con rol Jefe de Obra. Asigná el rol desde Usuarios.</span>';
+    return;
+  }
+  cont.innerHTML = allJefes.map(j => `
+    <label style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0;cursor:pointer;">
+      <input type="checkbox" class="obra-jefe-chk" value="${esc(j.codigo)}" ${sel[j.codigo] ? 'checked' : ''}>
+      <span>${esc(j.nombre)} <span style="color:var(--gray-400);">(${esc(j.codigo)})</span></span>
+    </label>
+  `).join('');
+}
+
+function getJefesSeleccionados() {
+  const obj = {};
+  document.querySelectorAll('.obra-jefe-chk:checked').forEach(chk => { obj[chk.value] = true; });
+  return obj;
+}
 
 function renderObras(list) {
   const container = $('obras-list');
@@ -57,8 +90,7 @@ function renderObras(list) {
 
   container.querySelectorAll('.user-card').forEach((card, i) => {
     const o = list[i];
-    card.querySelector('.btn-edit-obra').addEventListener('click', () =>
-      editObra(o.key, o.nombre, o.lugar_entrega || ''));
+    card.querySelector('.btn-edit-obra').addEventListener('click', () => editObra(o.key));
     card.querySelector('.btn-toggle-obra').addEventListener('click', () =>
       toggleActiva(o.key, o.activa, o.nombre));
   });
@@ -79,18 +111,26 @@ function openAddModal() {
   editingKey = null;
   $('modal-obra-title').textContent = 'Agregar obra';
   $('modal-obra-error').classList.add('hidden');
-  $('obra-nombre').value = '';
-  $('obra-lugar').value  = '';
+  $('obra-nombre').value   = '';
+  $('obra-lugar').value    = '';
+  $('obra-jornada').value  = '8';
+  $('obra-comida').value   = '';
+  renderJefesChecklist({});
   $('modal-obra').classList.remove('hidden');
   setTimeout(() => $('obra-nombre').focus(), 50);
 }
 
-window.editObra = function (key, nombre, lugar) {
+window.editObra = function (key) {
+  const obra = allObras.find(o => o.key === key) || {};
   editingKey = key;
   $('modal-obra-title').textContent = 'Editar obra';
   $('modal-obra-error').classList.add('hidden');
-  $('obra-nombre').value = nombre;
-  $('obra-lugar').value  = lugar;
+  $('obra-nombre').value  = obra.nombre || '';
+  $('obra-lugar').value   = obra.lugar_entrega || '';
+  const c = obra.constantes || {};
+  $('obra-jornada').value = (c.jornadaHoras ?? 8);
+  $('obra-comida').value  = (c.valorComida ?? '');
+  renderJefesChecklist(obra.jefes || {});
   $('modal-obra').classList.remove('hidden');
   setTimeout(() => $('obra-nombre').focus(), 50);
 };
@@ -106,17 +146,22 @@ async function saveObraModal() {
     return;
   }
 
+  const jornadaHoras = parseFloat($('obra-jornada').value) || 0;
+  const valorComida  = parseFloat($('obra-comida').value)  || 0;
+  const constantes   = { jornadaHoras, valorComida };
+  const jefes        = getJefesSeleccionados();
+
   const saveBtn = $('modal-obra-save');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Guardando…';
 
   try {
     if (editingKey) {
-      await patchObra(editingKey, { nombre, lugar_entrega: lugar });
+      await patchObra(editingKey, { nombre, lugar_entrega: lugar, constantes, jefes });
     } else {
       const key = nombre.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').substring(0, 40)
         + '_' + Date.now();
-      await saveObra(key, { nombre, lugar_entrega: lugar, activa: true, creadaEn: Date.now() });
+      await saveObra(key, { nombre, lugar_entrega: lugar, activa: true, creadaEn: Date.now(), constantes, jefes });
     }
     $('modal-obra').classList.add('hidden');
     showToast(editingKey ? 'Obra actualizada.' : 'Obra creada.');
@@ -170,5 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
   $('modal-obra-save').addEventListener('click', saveObraModal);
   $('obra-nombre').addEventListener('keydown', e => { if (e.key === 'Enter') saveObraModal(); });
 
+  loadJefes();
   loadObras();
 });

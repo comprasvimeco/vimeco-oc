@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Personal de obra</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    .sec-card { background:#fff; border:1px solid var(--gray-200); border-radius:12px; margin-bottom:1rem; overflow:hidden; }
+    .sec-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.85rem 1rem; cursor:pointer; user-select:none; }
+    .sec-head h2 { font-size:1rem; color:var(--gray-700); margin:0; display:flex; align-items:center; gap:.5rem; }
+    .sec-head .chev { transition:transform .2s; color:var(--gray-400); }
+    .sec-card.collapsed .chev { transform:rotate(-90deg); }
+    .sec-card.collapsed .sec-body { display:none; }
+    .sec-body { padding:0 1rem 1rem; }
+    .crew-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem; }
+    .crew-item { display:flex; align-items:center; gap:.75rem; padding:.6rem .25rem; border-bottom:1px solid var(--gray-100); }
+    .crew-item:last-child { border-bottom:none; }
+    .crew-avatar { width:40px; height:40px; border-radius:50%; background:var(--gray-100); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; }
+    .crew-avatar img { width:100%; height:100%; object-fit:cover; }
+    .crew-info { flex:1; min-width:0; }
+    .crew-name { font-weight:600; color:var(--gray-800); }
+    .crew-meta { font-size:.82rem; color:var(--gray-500); }
+    .crew-cat { display:inline-block; background:var(--gray-100); border-radius:999px; padding:.1rem .5rem; font-size:.72rem; color:var(--gray-600); }
+    .dni-preview { margin-top:.5rem; }
+    .dni-preview img { max-width:100%; max-height:160px; border-radius:8px; border:1px solid var(--gray-200); }
+
+    /* Calendario de quincena */
+    .cal-nav { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.75rem; }
+    .cal-nav .cal-label { font-weight:600; color:var(--gray-700); text-align:center; flex:1; }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+    .cal-dow { text-align:center; font-size:.68rem; color:var(--gray-400); font-weight:600; padding-bottom:2px; }
+    .cal-day { aspect-ratio:1/1; border:1px solid var(--gray-200); border-radius:8px; display:flex; flex-direction:column;
+               align-items:center; justify-content:center; cursor:pointer; position:relative; background:#fff; }
+    .cal-day.empty { border:none; background:transparent; cursor:default; }
+    .cal-day.nolab { background:var(--gray-100); color:var(--gray-400); }
+    .cal-day.feriado { background:#fdf1e7; }
+    .cal-day.validado { background:#eef7f1; border-color:#8fce9f; color:var(--gray-700); }
+    .cal-day.today { box-shadow:0 0 0 2px #1a3a5c; }
+    .cal-daynum { font-weight:600; font-size:.9rem; }
+    .cal-badge { font-size:.6rem; line-height:1; margin-top:2px; }
+    .cal-badge.ok { color:#2e8b57; }
+    .cal-badge.pend { color:#c47a3a; }
+    .cal-fmark { position:absolute; top:2px; right:4px; font-size:.58rem; color:#c47a3a; font-weight:700; }
+    .cal-legend { margin-top:.85rem; font-size:.72rem; color:var(--gray-500); display:flex; flex-wrap:wrap; gap:.85rem; }
+    .cal-legend span { display:inline-flex; align-items:center; gap:.3rem; }
+    .cal-swatch { width:12px; height:12px; border-radius:3px; border:1px solid var(--gray-200); display:inline-block; }
+    .cierre-bar { margin-top:1rem; padding-top:.85rem; border-top:1px solid var(--gray-200); display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; }
+    .cierre-msg { font-size:.8rem; color:var(--gray-500); flex:1; min-width:180px; }
+
+    /* Parte del día */
+    .modal.modal--parte { max-width:560px; }
+    .parte-info { font-size:.84rem; color:var(--gray-600); margin-bottom:.75rem; padding:.5rem .75rem; background:var(--gray-100); border-radius:8px; }
+    .parte-cerrada { color:#c47a3a; font-weight:600; }
+    .parte-row { border:1px solid var(--gray-200); border-radius:10px; padding:.6rem .75rem; margin-bottom:.6rem; }
+    .parte-row-head { font-weight:600; color:var(--gray-800); margin-bottom:.55rem; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+    .parte-fields { display:grid; grid-template-columns:1fr 1fr; gap:.5rem .75rem; align-items:end; }
+    .pf { display:flex; flex-direction:column; gap:.2rem; }
+    .pf label { font-size:.72rem; color:var(--gray-500); }
+    .pf input, .pf select { padding:.4rem .5rem; }
+    .pf-estado { grid-column:1 / -1; }
+    .pf-comida { flex-direction:row; align-items:center; gap:.45rem; padding-bottom:.35rem; }
+    .pf-comida input { width:18px; height:18px; }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='personal.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title" id="hdr-obra">Obra</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline" id="btn-back"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Obras</button>
+    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<main class="app-main">
+
+  <!-- CUADRILLA -->
+  <div class="sec-card" id="crew-card">
+    <div class="sec-head" id="crew-head">
+      <h2>👷 CUADRILLA <span id="crew-count" style="color:var(--gray-400);font-weight:400;"></span></h2>
+      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sec-body">
+      <div class="crew-actions">
+        <button class="btn btn-primary btn-sm" id="btn-add-personal">+ Agregar personal</button>
+        <button class="btn btn-outline btn-sm" id="btn-padron">Traer del padrón</button>
+      </div>
+      <div id="crew-list"><div class="hist-loading">Cargando cuadrilla…</div></div>
+    </div>
+  </div>
+
+  <!-- CALENDARIO (Capa 2) -->
+  <div class="sec-card" id="cal-card">
+    <div class="sec-head" id="cal-head">
+      <h2>📅 QUINCENA</h2>
+      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sec-body">
+      <div id="cal-container" style="color:var(--gray-500);font-size:.9rem;padding:.5rem 0;">
+        Cargando calendario…
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Modal: Agregar / Editar personal -->
+<div class="modal-overlay hidden" id="modal-personal">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-personal-title">Agregar personal</span>
+      <button class="modal-close" id="modal-personal-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:.75rem;">
+        <div class="form-group" style="flex:1">
+          <label for="p-nombre">Nombre *</label>
+          <input type="text" id="p-nombre" class="form-control" placeholder="Juan">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="p-apellido">Apellido *</label>
+          <input type="text" id="p-apellido" class="form-control" placeholder="Pérez">
+        </div>
+      </div>
+      <div style="display:flex;gap:.75rem;">
+        <div class="form-group" style="flex:1">
+          <label for="p-dni">DNI</label>
+          <input type="text" id="p-dni" class="form-control" inputmode="numeric" placeholder="30123456">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="p-categoria">Categoría</label>
+          <select id="p-categoria" class="form-control"></select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label for="p-foto">Foto del DNI</label>
+        <input type="file" id="p-foto" class="form-control" accept="image/*">
+        <div class="dni-preview" id="p-foto-preview"></div>
+      </div>
+      <div id="modal-personal-error" class="alert alert-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-personal-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-personal-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Traer del padrón -->
+<div class="modal-overlay hidden" id="modal-padron">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">Traer del padrón</span>
+      <button class="modal-close" id="modal-padron-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray-500);font-size:.85rem;margin-top:0;">Personal ya cargado en otras obras que podés asignar a esta.</p>
+      <div id="padron-list"><div class="hist-loading">Cargando padrón…</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-padron-cancel">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Parte del día -->
+<div class="modal-overlay hidden" id="modal-parte">
+  <div class="modal modal--parte">
+    <div class="modal-header">
+      <span class="modal-title" id="parte-title">Parte del día</span>
+      <button class="modal-close" id="modal-parte-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div id="parte-info" class="parte-info"></div>
+      <div id="parte-list"></div>
+    </div>
+    <div class="modal-footer" id="parte-footer">
+      <button class="btn btn-secondary" id="parte-guardar">Guardar</button>
+      <button class="btn btn-success" id="parte-validar">✓ Validar día</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar acción -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal modal--sm">
+    <div class="modal-header"><span class="modal-title" id="modal-confirm-title">Confirmar</span></div>
+    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+      <p id="modal-confirm-msg" style="color:var(--gray-600);"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-confirm-no">Cancelar</button>
+      <button class="btn btn-primary" id="modal-confirm-yes">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/personal-obra.js"></script>
+</body>
+</html>

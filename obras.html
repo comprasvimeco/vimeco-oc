@@ -49,10 +49,32 @@
         <label for="obra-nombre">Nombre de la obra *</label>
         <input type="text" id="obra-nombre" class="form-control" placeholder="Ej: Edificio San Martín">
       </div>
-      <div class="form-group" style="margin-bottom:0">
+      <div class="form-group">
         <label for="obra-lugar">Lugar de entrega</label>
         <input type="text" id="obra-lugar" class="form-control" placeholder="Ej: Av. San Martín 1234, Córdoba">
       </div>
+
+      <hr style="border:none;border-top:1px solid var(--gray-200);margin:1rem 0 .75rem;">
+      <p style="font-weight:600;color:var(--gray-700);margin:0 0 .5rem;">Personal</p>
+
+      <div style="display:flex;gap:.75rem;">
+        <div class="form-group" style="flex:1">
+          <label for="obra-jornada">Jornada (horas)</label>
+          <input type="number" id="obra-jornada" class="form-control" min="0" max="24" step="0.5" placeholder="8">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="obra-comida">Valor comida ($)</label>
+          <input type="number" id="obra-comida" class="form-control" min="0" step="0.01" placeholder="0">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0">
+        <label>Jefes de obra asignados</label>
+        <div id="obra-jefes-list" style="border:1px solid var(--gray-200);border-radius:8px;padding:.5rem .75rem;max-height:160px;overflow-y:auto;">
+          <span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span>
+        </div>
+      </div>
+
       <div id="modal-obra-error" class="alert alert-error hidden"></div>
     </div>
     <div class="modal-footer">

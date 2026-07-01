@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Personal (configuración)</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <style>
+    .cfg-section { background:#fff; border:1px solid var(--gray-200); border-radius:12px; padding:1rem 1.25rem; margin-bottom:1rem; }
+    .cfg-section h2 { font-size:1rem; color:var(--gray-700); margin:0 0 .75rem; }
+    .chip-list { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem; }
+    .chip { display:inline-flex; align-items:center; gap:.4rem; background:var(--gray-100); border:1px solid var(--gray-200);
+            border-radius:999px; padding:.3rem .75rem; font-size:.9rem; }
+    .chip button { border:none; background:none; color:var(--gray-500); cursor:pointer; font-size:1rem; line-height:1; padding:0; }
+    .chip button:hover { color:#d64545; }
+    .cfg-row { display:flex; gap:.5rem; flex-wrap:wrap; }
+    .fer-item { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.4rem .25rem; border-bottom:1px solid var(--gray-100); }
+    .fer-item:last-child { border-bottom:none; }
+    .fer-fecha { font-weight:600; color:var(--gray-700); min-width:110px; }
+    .fer-nombre { flex:1; color:var(--gray-600); }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='administracion.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Personal — Configuración</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline" id="btn-back"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver</button>
+    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<main class="app-main">
+  <div class="hist-page">
+
+    <!-- Categorías -->
+    <div class="cfg-section">
+      <h2>Categorías de personal</h2>
+      <div id="cat-list" class="chip-list"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
+      <div class="cfg-row">
+        <input type="text" id="cat-input" class="form-control" placeholder="Ej: Oficial" style="flex:1;min-width:160px;">
+        <button class="btn btn-primary btn-sm" id="cat-add">+ Agregar</button>
+      </div>
+    </div>
+
+    <!-- Feriados -->
+    <div class="cfg-section">
+      <h2>Feriados</h2>
+      <div id="fer-list" style="margin-bottom:.75rem;"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
+      <div class="cfg-row">
+        <input type="date" id="fer-fecha" class="form-control" style="min-width:150px;">
+        <input type="text" id="fer-nombre" class="form-control" placeholder="Nombre del feriado" style="flex:1;min-width:160px;">
+        <button class="btn btn-primary btn-sm" id="fer-add">+ Agregar</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Modal: Confirmar acción -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal modal--sm">
+    <div class="modal-header"><span class="modal-title" id="modal-confirm-title">Confirmar</span></div>
+    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+      <p id="modal-confirm-msg" style="color:var(--gray-600);"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-confirm-no">Cancelar</button>
+      <button class="btn btn-primary" id="modal-confirm-yes">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/personal-config.js"></script>
+</body>
+</html>

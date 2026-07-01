@@ -398,3 +398,150 @@
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   };
 })();
+
+// ─── Módulo Personal (Jefe de Obra) ──────────────────
+(function () {
+  const _base = () => FIREBASE_CONFIG.databaseURL;
+
+  function _genKey() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  async function _get(path) {
+    const resp = await fetch(_base() + path);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.json();
+  }
+  async function _put(path, data) {
+    const resp = await fetch(_base() + path, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  }
+  async function _patch(path, fields) {
+    const resp = await fetch(_base() + path, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  }
+
+  // --- Personal (padrón global) ---
+  window.getPersonal = async function () {
+    const data = await _get('/personal.json');
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, p]) => p && p.apellido)
+      .map(([id, p]) => ({ id, ...p }))
+      .sort((a, b) => (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre));
+  };
+
+  // Personal asignado a una obra
+  window.getPersonalDeObra = async function (obraKey) {
+    const all = await window.getPersonal();
+    return all.filter(p => p.obras && p.obras[obraKey]);
+  };
+
+  window.savePersonal = async function (data) {
+    const id = _genKey();
+    await _put('/personal/' + id + '.json', { ...data, creadoEn: Date.now() });
+    return id;
+  };
+
+  window.patchPersonal = async function (id, fields) {
+    await _patch('/personal/' + id + '.json', fields);
+  };
+
+  // --- Constantes por obra ---
+  window.getConstantesObra = async function (obraKey) {
+    const data = await _get('/obras/' + obraKey + '/constantes.json');
+    return data || { jornadaHoras: 8, valorComida: 0 };
+  };
+  window.patchConstantesObra = async function (obraKey, fields) {
+    await _patch('/obras/' + obraKey + '/constantes.json', fields);
+  };
+
+  // --- Jefes por obra / obras de un jefe ---
+  // codigos = array de códigos de usuario → se guarda como objeto {codigo:true}
+  window.setJefesObra = async function (obraKey, codigos) {
+    const obj = {};
+    (codigos || []).forEach(c => { obj[c] = true; });
+    await _put('/obras/' + obraKey + '/jefes.json', obj);
+  };
+
+  window.getObrasDeJefe = async function (codigo) {
+    const data = await _get('/obras.json');
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, o]) => o && o.nombre && o.activa && o.jefes && o.jefes[codigo])
+      .map(([key, o]) => ({ key, nombre: o.nombre, lugar_entrega: o.lugar_entrega || '' }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  };
+
+  // --- Categorías de personal --- (array de strings)
+  window.getCategoriasPersonal = async function () {
+    const data = await _get('/personal_config/categorias.json');
+    if (!data) return [];
+    return Array.isArray(data) ? data.filter(Boolean) : Object.values(data).filter(Boolean);
+  };
+  window.saveCategoriasPersonal = async function (cats) {
+    await _put('/personal_config/categorias.json', cats);
+  };
+
+  // --- Feriados --- { "YYYY-MM-DD": "Nombre" }
+  window.getFeriados = async function () {
+    const data = await _get('/personal_config/feriados.json');
+    return data || {};
+  };
+  window.saveFeriados = async function (feriados) {
+    await _put('/personal_config/feriados.json', feriados);
+  };
+
+  // --- Partes diarios ---
+  // Estructura: /partes/{obraKey}/{YYYY-MM-DD}/{ items:{personalId:{...}}, _meta:{validado,...} }
+  window.getParte = async function (obraKey, fecha) {
+    const data = await _get('/partes/' + obraKey + '/' + fecha + '.json');
+    return data || { items: {}, _meta: { validado: false } };
+  };
+
+  // _meta de todas las fechas (para pintar el calendario)
+  window.getPartesMeta = async function (obraKey) {
+    const data = await _get('/partes/' + obraKey + '.json');
+    if (!data) return {};
+    const out = {};
+    Object.entries(data).forEach(([fecha, p]) => {
+      out[fecha] = (p && p._meta) || { validado: false };
+    });
+    return out;
+  };
+
+  // Guarda todos los items del día de una (fuente única de verdad de la tabla)
+  window.saveParteDia = async function (obraKey, fecha, items) {
+    await _put('/partes/' + obraKey + '/' + fecha + '/items.json', items || {});
+  };
+
+  window.setValidadoDia = async function (obraKey, fecha, validado, codigo) {
+    await _put('/partes/' + obraKey + '/' + fecha + '/_meta.json', {
+      validado:    !!validado,
+      validadoPor: validado ? (codigo || '') : null,
+      validadoEn:  validado ? Date.now()    : null
+    });
+  };
+
+  // --- Cierres de quincena --- /cierres/{obraKey}/{quincenaId}  (ej "2026-06-Q2")
+  window.getCierre = async function (obraKey, quincenaId) {
+    return (await _get('/cierres/' + obraKey + '/' + quincenaId + '.json')) || null;
+  };
+  window.cerrarQuincena = async function (obraKey, quincenaId, codigo) {
+    await _put('/cierres/' + obraKey + '/' + quincenaId + '.json', {
+      cerrado: true, cerradoPor: codigo || '', cerradoEn: Date.now()
+    });
+  };
+  window.reabrirQuincena = async function (obraKey, quincenaId) {
+    const resp = await fetch(_base() + '/cierres/' + obraKey + '/' + quincenaId + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+})();
