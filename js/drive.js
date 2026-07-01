@@ -330,9 +330,10 @@
     return { fileId, url: `https://drive.google.com/file/d/${fileId}/view` };
   }
 
-  // Estructura Personal: PERSONAL → Padron → {label} → dni.{ext}
-  // label = "Apellido Nombre - DNI". Devuelve { fileId, url } (link de vista).
-  window.uploadDniToDrive = async function (file, { label }) {
+  // Estructura Personal: PERSONAL → Padron → {label} → dni_{lado}.{ext}
+  // label = "Apellido Nombre - DNI"; lado = 'frente' | 'dorso'.
+  // Devuelve { fileId, url } (link de vista).
+  window.uploadDniToDrive = async function (file, { label, lado }) {
     const token = await getAccessToken();
     const personalRootId = await getPersonalRootId(token);
 
@@ -341,12 +342,13 @@
 
     const mimeType = file.type || 'application/octet-stream';
     const ext      = (file.name && file.name.includes('.')) ? file.name.split('.').pop().toLowerCase() : 'jpg';
-    const fname    = 'dni.' + ext;
+    const base     = 'dni_' + (lado || 'frente');
+    const fname    = base + '.' + ext;
 
-    // Si ya hay un dni.* en la carpeta, lo reemplazamos (PATCH) en vez de duplicar
+    // Si ya hay un dni_{lado}.* en la carpeta, lo reemplazamos (PATCH) en vez de duplicar
     let existingId = null;
     try {
-      const q = `'${personFolder}' in parents and name contains 'dni' and trashed=false`;
+      const q = `'${personFolder}' in parents and name contains '${base}' and trashed=false`;
       const search = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
         { headers: { Authorization: `Bearer ${token}` } }

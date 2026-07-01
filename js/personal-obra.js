@@ -39,7 +39,8 @@ const obraNombre = params.get('nombre') || 'Obra';
 let categorias  = [];
 let cuadrilla   = [];   // personal asignado a esta obra (objetos completos)
 let editingId   = null;
-let fotoFile    = null; // archivo de DNI elegido en el modal
+let fotoFrente  = null; // archivo DNI frente elegido en el modal
+let fotoDorso   = null; // archivo DNI dorso elegido en el modal
 
 let feriados        = {};   // { "YYYY-MM-DD": "Nombre" }
 let partesMeta      = {};   // { "YYYY-MM-DD": { validado, ... } }
@@ -66,12 +67,25 @@ const ESTADOS = [
 ];
 
 // ───────── Cuadrilla ─────────
+function dniFrente(p) { return p.fotoDniFrente || p.fotoDniUrl || ''; }
+
 function avatar(p) {
   const ini = ((p.apellido || '')[0] || '') + ((p.nombre || '')[0] || '');
-  if (p.fotoDniUrl) {
-    return `<div class="crew-avatar"><a href="${esc(p.fotoDniUrl)}" target="_blank" rel="noopener" title="Ver DNI"><img src="${esc(p.fotoDniUrl)}" alt="DNI" onerror="this.parentNode.textContent='${esc(ini)}'"></a></div>`;
+  const front = dniFrente(p);
+  if (front) {
+    return `<div class="crew-avatar"><a href="${esc(front)}" target="_blank" rel="noopener" title="Ver DNI (frente)"><img src="${esc(front)}" alt="DNI" onerror="this.parentNode.textContent='${esc(ini)}'"></a></div>`;
   }
   return `<div class="crew-avatar">${esc(ini.toUpperCase()) || '👷'}</div>`;
+}
+
+// Links a frente/dorso del DNI para la fila
+function dniLinks(p) {
+  const front = dniFrente(p);
+  const back  = p.fotoDniDorso || '';
+  const parts = [];
+  if (front) parts.push(`<a href="${esc(front)}" target="_blank" rel="noopener">frente</a>`);
+  if (back)  parts.push(`<a href="${esc(back)}"  target="_blank" rel="noopener">dorso</a>`);
+  return parts.length ? ` · DNI: ${parts.join(' / ')}` : '';
 }
 
 function renderCuadrilla() {
@@ -89,6 +103,7 @@ function renderCuadrilla() {
         <div class="crew-meta">
           ${p.categoria ? `<span class="crew-cat">${esc(p.categoria)}</span> ` : ''}
           ${p.dni ? `DNI ${esc(p.dni)}` : '<span style="color:var(--gray-400)">sin DNI</span>'}
+          ${dniLinks(p)}
         </div>
       </div>
       <div class="crew-actions">
@@ -124,23 +139,24 @@ function fillCategorias(selected) {
   sel.innerHTML = opts.join('');
 }
 
-function setFotoPreview(url) {
-  $('p-foto-preview').innerHTML = url
-    ? `<img src="${esc(url)}" alt="DNI">`
-    : '';
+function setPreview(elId, url) {
+  $(elId).innerHTML = url ? `<img src="${esc(url)}" alt="DNI">` : '';
 }
 
 function openAddPersonal() {
-  editingId = null;
-  fotoFile  = null;
+  editingId  = null;
+  fotoFrente = null;
+  fotoDorso  = null;
   $('modal-personal-title').textContent = 'Agregar personal';
   $('modal-personal-error').classList.add('hidden');
   $('p-nombre').value = '';
   $('p-apellido').value = '';
   $('p-dni').value = '';
-  $('p-foto').value = '';
+  $('p-foto-frente').value = '';
+  $('p-foto-dorso').value = '';
   fillCategorias('');
-  setFotoPreview('');
+  setPreview('p-foto-frente-preview', '');
+  setPreview('p-foto-dorso-preview', '');
   $('modal-personal').classList.remove('hidden');
   setTimeout(() => $('p-nombre').focus(), 50);
 }
@@ -148,16 +164,19 @@ function openAddPersonal() {
 function openEditPersonal(id) {
   const p = cuadrilla.find(x => x.id === id);
   if (!p) return;
-  editingId = id;
-  fotoFile  = null;
+  editingId  = id;
+  fotoFrente = null;
+  fotoDorso  = null;
   $('modal-personal-title').textContent = 'Editar personal';
   $('modal-personal-error').classList.add('hidden');
   $('p-nombre').value   = p.nombre || '';
   $('p-apellido').value = p.apellido || '';
   $('p-dni').value      = p.dni || '';
-  $('p-foto').value = '';
+  $('p-foto-frente').value = '';
+  $('p-foto-dorso').value = '';
   fillCategorias(p.categoria || '');
-  setFotoPreview(p.fotoDniUrl || '');
+  setPreview('p-foto-frente-preview', dniFrente(p));
+  setPreview('p-foto-dorso-preview', p.fotoDniDorso || '');
   $('modal-personal').classList.remove('hidden');
   setTimeout(() => $('p-nombre').focus(), 50);
 }
@@ -187,20 +206,30 @@ async function savePersonalModal() {
       id = await savePersonal({
         nombre, apellido, dni, categoria,
         activo: true,
-        fotoDniUrl: '',
+        fotoDniFrente: '', fotoDniDorso: '',
         obras: { [obraKey]: true }
       });
     }
 
-    // Subir foto DNI (opcional). Si falla, se guarda igual y avisamos.
-    if (fotoFile) {
-      saveBtn.textContent = 'Subiendo foto…';
+    // Subir fotos DNI (frente/dorso, opcionales). Si falla, se guarda igual y avisamos.
+    if (fotoFrente || fotoDorso) {
+      saveBtn.textContent = 'Subiendo fotos…';
+      const label = `${apellido} ${nombre} - ${dni || 'sin dni'}`.substring(0, 100);
+      const patch = {};
       try {
-        const label = `${apellido} ${nombre} - ${dni || 'sin dni'}`.substring(0, 100);
-        const { url } = await uploadDniToDrive(fotoFile, { label });
-        await patchPersonal(id, { fotoDniUrl: url });
+        if (fotoFrente) {
+          const { url } = await uploadDniToDrive(fotoFrente, { label, lado: 'frente' });
+          patch.fotoDniFrente = url;
+          patch.fotoDniUrl    = url;   // compat con lector viejo
+        }
+        if (fotoDorso) {
+          const { url } = await uploadDniToDrive(fotoDorso, { label, lado: 'dorso' });
+          patch.fotoDniDorso = url;
+        }
+        if (Object.keys(patch).length) await patchPersonal(id, patch);
       } catch (_) {
-        showToast('Se guardó, pero la foto del DNI no se pudo subir.', 'warning');
+        if (Object.keys(patch).length) { try { await patchPersonal(id, patch); } catch (_) {} }
+        showToast('Se guardó, pero alguna foto del DNI no se pudo subir.', 'warning');
       }
     }
 
@@ -753,9 +782,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-personal-close').addEventListener('click',  () => $('modal-personal').classList.add('hidden'));
   $('modal-personal-cancel').addEventListener('click', () => $('modal-personal').classList.add('hidden'));
   $('modal-personal-save').addEventListener('click', savePersonalModal);
-  $('p-foto').addEventListener('change', e => {
-    fotoFile = e.target.files[0] || null;
-    if (fotoFile) setFotoPreview(URL.createObjectURL(fotoFile));
+  $('p-foto-frente').addEventListener('change', e => {
+    fotoFrente = e.target.files[0] || null;
+    if (fotoFrente) setPreview('p-foto-frente-preview', URL.createObjectURL(fotoFrente));
+  });
+  $('p-foto-dorso').addEventListener('change', e => {
+    fotoDorso = e.target.files[0] || null;
+    if (fotoDorso) setPreview('p-foto-dorso-preview', URL.createObjectURL(fotoDorso));
   });
 
   // Modal padrón

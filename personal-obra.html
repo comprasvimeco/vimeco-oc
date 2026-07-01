@@ -168,10 +168,18 @@
           <select id="p-categoria" class="form-control"></select>
         </div>
       </div>
-      <div class="form-group" style="margin-bottom:0">
-        <label for="p-foto">Foto del DNI</label>
-        <input type="file" id="p-foto" class="form-control" accept="image/*">
-        <div class="dni-preview" id="p-foto-preview"></div>
+      <label style="font-size:.9rem;color:var(--gray-700);font-weight:500;">Foto del DNI</label>
+      <div style="display:flex;gap:.75rem;margin-top:.35rem;">
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label for="p-foto-frente" style="font-size:.78rem;color:var(--gray-500);">Frente</label>
+          <input type="file" id="p-foto-frente" class="form-control" accept="image/*">
+          <div class="dni-preview" id="p-foto-frente-preview"></div>
+        </div>
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label for="p-foto-dorso" style="font-size:.78rem;color:var(--gray-500);">Dorso</label>
+          <input type="file" id="p-foto-dorso" class="form-control" accept="image/*">
+          <div class="dni-preview" id="p-foto-dorso-preview"></div>
+        </div>
       </div>
       <div id="modal-personal-error" class="alert alert-error hidden"></div>
     </div>
