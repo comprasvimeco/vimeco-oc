@@ -73,6 +73,17 @@
     .pf-estado { grid-column:1 / -1; }
     .pf-comida { flex-direction:row; align-items:center; gap:.45rem; padding-bottom:.35rem; }
     .pf-comida input { width:18px; height:18px; }
+    .pf-adjuntos { grid-column:1 / -1; }
+    .adj-list { display:flex; flex-wrap:wrap; gap:.4rem; margin:.35rem 0; }
+    .adj-chip { display:inline-flex; align-items:center; gap:.35rem; background:var(--gray-100); border:1px solid var(--gray-200); border-radius:999px; padding:.2rem .6rem; font-size:.78rem; max-width:100%; }
+    .adj-chip a { color:#1a3a5c; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
+    .adj-chip button { border:none; background:none; color:var(--gray-500); cursor:pointer; font-size:.95rem; line-height:1; padding:0; }
+    .adj-chip button:hover { color:#d64545; }
+
+    /* Barra de configuración de la obra */
+    .obra-cfg-bar { display:flex; align-items:center; justify-content:space-between; gap:.5rem; background:#fff;
+                    border:1px solid var(--gray-200); border-radius:12px; padding:.6rem .85rem; margin-bottom:1rem;
+                    font-size:.88rem; color:var(--gray-600); flex-wrap:wrap; }
   </style>
 </head>
 <body>
@@ -92,6 +103,12 @@
 </header>
 
 <main class="app-main">
+
+  <!-- Configuración de la obra -->
+  <div class="obra-cfg-bar">
+    <span>Jornada: <strong id="cfg-jornada">—</strong> h · Comida: $<strong id="cfg-comida">—</strong></span>
+    <button class="btn btn-sm btn-outline" id="btn-config-obra">⚙ Editar</button>
+  </div>
 
   <!-- CUADRILLA -->
   <div class="sec-card" id="crew-card">
@@ -178,6 +195,34 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="modal-padron-cancel">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Configuración de la obra -->
+<div class="modal-overlay hidden" id="modal-config-obra">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">Configuración de la obra</span>
+      <button class="modal-close" id="modal-config-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--gray-500);font-size:.85rem;margin-top:0;">Estos valores precargan el parte diario de esta obra.</p>
+      <div style="display:flex;gap:.75rem;">
+        <div class="form-group" style="flex:1">
+          <label for="cfg-jornada-input">Jornada (horas)</label>
+          <input type="number" id="cfg-jornada-input" class="form-control" min="0" max="24" step="0.5" placeholder="8">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="cfg-comida-input">Valor comida ($)</label>
+          <input type="number" id="cfg-comida-input" class="form-control" min="0" step="0.01" placeholder="0">
+        </div>
+      </div>
+      <div id="modal-config-error" class="alert alert-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-config-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-config-save">Guardar</button>
     </div>
   </div>
 </div>

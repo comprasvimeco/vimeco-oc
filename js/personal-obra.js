@@ -49,7 +49,9 @@ let constantes      = { jornadaHoras: 8, valorComida: 0 };
 let esAdmin         = false;
 let sessionCodigo   = '';
 
-let parteFecha = null;  // "YYYY-MM-DD" abierto en el modal
+let parteFecha    = null;   // "YYYY-MM-DD" abierto en el modal
+let parteReadonly = false;  // true si la quincena está cerrada
+let parteAdjuntos = {};     // { personalId: [{ name, url }] } del día abierto
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DOW   = ['L','M','M','J','V','S','D'];
@@ -477,6 +479,7 @@ async function onDayClick(iso) {
   parteFecha = iso;
   const q       = currentQuincena;
   const cerrada = !!(cierres[quincenaId(q)] && cierres[quincenaId(q)].cerrado);
+  parteReadonly = cerrada;
   const finde   = esFinde(iso);
   const ferNom  = feriados[iso];
   const noLab   = finde || !!ferNom;
@@ -499,6 +502,13 @@ async function onDayClick(iso) {
   try { parte = await getParte(obraKey, iso); }
   catch (_) { parte = { items: {}, _meta: { validado: false } }; }
   const items = parte.items || {};
+
+  // Reiniciar adjuntos del día con lo guardado
+  parteAdjuntos = {};
+  cuadrilla.forEach(p => {
+    const g = items[p.id];
+    parteAdjuntos[p.id] = (g && Array.isArray(g.adjuntos)) ? g.adjuntos.slice() : [];
+  });
 
   $('parte-list').innerHTML = cuadrilla.map(p => {
     const guardado = items[p.id];
@@ -529,9 +539,29 @@ async function onDayClick(iso) {
               ${ESTADOS.map(e => `<option value="${e.code}" ${e.code === estado ? 'selected' : ''}>${esc(e.label)}</option>`).join('')}
             </select>
           </div>
+          <div class="pf pf-adjuntos">
+            <label>Adjuntos (certificados, pasajes…)</label>
+            <div class="adj-list" data-id="${esc(p.id)}"></div>
+            <input type="file" class="adj-input" accept="image/*,application/pdf" style="display:none">
+            <button type="button" class="btn btn-sm btn-outline adj-btn" style="align-self:flex-start">📎 Adjuntar</button>
+          </div>
         </div>
       </div>`;
   }).join('');
+
+  // Adjuntos: render inicial + wiring por fila
+  $('parte-list').querySelectorAll('.parte-row').forEach(row => {
+    const id    = row.dataset.id;
+    const input = row.querySelector('.adj-input');
+    const btn   = row.querySelector('.adj-btn');
+    btn.addEventListener('click', () => input.click());
+    input.addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (f) subirAdjunto(id, f, btn);
+      input.value = '';
+    });
+    renderAdjuntos(id);
+  });
 
   // Auto-ajuste al cambiar estado
   $('parte-list').querySelectorAll('.parte-row').forEach(row => {
@@ -552,6 +582,7 @@ async function onDayClick(iso) {
   // Modo lectura si la quincena está cerrada
   const inputs = $('parte-list').querySelectorAll('input, select');
   inputs.forEach(el => { el.disabled = cerrada; });
+  $('parte-list').querySelectorAll('.adj-btn').forEach(b => { b.style.display = cerrada ? 'none' : ''; });
   $('parte-footer').style.display = cerrada ? 'none' : '';
 
   // Botón validar: refleja estado actual del día
@@ -566,11 +597,14 @@ async function onDayClick(iso) {
 function recolectarItems() {
   const items = {};
   $('parte-list').querySelectorAll('.parte-row').forEach(row => {
-    items[row.dataset.id] = {
+    const id = row.dataset.id;
+    const adjuntos = parteAdjuntos[id] || [];
+    items[id] = {
       horas:   parseFloat(row.querySelector('.pf-horas').value) || 0,
       comida:  row.querySelector('.pf-comidachk').checked,
       viatico: parseFloat(row.querySelector('.pf-viatico').value) || 0,
-      estado:  row.querySelector('.pf-estadosel').value || ''
+      estado:  row.querySelector('.pf-estadosel').value || '',
+      adjuntos
     };
   });
   return items;
@@ -620,6 +654,79 @@ async function onValidarDia() {
   }
 }
 
+// ───────── Configuración de la obra ─────────
+function updateCfgBar() {
+  $('cfg-jornada').textContent = constantes.jornadaHoras ?? 0;
+  $('cfg-comida').textContent  = constantes.valorComida ?? 0;
+}
+
+function openConfigObra() {
+  $('modal-config-error').classList.add('hidden');
+  $('cfg-jornada-input').value = constantes.jornadaHoras ?? 8;
+  $('cfg-comida-input').value  = constantes.valorComida ?? 0;
+  $('modal-config-obra').classList.remove('hidden');
+}
+
+async function saveConfigObra() {
+  const jornadaHoras = parseFloat($('cfg-jornada-input').value);
+  const valorComida  = parseFloat($('cfg-comida-input').value) || 0;
+  const errEl = $('modal-config-error');
+  if (isNaN(jornadaHoras) || jornadaHoras < 0) {
+    errEl.textContent = 'Ingresá una jornada válida.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  const btn = $('modal-config-save');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await patchConstantesObra(obraKey, { jornadaHoras, valorComida });
+    constantes = { ...constantes, jornadaHoras, valorComida };
+    updateCfgBar();
+    $('modal-config-obra').classList.add('hidden');
+    showToast('Configuración guardada.');
+  } catch (_) {
+    errEl.textContent = 'Error al guardar. Intentá de nuevo.';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+}
+
+// ───────── Adjuntos del parte ─────────
+function renderAdjuntos(id) {
+  const cont = $('parte-list').querySelector(`.adj-list[data-id="${id}"]`);
+  if (!cont) return;
+  const list = parteAdjuntos[id] || [];
+  cont.innerHTML = list.map((a, i) => `
+    <span class="adj-chip">
+      <a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.name)}</a>
+      ${parteReadonly ? '' : `<button data-id="${esc(id)}" data-i="${i}" title="Quitar">×</button>`}
+    </span>`).join('');
+  cont.querySelectorAll('button[data-i]').forEach(b =>
+    b.addEventListener('click', () => {
+      (parteAdjuntos[id] || []).splice(parseInt(b.dataset.i, 10), 1);
+      renderAdjuntos(id);
+    }));
+}
+
+async function subirAdjunto(id, file, btn) {
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Subiendo…';
+  try {
+    const p = cuadrilla.find(x => x.id === id);
+    const persona = p ? `${p.apellido} ${p.nombre}` : id;
+    const { url, name } = await uploadComprobantePersonal(file, { obra: obraNombre, fecha: parteFecha, persona });
+    parteAdjuntos[id] = parteAdjuntos[id] || [];
+    parteAdjuntos[id].push({ name, url });
+    renderAdjuntos(id);
+    showToast('Archivo adjuntado.');
+  } catch (_) {
+    showToast('No se pudo subir el archivo.', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
 // ───────── Init ─────────
 document.addEventListener('DOMContentLoaded', async () => {
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch (_) { return null; } })();
@@ -661,12 +768,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('parte-guardar').addEventListener('click', onGuardarParte);
   $('parte-validar').addEventListener('click', onValidarDia);
 
+  // Config de la obra (jornada + valor comida)
+  $('btn-config-obra').addEventListener('click', openConfigObra);
+  $('modal-config-close').addEventListener('click',  () => $('modal-config-obra').classList.add('hidden'));
+  $('modal-config-cancel').addEventListener('click', () => $('modal-config-obra').classList.add('hidden'));
+  $('modal-config-save').addEventListener('click', saveConfigObra);
+
   // Rol admin (para reabrir quincenas) y constantes de la obra
   esAdmin = sessionCodigo === '0000';
   if (!esAdmin) {
     try { const u = await getUsuario(sessionCodigo); esAdmin = !!(u && u.admin); } catch (_) {}
   }
   try { constantes = await getConstantesObra(obraKey); } catch (_) {}
+  updateCfgBar();
 
   try { categorias = await getCategoriasPersonal(); } catch (_) { categorias = []; }
   await loadCuadrilla();

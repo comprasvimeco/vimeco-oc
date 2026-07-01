@@ -292,25 +292,49 @@
     return { fileId: (await resp.json()).id };
   };
 
+  // Raíz PERSONAL (id cacheado en Firebase)
+  async function getPersonalRootId(token) {
+    let id;
+    try {
+      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalRootId.json');
+      if (r.ok) id = await r.json();
+    } catch (_) {}
+    if (!id) {
+      id = await getOrCreateFolder(token, 'PERSONAL', DRIVE_CONFIG.folderId);
+      fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalRootId.json', {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(id)
+      }).catch(() => {});
+    }
+    return id;
+  }
+
+  // Sube un blob a una carpeta y devuelve { fileId, url }
+  async function _uploadReturningId(token, file, name, folderId) {
+    const mimeType = file.type || 'application/octet-stream';
+    const boundary = 'vimeco_' + Date.now();
+    const meta     = JSON.stringify({ name, parents: [folderId], mimeType });
+    const enc      = new TextEncoder();
+    const pre      = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    const post     = enc.encode(`\r\n--${boundary}--`);
+    const content  = new Uint8Array(await file.arrayBuffer());
+    const body     = new Uint8Array(pre.length + content.length + post.length);
+    body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
+    const resp = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
+    );
+    if (!resp.ok) throw new Error(`Upload (${resp.status})`);
+    const fileId = (await resp.json()).id;
+    return { fileId, url: `https://drive.google.com/file/d/${fileId}/view` };
+  }
+
   // Estructura Personal: PERSONAL → Padron → {label} → dni.{ext}
   // label = "Apellido Nombre - DNI". Devuelve { fileId, url } (link de vista).
   window.uploadDniToDrive = async function (file, { label }) {
     const token = await getAccessToken();
-
-    // Raíz PERSONAL (id cacheado en Firebase)
-    let personalRootId;
-    try {
-      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalRootId.json');
-      if (r.ok) personalRootId = await r.json();
-    } catch (_) {}
-    if (!personalRootId) {
-      personalRootId = await getOrCreateFolder(token, 'PERSONAL', DRIVE_CONFIG.folderId);
-      fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalRootId.json', {
-        method:  'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(personalRootId)
-      }).catch(() => {});
-    }
+    const personalRootId = await getPersonalRootId(token);
 
     const padronId     = await getOrCreateFolder(token, 'Padron', personalRootId);
     const personFolder = await getOrCreateFolder(token, label || 'Sin nombre', padronId);
@@ -355,6 +379,22 @@
     if (!resp.ok) throw new Error(`Upload DNI (${resp.status})`);
     const fileId = (await resp.json()).id;
     return { fileId, url: `https://drive.google.com/file/d/${fileId}/view` };
+  };
+
+  // Comprobantes del parte (certificados médicos, pasajes, etc.)
+  // Estructura: PERSONAL → Comprobantes → {Obra} → {YYYY-MM-DD} → {Apellido Nombre} → archivo
+  // Devuelve { fileId, url, name }.
+  window.uploadComprobantePersonal = async function (file, { obra, fecha, persona }) {
+    const token   = await getAccessToken();
+    const rootId  = await getPersonalRootId(token);
+    const compId  = await getOrCreateFolder(token, 'Comprobantes', rootId);
+    const obraId  = await getOrCreateFolder(token, obra || 'Sin obra', compId);
+    const fechaId = await getOrCreateFolder(token, fecha || 'sin-fecha', obraId);
+    const persId  = await getOrCreateFolder(token, (persona || 'Sin nombre').substring(0, 100), fechaId);
+
+    const name = file.name || ('comprobante_' + Date.now());
+    const { fileId, url } = await _uploadReturningId(token, file, name, persId);
+    return { fileId, url, name };
   };
 
   // Adjuntar un archivo a las carpetas Drive de una OC existente
