@@ -97,7 +97,41 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for everything else
+  // Solo interceptamos GET; el resto lo maneja el navegador nativamente.
+  if (event.request.method !== 'GET') return;
+
+  const sameOrigin = url.origin === self.location.origin;
+  const path       = url.pathname;
+
+  // Assets pesados/inmutables → cache-first (no re-descargar en cada carga):
+  // librerías vendorizadas (opencv, jscanify), jsPDF, imágenes y fuentes.
+  const heavy = /\/js\/vendor\//.test(path)
+             || /jspdf\.umd\.min\.js$/.test(path)
+             || /\.(png|jpg|jpeg|gif|svg|ico|woff2?|ttf)$/i.test(path);
+
+  // Código de la app (HTML, JS, CSS, JSON) y navegaciones → network-first:
+  // siempre trae lo último cuando hay red, y cae a la caché si estás offline.
+  // Esto garantiza que la versión deployada se refleje sin depender de que
+  // el SW nuevo se active (causa de que en desktop quedara pegada la versión vieja).
+  const appCode = sameOrigin && !heavy &&
+    (event.request.mode === 'navigate' || /\.(html|js|css|json)$/i.test(path));
+
+  if (appCode) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.status === 200 && response.type !== 'opaque') {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request, { ignoreSearch: true }))
+    );
+    return;
+  }
+
+  // Resto (assets pesados, terceros cacheables) → cache-first
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
