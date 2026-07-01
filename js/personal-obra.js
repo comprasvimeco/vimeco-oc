@@ -89,7 +89,7 @@ function renderCuadrilla() {
           ${p.dni ? `DNI ${esc(p.dni)}` : '<span style="color:var(--gray-400)">sin DNI</span>'}
         </div>
       </div>
-      <div class="user-card-actions">
+      <div class="crew-actions">
         <button class="btn btn-sm btn-outline btn-edit-p">Editar</button>
         <button class="btn btn-sm btn-danger btn-quitar-p">Quitar</button>
       </div>
