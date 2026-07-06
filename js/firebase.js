@@ -524,6 +524,18 @@
     return out;
   };
 
+  // Partes completos (items + _meta) de un rango de fechas [isoStart, isoEnd]
+  // Devuelve { "YYYY-MM-DD": { items:{...}, _meta:{...} } } (para el reporte de quincena)
+  window.getPartesRango = async function (obraKey, isoStart, isoEnd) {
+    const data = await _get('/partes/' + obraKey + '.json');
+    if (!data) return {};
+    const out = {};
+    Object.entries(data).forEach(([fecha, p]) => {
+      if (fecha >= isoStart && fecha <= isoEnd) out[fecha] = p || {};
+    });
+    return out;
+  };
+
   // Guarda todos los items del día de una (fuente única de verdad de la tabla)
   window.saveParteDia = async function (obraKey, fecha, items) {
     await _put('/partes/' + obraKey + '/' + fecha + '/items.json', items || {});

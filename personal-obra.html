@@ -80,6 +80,19 @@
     .adj-chip button { border:none; background:none; color:var(--gray-500); cursor:pointer; font-size:.95rem; line-height:1; padding:0; }
     .adj-chip button:hover { color:#d64545; }
 
+    /* Viáticos del parte */
+    .pf-viaticos { grid-column:1 / -1; }
+    .viat-list { display:flex; flex-wrap:wrap; gap:.4rem; margin:.35rem 0; }
+    .viat-empty { font-size:.8rem; color:var(--gray-400); }
+    .viat-chip { display:inline-flex; align-items:center; gap:.4rem; background:#eef4fb; border:1px solid #cfe0f2; border-radius:8px; padding:.25rem .6rem; font-size:.8rem; max-width:100%; }
+    .viat-chip .viat-monto { font-weight:700; color:#1a3a5c; }
+    .viat-chip .viat-motivo { color:var(--gray-600); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px; }
+    .viat-chip a { text-decoration:none; }
+    .viat-chip button { border:none; background:none; color:var(--gray-500); cursor:pointer; font-size:.95rem; line-height:1; padding:0; }
+    .viat-chip button:hover { color:#d64545; }
+    .dni-folder { text-decoration:none; font-size:.9rem; margin-left:.25rem; }
+    .v-file-name { font-size:.8rem; color:var(--gray-500); margin-top:.25rem; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
     /* Barra de configuración de la obra */
     .obra-cfg-bar { display:flex; align-items:center; justify-content:space-between; gap:.5rem; background:#fff;
                     border:1px solid var(--gray-200); border-radius:12px; padding:.6rem .85rem; margin-bottom:1rem;
@@ -168,6 +181,17 @@
           <select id="p-categoria" class="form-control"></select>
         </div>
       </div>
+      <div style="display:flex;gap:.75rem;align-items:flex-end;">
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" id="p-horas-extra" style="width:18px;height:18px;"> Horas extras
+          </label>
+        </div>
+        <div class="form-group" style="flex:1;margin-bottom:0">
+          <label for="p-pct-extra">% extra</label>
+          <input type="number" id="p-pct-extra" class="form-control" min="0" step="1" placeholder="0">
+        </div>
+      </div>
       <label style="font-size:.9rem;color:var(--gray-700);font-weight:500;">Foto del DNI</label>
       <div style="display:flex;gap:.75rem;margin-top:.35rem;">
         <div class="form-group" style="flex:1;margin-bottom:0">
@@ -249,6 +273,36 @@
     <div class="modal-footer" id="parte-footer">
       <button class="btn btn-secondary" id="parte-guardar">Guardar</button>
       <button class="btn btn-success" id="parte-validar">✓ Validar día</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Agregar viático -->
+<div class="modal-overlay hidden" id="modal-viatico">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-viatico-title">Viático</span>
+      <button class="modal-close" id="modal-viatico-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="v-monto">Monto ($) *</label>
+        <input type="number" id="v-monto" class="form-control" min="0" step="0.01" inputmode="decimal" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label for="v-motivo">Motivo *</label>
+        <input type="text" id="v-motivo" class="form-control" placeholder="Ej: pasaje, combustible…">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label for="v-file">Adjunto (opcional)</label>
+        <input type="file" id="v-file" class="form-control" accept="image/*,application/pdf">
+        <span class="v-file-name" id="v-file-name"></span>
+      </div>
+      <div id="modal-viatico-error" class="alert alert-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-viatico-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-viatico-save">Agregar</button>
     </div>
   </div>
 </div>

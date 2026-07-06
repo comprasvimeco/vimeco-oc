@@ -31,6 +31,16 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Texto compuesto de categoría: "Oficial + Horas Extras", "Ayudante + 20%", etc.
+function categoriaLabel(p) {
+  const parts = [];
+  if (p.categoria) parts.push(p.categoria);
+  if (p.horasExtra) parts.push('Horas Extras');
+  const pct = Number(p.porcentajeExtra) || 0;
+  if (pct > 0) parts.push(pct + '%');
+  return parts.join(' + ');
+}
+
 // ───────────── Categorías ─────────────
 let categorias = [];
 
@@ -167,9 +177,11 @@ function renderPadron() {
       <div class="pad-item ${p.activo === false ? 'inactivo' : ''}" data-id="${esc(p.id)}">
         ${av}
         <div class="pad-info">
-          <div class="pad-name">${esc(p.apellido)}, ${esc(p.nombre)} ${p.activo === false ? '<span style="font-size:.72rem;color:#b91c1c">(inactivo)</span>' : ''}</div>
+          <div class="pad-name">${esc(p.apellido)}, ${esc(p.nombre)}
+            ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">📁</a>` : ''}
+            ${p.activo === false ? '<span style="font-size:.72rem;color:#b91c1c">(inactivo)</span>' : ''}</div>
           <div class="pad-meta">
-            ${p.categoria ? `<span class="pad-cat">${esc(p.categoria)}</span> ` : ''}
+            ${categoriaLabel(p) ? `<span class="pad-cat">${esc(categoriaLabel(p))}</span> ` : ''}
             ${p.dni ? `DNI ${esc(p.dni)}` : 'sin DNI'} · Obras: ${esc(obrasTxt)}
           </div>
         </div>
@@ -219,6 +231,8 @@ function openAddPersonal() {
   $('p-nombre').value = ''; $('p-apellido').value = ''; $('p-dni').value = '';
   $('p-foto-frente').value = ''; $('p-foto-dorso').value = '';
   fillCategorias('');
+  $('p-horas-extra').checked = false;
+  $('p-pct-extra').value = '';
   setPreview('p-foto-frente-preview', '');
   setPreview('p-foto-dorso-preview', '');
   $('modal-personal').classList.remove('hidden');
@@ -234,6 +248,8 @@ function openEditPersonal(id) {
   $('p-nombre').value = p.nombre || ''; $('p-apellido').value = p.apellido || ''; $('p-dni').value = p.dni || '';
   $('p-foto-frente').value = ''; $('p-foto-dorso').value = '';
   fillCategorias(p.categoria || '');
+  $('p-horas-extra').checked = !!p.horasExtra;
+  $('p-pct-extra').value = p.porcentajeExtra || '';
   setPreview('p-foto-frente-preview', dniFrente(p));
   setPreview('p-foto-dorso-preview', p.fotoDniDorso || '');
   $('modal-personal').classList.remove('hidden');
@@ -245,6 +261,8 @@ async function savePersonalModal() {
   const apellido = $('p-apellido').value.trim();
   const dni      = $('p-dni').value.trim();
   const categoria = $('p-categoria').value;
+  const horasExtra = $('p-horas-extra').checked;
+  const porcentajeExtra = parseFloat($('p-pct-extra').value) || 0;
   const errEl    = $('modal-personal-error');
 
   if (!nombre || !apellido) {
@@ -259,9 +277,9 @@ async function savePersonalModal() {
   try {
     let id = editingId;
     if (editingId) {
-      await patchPersonal(editingId, { nombre, apellido, dni, categoria });
+      await patchPersonal(editingId, { nombre, apellido, dni, categoria, horasExtra, porcentajeExtra });
     } else {
-      id = await savePersonal({ nombre, apellido, dni, categoria, activo: true, fotoDniFrente: '', fotoDniDorso: '', obras: {} });
+      id = await savePersonal({ nombre, apellido, dni, categoria, horasExtra, porcentajeExtra, activo: true, fotoDniFrente: '', fotoDniDorso: '', obras: {} });
     }
 
     if (fotoFrente || fotoDorso) {
@@ -269,8 +287,8 @@ async function savePersonalModal() {
       const label = `${apellido} ${nombre} - ${dni || 'sin dni'}`.substring(0, 100);
       const patch = {};
       try {
-        if (fotoFrente) { const { url } = await uploadDniToDrive(fotoFrente, { label, lado: 'frente' }); patch.fotoDniFrente = url; patch.fotoDniUrl = url; }
-        if (fotoDorso)  { const { url } = await uploadDniToDrive(fotoDorso,  { label, lado: 'dorso'  }); patch.fotoDniDorso = url; }
+        if (fotoFrente) { const { url, folderUrl } = await uploadDniToDrive(fotoFrente, { label, lado: 'frente' }); patch.fotoDniFrente = url; patch.fotoDniUrl = url; if (folderUrl) patch.dniFolderUrl = folderUrl; }
+        if (fotoDorso)  { const { url, folderUrl } = await uploadDniToDrive(fotoDorso,  { label, lado: 'dorso'  }); patch.fotoDniDorso = url; if (folderUrl && !patch.dniFolderUrl) patch.dniFolderUrl = folderUrl; }
         if (Object.keys(patch).length) await patchPersonal(id, patch);
       } catch (_) {
         if (Object.keys(patch).length) { try { await patchPersonal(id, patch); } catch (_) {} }

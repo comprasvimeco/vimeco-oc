@@ -53,18 +53,35 @@ let sessionCodigo   = '';
 let parteFecha    = null;   // "YYYY-MM-DD" abierto en el modal
 let parteReadonly = false;  // true si la quincena está cerrada
 let parteAdjuntos = {};     // { personalId: [{ name, url }] } del día abierto
+let parteViaticos = {};     // { personalId: [{ monto, motivo, adjunto:{name,url}|null }] }
+let viaticoTarget = null;   // personalId al que se le está agregando un viático (modal)
+let viaticoFile   = null;   // archivo elegido en el modal de viático
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DOW   = ['L','M','M','J','V','S','D'];
 const ESTADOS = [
-  { code: '',    label: 'Normal / Presente' },
-  { code: 'F',   label: 'F · Feriado trabajado' },
-  { code: 'A',   label: 'A · Ausencia con aviso' },
-  { code: 'ART', label: 'ART · Carpeta médica' },
-  { code: 'CC',  label: 'CC · Causas climáticas (lluvia)' },
-  { code: 'V',   label: 'V · Viaje a obra' },
-  { code: 'ACC', label: 'ACC · Accidente en obra' }
+  { code: '',   label: 'Normal / Presente' },
+  { code: 'F',  label: 'F · Feriado' },
+  { code: 'CM', label: 'CM · Certificado médico' },
+  { code: 'CC', label: 'CC · Causas climáticas (2,5 h)' },
+  { code: 'AC', label: 'AC · Accidente' }
 ];
+const CC_HORAS = 2.5;   // horas automáticas para Causas Climáticas
+
+// Texto compuesto de categoría: "Oficial + Horas Extras", "Ayudante + 20%", etc.
+function categoriaLabel(p) {
+  const parts = [];
+  if (p.categoria) parts.push(p.categoria);
+  if (p.horasExtra) parts.push('Horas Extras');
+  const pct = Number(p.porcentajeExtra) || 0;
+  if (pct > 0) parts.push(pct + '%');
+  return parts.join(' + ');
+}
+
+// Formatea horas con coma decimal (2.5 → "2,5")
+function fmtHoras(n) {
+  return Number.isInteger(n) ? String(n) : String(n).replace('.', ',');
+}
 
 // ───────── Cuadrilla ─────────
 function dniFrente(p) { return p.fotoDniFrente || p.fotoDniUrl || ''; }
@@ -99,9 +116,11 @@ function renderCuadrilla() {
     <div class="crew-item" data-id="${esc(p.id)}">
       ${avatar(p)}
       <div class="crew-info">
-        <div class="crew-name">${esc(p.apellido)}, ${esc(p.nombre)}</div>
+        <div class="crew-name">${esc(p.apellido)}, ${esc(p.nombre)}
+          ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">📁</a>` : ''}
+        </div>
         <div class="crew-meta">
-          ${p.categoria ? `<span class="crew-cat">${esc(p.categoria)}</span> ` : ''}
+          ${categoriaLabel(p) ? `<span class="crew-cat">${esc(categoriaLabel(p))}</span> ` : ''}
           ${p.dni ? `DNI ${esc(p.dni)}` : '<span style="color:var(--gray-400)">sin DNI</span>'}
           ${dniLinks(p)}
         </div>
@@ -155,6 +174,8 @@ function openAddPersonal() {
   $('p-foto-frente').value = '';
   $('p-foto-dorso').value = '';
   fillCategorias('');
+  $('p-horas-extra').checked = false;
+  $('p-pct-extra').value = '';
   setPreview('p-foto-frente-preview', '');
   setPreview('p-foto-dorso-preview', '');
   $('modal-personal').classList.remove('hidden');
@@ -175,6 +196,8 @@ function openEditPersonal(id) {
   $('p-foto-frente').value = '';
   $('p-foto-dorso').value = '';
   fillCategorias(p.categoria || '');
+  $('p-horas-extra').checked = !!p.horasExtra;
+  $('p-pct-extra').value = p.porcentajeExtra || '';
   setPreview('p-foto-frente-preview', dniFrente(p));
   setPreview('p-foto-dorso-preview', p.fotoDniDorso || '');
   $('modal-personal').classList.remove('hidden');
@@ -186,6 +209,8 @@ async function savePersonalModal() {
   const apellido = $('p-apellido').value.trim();
   const dni      = $('p-dni').value.trim();
   const categoria = $('p-categoria').value;
+  const horasExtra = $('p-horas-extra').checked;
+  const porcentajeExtra = parseFloat($('p-pct-extra').value) || 0;
   const errEl    = $('modal-personal-error');
 
   if (!nombre || !apellido) {
@@ -201,10 +226,10 @@ async function savePersonalModal() {
   try {
     let id = editingId;
     if (editingId) {
-      await patchPersonal(editingId, { nombre, apellido, dni, categoria });
+      await patchPersonal(editingId, { nombre, apellido, dni, categoria, horasExtra, porcentajeExtra });
     } else {
       id = await savePersonal({
-        nombre, apellido, dni, categoria,
+        nombre, apellido, dni, categoria, horasExtra, porcentajeExtra,
         activo: true,
         fotoDniFrente: '', fotoDniDorso: '',
         obras: { [obraKey]: true }
@@ -218,13 +243,15 @@ async function savePersonalModal() {
       const patch = {};
       try {
         if (fotoFrente) {
-          const { url } = await uploadDniToDrive(fotoFrente, { label, lado: 'frente' });
+          const { url, folderUrl } = await uploadDniToDrive(fotoFrente, { label, lado: 'frente' });
           patch.fotoDniFrente = url;
           patch.fotoDniUrl    = url;   // compat con lector viejo
+          if (folderUrl) patch.dniFolderUrl = folderUrl;
         }
         if (fotoDorso) {
-          const { url } = await uploadDniToDrive(fotoDorso, { label, lado: 'dorso' });
+          const { url, folderUrl } = await uploadDniToDrive(fotoDorso, { label, lado: 'dorso' });
           patch.fotoDniDorso = url;
+          if (folderUrl && !patch.dniFolderUrl) patch.dniFolderUrl = folderUrl;
         }
         if (Object.keys(patch).length) await patchPersonal(id, patch);
       } catch (_) {
@@ -382,18 +409,22 @@ function renderCalendar() {
   const laborables = diasLaborables(q);
   const faltantes  = laborables.filter(iso => !(partesMeta[iso] && partesMeta[iso].validado)).length;
 
+  const btnExcel = '<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">📊 Excel RRHH</button>';
   let cierreHtml;
   if (cerrada) {
     cierreHtml = `
       <span class="cierre-msg">✓ Quincena cerrada. Solo lectura.</span>
+      ${btnExcel}
       ${esAdmin ? '<button class="btn btn-sm btn-warning" id="btn-reabrir">Reabrir quincena</button>' : ''}`;
   } else if (faltantes > 0) {
     cierreHtml = `
       <span class="cierre-msg">Faltan validar ${faltantes} día(s) laborable(s) para poder cerrar.</span>
+      ${btnExcel}
       <button class="btn btn-sm btn-primary" id="btn-cerrar" disabled>Cerrar quincena</button>`;
   } else {
     cierreHtml = `
       <span class="cierre-msg">Todos los días laborables están validados.</span>
+      ${btnExcel}
       <button class="btn btn-sm btn-primary" id="btn-cerrar">Cerrar quincena</button>`;
   }
 
@@ -424,6 +455,7 @@ function renderCalendar() {
   });
   $('btn-cerrar')?.addEventListener('click', cerrarQuincenaActual);
   $('btn-reabrir')?.addEventListener('click', reabrirQuincenaActual);
+  $('btn-excel-rrhh')?.addEventListener('click', onExcelRRHH);
 }
 
 // Días laborables (lun-vie no feriados) de la quincena
@@ -459,8 +491,10 @@ async function cerrarQuincenaActual() {
   try {
     await cerrarQuincena(obraKey, qid, sessionCodigo);
     cierres[qid] = { cerrado: true, cerradoPor: sessionCodigo, cerradoEn: Date.now() };
-    showToast('Quincena cerrada.');
+    showToast('Quincena cerrada. Generando Excel de RRHH…');
     renderCalendar();
+    // Generar y subir el reporte a Drive en segundo plano (no bloquea el cierre)
+    generarReporte(q, { silencioso: false }).catch(() => {});
   } catch (_) {
     showToast('Error al cerrar la quincena.', 'error');
   }
@@ -532,23 +566,32 @@ async function onDayClick(iso) {
   catch (_) { parte = { items: {}, _meta: { validado: false } }; }
   const items = parte.items || {};
 
-  // Reiniciar adjuntos del día con lo guardado
+  // Reiniciar adjuntos y viáticos del día con lo guardado
   parteAdjuntos = {};
+  parteViaticos = {};
   cuadrilla.forEach(p => {
     const g = items[p.id];
     parteAdjuntos[p.id] = (g && Array.isArray(g.adjuntos)) ? g.adjuntos.slice() : [];
+    // Compat: dato viejo guardaba un único viatico numérico → lo migramos a un evento
+    if (g && Array.isArray(g.viaticos)) {
+      parteViaticos[p.id] = g.viaticos.map(v => ({ ...v }));
+    } else if (g && (Number(g.viatico) || 0) > 0) {
+      parteViaticos[p.id] = [{ monto: Number(g.viatico), motivo: '', adjunto: null }];
+    } else {
+      parteViaticos[p.id] = [];
+    }
   });
 
   $('parte-list').innerHTML = cuadrilla.map(p => {
     const guardado = items[p.id];
     const horas   = guardado ? (guardado.horas ?? 0) : (noLab ? 0 : constantes.jornadaHoras);
     const comida  = guardado ? !!guardado.comida  : (noLab ? false : true);
-    const viatico = guardado ? (guardado.viatico ?? 0) : 0;
     const estado  = guardado ? (guardado.estado || '') : '';
+    const catTxt  = categoriaLabel(p);
     return `
       <div class="parte-row" data-id="${esc(p.id)}">
         <div class="parte-row-head">${esc(p.apellido)}, ${esc(p.nombre)}
-          ${p.categoria ? `<span class="crew-cat">${esc(p.categoria)}</span>` : ''}</div>
+          ${catTxt ? `<span class="crew-cat">${esc(catTxt)}</span>` : ''}</div>
         <div class="parte-fields">
           <div class="pf">
             <label>Horas</label>
@@ -558,18 +601,19 @@ async function onDayClick(iso) {
             <input type="checkbox" class="pf-comidachk" ${comida ? 'checked' : ''}>
             <label style="margin:0">Comida</label>
           </div>
-          <div class="pf">
-            <label>Viático ($)</label>
-            <input type="number" class="form-control pf-viatico" min="0" step="0.01" value="${viatico}">
-          </div>
           <div class="pf pf-estado">
             <label>Estado</label>
             <select class="form-control pf-estadosel">
               ${ESTADOS.map(e => `<option value="${e.code}" ${e.code === estado ? 'selected' : ''}>${esc(e.label)}</option>`).join('')}
             </select>
           </div>
+          <div class="pf pf-viaticos">
+            <label>Viáticos</label>
+            <div class="viat-list" data-id="${esc(p.id)}"></div>
+            <button type="button" class="btn btn-sm btn-outline viat-add" style="align-self:flex-start">+ Viático</button>
+          </div>
           <div class="pf pf-adjuntos">
-            <label>Adjuntos (certificados, pasajes…)</label>
+            <label>Adjuntos (certificados médicos, pasajes…)</label>
             <div class="adj-list" data-id="${esc(p.id)}"></div>
             <input type="file" class="adj-input" accept="image/*,application/pdf" style="display:none">
             <button type="button" class="btn btn-sm btn-outline adj-btn" style="align-self:flex-start">📎 Adjuntar</button>
@@ -578,7 +622,7 @@ async function onDayClick(iso) {
       </div>`;
   }).join('');
 
-  // Adjuntos: render inicial + wiring por fila
+  // Adjuntos + viáticos: render inicial + wiring por fila
   $('parte-list').querySelectorAll('.parte-row').forEach(row => {
     const id    = row.dataset.id;
     const input = row.querySelector('.adj-input');
@@ -589,7 +633,9 @@ async function onDayClick(iso) {
       if (f) subirAdjunto(id, f, btn);
       input.value = '';
     });
+    row.querySelector('.viat-add').addEventListener('click', () => openViatico(id));
     renderAdjuntos(id);
+    renderViaticos(id);
   });
 
   // Auto-ajuste al cambiar estado
@@ -599,11 +645,12 @@ async function onDayClick(iso) {
       const code = sel.value;
       const horasInp = row.querySelector('.pf-horas');
       const comidaChk = row.querySelector('.pf-comidachk');
-      if (['A', 'ART', 'CC'].includes(code)) {
+      if (code === 'CM' || code === 'AC') {
         horasInp.value = 0;
         comidaChk.checked = false;
-      } else if (code === 'V') {
-        row.querySelector('.pf-viatico').focus();
+      } else if (code === 'CC') {
+        horasInp.value = CC_HORAS;
+        comidaChk.checked = false;
       }
     });
   });
@@ -611,7 +658,7 @@ async function onDayClick(iso) {
   // Modo lectura si la quincena está cerrada
   const inputs = $('parte-list').querySelectorAll('input, select');
   inputs.forEach(el => { el.disabled = cerrada; });
-  $('parte-list').querySelectorAll('.adj-btn').forEach(b => { b.style.display = cerrada ? 'none' : ''; });
+  $('parte-list').querySelectorAll('.adj-btn, .viat-add').forEach(b => { b.style.display = cerrada ? 'none' : ''; });
   $('parte-footer').style.display = cerrada ? 'none' : '';
 
   // Botón validar: refleja estado actual del día
@@ -629,10 +676,10 @@ function recolectarItems() {
     const id = row.dataset.id;
     const adjuntos = parteAdjuntos[id] || [];
     items[id] = {
-      horas:   parseFloat(row.querySelector('.pf-horas').value) || 0,
-      comida:  row.querySelector('.pf-comidachk').checked,
-      viatico: parseFloat(row.querySelector('.pf-viatico').value) || 0,
-      estado:  row.querySelector('.pf-estadosel').value || '',
+      horas:    parseFloat(row.querySelector('.pf-horas').value) || 0,
+      comida:   row.querySelector('.pf-comidachk').checked,
+      estado:   row.querySelector('.pf-estadosel').value || '',
+      viaticos: parteViaticos[id] || [],
       adjuntos
     };
   });
@@ -756,6 +803,424 @@ async function subirAdjunto(id, file, btn) {
   }
 }
 
+// ───────── Viáticos del parte ─────────
+function renderViaticos(id) {
+  const cont = $('parte-list').querySelector(`.viat-list[data-id="${id}"]`);
+  if (!cont) return;
+  const list = parteViaticos[id] || [];
+  if (!list.length) { cont.innerHTML = '<span class="viat-empty">Sin viáticos.</span>'; return; }
+  cont.innerHTML = list.map((v, i) => `
+    <span class="viat-chip">
+      <span class="viat-monto">$${Number(v.monto || 0).toLocaleString('es-AR')}</span>
+      <span class="viat-motivo">${esc(v.motivo || 'Sin motivo')}</span>
+      ${v.adjunto && v.adjunto.url ? `<a href="${esc(v.adjunto.url)}" target="_blank" rel="noopener" title="Ver adjunto">📎</a>` : ''}
+      ${parteReadonly ? '' : `<button data-id="${esc(id)}" data-i="${i}" title="Quitar">×</button>`}
+    </span>`).join('');
+  cont.querySelectorAll('button[data-i]').forEach(b =>
+    b.addEventListener('click', () => {
+      (parteViaticos[id] || []).splice(parseInt(b.dataset.i, 10), 1);
+      renderViaticos(id);
+    }));
+}
+
+function openViatico(id) {
+  viaticoTarget = id;
+  viaticoFile   = null;
+  const p = cuadrilla.find(x => x.id === id);
+  $('modal-viatico-title').textContent = p ? `Viático — ${p.apellido}, ${p.nombre}` : 'Viático';
+  $('modal-viatico-error').classList.add('hidden');
+  $('v-monto').value = '';
+  $('v-motivo').value = '';
+  $('v-file').value = '';
+  $('v-file-name').textContent = '';
+  $('modal-viatico').classList.remove('hidden');
+  setTimeout(() => $('v-monto').focus(), 50);
+}
+
+async function saveViatico() {
+  const monto  = parseFloat($('v-monto').value);
+  const motivo = $('v-motivo').value.trim();
+  const errEl  = $('modal-viatico-error');
+  if (isNaN(monto) || monto <= 0) { errEl.textContent = 'Ingresá un monto válido.'; errEl.classList.remove('hidden'); return; }
+  if (!motivo)                    { errEl.textContent = 'Ingresá el motivo del viático.'; errEl.classList.remove('hidden'); return; }
+
+  const btn = $('modal-viatico-save');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  let adjunto = null;
+  try {
+    if (viaticoFile) {
+      btn.textContent = 'Subiendo…';
+      const p = cuadrilla.find(x => x.id === viaticoTarget);
+      const persona = p ? `${p.apellido} ${p.nombre}` : viaticoTarget;
+      const { url, name } = await uploadComprobantePersonal(viaticoFile, { obra: obraNombre, fecha: parteFecha, persona });
+      adjunto = { name, url };
+    }
+    parteViaticos[viaticoTarget] = parteViaticos[viaticoTarget] || [];
+    parteViaticos[viaticoTarget].push({ monto, motivo, adjunto });
+    renderViaticos(viaticoTarget);
+    $('modal-viatico').classList.add('hidden');
+    showToast('Viático agregado.');
+  } catch (_) {
+    errEl.textContent = 'No se pudo subir el adjunto. Probá de nuevo.';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Agregar';
+  }
+}
+
+// ───────── Reporte de quincena (Excel para RRHH) ─────────
+const DOW_ABBR = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+
+async function ensureXLSX() {
+  if (window.XLSX) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    // xlsx-js-style: fork de SheetJS que sí escribe estilos (fills/fonts/borders) al exportar .xlsx
+    s.src     = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.onload  = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+// Construye el .xlsx de la quincena q → { blob, fname }
+async function buildReporteBlob(q) {
+  await ensureXLSX();
+
+  const range = quincenaRange(q);
+  const dias  = [];
+  for (let d = range.startDay; d <= range.endDay; d++) {
+    const iso = isoDate(q.year, q.month, d);
+    const dow = new Date(q.year, q.month - 1, d).getDay(); // 0=Dom..6=Sáb
+    dias.push({ d, iso, dow, finde: dow === 0 || dow === 6, feriado: !!feriados[iso] });
+  }
+  const N = dias.length;
+
+  let partes = {};
+  try { partes = await getPartesRango(obraKey, dias[0].iso, dias[N - 1].iso); } catch (_) {}
+
+  const crew = cuadrilla.slice();
+  const precioComida = Number(constantes.valorComida) || 0;
+
+  // Columnas
+  const C_NRO = 0, C_NAME = 1, C_DAY0 = 2;
+  const C_AFTER  = C_DAY0 + N;     // TOTAL DE HORAS · CANTIDAD (comidas)
+  const C_AFTER2 = C_AFTER + 1;    // IMPORTE (comidas)
+  const NCOLS    = C_AFTER2 + 1;
+
+  const blank = () => new Array(NCOLS).fill('');
+  const rows  = [];
+  const merges = [];
+  const stmap = {};
+  const linkmap = {};
+  const S = (r, c, s) => { stmap[r + ',' + c] = s; };
+  const L = (r, c, url) => { linkmap[r + ',' + c] = url; };
+
+  // ── Paleta / estilos ──
+  const A = h => 'FF' + h;
+  const NAVY = A('1A3A5C'), MBLUE = A('2D5F8A'), TEAL = A('3A78B5'), LBLUE = A('D6E4F0');
+  const WHITE = A('FFFFFF'), LGRAY = A('F5F7FA'), GRAY = A('E4E9EF'), ORANGE = A('ED7D31');
+  const LORANGE = A('FCE4D6'), YELW = A('FFF7E0'), DARK = '333333', BORDC = A('B0BEC5');
+  const bord = { style: 'thin', color: { rgb: BORDC } };
+  const allb = () => ({ top: bord, bottom: bord, left: bord, right: bord });
+  const solid = rgb => ({ patternType: 'solid', fgColor: { rgb }, bgColor: { indexed: 64 } });
+  const MONEY = '"$"#,##0';
+
+  const stTitle   = { font: { bold: true, sz: 14, color: { rgb: WHITE } }, fill: solid(NAVY),  alignment: { horizontal: 'center', vertical: 'center' } };
+  const stSub     = { font: { bold: true, sz: 12, color: { rgb: WHITE } }, fill: solid(MBLUE), alignment: { horizontal: 'center', vertical: 'center' } };
+  const stInfo    = { font: { italic: true, sz: 9, color: { rgb: WHITE } }, fill: solid(MBLUE), alignment: { horizontal: 'center', vertical: 'center' } };
+  const stSection = { font: { bold: true, sz: 11, color: { rgb: WHITE } }, fill: solid(MBLUE), alignment: { vertical: 'center' } };
+  const stTh      = a => ({ font: { bold: true, sz: 9, color: { rgb: WHITE } }, fill: solid(TEAL), border: allb(), alignment: { horizontal: a || 'center', vertical: 'center', wrapText: true } });
+  const stNro     = bg => ({ font: { sz: 9, color: { rgb: DARK } }, fill: solid(bg), border: allb(), alignment: { horizontal: 'center', vertical: 'center' } });
+  const stName    = bg => ({ font: { sz: 10, color: { rgb: DARK } }, fill: solid(bg), border: allb(), alignment: { horizontal: 'left', vertical: 'center' } });
+  const stDay     = bg => ({ font: { sz: 9, color: { rgb: DARK } }, fill: solid(bg), border: allb(), alignment: { horizontal: 'center', vertical: 'center' } });
+  const stTot     = bg => ({ font: { bold: true, sz: 10, color: { rgb: DARK } }, fill: solid(bg), border: allb(), alignment: { horizontal: 'center', vertical: 'center' } });
+  const stMoney   = (bg, bold) => ({ font: { bold: !!bold, sz: 10, color: { rgb: DARK } }, fill: solid(bg), border: allb(), numFmt: MONEY, alignment: { horizontal: 'right', vertical: 'center' } });
+  const stCat     = bg => ({ font: { sz: 10, color: { rgb: DARK } }, fill: solid(bg), border: allb(), alignment: { horizontal: 'left', vertical: 'center' } });
+  const bgAlt = i => (i % 2 === 0 ? WHITE : LGRAY);
+  const dayBg = (dia, i) => dia.feriado ? LORANGE : (dia.finde ? GRAY : bgAlt(i));
+
+  // ── Encabezado ──
+  const mergeFull = r => merges.push({ s: { r, c: 0 }, e: { r, c: NCOLS - 1 } });
+  let r;
+
+  r = rows.push(blank()) - 1; rows[r][0] = 'VIMECO S.A.';                                          S(r, 0, stTitle); mergeFull(r);
+  r = rows.push(blank()) - 1; rows[r][0] = `${q.half === 1 ? '1ª' : '2ª'} QUINCENA DE ${MESES[q.month - 1].toUpperCase()} ${q.year}`; S(r, 0, stSub); mergeFull(r);
+  r = rows.push(blank()) - 1; rows[r][0] = `Obra: ${obraNombre}  ·  Jornada: ${constantes.jornadaHoras} hs de lunes a viernes`; S(r, 0, stInfo); mergeFull(r);
+  rows.push(blank());
+
+  // ── PLANILLA DE CATEGORÍAS ──
+  r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE CATEGORÍAS'; S(r, 0, stSection); mergeFull(r);
+  const catMergeEnd = Math.min(C_DAY0 + 4, NCOLS - 1);
+  crew.forEach((p, i) => {
+    const row = blank();
+    row[C_NRO]  = i + 1;
+    row[C_NAME] = `${p.apellido}, ${p.nombre}`;
+    row[C_DAY0] = categoriaLabel(p) || '—';
+    const rr = rows.push(row) - 1;
+    const bg = bgAlt(i);
+    S(rr, C_NRO, stNro(bg));
+    S(rr, C_NAME, stName(bg));
+    S(rr, C_DAY0, stCat(bg));
+    for (let c = C_DAY0 + 1; c <= catMergeEnd; c++) S(rr, c, stCat(bg));
+    merges.push({ s: { r: rr, c: C_DAY0 }, e: { r: rr, c: catMergeEnd } });
+  });
+  rows.push(blank());
+
+  // Helper para las dos filas de encabezado de una tabla con días
+  const pushDayHeader = (trailingA, trailingB) => {
+    const hA = blank(), hB = blank();
+    hA[C_NRO] = 'Nro'; hA[C_NAME] = 'APELLIDO Y NOMBRES';
+    dias.forEach((dia, i) => { hA[C_DAY0 + i] = DOW_ABBR[dia.dow]; hB[C_DAY0 + i] = dia.d; });
+    trailingA.forEach(([c, txt]) => { hA[c] = txt; });
+    const rA = rows.push(hA) - 1;
+    const rB = rows.push(hB) - 1;
+    // Nro y Nombre: merge vertical de las dos filas
+    S(rA, C_NRO, stTh('center'));  merges.push({ s: { r: rA, c: C_NRO }, e: { r: rB, c: C_NRO } });
+    S(rA, C_NAME, stTh('left'));   merges.push({ s: { r: rA, c: C_NAME }, e: { r: rB, c: C_NAME } });
+    dias.forEach((dia, i) => {
+      const bg = dia.feriado ? A('C86A2A') : (dia.finde ? A('2C5B85') : TEAL);
+      S(rA, C_DAY0 + i, { ...stTh('center'), fill: solid(bg) });
+      S(rB, C_DAY0 + i, { ...stTh('center'), fill: solid(bg) });
+    });
+    trailingA.forEach(([c]) => { S(rA, c, stTh('center')); merges.push({ s: { r: rA, c }, e: { r: rB, c } }); });
+    return { rA, rB };
+  };
+
+  // ── PLANILLA DE HORAS ──
+  r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE HORAS'; S(r, 0, stSection); mergeFull(r);
+  pushDayHeader([[C_AFTER, 'TOTAL DE HORAS']]);
+  const dayTotals = new Array(N).fill(0);
+  let granTotal = 0;
+  crew.forEach((p, i) => {
+    const row = blank();
+    row[C_NRO]  = i + 1;
+    row[C_NAME] = `${p.apellido}, ${p.nombre}`;
+    let totalP = 0;
+    dias.forEach((dia, k) => {
+      const it     = ((partes[dia.iso] && partes[dia.iso].items) || {})[p.id];
+      const horas  = it ? (Number(it.horas) || 0) : 0;
+      const estado = it ? (it.estado || '') : '';
+      const code   = estado || (dia.feriado ? 'F' : '');
+      let val = '';
+      if (code && horas > 0) val = `${code} ${fmtHoras(horas)}`;   // ej "CC 2,5", "F 10"
+      else if (code)         val = code;                            // ej "CM", "AC", "F"
+      else if (horas > 0)    val = horas;
+      row[C_DAY0 + k] = val;
+      if (horas > 0) { totalP += horas; dayTotals[k] += horas; }
+    });
+    row[C_AFTER] = totalP;
+    granTotal += totalP;
+    const rr = rows.push(row) - 1;
+    const bg = bgAlt(i);
+    S(rr, C_NRO, stNro(bg));
+    S(rr, C_NAME, stName(bg));
+    dias.forEach((dia, k) => S(rr, C_DAY0 + k, stDay(dayBg(dia, i))));
+    S(rr, C_AFTER, stTot(LBLUE));
+  });
+  // Fila TOTALES de horas
+  {
+    const row = blank();
+    row[C_NAME] = 'TOTALES';
+    dias.forEach((dia, k) => { row[C_DAY0 + k] = dayTotals[k] || ''; });
+    row[C_AFTER] = granTotal;
+    const rr = rows.push(row) - 1;
+    S(rr, C_NRO, stTot(YELW));
+    S(rr, C_NAME, { ...stName(YELW), font: { bold: true, sz: 10, color: { rgb: DARK } } });
+    dias.forEach((dia, k) => S(rr, C_DAY0 + k, stTot(YELW)));
+    S(rr, C_AFTER, stTot(YELW));
+  }
+  rows.push(blank());
+
+  // ── PLANILLA DE COMIDAS (resumen en cantidades + importe) ──
+  r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE COMIDAS'; S(r, 0, stSection); mergeFull(r);
+  {
+    const h = blank();
+    h[C_NRO] = 'Nro'; h[C_NAME] = 'APELLIDO Y NOMBRES'; h[C_AFTER] = 'CANTIDAD'; h[C_AFTER2] = 'IMPORTE';
+    const rh = rows.push(h) - 1;
+    S(rh, C_NRO, stTh('center'));
+    for (let c = C_NAME; c < C_AFTER; c++) S(rh, c, stTh('left'));
+    merges.push({ s: { r: rh, c: C_NAME }, e: { r: rh, c: C_AFTER - 1 } });
+    S(rh, C_AFTER, stTh('center'));
+    S(rh, C_AFTER2, stTh('center'));
+  }
+  let totCant = 0, totImp = 0;
+  crew.forEach((p, i) => {
+    let cant = 0;
+    dias.forEach(dia => {
+      const it = ((partes[dia.iso] && partes[dia.iso].items) || {})[p.id];
+      if (it && it.comida) cant++;
+    });
+    const imp = cant * precioComida;
+    totCant += cant; totImp += imp;
+    const row = blank();
+    row[C_NRO] = i + 1;
+    row[C_NAME] = `${p.apellido}, ${p.nombre}`;
+    row[C_AFTER] = cant;
+    row[C_AFTER2] = imp;
+    const rr = rows.push(row) - 1;
+    const bg = bgAlt(i);
+    S(rr, C_NRO, stNro(bg));
+    for (let c = C_NAME; c < C_AFTER; c++) S(rr, c, stName(bg));
+    merges.push({ s: { r: rr, c: C_NAME }, e: { r: rr, c: C_AFTER - 1 } });
+    S(rr, C_AFTER, stTot(LBLUE));
+    S(rr, C_AFTER2, stMoney(LBLUE));
+  });
+  // Fila PRECIO X DÍA + totales (sin deliverys)
+  {
+    const row = blank();
+    row[C_NAME]   = `PRECIO X DÍA: $${precioComida.toLocaleString('es-AR')}`;
+    row[C_AFTER]  = totCant;
+    row[C_AFTER2] = totImp;
+    const rr = rows.push(row) - 1;
+    const lbl = { ...stName(YELW), font: { bold: true, sz: 10, color: { rgb: DARK } }, alignment: { horizontal: 'right', vertical: 'center' } };
+    S(rr, C_NRO, stTot(YELW));
+    for (let c = C_NAME; c < C_AFTER; c++) S(rr, c, lbl);
+    merges.push({ s: { r: rr, c: C_NAME }, e: { r: rr, c: C_AFTER - 1 } });
+    S(rr, C_AFTER, stTot(YELW));
+    S(rr, C_AFTER2, stMoney(YELW, true));
+  }
+  rows.push(blank());
+
+  // ── PLANILLA DE VIÁTICOS (tabla de eventos, solo si hay) ──
+  const viatEvents = [];
+  crew.forEach(p => {
+    dias.forEach(dia => {
+      const it = ((partes[dia.iso] && partes[dia.iso].items) || {})[p.id];
+      if (!it) return;
+      let list = [];
+      if (Array.isArray(it.viaticos)) list = it.viaticos;
+      else if ((Number(it.viatico) || 0) > 0) list = [{ monto: Number(it.viatico), motivo: '', adjunto: null }];
+      list.forEach(v => {
+        const monto = Number(v.monto) || 0;
+        if (monto <= 0) return;
+        viatEvents.push({
+          persona: `${p.apellido}, ${p.nombre}`,
+          fecha:   `${String(dia.d).padStart(2, '0')}/${String(q.month).padStart(2, '0')}`,
+          iso:     dia.iso,
+          motivo:  v.motivo || '',
+          monto,
+          url:     (v.adjunto && v.adjunto.url) || ''
+        });
+      });
+    });
+  });
+  viatEvents.sort((a, b) => a.persona.localeCompare(b.persona) || a.iso.localeCompare(b.iso));
+
+  if (viatEvents.length) {
+    r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE VIÁTICOS'; S(r, 0, stSection); mergeFull(r);
+    // Persona(0..1) | Fecha(2..3) | Descripción(4..C_AFTER-1) | Monto(C_AFTER) | Adjunto(C_AFTER2)
+    const P_PER = 0, P_FEC = 2, P_DES = 4, P_MON = C_AFTER, P_LNK = C_AFTER2;
+    const span = (rr2, s, a2, b2) => { for (let c = a2; c <= b2; c++) S(rr2, c, s); merges.push({ s: { r: rr2, c: a2 }, e: { r: rr2, c: b2 } }); };
+    {
+      const h = blank();
+      h[P_PER] = 'PERSONA'; h[P_FEC] = 'FECHA'; h[P_DES] = 'DESCRIPCIÓN'; h[P_MON] = 'MONTO'; h[P_LNK] = 'ADJUNTO';
+      const rh = rows.push(h) - 1;
+      span(rh, stTh('left'),   P_PER, P_FEC - 1);
+      span(rh, stTh('center'), P_FEC, P_DES - 1);
+      span(rh, stTh('left'),   P_DES, P_MON - 1);
+      S(rh, P_MON, stTh('center'));
+      S(rh, P_LNK, stTh('center'));
+    }
+    let granViat = 0;
+    viatEvents.forEach((ev, i) => {
+      granViat += ev.monto;
+      const row = blank();
+      row[P_PER] = ev.persona; row[P_FEC] = ev.fecha; row[P_DES] = ev.motivo || '—';
+      row[P_MON] = ev.monto;   row[P_LNK] = ev.url ? 'Ver' : '—';
+      const rr = rows.push(row) - 1;
+      const bg = bgAlt(i);
+      span(rr, stName(bg), P_PER, P_FEC - 1);
+      span(rr, stDay(bg),  P_FEC, P_DES - 1);
+      span(rr, stName(bg), P_DES, P_MON - 1);
+      S(rr, P_MON, stMoney(bg));
+      S(rr, P_LNK, { ...stDay(bg), font: { sz: 9, color: { rgb: ev.url ? A('1155CC') : DARK }, underline: !!ev.url } });
+      if (ev.url) L(rr, P_LNK, ev.url);
+    });
+    {
+      const row = blank();
+      row[P_PER] = 'TOTAL VIÁTICOS';
+      row[P_MON] = granViat;
+      const rr = rows.push(row) - 1;
+      const lbl = { ...stName(YELW), font: { bold: true, sz: 10, color: { rgb: DARK } }, alignment: { horizontal: 'right', vertical: 'center' } };
+      span(rr, lbl, P_PER, P_MON - 1);
+      S(rr, P_MON, stMoney(YELW, true));
+      S(rr, P_LNK, stDay(YELW));
+    }
+  }
+
+  // ── Construir hoja ──
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  ws['!cols'] = [];
+  ws['!cols'][C_NRO]  = { wch: 5 };
+  ws['!cols'][C_NAME] = { wch: 26 };
+  for (let c = C_DAY0; c < C_AFTER; c++) ws['!cols'][c] = { wch: 4.5 };
+  ws['!cols'][C_AFTER]  = { wch: 10 };
+  ws['!cols'][C_AFTER2] = { wch: 12 };
+
+  ws['!merges'] = merges;
+
+  Object.entries(stmap).forEach(([k, s]) => {
+    const [rr, cc] = k.split(',').map(Number);
+    const addr = XLSX.utils.encode_cell({ r: rr, c: cc });
+    if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+    ws[addr].s = s;
+  });
+
+  Object.entries(linkmap).forEach(([k, url]) => {
+    const [rr, cc] = k.split(',').map(Number);
+    const addr = XLSX.utils.encode_cell({ r: rr, c: cc });
+    if (!ws[addr]) ws[addr] = { t: 's', v: 'Ver' };
+    ws[addr].l = { Target: url, Tooltip: 'Abrir adjunto' };
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, `${q.half === 1 ? '1ra' : '2da'} Q ${MESES[q.month - 1].substring(0, 3)} ${q.year}`.substring(0, 31));
+
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+  const blob  = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const safe  = (obraNombre || 'Obra').replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+  const fname = `Personal_${safe}_${quincenaId(q)}.xlsx`;
+  return { blob, fname };
+}
+
+// Genera el Excel, lo sube a Drive y (opcional) lo descarga
+async function generarReporte(q, { silencioso = false, download = false } = {}) {
+  let blob, fname;
+  try {
+    ({ blob, fname } = await buildReporteBlob(q));
+  } catch (_) {
+    if (!silencioso) showToast('No se pudo generar el Excel de RRHH.', 'error');
+    return null;
+  }
+  let url = null;
+  try {
+    if (typeof uploadReporteQuincena === 'function') {
+      const res = await uploadReporteQuincena(new File([blob], fname, { type: blob.type }), { obra: obraNombre });
+      url = res.url;
+    }
+  } catch (_) {
+    if (!silencioso) showToast('Excel generado, pero no se pudo subir a Drive.', 'warning');
+  }
+  if (download) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  if (!silencioso) showToast(url ? 'Excel de RRHH generado y subido a Drive.' : 'Excel de RRHH generado.', 'success');
+  return url;
+}
+
+async function onExcelRRHH() {
+  const btn = $('btn-excel-rrhh');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
+  try { await generarReporte(currentQuincena, { download: true }); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '📊 Excel RRHH'; } }
+}
+
 // ───────── Init ─────────
 document.addEventListener('DOMContentLoaded', async () => {
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch (_) { return null; } })();
@@ -800,6 +1265,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-parte-close').addEventListener('click', () => $('modal-parte').classList.add('hidden'));
   $('parte-guardar').addEventListener('click', onGuardarParte);
   $('parte-validar').addEventListener('click', onValidarDia);
+
+  // Modal viático
+  $('modal-viatico-close').addEventListener('click',  () => $('modal-viatico').classList.add('hidden'));
+  $('modal-viatico-cancel').addEventListener('click', () => $('modal-viatico').classList.add('hidden'));
+  $('modal-viatico-save').addEventListener('click', saveViatico);
+  $('v-file').addEventListener('change', e => {
+    viaticoFile = e.target.files[0] || null;
+    $('v-file-name').textContent = viaticoFile ? viaticoFile.name : '';
+  });
 
   // Config de la obra (jornada + valor comida)
   $('btn-config-obra').addEventListener('click', openConfigObra);

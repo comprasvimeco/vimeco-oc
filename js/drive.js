@@ -380,6 +380,56 @@
     });
     if (!resp.ok) throw new Error(`Upload DNI (${resp.status})`);
     const fileId = (await resp.json()).id;
+    return {
+      fileId,
+      url:       `https://drive.google.com/file/d/${fileId}/view`,
+      folderId:  personFolder,
+      folderUrl: `https://drive.google.com/drive/folders/${personFolder}`
+    };
+  };
+
+  // Reporte de quincena para RRHH (Excel).
+  // Estructura: PERSONAL → Reportes → {Obra} → archivo. Si ya existe (mismo nombre), lo actualiza.
+  // Devuelve { fileId, url }.
+  window.uploadReporteQuincena = async function (file, { obra }) {
+    const token   = await getAccessToken();
+    const rootId  = await getPersonalRootId(token);
+    const repId   = await getOrCreateFolder(token, 'Reportes', rootId);
+    const obraId  = await getOrCreateFolder(token, obra || 'Sin obra', repId);
+    const mimeType = file.type || 'application/octet-stream';
+
+    // Buscar archivo existente con el mismo nombre → PATCH (actualizar contenido)
+    let existingId = null;
+    try {
+      const q = `name=${JSON.stringify(file.name)} and '${obraId}' in parents and trashed=false`;
+      const s = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (s.ok) { const { files } = await s.json(); if (files?.length) existingId = files[0].id; }
+    } catch (_) {}
+
+    const boundary = 'vimeco_' + Date.now();
+    const meta     = JSON.stringify(existingId
+      ? { name: file.name, mimeType }
+      : { name: file.name, parents: [obraId], mimeType });
+    const enc     = new TextEncoder();
+    const pre     = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    const post    = enc.encode(`\r\n--${boundary}--`);
+    const content = new Uint8Array(await file.arrayBuffer());
+    const body    = new Uint8Array(pre.length + content.length + post.length);
+    body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
+
+    const upUrl = existingId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart&fields=id`
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+    const resp = await fetch(upUrl, {
+      method:  existingId ? 'PATCH' : 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body
+    });
+    if (!resp.ok) throw new Error(`Upload reporte (${resp.status})`);
+    const fileId = (await resp.json()).id;
     return { fileId, url: `https://drive.google.com/file/d/${fileId}/view` };
   };
 
