@@ -367,5 +367,22 @@
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>
 <script src="js/personal-obra.js"></script>
+<script>
+  // Auto-actualización del service worker (evita quedar pegado a una versión vieja en la PWA).
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/vimeco-oc/sw.js', { updateViaCache: 'none' })
+      .then(reg => reg.update()).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // No recargar si hay un parte abierto sin guardar.
+      const parte = document.getElementById('modal-parte');
+      if (parte && !parte.classList.contains('hidden')) return;
+      window.location.reload();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible')
+        navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
+    });
+  }
+</script>
 </body>
 </html>
