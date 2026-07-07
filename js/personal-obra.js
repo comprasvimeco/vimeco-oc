@@ -580,14 +580,19 @@ async function onDayClick(iso) {
     }
   });
 
-  // Condición general del día: feriado del calendario, o CC si algún parte guardado lo tiene.
+  // Condición del día para presentes ('', F o CC): feriado del calendario o CC guardado.
   parteDiaCond = ferNom ? 'F' : '';
   cuadrilla.forEach(p => {
     const g = items[p.id];
     if (g && (g.estado === 'CC' || g.estado === 'F')) parteDiaCond = g.estado;
   });
-  const genHorasInit  = parteDiaCond === 'CC' ? CC_HORAS : (noLab ? 0 : constantes.jornadaHoras);
-  const genComidaInit = !noLab && parteDiaCond === '';
+  // El selector general puede mostrar "Ausente (todos)" si toda la cuadrilla está ausente.
+  const savedAll      = cuadrilla.length > 0 && cuadrilla.every(p => items[p.id]);
+  const todosAusentes = savedAll && cuadrilla.every(p => (items[p.id].estado || '') === 'AU');
+  const initCond      = todosAusentes ? 'AU' : parteDiaCond;
+
+  const genHorasInit  = initCond === 'CC' ? CC_HORAS : (initCond === '' && !noLab ? constantes.jornadaHoras : 0);
+  const genComidaInit = initCond === '' && !noLab;
 
   // Sección general (aplica a toda la cuadrilla)
   $('parte-general').innerHTML = `
@@ -599,6 +604,7 @@ async function onDayClick(iso) {
           <option value="">Normal</option>
           <option value="F">Feriado</option>
           <option value="CC">CC · Causas climáticas</option>
+          <option value="AU">Ausente (todos)</option>
         </select>
       </div>
       <div class="pf">
@@ -611,7 +617,7 @@ async function onDayClick(iso) {
       </div>
     </div>
     <div class="pg-note">Un cambio acá se aplica a toda la cuadrilla. Abajo marcá las excepciones por persona.</div>`;
-  $('pg-cond').value = parteDiaCond;
+  $('pg-cond').value = initCond;
 
   // Estado por persona → botón activo:
   //   Presente = '', 'F' o 'CC' (según la condición del día) · Ausente 'AU' · Accidente 'AC' · Carpeta Médica 'CM'
@@ -681,15 +687,19 @@ async function onDayClick(iso) {
     });
   });
 
-  // Controles generales → aplican a toda la cuadrilla
+  // Controles generales.
+  // Cambiar la CONDICIÓN del día es una acción masiva (aplica a toda la cuadrilla);
+  // tocar solo horas/comida afecta únicamente a los presentes.
   $('pg-cond').addEventListener('change', () => {
     const c = $('pg-cond').value;
-    $('pg-horas').value    = c === 'CC' ? CC_HORAS : (c === 'F' ? 0 : (constantes.jornadaHoras ?? 8));
-    $('pg-comida').checked = c === '';   // sólo día normal lleva comida por defecto
-    applyGeneralToAll();
+    if (c === 'CC')      { $('pg-horas').value = CC_HORAS; $('pg-comida').checked = false; }
+    else if (c === 'F')  { $('pg-horas').value = 0;        $('pg-comida').checked = false; }
+    else if (c === 'AU') { $('pg-horas').value = 0;        $('pg-comida').checked = false; }
+    else                 { $('pg-horas').value = constantes.jornadaHoras ?? 8; $('pg-comida').checked = true; }
+    applyCondToAll();
   });
-  $('pg-horas').addEventListener('input', applyGeneralToAll);
-  $('pg-comida').addEventListener('change', applyGeneralToAll);
+  $('pg-horas').addEventListener('input', applyHorasComidaPresentes);
+  $('pg-comida').addEventListener('change', applyHorasComidaPresentes);
 
   // Modo lectura si la quincena está cerrada
   const inputs = $('parte-list').querySelectorAll('input, select, .eb');
@@ -731,19 +741,35 @@ function setRowEstado(row, kind) {
   });
 }
 
-// Aplica la sección general a toda la cuadrilla, respetando las excepciones
-// por persona (Ausente / Accidente / Carpeta Médica no se pisan).
-function applyGeneralToAll() {
-  parteDiaCond = $('pg-cond').value;             // '', F o CC
+// Cambio de CONDICIÓN del día (acción masiva sobre toda la cuadrilla).
+//   Ausente (todos): marca AU a todos (incluye accidente/carpeta médica).
+//   Normal/Feriado/CC: pone a todos como Presente con esa condición,
+//   preservando Accidente y Carpeta Médica (excepciones médicas reales).
+function applyCondToAll() {
+  const cond = $('pg-cond').value;
+  const rows = $('parte-list').querySelectorAll('.parte-row');
+  if (cond === 'AU') {
+    parteDiaCond = '';   // si luego marcan Presente a alguien, queda normal
+    rows.forEach(row => setRowEstado(row, 'AU'));
+    return;
+  }
+  parteDiaCond = cond;   // '', F o CC
+  rows.forEach(row => {
+    const e = row.dataset.estado;
+    if (e === 'AC' || e === 'CM') return;   // preservar accidente / carpeta médica
+    setRowEstado(row, 'presente');          // presentes y ausentes → presente con la condición
+  });
+}
+
+// Cambio de HORAS/COMIDA generales: solo afecta a los presentes.
+function applyHorasComidaPresentes() {
   const genHoras  = parseFloat($('pg-horas').value) || 0;
   const genComida = $('pg-comida').checked;
   $('parte-list').querySelectorAll('.parte-row').forEach(row => {
     const e = row.dataset.estado;
     if (e === 'AU' || e === 'AC' || e === 'CM') return;   // excepción por persona
-    row.dataset.estado = parteDiaCond;
     row.querySelector('.pf-horas').value       = genHoras;
     row.querySelector('.pf-comidachk').checked = genComida;
-    row.querySelectorAll('.eb').forEach(b => b.classList.toggle('active', b.dataset.e === 'presente'));
   });
 }
 
@@ -1093,9 +1119,10 @@ async function buildReporteWorkbook(q) {
       const horas  = it ? (Number(it.horas) || 0) : 0;
       const estado = it ? (it.estado || '') : '';
       const code   = estado || (dia.feriado ? 'F' : '');
+      const disp   = code === 'AU' ? 'X' : code;   // Ausente se muestra como "X"
       let val = '';
-      if (code && horas > 0) val = `${code} ${fmtHoras(horas)}`;   // ej "CC 2,5", "F 10"
-      else if (code)         val = code;                            // ej "CM", "AC", "F"
+      if (disp && horas > 0) val = `${disp} ${fmtHoras(horas)}`;   // ej "CC 2,5", "F 10"
+      else if (disp)         val = disp;                            // ej "X", "CM", "AC", "F"
       else if (horas > 0)    val = horas;
       row[C_DAY0 + k] = val;
       if (horas > 0) { totalP += horas; dayTotals[k] += horas; }

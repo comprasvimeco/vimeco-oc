@@ -15,6 +15,12 @@ let cajaHtml = fs.readFileSync('caja.html', 'utf8');
 cajaHtml = cajaHtml.replace(versionRe, (_, pre, _num, post) => `${pre}${nextVersion}${post}`);
 fs.writeFileSync('caja.html', cajaHtml);
 
+// Misma versión en el menú principal (etiqueta chica bajo las tarjetas)
+const menuVersionRe = /(<div class="menu-version"[^>]*>v)(\d+)(<\/div>)/;
+let menuHtml = fs.readFileSync('menu.html', 'utf8');
+menuHtml = menuHtml.replace(menuVersionRe, (_, pre, _num, post) => `${pre}${nextVersion}${post}`);
+fs.writeFileSync('menu.html', menuHtml);
+
 // Bump SW cache version so mobile devices detect the update
 let sw = fs.readFileSync('sw.js', 'utf8');
 sw = sw.replace(/vimeco-oc-v[\w.]+/, 'vimeco-oc-v' + Date.now());
