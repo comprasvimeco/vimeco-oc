@@ -1271,7 +1271,89 @@ async function buildReporteWorkbook(q) {
 
   const safe  = (obraNombre || 'Obra').replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
   const fname = `Personal_${safe}_${quincenaId(q)}.xlsx`;
-  return { wb, ws, fname };
+
+  // HTML formateado (vista previa read-only) — reusa rows/merges/stmap/linkmap.
+  // Traduce los estilos de celda del Excel a CSS inline para que la preview
+  // se vea igual (colores, negritas, alineación, celdas combinadas).
+  const html = buildReporteHtml({ rows, merges, stmap, linkmap, cols: ws['!cols'], NCOLS });
+
+  return { wb, ws, fname, html };
+}
+
+// Convierte un color ARGB del Excel (ej 'FF1A3A5C' o '333333') a '#RRGGBB'.
+function argbToHex(x) {
+  if (!x) return null;
+  const s = String(x);
+  return '#' + (s.length >= 8 ? s.slice(2) : s);
+}
+
+// Traduce un objeto de estilo de celda (xlsx-js-style) a CSS inline.
+function cellStyleToCss(s) {
+  if (!s) return 'border:none';
+  const css = [];
+  const bg = s.fill && s.fill.fgColor && argbToHex(s.fill.fgColor.rgb);
+  if (bg) css.push('background:' + bg);
+  if (s.font) {
+    const c = s.font.color && argbToHex(s.font.color.rgb);
+    if (c) css.push('color:' + c);
+    if (s.font.bold)      css.push('font-weight:700');
+    if (s.font.italic)    css.push('font-style:italic');
+    if (s.font.underline) css.push('text-decoration:underline');
+    if (s.font.sz)        css.push('font-size:' + s.font.sz + 'px');
+  }
+  if (s.alignment) {
+    if (s.alignment.horizontal) css.push('text-align:' + s.alignment.horizontal);
+    if (s.alignment.vertical)   css.push('vertical-align:' + (s.alignment.vertical === 'center' ? 'middle' : s.alignment.vertical));
+  }
+  css.push(s.border ? 'border:1px solid #b0bec5' : 'border:none');
+  return css.join(';');
+}
+
+// Formatea el texto de una celda (aplica formato moneda si corresponde).
+function cellDisplay(v, s) {
+  if (v === '' || v == null) return '';
+  if (s && s.numFmt && /"\$"/.test(s.numFmt) && typeof v === 'number') {
+    return '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+  }
+  return esc(v);
+}
+
+// Arma la tabla HTML respetando celdas combinadas (rowspan/colspan) y estilos.
+function buildReporteHtml({ rows, merges, stmap, linkmap, cols, NCOLS }) {
+  const spanTL  = {};          // "r,c" → { rs, cs } de la celda superior-izquierda
+  const covered = new Set();   // celdas tapadas por una combinación
+  (merges || []).forEach(m => {
+    spanTL[m.s.r + ',' + m.s.c] = { rs: m.e.r - m.s.r + 1, cs: m.e.c - m.s.c + 1 };
+    for (let r = m.s.r; r <= m.e.r; r++)
+      for (let c = m.s.c; c <= m.e.c; c++)
+        if (!(r === m.s.r && c === m.s.c)) covered.add(r + ',' + c);
+  });
+
+  let out = '<table><colgroup>';
+  for (let c = 0; c < NCOLS; c++) {
+    const wch = cols && cols[c] && cols[c].wch;
+    out += `<col style="width:${wch ? Math.round(wch * 7) : 40}px">`;
+  }
+  out += '</colgroup><tbody>';
+
+  for (let r = 0; r < rows.length; r++) {
+    out += '<tr>';
+    for (let c = 0; c < NCOLS; c++) {
+      const key = r + ',' + c;
+      if (covered.has(key)) continue;
+      const s   = stmap[key];
+      let txt   = cellDisplay(rows[r][c], s);
+      if (linkmap[key] && txt) txt = `<a href="${esc(linkmap[key])}" target="_blank" rel="noopener">${txt}</a>`;
+      const sp  = spanTL[key];
+      const at  = [];
+      if (sp && sp.cs > 1) at.push(`colspan="${sp.cs}"`);
+      if (sp && sp.rs > 1) at.push(`rowspan="${sp.rs}"`);
+      at.push(`style="${cellStyleToCss(s)}"`);
+      out += `<td ${at.join(' ')}>${txt}</td>`;
+    }
+    out += '</tr>';
+  }
+  return out + '</tbody></table>';
 }
 
 // Serializa el libro a un .xlsx → { blob, fname }
@@ -1282,29 +1364,16 @@ async function buildReporteBlob(q) {
   return { blob, fname };
 }
 
-// Vista previa read-only: renderiza la misma hoja como tabla HTML (no editable).
+// Vista previa read-only: renderiza la misma hoja como tabla HTML formateada (no editable).
 async function previewReporte(q) {
-  let ws;
+  let html;
   try {
-    ({ ws } = await buildReporteWorkbook(q));
+    ({ html } = await buildReporteWorkbook(q));
   } catch (_) {
     showToast('No se pudo generar la vista previa.', 'error');
     return;
   }
-  if (!XLSX.utils.sheet_to_html) {
-    showToast('Vista previa no disponible. Descargá el Excel.', 'warning');
-    return;
-  }
-  const html = XLSX.utils.sheet_to_html(ws, { editable: false });
-  const cont = $('excel-preview');
-  cont.innerHTML = '';
-  try {
-    const table = new DOMParser().parseFromString(html, 'text/html').querySelector('table');
-    if (table) cont.appendChild(document.importNode(table, true));
-    else cont.innerHTML = html;
-  } catch (_) {
-    cont.innerHTML = html;
-  }
+  $('excel-preview').innerHTML = html || '<div class="hist-empty">Sin datos para mostrar.</div>';
   $('excel-preview-title').textContent = `Planilla — ${quincenaLabel(q)}`;
   $('modal-excel-preview').classList.remove('hidden');
 }
