@@ -952,18 +952,32 @@ async function buildReporteBlob(q) {
   // ── PLANILLA DE CATEGORÍAS ──
   r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE CATEGORÍAS'; S(r, 0, stSection); mergeFull(r);
   const catMergeEnd = Math.min(C_DAY0 + 4, NCOLS - 1);
+  // Encabezado: Nro | APELLIDO Y NOMBRES | DNI | CATEGORÍA
+  {
+    const h = blank();
+    h[C_NRO] = 'Nro'; h[C_NAME] = 'APELLIDO Y NOMBRES'; h[C_DAY0] = 'DNI'; h[C_DAY0 + 1] = 'CATEGORÍA';
+    const rh = rows.push(h) - 1;
+    S(rh, C_NRO, stTh('center'));
+    S(rh, C_NAME, stTh('left'));
+    S(rh, C_DAY0, stTh('center'));
+    for (let c = C_DAY0 + 1; c <= catMergeEnd; c++) S(rh, c, stTh('left'));
+    merges.push({ s: { r: rh, c: C_DAY0 + 1 }, e: { r: rh, c: catMergeEnd } });
+  }
   crew.forEach((p, i) => {
     const row = blank();
     row[C_NRO]  = i + 1;
     row[C_NAME] = `${p.apellido}, ${p.nombre}`;
-    row[C_DAY0] = categoriaLabel(p) || '—';
+    const dniUrl = p.dniFolderUrl || dniFrente(p) || '';   // link a la carpeta de documentos (o al frente)
+    row[C_DAY0]     = dniUrl ? 'Ver' : '—';
+    row[C_DAY0 + 1] = categoriaLabel(p) || '—';
     const rr = rows.push(row) - 1;
     const bg = bgAlt(i);
     S(rr, C_NRO, stNro(bg));
     S(rr, C_NAME, stName(bg));
-    S(rr, C_DAY0, stCat(bg));
+    S(rr, C_DAY0, { ...stDay(bg), font: { sz: 9, color: { rgb: dniUrl ? A('1155CC') : DARK }, underline: !!dniUrl } });
+    if (dniUrl) L(rr, C_DAY0, dniUrl);
     for (let c = C_DAY0 + 1; c <= catMergeEnd; c++) S(rr, c, stCat(bg));
-    merges.push({ s: { r: rr, c: C_DAY0 }, e: { r: rr, c: catMergeEnd } });
+    merges.push({ s: { r: rr, c: C_DAY0 + 1 }, e: { r: rr, c: catMergeEnd } });
   });
   rows.push(blank());
 

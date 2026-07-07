@@ -531,7 +531,7 @@ function drawFooter(doc, data, y) {
       const sigX  = xs[2] + (FTR_COLS[2] - sigW) / 2;  // centrado horizontal
       const sigY  = y + 10;
       doc.addImage(data._firma, 'PNG', sigX, sigY, sigW, sigH);
-      // Nombre del firmante: solo se muestra si hay firma, debajo de la misma
+      // Nombre del firmante, debajo de la firma
       if (data.ejecutor) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.2);
@@ -539,6 +539,12 @@ function drawFooter(doc, data, y) {
         doc.text(data.ejecutor, xs[2] + FTR_COLS[2] / 2, sigY + sigH + 4, { align: 'center' });
       }
     } catch (_) {}
+  } else if (data.ejecutor) {
+    // Sin firma: se autoriza igual, con el nombre del usuario
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.2);
+    doc.setTextColor(...C.negro);
+    doc.text(`Autorizado por: ${data.ejecutor}`, xs[2] + FTR_COLS[2] / 2, y + COL_H - 10, { align: 'center' });
   }
   doc.setLineWidth(0.3);
   doc.setDrawColor(...C.borde);

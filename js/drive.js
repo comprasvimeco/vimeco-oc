@@ -292,7 +292,51 @@
     return { fileId: (await resp.json()).id };
   };
 
-  // Raíz PERSONAL (id cacheado en Firebase)
+  // Carpeta padre de COMPRAS (para colgar PERSONAL como hermana, no adentro)
+  async function getComprasParentId(token) {
+    try {
+      const r = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${DRIVE_CONFIG.folderId}?fields=parents&supportsAllDrives=true`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!r.ok) return null;
+      const { parents } = await r.json();
+      return (parents && parents[0]) || null;
+    } catch (_) { return null; }
+  }
+
+  function _setPersonalMovedFlag() {
+    fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalMovedOut.json', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true'
+    }).catch(() => {});
+  }
+
+  // Migración única: si PERSONAL quedó dentro de COMPRAS, la mueve al padre de COMPRAS.
+  // Best-effort y guardada por flag para no chequear en cada subida.
+  async function _ensurePersonalOutsideCompras(token, personalId) {
+    try {
+      const f = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalMovedOut.json');
+      if (f.ok && (await f.json()) === true) return;
+
+      const r = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${personalId}?fields=parents&supportsAllDrives=true`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!r.ok) return;
+      const parents = (await r.json()).parents || [];
+      if (!parents.includes(DRIVE_CONFIG.folderId)) { _setPersonalMovedFlag(); return; }
+
+      const target = await getComprasParentId(token);
+      if (!target || target === DRIVE_CONFIG.folderId) return;
+      const upd = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${personalId}?addParents=${target}&removeParents=${DRIVE_CONFIG.folderId}&supportsAllDrives=true&fields=id`,
+        { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (upd.ok) _setPersonalMovedFlag();
+    } catch (_) {}
+  }
+
+  // Raíz PERSONAL (id cacheado en Firebase). Vive como hermana de COMPRAS.
   async function getPersonalRootId(token) {
     let id;
     try {
@@ -300,13 +344,17 @@
       if (r.ok) id = await r.json();
     } catch (_) {}
     if (!id) {
-      id = await getOrCreateFolder(token, 'PERSONAL', DRIVE_CONFIG.folderId);
+      const parent = (await getComprasParentId(token)) || DRIVE_CONFIG.folderId;
+      id = await getOrCreateFolder(token, 'PERSONAL', parent);
       fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalRootId.json', {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(id)
       }).catch(() => {});
+      return id;
     }
+    // Si ya existía (probablemente dentro de COMPRAS), moverla afuera una vez.
+    _ensurePersonalOutsideCompras(token, id);
     return id;
   }
 
