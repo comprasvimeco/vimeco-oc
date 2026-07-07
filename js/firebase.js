@@ -198,21 +198,8 @@
   };
 
   // ─── Autorizaciones ───────────────────────────────
-  // Usuarios activos que tienen firma cargada → candidatos para autorizar una OC.
-  // Devuelve [{ codigo, nombre }] ordenado por nombre.
-  window.getUsuariosConFirma = async function () {
-    const [firmasResp, usuariosResp] = await Promise.all([
-      fetch(_base() + '/firmas.json'),
-      fetch(_base() + '/usuarios.json')
-    ]);
-    const firmas   = firmasResp.ok   ? await firmasResp.json()   : null;
-    const usuarios = usuariosResp.ok ? await usuariosResp.json() : null;
-    if (!firmas || !usuarios) return [];
-    return Object.entries(usuarios)
-      .filter(([codigo, u]) => u && u.nombre && u.activo && firmas[codigo])
-      .map(([codigo, u]) => ({ codigo, nombre: u.nombre }))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre));
-  };
+  // Para elegir autorizador se usa getUsuariosActivos(): cualquier usuario
+  // activo puede autorizar (si no tiene firma, la dibuja en el momento).
 
   // OC en estado 'pendiente' cuya autorización fue solicitada al usuario dado.
   window.getAutorizacionesPendientes = async function (codigo) {

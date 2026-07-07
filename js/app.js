@@ -1415,7 +1415,7 @@ function elegirAutorizador() {
     modal.classList.remove('hidden');
 
     const myCode = sessionStorage.getItem('responsable_code');
-    const loader = typeof getUsuariosConFirma === 'function' ? getUsuariosConFirma() : Promise.resolve([]);
+    const loader = typeof getUsuariosActivos === 'function' ? getUsuariosActivos() : Promise.resolve([]);
     loader.then(list => {
       const opts = (list || []).filter(u => u.codigo !== myCode);
       select.innerHTML = '';
