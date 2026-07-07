@@ -351,18 +351,43 @@
   </div>
 </div>
 
-<!-- ===== MODAL: Confirmar firma en OC ===== -->
+<!-- ===== MODAL: Autorización de la OC ===== -->
 <div class="modal-overlay hidden" id="modal-firma-confirm">
   <div class="modal modal--sm">
     <div class="modal-header">
-      <span class="modal-title">¿Incluir firma?</span>
+      <span class="modal-title">Generar Orden de Compra</span>
     </div>
-    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
-      <p style="color:var(--gray-600);">Tenés una firma guardada.<br>¿Querés incluirla en esta OC?</p>
+    <div class="modal-body" style="padding:1.35rem 1.25rem;">
+      <p style="color:var(--gray-600);text-align:center;margin-bottom:1.1rem;">¿Cómo querés autorizar esta OC?</p>
+      <div style="display:flex;flex-direction:column;gap:.6rem;">
+        <button class="btn btn-primary" id="btn-firma-con" style="justify-content:center;"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Firmar yo y generar</button>
+        <button class="btn btn-outline" id="btn-firma-pedir" style="justify-content:center;"><svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg> Pedir autorización a otro usuario</button>
+        <button class="btn btn-secondary" id="btn-firma-sin" style="justify-content:center;">Generar sin firma</button>
+      </div>
+      <div style="text-align:center;">
+        <button id="btn-firma-cancel" style="background:none;border:none;color:var(--gray-500);cursor:pointer;font-size:.85rem;text-decoration:underline;margin-top:.9rem;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Pedir autorización (elegir usuario) ===== -->
+<div class="modal-overlay hidden" id="modal-pedir-autorizacion">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">Pedir autorización</span>
+      <button class="modal-close" id="modal-pedir-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" style="padding:1.35rem 1.25rem;">
+      <p style="color:var(--gray-600);font-size:.9rem;margin-bottom:.7rem;">Elegí a quién le pedís que firme esta OC. Le va a aparecer en su bandeja de autorizaciones.</p>
+      <select id="select-autorizador" class="form-control" style="width:100%;">
+        <option value="">Cargando usuarios…</option>
+      </select>
+      <p id="pedir-empty" class="hidden" style="color:var(--gray-500);font-size:.82rem;margin-top:.6rem;">No hay usuarios con firma cargada disponibles para autorizar.</p>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" id="btn-firma-sin">Sin firma</button>
-      <button class="btn btn-primary"   id="btn-firma-con"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Con firma</button>
+      <button class="btn btn-secondary" id="btn-pedir-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-pedir-confirm">Enviar solicitud</button>
     </div>
   </div>
 </div>

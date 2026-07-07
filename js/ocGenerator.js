@@ -545,6 +545,9 @@ function drawFooter(doc, data, y) {
   doc.text('Firma y Aclaración', xs[1] + FTR_COLS[1] / 2, y + COL_H - 3, { align: 'center' });
 
   // Col 3 — Autorizado por VIMECO S.A.
+  // El nombre que se muestra es el de quien firma/autoriza (_firmante); si no se
+  // especifica, cae al ejecutor (creador de la OC) para conservar el comportamiento previo.
+  const firmante = data._firmante || data.ejecutor;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(...C.azul);
@@ -557,19 +560,19 @@ function drawFooter(doc, data, y) {
       const sigY  = y + 10;
       doc.addImage(data._firma, 'PNG', sigX, sigY, sigW, sigH);
       // Nombre del firmante, debajo de la firma
-      if (data.ejecutor) {
+      if (firmante) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.2);
         doc.setTextColor(...C.negro);
-        doc.text(data.ejecutor, xs[2] + FTR_COLS[2] / 2, sigY + sigH + 4, { align: 'center' });
+        doc.text(firmante, xs[2] + FTR_COLS[2] / 2, sigY + sigH + 4, { align: 'center' });
       }
     } catch (_) {}
-  } else if (data.ejecutor) {
+  } else if (firmante) {
     // Sin firma: se autoriza igual, con el nombre del usuario
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
     doc.setTextColor(...C.negro);
-    doc.text(`Autorizado por: ${data.ejecutor}`, xs[2] + FTR_COLS[2] / 2, y + COL_H - 10, { align: 'center' });
+    doc.text(`Autorizado por: ${firmante}`, xs[2] + FTR_COLS[2] / 2, y + COL_H - 10, { align: 'center' });
   }
   doc.setLineWidth(0.3);
   doc.setDrawColor(...C.borde);

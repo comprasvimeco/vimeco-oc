@@ -77,7 +77,9 @@
     return 'nom_' + (p.nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 40);
   }
 
-  window.saveOCToHistory = async function (ocData, total) {
+  // `extra` permite adjuntar campos adicionales al registro (estado, autorizacion,
+  // _payload para regenerar el PDF, etc.) sin duplicar la construcción del record.
+  window.saveOCToHistory = async function (ocData, total, extra = {}) {
     const key  = ocData.nroOC.replace(/-/g, '');
     const prov = ocData.proveedor;
     const clean = v => (v && v !== '—') ? v : '';
@@ -106,7 +108,8 @@
       total:          total,
       descuento:      ocData._descuento      || { pct: null, monto: 0 },
       noGravado:      ocData._noGravado      || { pct: null, monto: 0 },
-      impuestosExtra: ocData._impuestosExtra || []
+      impuestosExtra: ocData._impuestosExtra || [],
+      ...extra
     };
 
     const base = _base();
@@ -192,6 +195,37 @@
       const raw = localStorage.getItem(`vimeco_hist_${codigoResponsable}`);
       return raw ? JSON.parse(raw) : null;
     } catch (_) { return null; }
+  };
+
+  // ─── Autorizaciones ───────────────────────────────
+  // Usuarios activos que tienen firma cargada → candidatos para autorizar una OC.
+  // Devuelve [{ codigo, nombre }] ordenado por nombre.
+  window.getUsuariosConFirma = async function () {
+    const [firmasResp, usuariosResp] = await Promise.all([
+      fetch(_base() + '/firmas.json'),
+      fetch(_base() + '/usuarios.json')
+    ]);
+    const firmas   = firmasResp.ok   ? await firmasResp.json()   : null;
+    const usuarios = usuariosResp.ok ? await usuariosResp.json() : null;
+    if (!firmas || !usuarios) return [];
+    return Object.entries(usuarios)
+      .filter(([codigo, u]) => u && u.nombre && u.activo && firmas[codigo])
+      .map(([codigo, u]) => ({ codigo, nombre: u.nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  };
+
+  // OC en estado 'pendiente' cuya autorización fue solicitada al usuario dado.
+  window.getAutorizacionesPendientes = async function (codigo) {
+    const resp = await fetch(_base() + '/historial.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([key, oc]) => ({ _key: key, ...oc }))
+      .filter(oc => oc && oc.estado === 'pendiente' &&
+                    oc.autorizacion && oc.autorizacion.solicitadoA &&
+                    oc.autorizacion.solicitadoA.codigo === codigo)
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   };
 })();
 

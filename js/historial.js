@@ -23,6 +23,25 @@ function fmtMoney(n) {
   return (parseFloat(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Badge de estado de autorización. Las OC viejas (sin `estado`) se consideran emitidas.
+function estadoBadge(oc) {
+  const e = oc.estado || 'emitida';
+  const base = 'display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;';
+  if (e === 'pendiente') {
+    const quien = oc.autorizacion?.solicitadoA?.nombre;
+    return `<span style="${base}background:#fff4e0;color:#9a6a00;">Pendiente${quien ? ' — ' + esc(quien) : ''}</span>`;
+  }
+  if (e === 'autorizada') {
+    const quien = oc.autorizacion?.firmante;
+    return `<span style="${base}background:#e3f5e8;color:#1e7d3a;">Autorizada${quien ? ' — ' + esc(quien) : ''}</span>`;
+  }
+  if (e === 'rechazada') {
+    const motivo = oc.autorizacion?.motivoRechazo;
+    return `<span style="${base}background:#fde6e6;color:#b02a2a;" title="${esc(motivo || '')}">Rechazada</span>`;
+  }
+  return '';
+}
+
 function renderCards(ocs) {
   const isAdmin = viewerIsAdmin;
   const list = $('hist-list');
@@ -45,6 +64,9 @@ function renderCards(ocs) {
     const obra       = oc.obra || '—';
     const total      = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
     const resp       = oc.responsable?.nombre || '';
+    const badge      = estadoBadge(oc);
+    // Las OC pendientes todavía no tienen PDF definitivo → no se descarga.
+    const showRegen  = canRegen && oc.estado !== 'pendiente';
 
     card.innerHTML = `
       <div class="hist-card-top">
@@ -53,18 +75,19 @@ function renderCards(ocs) {
       </div>
       <div class="hist-proveedor">${esc(provNombre)}</div>
       <div class="hist-obra">${esc(obra)}</div>
+      ${badge ? `<div style="margin-top:.35rem;">${badge}</div>` : ''}
       <div class="hist-card-bottom">
         <span class="hist-total">${total}</span>
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
         <div class="hist-actions">
-          ${canRegen ? `<button class="btn btn-sm btn-outline btn-regenerar" title="Regenerar y descargar PDF">${icSvg('print')}</button>` : ''}
+          ${showRegen ? `<button class="btn btn-sm btn-outline btn-regenerar" title="Regenerar y descargar PDF">${icSvg('print')}</button>` : ''}
           <button class="btn btn-sm btn-primary btn-usar-base" title="Cargar en formulario">Usar como base</button>
         </div>
       </div>`;
 
     card.querySelector('.btn-usar-base').addEventListener('click', () => usarComoBase(oc));
 
-    if (canRegen) {
+    if (showRegen) {
       const regenBtn = card.querySelector('.btn-regenerar');
       regenBtn.addEventListener('click', () => regenerarPDF(oc, regenBtn));
     }
@@ -123,8 +146,10 @@ function applyFilters() {
 async function regenerarPDF(oc, btn) {
   btn.disabled = true;
   try {
-    const prov   = oc.proveedor || {};
-    const ocData = {
+    const prov = oc.proveedor || {};
+    // Preferir el payload guardado (regenera el PDF idéntico al original);
+    // si no está (registros viejos), reconstruir desde los campos sueltos.
+    const ocData = oc._payload ? { ...oc._payload } : {
       nroOC:    oc.nroOC,
       fecha:    oc.fecha,
       ejecutor: oc.responsable?.nombre || '',
@@ -156,6 +181,15 @@ async function regenerarPDF(oc, btn) {
       _noGravado:      oc.noGravado      || { pct: null, monto: 0 },
       _impuestosExtra: oc.impuestosExtra || []
     };
+
+    // OC autorizada por otro usuario → re-incrustar su firma y su nombre.
+    if (oc.estado === 'autorizada' && oc.autorizacion) {
+      ocData._firmante = oc.autorizacion.firmante || ocData.ejecutor;
+      if (oc.autorizacion.firmaCodigo && typeof getFirma === 'function') {
+        try { ocData._firma = await getFirma(oc.autorizacion.firmaCodigo); } catch (_) {}
+      }
+    }
+
     const blob  = generateOCBlob(ocData);
     const fname = `OC_${oc.nroOC}_${sanitizeStr(prov.nombre || 'SinProveedor')}.pdf`;
 

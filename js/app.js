@@ -1383,23 +1383,79 @@ function buildOCData(numero, firma = null) {
   };
 }
 
-function confirmarFirma() {
+// Modal de autorización: devuelve la acción elegida.
+//   'con'   → firmar yo y generar        'sin'   → generar sin firma
+//   'pedir' → pedir autorización a otro   'cancel'→ no hacer nada
+function elegirAutorizacion() {
   return new Promise(resolve => {
     const modal = $('modal-firma-confirm');
+    // "Firmar yo" solo tiene sentido si el usuario tiene firma guardada.
+    $('btn-firma-con').classList.toggle('hidden', !firmaBase64);
     modal.classList.remove('hidden');
-    $('btn-firma-sin').onclick = () => { modal.classList.add('hidden'); resolve(false); };
-    $('btn-firma-con').onclick = () => { modal.classList.add('hidden'); resolve(true); };
+    const close = val => { modal.classList.add('hidden'); resolve(val); };
+    $('btn-firma-con').onclick    = () => close('con');
+    $('btn-firma-sin').onclick    = () => close('sin');
+    $('btn-firma-pedir').onclick  = () => close('pedir');
+    $('btn-firma-cancel').onclick = () => close('cancel');
+  });
+}
+
+// Modal de selección de autorizador. Resuelve {codigo,nombre} o null si cancela.
+function elegirAutorizador() {
+  return new Promise(resolve => {
+    const modal  = $('modal-pedir-autorizacion');
+    const select = $('select-autorizador');
+    const empty  = $('pedir-empty');
+    const btnOk  = $('btn-pedir-confirm');
+    const nombres = {};
+
+    empty.classList.add('hidden');
+    btnOk.disabled = true;
+    select.innerHTML = '<option value="">Cargando usuarios…</option>';
+    modal.classList.remove('hidden');
+
+    const myCode = sessionStorage.getItem('responsable_code');
+    const loader = typeof getUsuariosConFirma === 'function' ? getUsuariosConFirma() : Promise.resolve([]);
+    loader.then(list => {
+      const opts = (list || []).filter(u => u.codigo !== myCode);
+      select.innerHTML = '';
+      if (!opts.length) {
+        select.add(new Option('—', ''));
+        empty.classList.remove('hidden');
+        return;
+      }
+      select.add(new Option('Elegí un usuario…', ''));
+      opts.forEach(u => { nombres[u.codigo] = u.nombre; select.add(new Option(u.nombre, u.codigo)); });
+    }).catch(() => {
+      select.innerHTML = '<option value="">Error al cargar usuarios</option>';
+    });
+
+    select.onchange = () => { btnOk.disabled = !select.value; };
+    const close = val => { modal.classList.add('hidden'); select.onchange = null; resolve(val); };
+    $('btn-pedir-cancel').onclick  = () => close(null);
+    $('modal-pedir-close').onclick = () => close(null);
+    btnOk.onclick = () => {
+      if (!select.value) return;
+      close({ codigo: select.value, nombre: nombres[select.value] || '' });
+    };
   });
 }
 
 async function handleGenerate() {
   if (!validateOCForm()) return;
 
-  // Preguntar si incluir firma antes de bloquear el botón
-  let usarFirma = false;
-  if (firmaBase64) {
-    usarFirma = await confirmarFirma();
+  // Elegir cómo se autoriza la OC antes de bloquear el botón.
+  const accion = await elegirAutorizacion();
+  if (accion === 'cancel') return;
+
+  // Pedir autorización a otro usuario → flujo aparte (no genera PDF ahora).
+  if (accion === 'pedir') {
+    const autorizador = await elegirAutorizador();
+    if (!autorizador) return;
+    return solicitarAutorizacion(autorizador);
   }
+
+  const usarFirma = accion === 'con';
 
   const btn = $('btn-generate');
   btn.disabled = true;
@@ -1440,7 +1496,7 @@ async function handleGenerate() {
 
   // Guardar en historial; una vez guardado, subir a Drive y salvar folder_id
   const histKey   = numero.replace(/-/g, '');
-  const histSaved = saveOCToHistory(ocData, ocData._total)
+  const histSaved = saveOCToHistory(ocData, ocData._total, { estado: 'emitida' })
     .then(() => { updateProveedoresCache(); return true; })
     .catch(e => { console.warn('saveOCToHistory:', e); return false; });
 
@@ -1500,6 +1556,87 @@ async function handleGenerate() {
         })
     );
   }
+}
+
+// ---- Pedir autorización a otro usuario ----
+// Reserva número, guarda la OC como 'pendiente' con su payload completo (para
+// regenerar el PDF idéntico al firmar), sube el archivo fuente a Drive para que
+// el autorizador lo pueda ver, y le manda una novedad dirigida. No genera PDF.
+async function solicitarAutorizacion(autorizador) {
+  const btn = $('btn-generate');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Reservando número…';
+
+  let numero;
+  try {
+    if (manualOCNumber) {
+      numero = manualOCNumber;
+      manualOCNumber = null;
+      $('oc-number-display').classList.remove('oc-number-manual');
+      $('btn-clear-oc-number').classList.add('hidden');
+    } else {
+      if (typeof window.claimNextOCSeq !== 'function')
+        throw new Error('Firebase no cargó — recargá la página (F5).');
+      numero = formatOCNumber(await window.claimNextOCSeq());
+    }
+  } catch (err) {
+    toast(`Error N° OC: ${err.message}`, 'error');
+    btn.disabled = false;
+    btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
+    return;
+  }
+
+  const ocData      = buildOCData(numero);   // sin firma
+  const solicitante = {
+    codigo: sessionStorage.getItem('responsable_code') || '',
+    nombre: sessionStorage.getItem('responsable_name') || ''
+  };
+  const autorizacion = {
+    solicitadoPor: solicitante,
+    solicitadoA:   { codigo: autorizador.codigo, nombre: autorizador.nombre },
+    solicitadoEn:  Date.now(),
+    resueltoEn:    null,
+    firmaCodigo:   null,
+    motivoRechazo: null
+  };
+
+  const histKey = numero.replace(/-/g, '');
+  try {
+    await saveOCToHistory(ocData, ocData._total, {
+      estado:       'pendiente',
+      autorizacion,
+      _payload:     ocData
+    });
+    updateProveedoresCache();
+  } catch (e) {
+    console.warn('saveOCToHistory (pendiente):', e);
+    toast('No se pudo registrar la solicitud. Revisá tu conexión.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
+    return;
+  }
+
+  const driveObra  = ($('obra').value || '').trim() || 'Sin obra';
+  const driveFecha = new Date().toISOString().slice(0, 10);
+  const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
+
+  // Subir el archivo fuente a Drive (si hay) para que el autorizador lo revise.
+  if (typeof uploadSourceToDrive === 'function') {
+    uploadSourceToDrive({ obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
+      .then(({ obrasFolderId, proveedoresFolderId, sourceLink }) =>
+        patchHistorialEntry(histKey, {
+          drive_folder_obras_id:       obrasFolderId || null,
+          drive_folder_proveedores_id: proveedoresFolderId || null,
+          fuenteUrl:                   sourceLink || ''
+        }).catch(() => {}))
+      .catch(() => {});
+  }
+
+  refreshOCNumberDisplay();
+  toast(`OC ${numero} enviada a ${autorizador.nombre} para autorización.`, 'success');
+  btn.disabled = false;
+  btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
+  $('btn-same-provider').classList.remove('hidden');
 }
 
 // ---- Vista previa ----

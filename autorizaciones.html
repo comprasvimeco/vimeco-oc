@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Autorizaciones</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <style>
+    .aut-card-top { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
+    .aut-nro { font-weight:700; color:var(--gray-800); }
+    .aut-fecha { color:var(--gray-500); font-size:.82rem; }
+    .aut-prov { font-weight:600; margin-top:.15rem; }
+    .aut-obra { color:var(--gray-600); font-size:.9rem; }
+    .aut-meta { color:var(--gray-500); font-size:.82rem; margin-top:.25rem; }
+    .aut-total { font-weight:700; color:var(--gray-800); }
+    .aut-actions { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.75rem; }
+    .aut-bottom { display:flex; justify-content:space-between; align-items:center; margin-top:.5rem; }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='menu.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Autorizaciones</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge">
+      <span id="hdr-name">—</span>
+    </div>
+    <button class="btn btn-sm btn-outline" id="btn-back"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver</button>
+    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+  </div>
+</header>
+
+<main class="app-main">
+  <div class="hist-page">
+    <div class="hist-toolbar">
+      <span class="card-title">OC pendientes de tu autorización</span>
+      <span class="hist-count" id="aut-count"></span>
+    </div>
+    <div id="aut-list" class="hist-list">
+      <div class="hist-loading">Cargando…</div>
+    </div>
+  </div>
+</main>
+
+<!-- ===== MODAL: Vista previa ===== -->
+<div class="modal-overlay hidden" id="modal-preview">
+  <div class="modal modal--xl">
+    <div class="modal-header">
+      <span class="modal-title" id="preview-title">Vista previa</span>
+      <button class="modal-close" id="modal-preview-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="preview-body"></div>
+    <div class="modal-footer" id="preview-footer">
+      <a class="btn btn-outline hidden" id="preview-fuente" target="_blank" rel="noopener"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Ver archivo adjunto</a>
+      <button class="btn btn-secondary" id="modal-preview-close2">Cerrar</button>
+      <button class="btn btn-danger"  id="preview-rechazar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Rechazar</button>
+      <button class="btn btn-success" id="preview-firmar"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Firmar y autorizar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Firma ===== -->
+<div class="modal-overlay hidden" id="modal-firma">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Tu Firma</span>
+      <button class="modal-close" id="modal-firma-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p class="firma-hint-top">Dibujá tu firma para autorizar. Se guardará para próximas OC.</p>
+      <div class="firma-canvas-wrap">
+        <canvas id="firma-canvas"></canvas>
+      </div>
+      <p class="firma-hint-bot">Usá el dedo o el mouse para dibujar</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-firma-limpiar">Limpiar</button>
+      <button class="btn btn-primary" id="btn-firma-guardar">Guardar y autorizar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Rechazar ===== -->
+<div class="modal-overlay hidden" id="modal-rechazo">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">Rechazar OC</span>
+      <button class="modal-close" id="modal-rechazo-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" style="padding:1.25rem;">
+      <p style="color:var(--gray-600);font-size:.9rem;margin-bottom:.6rem;">Contale al solicitante por qué la rechazás (opcional):</p>
+      <textarea id="rechazo-motivo" class="form-control" rows="3" style="width:100%;resize:vertical;" placeholder="Motivo del rechazo…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-rechazo-cancel">Cancelar</button>
+      <button class="btn btn-danger" id="btn-rechazo-confirm">Confirmar rechazo</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/jspdf.umd.min.js"></script>
+<script src="js/logoBase64.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/ocGenerator.js"></script>
+<script src="js/autorizaciones.js"></script>
+</body>
+</html>

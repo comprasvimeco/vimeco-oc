@@ -12,7 +12,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
   <style>
-    #menu-card-novedades .menu-card-icon { position: relative; }
+    #menu-card-novedades .menu-card-icon,
+    #menu-card-autorizaciones .menu-card-icon { position: relative; }
     .menu-card-badge {
       position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px;
       padding: 0 5px; border-radius: 999px; background: #d64545; color: #fff;
@@ -81,6 +82,17 @@
       </div>
       <div class="menu-card-title">Novedades</div>
     </a>
+    <a href="autorizaciones.html" class="menu-card" id="menu-card-autorizaciones" style="display:none">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M22 11l-3 3-2-2"/>
+        </svg>
+        <span id="autorizaciones-badge" class="menu-card-badge hidden"></span>
+      </div>
+      <div class="menu-card-title">Autorizaciones</div>
+    </a>
     <a href="administracion.html" class="menu-card" id="menu-card-admin" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -109,6 +121,18 @@
     // Administración: solo super-admin (0000).
     if (_s.codigo === '0000') {
       document.getElementById('menu-card-admin').style.display = '';
+    }
+
+    // Autorizaciones: visible para cualquier usuario con OC pendientes de su firma.
+    if (typeof getAutorizacionesPendientes === 'function') {
+      getAutorizacionesPendientes(_s.codigo).then(pend => {
+        if (pend && pend.length) {
+          document.getElementById('menu-card-autorizaciones').style.display = '';
+          const b = document.getElementById('autorizaciones-badge');
+          b.textContent = pend.length > 99 ? '99+' : String(pend.length);
+          b.classList.remove('hidden');
+        }
+      }).catch(() => {});
     }
 
     // Personal: visible para 0000, admins o jefes de obra.
