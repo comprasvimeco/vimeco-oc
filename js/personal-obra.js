@@ -405,23 +405,24 @@ function renderCalendar() {
   const laborables = diasLaborables(q);
   const faltantes  = laborables.filter(iso => !(partesMeta[iso] && partesMeta[iso].validado)).length;
 
-  const btnExcel = '<button class="btn btn-sm btn-outline" id="btn-excel-preview">👁 Ver planilla</button>' +
-                   '<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">📊 Excel RRHH</button>';
+  // "Ver planilla" (preview) siempre disponible; "Excel RRHH" solo con la quincena cerrada.
+  const btnPreview = '<button class="btn btn-sm btn-outline" id="btn-excel-preview">👁 Ver planilla</button>';
+  const btnExcel   = '<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">📊 Excel RRHH</button>';
   let cierreHtml;
   if (cerrada) {
     cierreHtml = `
       <span class="cierre-msg">✓ Quincena cerrada. Solo lectura.</span>
-      ${btnExcel}
+      ${btnPreview}${btnExcel}
       ${esAdmin ? '<button class="btn btn-sm btn-warning" id="btn-reabrir">Reabrir quincena</button>' : ''}`;
   } else if (faltantes > 0) {
     cierreHtml = `
       <span class="cierre-msg">Faltan validar ${faltantes} día(s) laborable(s) para poder cerrar.</span>
-      ${btnExcel}
+      ${btnPreview}
       <button class="btn btn-sm btn-primary" id="btn-cerrar" disabled>Cerrar quincena</button>`;
   } else {
     cierreHtml = `
-      <span class="cierre-msg">Todos los días laborables están validados.</span>
-      ${btnExcel}
+      <span class="cierre-msg">Todos los días laborables están validados. Cerrá la quincena para enviar el Excel a RRHH.</span>
+      ${btnPreview}
       <button class="btn btn-sm btn-primary" id="btn-cerrar">Cerrar quincena</button>`;
   }
 
