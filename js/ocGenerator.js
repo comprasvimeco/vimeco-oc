@@ -32,8 +32,9 @@ const C = {
 // ─── Geometría de página A4 ──────────────────────────
 const PG = {
   w: 210, h: 297,
-  ml: 10, mt: 10,
-  get cw() { return this.w - 2 * this.ml; }  // 190mm
+  ml: 10, mt: 10, mb: 10,
+  get cw()   { return this.w - 2 * this.ml; },  // 190mm
+  get maxY() { return this.h - this.mb; }        // 287mm — límite inferior de contenido
 };
 
 // ─── Anchos de columna en mm ─────────────────────────
@@ -63,6 +64,17 @@ function buildOCDoc(data) {
   y += 2;
   const itmColW = computeItemColWidths(doc, data.items);
   y = drawItemsTable(doc, data.items, y, itmColW);
+
+  // El bloque de cierre (totales + monto en letras + firmas) se mantiene junto.
+  // Si no entra en lo que queda de la página, se pasa a una hoja nueva.
+  const totalsH  = (data.impuestos || []).length * 7.5;
+  const closingH = totalsH + 2 + measureWordsHeight(doc, data.totalLetras) + 3
+                 + measureFooterHeight(doc, data);
+  if (y + closingH > PG.maxY) {
+    doc.addPage();
+    y = PG.mt;
+  }
+
   y = drawTotalsTable(doc, data, y, itmColW);
   y += 2;
   y = drawAmountInWords(doc, data.totalLetras, y);
@@ -348,18 +360,22 @@ function drawItemsTable(doc, items, y, colW) {
     { label: 'IMPORTE',     align: 'right'  }
   ];
 
-  // Encabezado
-  fillRect(doc, ml, y, cw, HDR_H, C.azul);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...C.blanco);
-  headers.forEach((h, i) => {
-    doc.text(h.label, textX(xs[i], colW[i], h.align), y + HDR_H / 2 + 1.5, { align: h.align });
-  });
-  setThinBorder(doc);
-  doc.rect(ml, y, cw, HDR_H, 'S');
-  xs.slice(1).forEach(cx => doc.line(cx, y, cx, y + HDR_H));
-  y += HDR_H;
+  // Encabezado (se redibuja al inicio de cada página)
+  function drawItemsHeader(yy) {
+    fillRect(doc, ml, yy, cw, HDR_H, C.azul);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.blanco);
+    headers.forEach((h, i) => {
+      doc.text(h.label, textX(xs[i], colW[i], h.align), yy + HDR_H / 2 + 1.5, { align: h.align });
+    });
+    setThinBorder(doc);
+    doc.rect(ml, yy, cw, HDR_H, 'S');
+    xs.slice(1).forEach(cx => doc.line(cx, yy, cx, yy + HDR_H));
+    return yy + HDR_H;
+  }
+
+  y = drawItemsHeader(y);
 
   // Filas con alto variable según largo de descripción
   doc.setFont('helvetica', 'normal');
@@ -368,6 +384,15 @@ function drawItemsTable(doc, items, y, colW) {
     const desc      = String(item.desc || '').trim() || '—';
     const descLines = doc.splitTextToSize(desc, colW[0] - 4);
     const rowH      = Math.max(ROW_H, descLines.length * LINE_H + 3);
+
+    // Salto de página si la fila no entra en lo que queda de la hoja
+    if (y + rowH > PG.maxY) {
+      doc.addPage();
+      y = PG.mt;
+      y = drawItemsHeader(y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+    }
 
     fillRect(doc, ml, y, cw, rowH, C.blanco);
     setThinBorder(doc);
@@ -566,6 +591,34 @@ function drawFooter(doc, data, y) {
     'NOTA: HACER MENCIÓN DE LA PRESENTE ORDEN EN SUS REMITOS Y FACTURAS',
     w / 2, noteY + 5.5, { align: 'center' }
   );
+}
+
+/* =====================================================
+   MEDICIÓN DE ALTURAS (para decidir saltos de página)
+   Replican el cálculo de alto de drawAmountInWords y drawFooter
+   sin dibujar nada.
+   ===================================================== */
+function measureWordsHeight(doc, totalLetras) {
+  const text = `Son PESOS: ${totalLetras || ''}`;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  const wrapped = doc.splitTextToSize(text, PG.cw - 6);
+  return wrapped.length * 4.5 + 5;
+}
+
+function measureFooterHeight(doc, data) {
+  const LH = 4.2;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  const col1Values = [
+    data.proveedor.pago  || '—',
+    data.proveedor.plazo || '—',
+    data.proveedor.lugar || '—'
+  ].map(v => doc.splitTextToSize(v, FTR_COLS[0] - 5));
+  let col1TextH = 4;
+  col1Values.forEach(lines => { col1TextH += LH + lines.length * LH + 2; });
+  const COL_H = Math.max(38, col1TextH + 3);
+  return COL_H + 10;   // + área de la nota al pie (línea + texto)
 }
 
 /* =====================================================
