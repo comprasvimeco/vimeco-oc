@@ -405,7 +405,8 @@ function renderCalendar() {
   const laborables = diasLaborables(q);
   const faltantes  = laborables.filter(iso => !(partesMeta[iso] && partesMeta[iso].validado)).length;
 
-  const btnExcel = '<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">📊 Excel RRHH</button>';
+  const btnExcel = '<button class="btn btn-sm btn-outline" id="btn-excel-preview">👁 Ver planilla</button>' +
+                   '<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">📊 Excel RRHH</button>';
   let cierreHtml;
   if (cerrada) {
     cierreHtml = `
@@ -452,6 +453,7 @@ function renderCalendar() {
   $('btn-cerrar')?.addEventListener('click', cerrarQuincenaActual);
   $('btn-reabrir')?.addEventListener('click', reabrirQuincenaActual);
   $('btn-excel-rrhh')?.addEventListener('click', onExcelRRHH);
+  $('btn-excel-preview')?.addEventListener('click', onExcelPreview);
 }
 
 // Días laborables (lun-vie no feriados) de la quincena
@@ -958,8 +960,8 @@ async function ensureXLSX() {
   });
 }
 
-// Construye el .xlsx de la quincena q → { blob, fname }
-async function buildReporteBlob(q) {
+// Construye el libro de la quincena q → { wb, ws, fname } (sin serializar)
+async function buildReporteWorkbook(q) {
   await ensureXLSX();
 
   const range = quincenaRange(q);
@@ -1267,11 +1269,44 @@ async function buildReporteBlob(q) {
 
   XLSX.utils.book_append_sheet(wb, ws, `${q.half === 1 ? '1ra' : '2da'} Q ${MESES[q.month - 1].substring(0, 3)} ${q.year}`.substring(0, 31));
 
-  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
-  const blob  = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const safe  = (obraNombre || 'Obra').replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
   const fname = `Personal_${safe}_${quincenaId(q)}.xlsx`;
+  return { wb, ws, fname };
+}
+
+// Serializa el libro a un .xlsx → { blob, fname }
+async function buildReporteBlob(q) {
+  const { wb, fname } = await buildReporteWorkbook(q);
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+  const blob  = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   return { blob, fname };
+}
+
+// Vista previa read-only: renderiza la misma hoja como tabla HTML (no editable).
+async function previewReporte(q) {
+  let ws;
+  try {
+    ({ ws } = await buildReporteWorkbook(q));
+  } catch (_) {
+    showToast('No se pudo generar la vista previa.', 'error');
+    return;
+  }
+  if (!XLSX.utils.sheet_to_html) {
+    showToast('Vista previa no disponible. Descargá el Excel.', 'warning');
+    return;
+  }
+  const html = XLSX.utils.sheet_to_html(ws, { editable: false });
+  const cont = $('excel-preview');
+  cont.innerHTML = '';
+  try {
+    const table = new DOMParser().parseFromString(html, 'text/html').querySelector('table');
+    if (table) cont.appendChild(document.importNode(table, true));
+    else cont.innerHTML = html;
+  } catch (_) {
+    cont.innerHTML = html;
+  }
+  $('excel-preview-title').textContent = `Planilla — ${quincenaLabel(q)}`;
+  $('modal-excel-preview').classList.remove('hidden');
 }
 
 // Genera el Excel, lo sube a Drive y (opcional) lo descarga
@@ -1308,6 +1343,13 @@ async function onExcelRRHH() {
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
   try { await generarReporte(currentQuincena, { download: true }); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '📊 Excel RRHH'; } }
+}
+
+async function onExcelPreview() {
+  const btn = $('btn-excel-preview');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
+  try { await previewReporte(currentQuincena); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '👁 Ver planilla'; } }
 }
 
 // ───────── Init ─────────
@@ -1362,6 +1404,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('v-file').addEventListener('change', e => {
     viaticoFile = e.target.files[0] || null;
     $('v-file-name').textContent = viaticoFile ? viaticoFile.name : '';
+  });
+
+  // Vista previa del Excel (read-only)
+  $('modal-excel-preview-close').addEventListener('click',  () => $('modal-excel-preview').classList.add('hidden'));
+  $('modal-excel-preview-close2').addEventListener('click', () => $('modal-excel-preview').classList.add('hidden'));
+  $('btn-excel-download').addEventListener('click', () => {
+    $('modal-excel-preview').classList.add('hidden');
+    onExcelRRHH();
   });
 
   // Config de la obra (jornada + valor comida)

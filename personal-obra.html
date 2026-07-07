@@ -109,6 +109,12 @@
     .dni-folder { text-decoration:none; font-size:.9rem; margin-left:.25rem; }
     .v-file-name { font-size:.8rem; color:var(--gray-500); margin-top:.25rem; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+    /* Vista previa del Excel (tabla read-only) */
+    #excel-preview { height:100%; overflow:auto; padding:.5rem; -webkit-overflow-scrolling:touch; }
+    #excel-preview table { border-collapse:collapse; font-size:.72rem; width:max-content; }
+    #excel-preview td, #excel-preview th { border:1px solid var(--gray-300); padding:2px 6px; white-space:nowrap; text-align:center; color:var(--gray-700); }
+    #excel-preview a { color:#1155cc; }
+
     /* Barra de configuración de la obra */
     .obra-cfg-bar { display:flex; align-items:center; justify-content:space-between; gap:.5rem; background:#fff;
                     border:1px solid var(--gray-200); border-radius:12px; padding:.6rem .85rem; margin-bottom:1rem;
@@ -320,6 +326,23 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" id="modal-viatico-cancel">Cancelar</button>
       <button class="btn btn-primary" id="modal-viatico-save">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Vista previa del Excel (read-only) -->
+<div class="modal-overlay hidden" id="modal-excel-preview">
+  <div class="modal modal--xl">
+    <div class="modal-header">
+      <span class="modal-title" id="excel-preview-title">Vista previa de la planilla</span>
+      <button class="modal-close" id="modal-excel-preview-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div id="excel-preview"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-excel-preview-close2">Cerrar</button>
+      <button class="btn btn-primary" id="btn-excel-download">📊 Descargar Excel</button>
     </div>
   </div>
 </div>
