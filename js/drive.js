@@ -7,6 +7,7 @@
     window.uploadToDrive       = noDrive;
     window.uploadSourceToDrive = noDrive;
     window.uploadPdfToDrive    = noDrive;
+    window.deleteDriveFile     = async function () {};   // no-op sin Drive
     return;
   }
 
@@ -111,6 +112,17 @@
     }
     throw lastErr;
   }
+
+  // Borra un archivo de Drive por su ID. 404 (ya no existe) se trata como éxito.
+  window.deleteDriveFile = async function (fileId) {
+    if (!fileId) return;
+    const token = await getAccessToken();
+    const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId), {
+      method:  'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!resp.ok && resp.status !== 404) throw new Error('Drive delete (' + resp.status + ')');
+  };
 
   async function logDriveError(nroOC, error) {
     try {

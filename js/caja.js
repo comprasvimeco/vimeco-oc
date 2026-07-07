@@ -369,9 +369,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function confirmDelete(key) {
     if (!confirm('¿Eliminar este movimiento?')) return;
-    const mesMov = movimientos.find(m => m.key === key)?.fecha?.substring(0, 7);
+    const mov    = movimientos.find(m => m.key === key);
+    const mesMov = mov?.fecha?.substring(0, 7);
     try {
       await deleteCajaMovimiento(targetCodigo, key);
+      // Borrar también el comprobante en Drive (best-effort, no frena el flujo)
+      if (mov?.driveFileId && typeof deleteDriveFile === 'function') {
+        deleteDriveFile(mov.driveFileId).catch(() => {});
+      }
       showToast('Movimiento eliminado', 'success');
       await loadMovimientos();
       sincronizarExcel(mesMov);

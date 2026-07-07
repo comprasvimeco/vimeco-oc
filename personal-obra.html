@@ -73,6 +73,22 @@
     .pf-estado { grid-column:1 / -1; }
     .pf-comida { flex-direction:row; align-items:center; gap:.45rem; padding-bottom:.35rem; }
     .pf-comida input { width:18px; height:18px; }
+
+    /* Sección general del parte (aplica a toda la cuadrilla) */
+    .parte-general { border:1px solid #cfe0f2; background:#f2f7fc; border-radius:10px; padding:.75rem .85rem; margin-bottom:.9rem; }
+    .pg-title { font-weight:700; color:#1a3a5c; font-size:.92rem; margin-bottom:.55rem; display:flex; align-items:center; gap:.4rem; }
+    .pg-fields { display:grid; grid-template-columns:1fr 1fr; gap:.5rem .75rem; align-items:end; }
+    .pg-note { font-size:.72rem; color:var(--gray-500); margin-top:.55rem; }
+
+    /* Botones de estado por persona */
+    .estado-btns { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.6rem; }
+    .estado-btns .eb { flex:1 1 auto; padding:.38rem .5rem; font-size:.78rem; border:1px solid var(--gray-300);
+                       background:#fff; color:var(--gray-600); border-radius:7px; cursor:pointer; }
+    .estado-btns .eb.active { background:#1a3a5c; color:#fff; border-color:#1a3a5c; font-weight:600; }
+    .estado-btns .eb[data-e="AU"].active { background:#b02a2a; border-color:#b02a2a; }
+    .estado-btns .eb[data-e="AC"].active { background:#c47a3a; border-color:#c47a3a; }
+    .estado-btns .eb[data-e="CM"].active { background:#7a5ba6; border-color:#7a5ba6; }
+    .estado-btns .eb:disabled { opacity:.5; cursor:default; }
     .pf-adjuntos { grid-column:1 / -1; }
     .adj-list { display:flex; flex-wrap:wrap; gap:.4rem; margin:.35rem 0; }
     .adj-chip { display:inline-flex; align-items:center; gap:.35rem; background:var(--gray-100); border:1px solid var(--gray-200); border-radius:999px; padding:.2rem .6rem; font-size:.78rem; max-width:100%; }
@@ -117,14 +133,21 @@
 
 <main class="app-main">
 
-  <!-- Configuración de la obra -->
-  <div class="obra-cfg-bar">
-    <span>Jornada: <strong id="cfg-jornada">—</strong> h · Comida: $<strong id="cfg-comida">—</strong></span>
-    <button class="btn btn-sm btn-outline" id="btn-config-obra">⚙ Editar</button>
+  <!-- CALENDARIO (Capa 2) -->
+  <div class="sec-card" id="cal-card">
+    <div class="sec-head" id="cal-head">
+      <h2>📅 QUINCENA</h2>
+      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="sec-body">
+      <div id="cal-container" style="color:var(--gray-500);font-size:.9rem;padding:.5rem 0;">
+        Cargando calendario…
+      </div>
+    </div>
   </div>
 
-  <!-- CUADRILLA -->
-  <div class="sec-card" id="crew-card">
+  <!-- CUADRILLA (colapsada por defecto) -->
+  <div class="sec-card collapsed" id="crew-card">
     <div class="sec-head" id="crew-head">
       <h2>👷 CUADRILLA <span id="crew-count" style="color:var(--gray-400);font-weight:400;"></span></h2>
       <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
@@ -138,17 +161,10 @@
     </div>
   </div>
 
-  <!-- CALENDARIO (Capa 2) -->
-  <div class="sec-card" id="cal-card">
-    <div class="sec-head" id="cal-head">
-      <h2>📅 QUINCENA</h2>
-      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-    </div>
-    <div class="sec-body">
-      <div id="cal-container" style="color:var(--gray-500);font-size:.9rem;padding:.5rem 0;">
-        Cargando calendario…
-      </div>
-    </div>
+  <!-- Configuración de la obra (jornada + comida) -->
+  <div class="obra-cfg-bar">
+    <span>Jornada: <strong id="cfg-jornada">—</strong> h · Comida: $<strong id="cfg-comida">—</strong></span>
+    <button class="btn btn-sm btn-outline" id="btn-config-obra">⚙ Editar</button>
   </div>
 
 </main>
@@ -268,6 +284,7 @@
     </div>
     <div class="modal-body">
       <div id="parte-info" class="parte-info"></div>
+      <div id="parte-general"></div>
       <div id="parte-list"></div>
     </div>
     <div class="modal-footer" id="parte-footer">
