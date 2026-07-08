@@ -135,9 +135,21 @@ function renderCuadrilla() {
   });
 }
 
+// Orden por jerarquía: posición de la categoría en la lista de config
+// (de mayor a menor); sin categoría al final. A igual jerarquía, alfabético.
+function ordenJerarquia(list) {
+  const rango = p => {
+    const i = p.categoria ? categorias.indexOf(p.categoria) : -1;
+    return i === -1 ? categorias.length : i;
+  };
+  return list.slice().sort((a, b) =>
+    rango(a) - rango(b) ||
+    (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre));
+}
+
 async function loadCuadrilla() {
   try {
-    cuadrilla = await getPersonalDeObra(obraKey);
+    cuadrilla = ordenJerarquia(await getPersonalDeObra(obraKey));
     renderCuadrilla();
   } catch (_) {
     $('crew-list').innerHTML = '<div class="hist-empty">Error al cargar la cuadrilla.</div>';
@@ -167,6 +179,8 @@ function openAddPersonal() {
   $('p-nombre').value = '';
   $('p-apellido').value = '';
   $('p-dni').value = '';
+  $('p-telefono').value = '';
+  $('p-domicilio').value = '';
   $('p-foto-frente').value = '';
   $('p-foto-dorso').value = '';
   fillCategorias('');
@@ -189,6 +203,8 @@ function openEditPersonal(id) {
   $('p-nombre').value   = p.nombre || '';
   $('p-apellido').value = p.apellido || '';
   $('p-dni').value      = p.dni || '';
+  $('p-telefono').value  = p.telefono || '';
+  $('p-domicilio').value = p.domicilio || '';
   $('p-foto-frente').value = '';
   $('p-foto-dorso').value = '';
   fillCategorias(p.categoria || '');
@@ -204,6 +220,8 @@ async function savePersonalModal() {
   const nombre   = $('p-nombre').value.trim();
   const apellido = $('p-apellido').value.trim();
   const dni      = $('p-dni').value.trim();
+  const telefono  = $('p-telefono').value.trim();
+  const domicilio = $('p-domicilio').value.trim();
   const categoria = $('p-categoria').value;
   const horasExtra = $('p-horas-extra').checked;
   const porcentajeExtra = parseFloat($('p-pct-extra').value) || 0;
@@ -222,10 +240,10 @@ async function savePersonalModal() {
   try {
     let id = editingId;
     if (editingId) {
-      await patchPersonal(editingId, { nombre, apellido, dni, categoria, horasExtra, porcentajeExtra });
+      await patchPersonal(editingId, { nombre, apellido, dni, telefono, domicilio, categoria, horasExtra, porcentajeExtra });
     } else {
       id = await savePersonal({
-        nombre, apellido, dni, categoria, horasExtra, porcentajeExtra,
+        nombre, apellido, dni, telefono, domicilio, categoria, horasExtra, porcentajeExtra,
         activo: true,
         fotoDniFrente: '', fotoDniDorso: '',
         obras: { [obraKey]: true }
@@ -1055,33 +1073,46 @@ async function buildReporteWorkbook(q) {
 
   // ── PLANILLA DE CATEGORÍAS ──
   r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE CATEGORÍAS'; S(r, 0, stSection); mergeFull(r);
-  const catMergeEnd = Math.min(C_DAY0 + 4, NCOLS - 1);
-  // Encabezado: Nro | APELLIDO Y NOMBRES | DNI | CATEGORÍA
+  // Estila y combina un tramo de columnas [c0..c1] en la fila rr
+  const spanCols = (rr2, st, c0, c1) => {
+    for (let c = c0; c <= c1; c++) S(rr2, c, st);
+    if (c1 > c0) merges.push({ s: { r: rr2, c: c0 }, e: { r: rr2, c: c1 } });
+  };
+  // Tramos: DNI (1 col) | CATEGORÍA | TELÉFONO | DOMICILIO (hasta el final)
+  const C_CAT0 = C_DAY0 + 1, C_CAT1 = C_DAY0 + 4;
+  const C_TEL0 = C_DAY0 + 5, C_TEL1 = C_DAY0 + 7;
+  const C_DOM0 = C_DAY0 + 8, C_DOM1 = NCOLS - 1;
+  // Encabezado: Nro | APELLIDO Y NOMBRES | DNI | CATEGORÍA | TELÉFONO | DOMICILIO
   {
     const h = blank();
-    h[C_NRO] = 'Nro'; h[C_NAME] = 'APELLIDO Y NOMBRES'; h[C_DAY0] = 'DNI'; h[C_DAY0 + 1] = 'CATEGORÍA';
+    h[C_NRO] = 'Nro'; h[C_NAME] = 'APELLIDO Y NOMBRES'; h[C_DAY0] = 'DNI';
+    h[C_CAT0] = 'CATEGORÍA'; h[C_TEL0] = 'TELÉFONO'; h[C_DOM0] = 'DOMICILIO';
     const rh = rows.push(h) - 1;
     S(rh, C_NRO, stTh('center'));
     S(rh, C_NAME, stTh('left'));
     S(rh, C_DAY0, stTh('center'));
-    for (let c = C_DAY0 + 1; c <= catMergeEnd; c++) S(rh, c, stTh('left'));
-    merges.push({ s: { r: rh, c: C_DAY0 + 1 }, e: { r: rh, c: catMergeEnd } });
+    spanCols(rh, stTh('left'), C_CAT0, C_CAT1);
+    spanCols(rh, stTh('left'), C_TEL0, C_TEL1);
+    spanCols(rh, stTh('left'), C_DOM0, C_DOM1);
   }
   crew.forEach((p, i) => {
     const row = blank();
     row[C_NRO]  = i + 1;
     row[C_NAME] = `${p.apellido}, ${p.nombre}`;
     const dniUrl = p.dniFolderUrl || dniFrente(p) || '';   // link a la carpeta de documentos (o al frente)
-    row[C_DAY0]     = dniUrl ? 'Ver' : '—';
-    row[C_DAY0 + 1] = categoriaLabel(p) || '—';
+    row[C_DAY0]  = dniUrl ? 'Ver' : '—';
+    row[C_CAT0]  = categoriaLabel(p) || '—';
+    row[C_TEL0]  = p.telefono || '—';
+    row[C_DOM0]  = p.domicilio || '—';
     const rr = rows.push(row) - 1;
     const bg = bgAlt(i);
     S(rr, C_NRO, stNro(bg));
     S(rr, C_NAME, stName(bg));
     S(rr, C_DAY0, { ...stDay(bg), font: { sz: 9, color: { rgb: dniUrl ? A('1155CC') : DARK }, underline: !!dniUrl } });
     if (dniUrl) L(rr, C_DAY0, dniUrl);
-    for (let c = C_DAY0 + 1; c <= catMergeEnd; c++) S(rr, c, stCat(bg));
-    merges.push({ s: { r: rr, c: C_DAY0 + 1 }, e: { r: rr, c: catMergeEnd } });
+    spanCols(rr, stCat(bg), C_CAT0, C_CAT1);
+    spanCols(rr, stCat(bg), C_TEL0, C_TEL1);
+    spanCols(rr, stCat(bg), C_DOM0, C_DOM1);
   });
   rows.push(blank());
 
@@ -1268,6 +1299,124 @@ async function buildReporteWorkbook(q) {
     }
   }
 
+  // ── PLANILLA DE MONTOS A PAGAR (por horas, con valores de categoría del mes) ──
+  // Reglas: horas que exceden la jornada ×1,5 · horas en feriado ×2 ·
+  // plus porcentual de la persona sobre el valor hora de su categoría.
+  {
+    const mesQ = `${q.year}-${pad2(q.month)}`;
+    let valores = {}, origenValores = null;
+    try {
+      const todos = await getValoresCategoriasTodos();
+      if (todos[mesQ] && Object.keys(todos[mesQ]).length) {
+        valores = todos[mesQ]; origenValores = mesQ;
+      } else {
+        // Sin valores del mes: usar el mes más reciente anterior que tenga carga
+        const prev = Object.keys(todos)
+          .filter(m => m < mesQ && Object.keys(todos[m] || {}).length)
+          .sort().pop();
+        if (prev) { valores = todos[prev]; origenValores = prev; }
+      }
+    } catch (_) {}
+    const catKey  = c => (typeof sanitizeCatKey === 'function' ? sanitizeCatKey(c) : String(c || ''));
+    const jornada = Number(constantes.jornadaHoras) || 8;
+
+    r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE MONTOS A PAGAR (HORAS)'; S(r, 0, stSection); mergeFull(r);
+
+    // Tramos de columnas
+    const M_CAT0 = C_DAY0,      M_CAT1 = C_DAY0 + 3;
+    const M_HN0  = C_DAY0 + 4,  M_HN1  = C_DAY0 + 5;
+    const M_HX0  = C_DAY0 + 6,  M_HX1  = C_DAY0 + 7;
+    const M_HF0  = C_DAY0 + 8,  M_HF1  = C_DAY0 + 9;
+    const M_VH0  = C_DAY0 + 10, M_VH1  = C_DAY0 + 11;
+    const M_PCT  = C_DAY0 + 12;
+    const M_TOT0 = C_DAY0 + 13, M_TOT1 = NCOLS - 1;
+    {
+      const h = blank();
+      h[C_NRO] = 'Nro'; h[C_NAME] = 'APELLIDO Y NOMBRES';
+      h[M_CAT0] = 'CATEGORÍA'; h[M_HN0] = 'HS NORMALES'; h[M_HX0] = 'HS EXTRAS ×1,5';
+      h[M_HF0] = 'HS FERIADO ×2'; h[M_VH0] = 'VALOR HORA'; h[M_PCT] = 'PLUS %'; h[M_TOT0] = 'MONTO A PAGAR';
+      const rh = rows.push(h) - 1;
+      S(rh, C_NRO, stTh('center'));
+      S(rh, C_NAME, stTh('left'));
+      spanCols(rh, stTh('left'),   M_CAT0, M_CAT1);
+      spanCols(rh, stTh('center'), M_HN0, M_HN1);
+      spanCols(rh, stTh('center'), M_HX0, M_HX1);
+      spanCols(rh, stTh('center'), M_HF0, M_HF1);
+      spanCols(rh, stTh('center'), M_VH0, M_VH1);
+      S(rh, M_PCT, stTh('center'));
+      spanCols(rh, stTh('center'), M_TOT0, M_TOT1);
+    }
+
+    let granMonto = 0, sinValor = false;
+    crew.forEach((p, i) => {
+      let hNorm = 0, hExtra = 0, hFer = 0;
+      dias.forEach(dia => {
+        const it = ((partes[dia.iso] && partes[dia.iso].items) || {})[p.id];
+        if (!it) return;
+        const horas = Number(it.horas) || 0;
+        if (horas <= 0) return;
+        if (dia.feriado || it.estado === 'F') {
+          hFer += horas;
+        } else {
+          hNorm  += Math.min(horas, jornada);
+          hExtra += Math.max(0, horas - jornada);
+        }
+      });
+      const base = Number(valores[catKey(p.categoria)]) || 0;
+      if (!base && (hNorm + hExtra + hFer) > 0) sinValor = true;
+      const pct   = Number(p.porcentajeExtra) || 0;
+      const vh    = base * (1 + pct / 100);
+      const monto = vh * (hNorm + 1.5 * hExtra + 2 * hFer);
+      granMonto  += monto;
+
+      const row = blank();
+      row[C_NRO]  = i + 1;
+      row[C_NAME] = `${p.apellido}, ${p.nombre}`;
+      row[M_CAT0] = p.categoria || '—';
+      row[M_HN0]  = hNorm  || 0;
+      row[M_HX0]  = hExtra || 0;
+      row[M_HF0]  = hFer   || 0;
+      row[M_VH0]  = base ? vh : '—';
+      row[M_PCT]  = pct ? pct + '%' : '—';
+      row[M_TOT0] = base ? monto : '—';
+      const rr = rows.push(row) - 1;
+      const bg = bgAlt(i);
+      S(rr, C_NRO, stNro(bg));
+      S(rr, C_NAME, stName(bg));
+      spanCols(rr, stCat(bg), M_CAT0, M_CAT1);
+      spanCols(rr, stTot(bg), M_HN0, M_HN1);
+      spanCols(rr, stTot(bg), M_HX0, M_HX1);
+      spanCols(rr, stTot(bg), M_HF0, M_HF1);
+      spanCols(rr, base ? stMoney(bg) : stDay(bg), M_VH0, M_VH1);
+      S(rr, M_PCT, stDay(bg));
+      spanCols(rr, base ? stMoney(LBLUE, true) : stDay(LBLUE), M_TOT0, M_TOT1);
+    });
+
+    // Fila TOTAL general
+    {
+      const row = blank();
+      row[C_NAME]  = 'TOTAL';
+      row[M_TOT0]  = granMonto;
+      const rr = rows.push(row) - 1;
+      const lbl = { ...stName(YELW), font: { bold: true, sz: 10, color: { rgb: DARK } }, alignment: { horizontal: 'right', vertical: 'center' } };
+      S(rr, C_NRO, stTot(YELW));
+      spanCols(rr, lbl, C_NAME, M_TOT0 - 1);
+      spanCols(rr, stMoney(YELW, true), M_TOT0, M_TOT1);
+    }
+
+    // Nota sobre el origen de los valores usados
+    let notaValores = '';
+    if (!origenValores)          notaValores = '⚠ Sin valores de categoría cargados. Cargalos en Administración → Personal (configuración) → Valores por categoría.';
+    else if (origenValores !== mesQ) notaValores = `⚠ Valores de categoría de ${origenValores} (no hay cargados para ${mesQ}).`;
+    else if (sinValor)           notaValores = `⚠ Hay categorías sin valor cargado en ${mesQ}: esas filas no se pudieron calcular.`;
+    if (notaValores) {
+      r = rows.push(blank()) - 1;
+      rows[r][0] = notaValores;
+      S(r, 0, { font: { italic: true, sz: 9, color: { rgb: A('B45309') } }, alignment: { horizontal: 'left', vertical: 'center' } });
+      mergeFull(r);
+    }
+  }
+
   // ── Construir hoja ──
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1406,6 +1555,28 @@ async function previewReporte(q) {
   $('modal-excel-preview').classList.remove('hidden');
 }
 
+// Imprimir / PDF: abre la planilla ya renderizada en una ventana de impresión.
+// Desde el diálogo del navegador se imprime o se elige "Guardar como PDF".
+function onExcelPrint() {
+  const html = $('excel-preview').innerHTML;
+  if (!html) return;
+  const w = window.open('', '_blank');
+  if (!w) { showToast('El navegador bloqueó la ventana. Permití pop-ups para imprimir.', 'warning'); return; }
+  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>Planilla — ${esc(obraNombre)} — ${esc(quincenaLabel(currentQuincena))}</title>
+<style>
+  @page { size: A4 landscape; margin: 8mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0; }
+  table { border-collapse: collapse; table-layout: fixed; }
+  td { padding: 2px 4px; overflow: hidden; }
+  a { color: #1155cc; text-decoration: none; }
+</style></head><body>${html}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch (_) {} }, 350);
+}
+
 // Genera el Excel, lo sube a Drive y (opcional) lo descarga
 async function generarReporte(q, { silencioso = false, download = false } = {}) {
   let blob, fname;
@@ -1510,6 +1681,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('modal-excel-preview').classList.add('hidden');
     onExcelRRHH();
   });
+  $('btn-excel-print').addEventListener('click', onExcelPrint);
 
   // Config de la obra (jornada + valor comida)
   $('btn-config-obra').addEventListener('click', openConfigObra);

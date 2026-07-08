@@ -344,7 +344,8 @@
     if (!data) return [];
     return Object.entries(data)
       .map(([key, m]) => ({ key, ...m }))
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      // Por fecha del movimiento (desc); a igual fecha, el más reciente primero
+      .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || (b.timestamp || 0) - (a.timestamp || 0));
   };
 
   window.saveCajaMovimiento = async function (userId, movimiento) {
@@ -516,6 +517,23 @@
   };
   window.saveCategoriasPersonal = async function (cats) {
     await _put('/personal_config/categorias.json', cats);
+  };
+
+  // --- Valores por categoría (UOCRA, carga mensual manual) ---
+  // Estructura: /personal_config/valores/{YYYY-MM}/{categoria}: valorHora
+  // Firebase no admite . $ # [ ] / en las claves → se sanitizan los nombres.
+  window.sanitizeCatKey = function (cat) {
+    return String(cat || '').replace(/[.#$/\[\]]/g, '_');
+  };
+  // Todos los meses cargados: { "YYYY-MM": { catKey: valorHora } }
+  window.getValoresCategoriasTodos = async function () {
+    return (await _get('/personal_config/valores.json')) || {};
+  };
+  window.getValoresCategorias = async function (mes) {
+    return (await _get('/personal_config/valores/' + mes + '.json')) || {};
+  };
+  window.saveValoresCategorias = async function (mes, valores) {
+    await _put('/personal_config/valores/' + mes + '.json', valores);
   };
 
   // --- Feriados --- { "YYYY-MM-DD": "Nombre" }

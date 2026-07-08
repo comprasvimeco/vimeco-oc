@@ -22,6 +22,10 @@
             border-radius:999px; padding:.3rem .75rem; font-size:.9rem; }
     .chip button { border:none; background:none; color:var(--gray-500); cursor:pointer; font-size:1rem; line-height:1; padding:0; }
     .chip button:hover { color:#d64545; }
+    .chip .chip-move { font-weight:700; }
+    .chip .chip-move:hover { color:var(--gray-800); }
+    .chip .chip-move:disabled { opacity:.25; cursor:default; }
+    .chip .chip-move:disabled:hover { color:var(--gray-500); }
     .cfg-row { display:flex; gap:.5rem; flex-wrap:wrap; }
     .fer-item { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.4rem .25rem; border-bottom:1px solid var(--gray-100); }
     .fer-item:last-child { border-bottom:none; }
@@ -70,11 +74,32 @@
     <div class="sec-head"><h2>Categorías de personal</h2>
       <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
     <div class="sec-body">
+      <p style="color:var(--gray-500);font-size:.82rem;margin:.25rem 0 .6rem;">El orden define la jerarquía (de mayor a menor): las cuadrillas y las planillas se ordenan así. Usá ‹ › para reordenar.</p>
       <div id="cat-list" class="chip-list"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
       <div class="cfg-row">
         <input type="text" id="cat-input" class="form-control" placeholder="Ej: Oficial" style="flex:1;min-width:160px;">
         <button class="btn btn-primary btn-sm" id="cat-add">+ Agregar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Valores por categoría (UOCRA) -->
+  <div class="sec-card collapsed" id="val-card">
+    <div class="sec-head"><h2>Valores por categoría ($/hora)</h2>
+      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div class="sec-body">
+      <p style="color:var(--gray-500);font-size:.82rem;margin:.25rem 0 .6rem;">
+        Valor hora básico de convenio (UOCRA) por categoría, para el cálculo del monto a pagar.
+        La UOCRA no publica una API: hay que cargarlos a mano cada mes cuando sale la escala
+        (<a href="https://www.uocra.org" target="_blank" rel="noopener">uocra.org</a>).
+      </p>
+      <div class="cfg-row" style="margin-bottom:.75rem;align-items:center;">
+        <label for="val-mes" style="font-size:.85rem;color:var(--gray-600);">Mes:</label>
+        <input type="month" id="val-mes" class="form-control" style="max-width:180px;">
+        <button class="btn btn-sm btn-outline" id="val-copiar">Copiar del mes anterior</button>
+      </div>
+      <div id="val-list" style="margin-bottom:.75rem;"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
+      <button class="btn btn-primary btn-sm" id="val-save">Guardar valores</button>
     </div>
   </div>
 
@@ -126,6 +151,12 @@
           <input type="text" id="p-dni" class="form-control" inputmode="numeric" placeholder="30123456"></div>
         <div class="form-group" style="flex:1"><label for="p-categoria">Categoría</label>
           <select id="p-categoria" class="form-control"></select></div>
+      </div>
+      <div style="display:flex;gap:.75rem;">
+        <div class="form-group" style="flex:1"><label for="p-telefono">Teléfono</label>
+          <input type="tel" id="p-telefono" class="form-control" inputmode="tel" placeholder="11 2345-6789"></div>
+        <div class="form-group" style="flex:1"><label for="p-domicilio">Domicilio</label>
+          <input type="text" id="p-domicilio" class="form-control" placeholder="Calle 123, Localidad"></div>
       </div>
       <div style="display:flex;gap:.75rem;align-items:flex-end;">
         <div class="form-group" style="flex:1;margin-bottom:0">

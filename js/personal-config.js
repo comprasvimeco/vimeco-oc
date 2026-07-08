@@ -51,11 +51,30 @@ function renderCategorias() {
     return;
   }
   cont.innerHTML = categorias.map((c, i) => `
-    <span class="chip">${esc(c)}<button data-i="${i}" title="Quitar">×</button></span>
+    <span class="chip">
+      <button class="chip-move" data-i="${i}" data-d="-1" title="Subir en la jerarquía" ${i === 0 ? 'disabled' : ''}>‹</button>
+      ${esc(c)}
+      <button class="chip-move" data-i="${i}" data-d="1" title="Bajar en la jerarquía" ${i === categorias.length - 1 ? 'disabled' : ''}>›</button>
+      <button class="chip-del" data-i="${i}" title="Quitar">×</button>
+    </span>
   `).join('');
-  cont.querySelectorAll('.chip button').forEach(btn => {
+  cont.querySelectorAll('.chip-del').forEach(btn => {
     btn.addEventListener('click', () => removeCategoria(parseInt(btn.dataset.i, 10)));
   });
+  cont.querySelectorAll('.chip-move').forEach(btn => {
+    btn.addEventListener('click', () => moveCategoria(parseInt(btn.dataset.i, 10), parseInt(btn.dataset.d, 10)));
+  });
+}
+
+// Mueve una categoría dentro de la jerarquía (d = -1 sube, +1 baja)
+async function moveCategoria(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= categorias.length) return;
+  [categorias[i], categorias[j]] = [categorias[j], categorias[i]];
+  renderCategorias();
+  renderValores();
+  try { await saveCategoriasPersonal(categorias); }
+  catch (_) { showToast('Error al guardar el orden.', 'error'); }
 }
 
 async function addCategoria() {
@@ -68,6 +87,7 @@ async function addCategoria() {
   categorias.push(val);
   $('cat-input').value = '';
   renderCategorias();
+  renderValores();
   try { await saveCategoriasPersonal(categorias); showToast('Categoría agregada.'); }
   catch (_) { showToast('Error al guardar.', 'error'); }
 }
@@ -78,8 +98,81 @@ async function removeCategoria(i) {
   if (!ok) return;
   categorias.splice(i, 1);
   renderCategorias();
+  renderValores();
   try { await saveCategoriasPersonal(categorias); showToast('Categoría quitada.'); }
   catch (_) { showToast('Error al guardar.', 'error'); }
+}
+
+// ───────────── Valores por categoría ($/hora, por mes) ─────────────
+let valoresMes = {};   // { catKey: valorHora } del mes seleccionado
+
+function mesIsoActual() { return new Date().toISOString().substring(0, 7); }
+
+function mesIsoAnterior(mes) {
+  const [y, m] = mes.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+function renderValores() {
+  const cont = $('val-list');
+  if (!categorias.length) {
+    cont.innerHTML = '<span style="color:var(--gray-500);font-size:.85rem;">Primero cargá las categorías.</span>';
+    return;
+  }
+  cont.innerHTML = categorias.map(c => {
+    const k = sanitizeCatKey(c);
+    const v = valoresMes[k];
+    return `
+      <div class="fer-item">
+        <span class="fer-fecha" style="min-width:170px">${esc(c)}</span>
+        <span style="color:var(--gray-500);font-size:.85rem;">$/hora</span>
+        <input type="number" class="form-control val-input" data-k="${esc(k)}" min="0" step="0.01"
+               value="${(v ?? '') === '' ? '' : v}" placeholder="0" style="max-width:140px">
+      </div>`;
+  }).join('');
+}
+
+async function loadValores() {
+  const mes = $('val-mes').value || mesIsoActual();
+  try { valoresMes = (await getValoresCategorias(mes)) || {}; }
+  catch (_) { valoresMes = {}; showToast('Error al cargar los valores.', 'error'); }
+  renderValores();
+}
+
+async function saveValores() {
+  const mes = $('val-mes').value;
+  if (!mes) { showToast('Elegí un mes.', 'warning'); return; }
+  const out = {};
+  $('val-list').querySelectorAll('.val-input').forEach(inp => {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v) && v > 0) out[inp.dataset.k] = v;
+  });
+  const btn = $('val-save');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await saveValoresCategorias(mes, out);
+    valoresMes = out;
+    showToast('Valores guardados.');
+  } catch (_) {
+    showToast('Error al guardar los valores.', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar valores';
+  }
+}
+
+async function copiarValoresMesAnterior() {
+  const mes = $('val-mes').value;
+  if (!mes) { showToast('Elegí un mes.', 'warning'); return; }
+  const prev = mesIsoAnterior(mes);
+  try {
+    const vals = (await getValoresCategorias(prev)) || {};
+    if (!Object.keys(vals).length) { showToast(`No hay valores cargados en ${prev}.`, 'warning'); return; }
+    valoresMes = vals;
+    renderValores();
+    showToast('Valores copiados. Ajustalos si hace falta y guardá.');
+  } catch (_) {
+    showToast('Error al copiar los valores.', 'error');
+  }
 }
 
 // ───────────── Feriados ─────────────
@@ -229,6 +322,7 @@ function openAddPersonal() {
   $('modal-personal-title').textContent = 'Agregar al padrón';
   $('modal-personal-error').classList.add('hidden');
   $('p-nombre').value = ''; $('p-apellido').value = ''; $('p-dni').value = '';
+  $('p-telefono').value = ''; $('p-domicilio').value = '';
   $('p-foto-frente').value = ''; $('p-foto-dorso').value = '';
   fillCategorias('');
   $('p-horas-extra').checked = false;
@@ -246,6 +340,7 @@ function openEditPersonal(id) {
   $('modal-personal-title').textContent = 'Editar personal';
   $('modal-personal-error').classList.add('hidden');
   $('p-nombre').value = p.nombre || ''; $('p-apellido').value = p.apellido || ''; $('p-dni').value = p.dni || '';
+  $('p-telefono').value = p.telefono || ''; $('p-domicilio').value = p.domicilio || '';
   $('p-foto-frente').value = ''; $('p-foto-dorso').value = '';
   fillCategorias(p.categoria || '');
   $('p-horas-extra').checked = !!p.horasExtra;
@@ -260,6 +355,8 @@ async function savePersonalModal() {
   const nombre   = $('p-nombre').value.trim();
   const apellido = $('p-apellido').value.trim();
   const dni      = $('p-dni').value.trim();
+  const telefono  = $('p-telefono').value.trim();
+  const domicilio = $('p-domicilio').value.trim();
   const categoria = $('p-categoria').value;
   const horasExtra = $('p-horas-extra').checked;
   const porcentajeExtra = parseFloat($('p-pct-extra').value) || 0;
@@ -277,9 +374,9 @@ async function savePersonalModal() {
   try {
     let id = editingId;
     if (editingId) {
-      await patchPersonal(editingId, { nombre, apellido, dni, categoria, horasExtra, porcentajeExtra });
+      await patchPersonal(editingId, { nombre, apellido, dni, telefono, domicilio, categoria, horasExtra, porcentajeExtra });
     } else {
-      id = await savePersonal({ nombre, apellido, dni, categoria, horasExtra, porcentajeExtra, activo: true, fotoDniFrente: '', fotoDniDorso: '', obras: {} });
+      id = await savePersonal({ nombre, apellido, dni, telefono, domicilio, categoria, horasExtra, porcentajeExtra, activo: true, fotoDniFrente: '', fotoDniDorso: '', obras: {} });
     }
 
     if (fotoFrente || fotoDorso) {
@@ -351,6 +448,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('fer-add').addEventListener('click', addFeriado);
   $('fer-nombre').addEventListener('keydown', e => { if (e.key === 'Enter') addFeriado(); });
 
+  // Valores por categoría
+  $('val-mes').value = mesIsoActual();
+  $('val-mes').addEventListener('change', loadValores);
+  $('val-save').addEventListener('click', saveValores);
+  $('val-copiar').addEventListener('click', copiarValoresMesAnterior);
+
   // Padrón
   $('pad-search').addEventListener('input', renderPadron);
   $('pad-add').addEventListener('click', openAddPersonal);
@@ -374,5 +477,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   renderCategorias();
   renderFeriados();
+  loadValores();
   loadPadron();
 });
