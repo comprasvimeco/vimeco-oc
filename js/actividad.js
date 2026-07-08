@@ -17,10 +17,10 @@ function esc(str) {
 }
 
 function showToast(msg, type = 'success') {
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${esc(msg)}</span>`;
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${esc(msg)}</span>`;
   $('toast-container').appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transition = 'opacity .3s';
@@ -187,14 +187,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('hdr-name').textContent = name || '';
 
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
-  $('btn-logout').addEventListener('click', () => {
-    sessionStorage.clear();
-    localStorage.removeItem('responsable_code');
-    localStorage.removeItem('responsable_name');
-    localStorage.removeItem('vimeco_session');
-    window.location.href = 'index.html';
-  });
-
   // Sólo admins acceden a Novedades
   let isAdmin = code === '0000';
   if (!isAdmin) {

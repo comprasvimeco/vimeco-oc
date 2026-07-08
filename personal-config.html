@@ -54,7 +54,7 @@
 <body>
 
 <header class="app-header">
-  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='administracion.html'">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='menu.html'">
     <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
       onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
     <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
@@ -62,8 +62,7 @@
   </div>
   <div class="header-user">
     <div class="user-badge"><span id="hdr-name">—</span></div>
-    <button class="btn btn-sm btn-outline" id="btn-back"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Volver</button>
-    <button class="btn btn-sm btn-secondary" id="btn-logout">Salir</button>
+    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
 </header>
 
@@ -205,6 +204,7 @@
 
 <div class="toast-container" id="toast-container"></div>
 
+<script src="js/icons.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>

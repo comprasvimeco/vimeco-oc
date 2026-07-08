@@ -3,10 +3,10 @@
 const $ = id => document.getElementById(id);
 
 function showToast(msg, type = 'success') {
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
   $('toast-container').appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transition = 'opacity .3s';
@@ -53,12 +53,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = _s.nombre;
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
-  $('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('vimeco_session');
-    sessionStorage.clear();
-    window.location.href = 'index.html';
-  });
-
   // Determinar rol: admin (0000 o flag admin) ve todas las obras; jefe ve las suyas.
   let esAdmin = _s.codigo === '0000';
   let esJefe  = false;

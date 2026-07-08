@@ -91,11 +91,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.addEventListener('click', () => document.getElementById('hdr-dropdown').classList.add('hidden'));
 
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('vimeco_session');
-    window.location.href = 'index.html';
-  });
-
   if (isAdmin) {
     document.getElementById('btn-categorias').classList.remove('hidden');
     document.getElementById('btn-categorias').addEventListener('click', openCategoriasModal);

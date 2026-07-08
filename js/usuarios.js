@@ -3,10 +3,10 @@
 const $ = id => document.getElementById(id);
 
 function showToast(msg, type = 'success') {
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
   $('toast-container').appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transition = 'opacity .3s';
@@ -42,13 +42,13 @@ function renderUsers(list) {
   container.innerHTML = list.map(u => {
     const esSuper = u.codigo === '0000';
     const cajaBadge = esSuper
-      ? '<span class="u-badge u-badge-activo">🧮 Caja (admin)</span>'
-      : `<span class="u-badge ${u.caja ? 'u-badge-activo' : 'u-badge-inactivo'}">${u.caja ? '🧮 Caja' : '🧮 Sin caja'}</span>`;
+      ? `<span class="u-badge u-badge-activo">${icSvg('calc')} Caja (admin)</span>`
+      : `<span class="u-badge ${u.caja ? 'u-badge-activo' : 'u-badge-inactivo'}">${icSvg('calc')} ${u.caja ? 'Caja' : 'Sin caja'}</span>`;
     const adminBadge = esSuper
-      ? '<span class="u-badge u-badge-activo">⚙️ Admin (super)</span>'
-      : (u.admin ? '<span class="u-badge u-badge-activo">⚙️ Admin</span>' : '');
+      ? `<span class="u-badge u-badge-activo">${icSvg('settings')} Admin (super)</span>`
+      : (u.admin ? `<span class="u-badge u-badge-activo">${icSvg('settings')} Admin</span>` : '');
     const jefeBadge = (!esSuper && u.jefeObra)
-      ? '<span class="u-badge u-badge-activo">👷 Jefe de Obra</span>'
+      ? `<span class="u-badge u-badge-activo">${icSvg('user')} Jefe de Obra</span>`
       : '';
     const jefeBtn = esSuper
       ? ''
@@ -65,7 +65,7 @@ function renderUsers(list) {
         <span class="user-card-code">${esc(u.codigo)}</span>
         <span class="user-card-name">${esc(u.nombre)}</span>
         <span class="u-badge ${u.activo ? 'u-badge-activo' : 'u-badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
-        <span class="u-badge ${u.passwordHash ? 'u-badge-pwd-ok' : 'u-badge-pwd-none'}">${u.passwordHash ? '🔑 Con contraseña' : '⚠ Sin contraseña'}</span>
+        <span class="u-badge ${u.passwordHash ? 'u-badge-pwd-ok' : 'u-badge-pwd-none'}">${u.passwordHash ? icSvg('key') + ' Con contraseña' : icSvg('alert') + ' Sin contraseña'}</span>
         ${cajaBadge}
         ${adminBadge}
         ${jefeBadge}
@@ -269,14 +269,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('hdr-name').textContent = name;
   $('btn-back').addEventListener('click', () => { window.location.href = 'administracion.html'; });
-  $('btn-logout').addEventListener('click', () => {
-    sessionStorage.clear();
-    localStorage.removeItem('responsable_code');
-    localStorage.removeItem('responsable_name');
-    localStorage.removeItem('vimeco_session');
-    window.location.href = 'index.html';
-  });
-
   $('btn-add-user').addEventListener('click', openAddModal);
   $('modal-user-close').addEventListener('click', () => $('modal-user').classList.add('hidden'));
   $('modal-user-cancel').addEventListener('click', () => $('modal-user').classList.add('hidden'));

@@ -149,7 +149,7 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .extract-status.loading { background: #eff6ff; color: #1d4ed8; }
 .extract-status.success { background: #f0fdf4; color: #166534; }
 .extract-status.error { background: #fef2f2; color: #991b1b; }
-.spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ===== ITEMS TABLE ===== */

@@ -11,8 +11,8 @@ function toast(msg, type = 'info') {
   const c  = $('toast-container');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
   c.appendChild(el);
   setTimeout(() => {
     el.style.opacity    = '0';
@@ -237,7 +237,7 @@ function logAdjuntoActivity(oc, file, folderId) {
 async function doAttachPick(file, oc) {
   if (!file || !oc) return;
   const btn = document.querySelector(`.btn-attach-pick[data-nro="${oc.nroOC}"]`);
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Subiendo…'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Subiendo…'; }
   try {
     const res = await attachToDriveOC(file, {
       drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
@@ -251,7 +251,7 @@ async function doAttachPick(file, oc) {
     logAdjuntoActivity(oc, file, res?.folderId);
     await clearShareFile();
     toast(`Archivo adjuntado a OC ${oc.nroOC}`, 'success');
-    if (btn) { btn.textContent = '✓ Adjuntado'; }
+    if (btn) { btn.innerHTML = `${icSvg('checkSm')} Adjuntado`; }
   } catch (e) {
     console.error('doAttachPick:', e);
     toast('Error al subir el archivo a Drive.', 'error');
@@ -324,8 +324,8 @@ function showManualMode() {
 // ---- Attach ----
 
 async function doAttach(file, oc, btn) {
-  btn.disabled    = true;
-  btn.textContent = '⏳ Subiendo…';
+  btn.disabled  = true;
+  btn.innerHTML = '<span class="spinner"></span> Subiendo…';
   try {
     const res = await attachToDriveOC(file, {
       drive_folder_obras_id:       oc.drive_folder_obras_id       || null,

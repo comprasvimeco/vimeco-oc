@@ -14,8 +14,8 @@ function toast(msg, type = 'info') {
   const c  = $('toast-container');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${esc(msg)}</span>`;
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${esc(msg)}</span>`;
   c.appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transition = 'opacity .3s';
@@ -167,7 +167,7 @@ async function firmarOC(oc) {
   if (!myFirma) { pendingSign = oc; openFirmaModal(); return; }
 
   const btn = $('preview-firmar');
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Autorizando…'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Autorizando…'; }
 
   const ocData = ocDataFromRecord(oc);
   ocData._firma    = myFirma;   // firma del autorizador
@@ -336,14 +336,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = myName || '';
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
-  $('btn-logout').addEventListener('click', () => {
-    sessionStorage.clear();
-    localStorage.removeItem('responsable_code');
-    localStorage.removeItem('responsable_name');
-    localStorage.removeItem('vimeco_session');
-    window.location.href = 'index.html';
-  });
-
   // Modales
   $('modal-preview-close').addEventListener('click', cerrarPreview);
   $('modal-preview-close2').addEventListener('click', cerrarPreview);

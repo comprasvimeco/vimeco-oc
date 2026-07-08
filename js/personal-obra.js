@@ -3,10 +3,10 @@
 const $ = id => document.getElementById(id);
 
 function showToast(msg, type = 'success') {
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
   $('toast-container').appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transition = 'opacity .3s';
@@ -91,7 +91,7 @@ function avatar(p) {
   if (front) {
     return `<div class="crew-avatar"><a href="${esc(front)}" target="_blank" rel="noopener" title="Ver DNI (frente)"><img src="${esc(front)}" alt="DNI" onerror="this.parentNode.textContent='${esc(ini)}'"></a></div>`;
   }
-  return `<div class="crew-avatar">${esc(ini.toUpperCase()) || '👷'}</div>`;
+  return `<div class="crew-avatar">${esc(ini.toUpperCase()) || icSvg('user')}</div>`;
 }
 
 // Links a frente/dorso del DNI para la fila
@@ -116,7 +116,7 @@ function renderCuadrilla() {
       ${avatar(p)}
       <div class="crew-info">
         <div class="crew-name">${esc(p.apellido)}, ${esc(p.nombre)}
-          ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">📁</a>` : ''}
+          ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">${icSvg('folder')}</a>` : ''}
         </div>
         <div class="crew-meta">
           ${categoriaLabel(p) ? `<span class="crew-cat">${esc(categoriaLabel(p))}</span> ` : ''}
@@ -427,12 +427,12 @@ function renderCalendar() {
   const faltantes  = laborables.filter(iso => !(partesMeta[iso] && partesMeta[iso].validado)).length;
 
   // "Ver planilla" (preview) siempre disponible; "Excel RRHH" solo con la quincena cerrada.
-  const btnPreview = '<button class="btn btn-sm btn-outline" id="btn-excel-preview">👁 Ver planilla</button>';
-  const btnExcel   = '<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">📊 Excel RRHH</button>';
+  const btnPreview = `<button class="btn btn-sm btn-outline" id="btn-excel-preview">${icSvg('eye')} Ver planilla</button>`;
+  const btnExcel   = `<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">${icSvg('sheet')} Excel RRHH</button>`;
   let cierreHtml;
   if (cerrada) {
     cierreHtml = `
-      <span class="cierre-msg">✓ Quincena cerrada. Solo lectura.</span>
+      <span class="cierre-msg">${icSvg('checkSm')} Quincena cerrada. Solo lectura.</span>
       ${btnPreview}${btnExcel}
       ${esAdmin ? '<button class="btn btn-sm btn-warning" id="btn-reabrir">Reabrir quincena</button>' : ''}`;
   } else if (faltantes > 0) {
@@ -618,7 +618,7 @@ async function onDayClick(iso) {
 
   // Sección general (aplica a toda la cuadrilla)
   $('parte-general').innerHTML = `
-    <div class="pg-title">⚙️ General · toda la cuadrilla</div>
+    <div class="pg-title">${icSvg('settings')} General · toda la cuadrilla</div>
     <div class="pg-fields">
       <div class="pf">
         <label>Condición del día</label>
@@ -680,7 +680,7 @@ async function onDayClick(iso) {
             <label>Adjuntos (certificados médicos, pasajes…)</label>
             <div class="adj-list" data-id="${esc(p.id)}"></div>
             <input type="file" class="adj-input" accept="image/*,application/pdf" style="display:none">
-            <button type="button" class="btn btn-sm btn-outline adj-btn" style="align-self:flex-start">📎 Adjuntar</button>
+            <button type="button" class="btn btn-sm btn-outline adj-btn" style="align-self:flex-start">${icSvg('clip')} Adjuntar</button>
           </div>
         </div>
       </div>`;
@@ -733,7 +733,7 @@ async function onDayClick(iso) {
   // Botón validar: refleja estado actual del día
   const validado = partesMeta[iso] && partesMeta[iso].validado;
   const btnVal = $('parte-validar');
-  btnVal.textContent = validado ? '↺ Quitar validación' : '✓ Validar día';
+  btnVal.innerHTML   = validado ? `${icSvg('undo')} Quitar validación` : `${icSvg('checkSm')} Validar día`;
   btnVal.className   = validado ? 'btn btn-warning' : 'btn btn-success';
 
   $('modal-parte').classList.remove('hidden');
@@ -938,7 +938,7 @@ function renderViaticos(id) {
     <span class="viat-chip">
       <span class="viat-monto">$${Number(v.monto || 0).toLocaleString('es-AR')}</span>
       <span class="viat-motivo">${esc(v.motivo || 'Sin motivo')}</span>
-      ${v.adjunto && v.adjunto.url ? `<a href="${esc(v.adjunto.url)}" target="_blank" rel="noopener" title="Ver adjunto">📎</a>` : ''}
+      ${v.adjunto && v.adjunto.url ? `<a href="${esc(v.adjunto.url)}" target="_blank" rel="noopener" title="Ver adjunto">${icSvg('clip')}</a>` : ''}
       ${parteReadonly ? '' : `<button data-id="${esc(id)}" data-i="${i}" title="Quitar">×</button>`}
     </span>`).join('');
   cont.querySelectorAll('button[data-i]').forEach(b =>
@@ -1612,14 +1612,14 @@ async function onExcelRRHH() {
   const btn = $('btn-excel-rrhh');
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
   try { await generarReporte(currentQuincena, { download: true }); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '📊 Excel RRHH'; } }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = `${icSvg('sheet')} Excel RRHH`; } }
 }
 
 async function onExcelPreview() {
   const btn = $('btn-excel-preview');
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
   try { await previewReporte(currentQuincena); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '👁 Ver planilla'; } }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = `${icSvg('eye')} Ver planilla`; } }
 }
 
 // ───────── Init ─────────
@@ -1632,12 +1632,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('hdr-name').textContent = _s.nombre;
   $('hdr-obra').textContent = obraNombre;
   $('btn-back').addEventListener('click', () => { window.location.href = 'personal.html'; });
-  $('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('vimeco_session');
-    sessionStorage.clear();
-    window.location.href = 'index.html';
-  });
-
   // Acordeón de secciones
   document.querySelectorAll('.sec-head').forEach(head => {
     head.addEventListener('click', () => head.closest('.sec-card').classList.toggle('collapsed'));

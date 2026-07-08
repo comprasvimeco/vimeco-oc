@@ -3,10 +3,10 @@
 const $ = id => document.getElementById(id);
 
 function showToast(msg, type = 'success') {
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
   $('toast-container').appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transition = 'opacity .3s';
@@ -263,7 +263,7 @@ function renderPadron() {
     const front = dniFrente(p);
     const av = front
       ? `<div class="pad-avatar"><a href="${esc(front)}" target="_blank" rel="noopener"><img src="${esc(front)}" alt="DNI" onerror="this.parentNode.textContent='${esc(ini)}'"></a></div>`
-      : `<div class="pad-avatar">${esc(ini) || '👷'}</div>`;
+      : `<div class="pad-avatar">${esc(ini) || icSvg('user')}</div>`;
     const obras = obrasDe(p);
     const obrasTxt = obras.length ? obras.join(', ') : 'sin obra';
     return `
@@ -271,7 +271,7 @@ function renderPadron() {
         ${av}
         <div class="pad-info">
           <div class="pad-name">${esc(p.apellido)}, ${esc(p.nombre)}
-            ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">📁</a>` : ''}
+            ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">${icSvg('folder')}</a>` : ''}
             ${p.activo === false ? '<span style="font-size:.72rem;color:#b91c1c">(inactivo)</span>' : ''}</div>
           <div class="pad-meta">
             ${categoriaLabel(p) ? `<span class="pad-cat">${esc(categoriaLabel(p))}</span> ` : ''}
@@ -431,12 +431,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = _s.nombre;
   $('btn-back').addEventListener('click', () => { window.location.href = 'administracion.html'; });
-  $('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('vimeco_session');
-    sessionStorage.clear();
-    window.location.href = 'index.html';
-  });
-
   // Colapsar/expandir secciones
   document.querySelectorAll('.sec-head').forEach(head => {
     head.addEventListener('click', () => head.closest('.sec-card').classList.toggle('collapsed'));

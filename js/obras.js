@@ -3,10 +3,10 @@
 const $ = id => document.getElementById(id);
 
 function showToast(msg, type = 'success') {
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
   $('toast-container').appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0'; el.style.transition = 'opacity .3s';
@@ -201,14 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('hdr-name').textContent = name;
   $('btn-back').addEventListener('click', () => { window.location.href = 'administracion.html'; });
-  $('btn-logout').addEventListener('click', () => {
-    sessionStorage.clear();
-    localStorage.removeItem('responsable_code');
-    localStorage.removeItem('responsable_name');
-    localStorage.removeItem('vimeco_session');
-    window.location.href = 'index.html';
-  });
-
   $('btn-add-obra').addEventListener('click', openAddModal);
   $('modal-obra-close').addEventListener('click',  () => $('modal-obra').classList.add('hidden'));
   $('modal-obra-cancel').addEventListener('click', () => $('modal-obra').classList.add('hidden'));

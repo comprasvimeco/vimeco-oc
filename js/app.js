@@ -193,15 +193,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// ---- Auth ----
-function logout() {
-  sessionStorage.clear();
-  localStorage.removeItem('responsable_code');
-  localStorage.removeItem('responsable_name');
-  localStorage.removeItem('vimeco_session');
-  window.location.href = 'index.html';
-}
-
 // ---- IVA Toggle ----
 function setupIVAToggle() {
   const checkbox = $('iva-toggle');
@@ -274,7 +265,6 @@ function setupMenu() {
   document.addEventListener('click', () => dropdown.classList.add('hidden'));
   dropdown.addEventListener('click', e => e.stopPropagation());
 
-  $('btn-logout').addEventListener('click', logout);
   $('btn-firma').addEventListener('click', () => {
     dropdown.classList.add('hidden');
     openFirmaModal();
@@ -876,7 +866,7 @@ function applyExtractionResult(r) {
         return ratio > 1.17 && ratio < 1.25;
       })());
     if (sugerirIva) {
-      toast('⚠️ Los precios podrían incluir IVA — revisá el toggle "Precios con IVA incluido".', 'warning');
+      toast('Los precios podrían incluir IVA — revisá el toggle "Precios con IVA incluido".', 'warning');
     }
   }
 
@@ -894,10 +884,10 @@ async function handleExtract() {
     await enrichFromBase({ notify: true });   // la base maestra tiene prioridad
     const impMsg = impuestos.length ? ` y ${impuestos.length} impuesto(s)` : '';
     if (r.items?.length) {
-      setExtractStatus('success', `✓ Se extrajeron ${r.items.length} ítem(s)${impMsg}.`);
+      setExtractStatus('success', `${icSvg('checkSm')} Se extrajeron ${r.items.length} ítem(s)${impMsg}.`);
       toast(`IA extrajo ${r.items.length} ítem(s)${impMsg}.`, 'success');
     } else {
-      setExtractStatus('success', '✓ Datos del proveedor completados. No se detectaron ítems.');
+      setExtractStatus('success', `${icSvg('checkSm')} Datos del proveedor completados. No se detectaron ítems.`);
       toast('Datos extraídos. No se detectaron ítems — podés agregarlos manualmente.', 'warning');
     }
   } catch (err) {
@@ -1459,7 +1449,7 @@ async function handleGenerate() {
 
   const btn = $('btn-generate');
   btn.disabled = true;
-  btn.innerHTML = '⏳ Asignando número…';
+  btn.innerHTML = '<span class="spinner"></span> Asignando número…';
 
   let numero;
   try {
@@ -1565,7 +1555,7 @@ async function handleGenerate() {
 async function solicitarAutorizacion(autorizador) {
   const btn = $('btn-generate');
   btn.disabled = true;
-  btn.innerHTML = '⏳ Reservando número…';
+  btn.innerHTML = '<span class="spinner"></span> Reservando número…';
 
   let numero;
   try {
@@ -1818,8 +1808,8 @@ function toast(msg, type = 'info') {
   const c  = $('toast-container');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
-  el.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
+  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
   c.appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0';
