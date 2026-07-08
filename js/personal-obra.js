@@ -63,6 +63,9 @@ const DOW   = ['L','M','M','J','V','S','D'];
 // Estados por persona (parte del día): '' = Presente (según condición del día: '', F o CC),
 // AU = Ausente, AC = Accidente, CM = Carpeta Médica. AU/AC/CM ponen horas en 0 y sacan comida.
 const CC_HORAS = 2.5;   // horas automáticas para Causas Climáticas
+// Jornada legal (UOCRA): lo que exceda de 8 hs/día se paga ×1,5. Es fija:
+// la jornada configurada en la obra (p.ej. 10 hs) solo precarga el parte.
+const JORNADA_LEGAL = 8;
 
 // Texto compuesto de categoría: "Oficial + Horas Extras", "Ayudante + 20%", etc.
 function categoriaLabel(p) {
@@ -1300,8 +1303,8 @@ async function buildReporteWorkbook(q) {
   }
 
   // ── PLANILLA DE MONTOS A PAGAR (por horas, con valores de categoría del mes) ──
-  // Reglas: horas que exceden la jornada ×1,5 · horas en feriado ×2 ·
-  // plus porcentual de la persona sobre el valor hora de su categoría.
+  // Reglas: horas que exceden la jornada legal (8 hs/día) ×1,5 · horas en
+  // feriado ×2 · plus porcentual de la persona sobre el valor hora de su categoría.
   {
     const mesQ = `${q.year}-${pad2(q.month)}`;
     let valores = {}, origenValores = null;
@@ -1317,8 +1320,7 @@ async function buildReporteWorkbook(q) {
         if (prev) { valores = todos[prev]; origenValores = prev; }
       }
     } catch (_) {}
-    const catKey  = c => (typeof sanitizeCatKey === 'function' ? sanitizeCatKey(c) : String(c || ''));
-    const jornada = Number(constantes.jornadaHoras) || 8;
+    const catKey = c => (typeof sanitizeCatKey === 'function' ? sanitizeCatKey(c) : String(c || ''));
 
     r = rows.push(blank()) - 1; rows[r][0] = 'PLANILLA DE MONTOS A PAGAR (HORAS)'; S(r, 0, stSection); mergeFull(r);
 
@@ -1358,8 +1360,8 @@ async function buildReporteWorkbook(q) {
         if (dia.feriado || it.estado === 'F') {
           hFer += horas;
         } else {
-          hNorm  += Math.min(horas, jornada);
-          hExtra += Math.max(0, horas - jornada);
+          hNorm  += Math.min(horas, JORNADA_LEGAL);
+          hExtra += Math.max(0, horas - JORNADA_LEGAL);
         }
       });
       const base = Number(valores[catKey(p.categoria)]) || 0;
