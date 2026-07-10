@@ -48,7 +48,10 @@ const STATIC_ASSETS = [
   BASE + '/personal-obra.html',
   BASE + '/js/personal-obra.js',
   BASE + '/autorizaciones.html',
-  BASE + '/js/autorizaciones.js'
+  BASE + '/js/autorizaciones.js',
+  BASE + '/reportes.html',
+  BASE + '/js/reportes.js',
+  BASE + '/js/dolar.js'
 ];
 
 self.addEventListener('install', event => {
@@ -99,6 +102,13 @@ self.addEventListener('fetch', event => {
   // tirando "TypeError: Load failed".
   if (url.hostname.endsWith('.googleapis.com') ||
       url.hostname.endsWith('.firebaseio.com')) {
+    return;
+  }
+
+  // dolarapi.com: cotización del dólar. Debe ser siempre fresca — si el SW la
+  // cacheara (cache-first de terceros, más abajo) devolvería siempre el primer
+  // valor. Se deja pasar a la red nativamente (y dolar.js cachea en localStorage).
+  if (url.hostname.endsWith('dolarapi.com')) {
     return;
   }
 

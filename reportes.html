@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Reportes</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <style>
+    .rep-wrap { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+
+    .rep-dolar { font-size: .8rem; color: var(--gray-500); text-align: right; margin-bottom: .75rem; }
+    .rep-dolar strong { color: var(--primary); }
+
+    /* Toolbar de controles */
+    .rep-controls { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: flex-end;
+      background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+      padding: .9rem 1rem; margin-bottom: 1rem; box-shadow: var(--shadow-sm); }
+    .rep-ctrl { display: flex; flex-direction: column; gap: .3rem; }
+    .rep-ctrl > label { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); font-weight: 600; }
+    .rep-ctrl input[type=date] { padding: .4rem .5rem; border: 1px solid var(--gray-300); border-radius: var(--radius); font: inherit; color: var(--gray-700); }
+    .rep-check { flex-direction: row; align-items: center; gap: .4rem; }
+    .rep-check label { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray-600); font-size: .82rem; }
+
+    /* Segmented control */
+    .seg { display: inline-flex; border: 1px solid var(--gray-300); border-radius: var(--radius); overflow: hidden; }
+    .seg button { border: none; background: var(--white); color: var(--gray-600); padding: .4rem .7rem; font: inherit; font-size: .82rem; cursor: pointer; }
+    .seg button + button { border-left: 1px solid var(--gray-300); }
+    .seg button.active { background: var(--primary); color: var(--white); font-weight: 600; }
+
+    /* KPIs */
+    .rep-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; margin-bottom: 1.25rem; }
+    .kpi { background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+      padding: 1rem 1.1rem; box-shadow: var(--shadow-sm); }
+    .kpi-lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); font-weight: 600; }
+    .kpi-val { font-size: 1.5rem; font-weight: 800; color: var(--primary); margin-top: .25rem; line-height: 1.1; }
+
+    .rep-note { background: #fff4e0; color: #9a6a00; border: 1px solid #f0dca8;
+      border-radius: var(--radius); padding: .55rem .8rem; font-size: .8rem; margin-bottom: 1rem; }
+
+    /* Secciones (grid 2 col en desktop) */
+    .rep-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .rep-card { grid-column: span 1; }
+    .rep-card.rep-full { grid-column: 1 / -1; }
+    .rep-card .card-body { padding: 1rem 1.1rem; }
+
+    /* Barras */
+    .rep-bar-row { margin-bottom: .8rem; }
+    .rep-bar-row:last-child { margin-bottom: 0; }
+    .rep-bar-head { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; margin-bottom: .25rem; }
+    .rep-bar-label { font-size: .85rem; color: var(--gray-700); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rep-bar-val { font-size: .85rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
+    .rep-bar-track { background: var(--gray-100); border-radius: 999px; height: 9px; overflow: hidden; }
+    .rep-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--primary-light)); }
+    .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .2rem; }
+
+    .rep-empty { color: var(--gray-500); font-size: .85rem; padding: .5rem 0; }
+    .rep-loading { text-align: center; color: var(--gray-500); padding: 3rem 1rem; }
+
+    @media (max-width: 768px) {
+      .rep-kpis { grid-template-columns: 1fr; }
+      .rep-sections { grid-template-columns: 1fr; }
+      .kpi-val { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Reportes</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
+  </div>
+</header>
+
+<main class="app-main">
+  <div class="rep-wrap">
+
+    <div class="rep-dolar" id="rep-dolar-hoy"></div>
+
+    <div class="rep-controls">
+      <div class="rep-ctrl">
+        <label>Desde</label>
+        <input type="date" id="rep-desde">
+      </div>
+      <div class="rep-ctrl">
+        <label>Hasta</label>
+        <input type="date" id="rep-hasta">
+      </div>
+      <div class="rep-ctrl">
+        <label>&nbsp;</label>
+        <button class="btn btn-secondary btn-sm" id="btn-clear-dates">Limpiar fechas</button>
+      </div>
+      <div class="rep-ctrl">
+        <label>Moneda</label>
+        <div class="seg" id="seg-moneda">
+          <button data-val="ARS" class="active">ARS</button>
+          <button data-val="USD">USD</button>
+        </div>
+      </div>
+      <div class="rep-ctrl">
+        <label>Cotización</label>
+        <div class="seg" id="seg-rate">
+          <button data-val="oficial" class="active">Oficial</button>
+          <button data-val="blue">Blue</button>
+        </div>
+      </div>
+      <div class="rep-ctrl rep-check">
+        <input type="checkbox" id="chk-no-emitidas">
+        <label for="chk-no-emitidas">Incluir pendientes / rechazadas</label>
+      </div>
+    </div>
+
+    <div id="rep-loading" class="rep-loading">Cargando órdenes de compra…</div>
+
+    <div id="rep-content" class="hidden">
+
+      <div class="rep-kpis">
+        <div class="kpi"><div class="kpi-lbl">Total gastado</div><div class="kpi-val" id="kpi-total">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Órdenes de compra</div><div class="kpi-val" id="kpi-count">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Ticket promedio</div><div class="kpi-val" id="kpi-avg">—</div></div>
+      </div>
+
+      <div id="rep-note" class="rep-note hidden"></div>
+
+      <div class="rep-sections">
+        <div class="card rep-card rep-full">
+          <div class="card-header"><span class="card-title">Gasto por Obra</span></div>
+          <div class="card-body" id="rep-obras"></div>
+        </div>
+
+        <div class="card rep-card">
+          <div class="card-header"><span class="card-title">Gasto por Equipo</span></div>
+          <div class="card-body" id="rep-equipos"></div>
+        </div>
+
+        <div class="card rep-card">
+          <div class="card-header"><span class="card-title">Evolución mensual</span></div>
+          <div class="card-body" id="rep-meses"></div>
+        </div>
+
+        <div class="card rep-card">
+          <div class="card-header"><span class="card-title">Top proveedores</span></div>
+          <div class="card-body" id="rep-proveedores"></div>
+        </div>
+
+        <div class="card rep-card">
+          <div class="card-header"><span class="card-title">Por responsable</span></div>
+          <div class="card-body" id="rep-responsables"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/config.js"></script>
+<script src="js/dolar.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/reportes.js"></script>
+</body>
+</html>

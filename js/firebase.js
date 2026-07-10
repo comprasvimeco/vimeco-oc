@@ -111,6 +111,10 @@
       descuento:      ocData._descuento      || { pct: null, monto: 0 },
       noGravado:      ocData._noGravado      || { pct: null, monto: 0 },
       impuestosExtra: ocData._impuestosExtra || [],
+      // Snapshot de la cotización del dólar al momento de emitir la OC.
+      // Permite reexpresar el total en ARS/USD con el valor real de esa fecha.
+      // null si nunca se pudo traer (offline sin caché previa).
+      cotizacion:     (typeof getDolarCached === 'function' ? getDolarCached() : null),
       ...extra
     };
 
