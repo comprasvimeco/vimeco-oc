@@ -38,3 +38,25 @@ function _toast(msg, type) {
 
 window.toast     = (msg, type = 'info')    => _toast(msg, type);
 window.showToast = (msg, type = 'success') => _toast(msg, type);
+
+/*
+ * Header responsive: mantiene `data-initials` sincronizado con #hdr-name.
+ * En mobile el CSS oculta el nombre completo y muestra las iniciales
+ * (via ::after content: attr(data-initials)), sin tocar el JS de cada página.
+ */
+function _hdrInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('hdr-name');
+  if (!el) return;
+  const sync = () => {
+    const t = el.textContent.trim();
+    el.setAttribute('data-initials', (t && t !== '—') ? _hdrInitials(t) : '');
+  };
+  sync();
+  new MutationObserver(sync).observe(el, { childList: true, characterData: true, subtree: true });
+});
