@@ -31,6 +31,26 @@ function esc(s) {
     .replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// Clave del registro en /historial (así se guarda en saveOCToHistory).
+function histKeyOf(oc) { return (oc.nroOC || '').replace(/-/g, ''); }
+function ocByKey(key)  { return ALL.find(o => histKeyOf(o) === key); }
+
+let OBRAS_ALL = []; // nombres de obras (para el datalist de reasignación)
+function distinctObras() {
+  const s = new Set(OBRAS_ALL);
+  ALL.forEach(o => { if (o.obra) s.add(o.obra); });
+  return [...s].sort((a, b) => a.localeCompare(b));
+}
+
+// Parseo tolerante de montos (acepta 2400469632, 2.400.469,63 o 2400469.63).
+function parseNum(s) {
+  s = String(s).trim();
+  if (!s) return NaN;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else s = s.replace(/\s/g, '');
+  return parseFloat(s);
+}
+
 // Monto completo con separadores de miles.
 function fmtFull(n, cur) {
   const v = (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -169,6 +189,7 @@ function renderBars(containerId, rows, opts = {}) {
             <span class="rep-oc-fecha">${esc(oc.fecha || '')}</span>
             ${estadoChip(oc)}
             ${flag ? '<span class="rep-flag" title="Monto muy por encima del resto — posible error de carga">⚠ revisar</span>' : ''}
+            <button class="rep-oc-edit" data-editkey="${esc(histKeyOf(oc))}" title="Editar / corregir">Editar</button>
           </div>
           <span class="rep-oc-total">${fmtFull(amt, state.moneda)}</span>
         </div>`).join('')}</div>`;
@@ -191,6 +212,8 @@ function renderBars(containerId, rows, opts = {}) {
   if (opts.drill && !el._wired) {
     el._wired = true;
     el.addEventListener('click', e => {
+      const eb = e.target.closest('[data-editkey]');
+      if (eb) { e.stopPropagation(); openOCEdit(eb.dataset.editkey); return; }
       const row = e.target.closest('.rep-bar-row');
       if (!row) return;
       const k = row.dataset.rowkey;
@@ -251,6 +274,152 @@ function render() {
   renderBars('rep-meses', meses, { grandTotal: grand, emptyMsg: 'Sin movimientos.' });
 }
 
+// ===================================================
+//  Corrección de datos (solo admin)
+// ===================================================
+
+// ---- Editar / corregir una OC ----
+let editingKey = null;
+
+function openOCEdit(key) {
+  const oc = ocByKey(key);
+  if (!oc) return;
+  editingKey = key;
+  $('moc-title').textContent  = 'OC ' + oc.nroOC;
+  $('moc-moneda').textContent = oc.moneda || 'ARS';
+  $('moc-obras-list').innerHTML = distinctObras().map(n => `<option value="${esc(n)}">`).join('');
+  $('moc-obra').value  = oc.obra || '';
+  $('moc-total').value = Number(oc.total) || 0;
+  $('moc-error').classList.add('hidden');
+  $('modal-oc').classList.remove('hidden');
+}
+
+function closeOCEdit() {
+  $('modal-oc').classList.add('hidden');
+  editingKey = null;
+}
+
+function mocError(msg) {
+  const el = $('moc-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+async function saveOCEdit() {
+  const oc = ocByKey(editingKey);
+  if (!oc) return;
+  const nuevaObra  = $('moc-obra').value.trim();
+  const nuevoTotal = parseNum($('moc-total').value);
+  if (!isFinite(nuevoTotal) || nuevoTotal < 0) { mocError('El total no es válido.'); return; }
+
+  const fields = {};
+  if (nuevaObra && nuevaObra !== oc.obra)          fields.obra  = nuevaObra;
+  if (Math.round(nuevoTotal * 100) !== Math.round((Number(oc.total) || 0) * 100)) fields.total = nuevoTotal;
+  if (!Object.keys(fields).length) { closeOCEdit(); return; }
+
+  const btn = $('moc-save'); btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await patchHistorialEntry(editingKey, fields);
+    Object.assign(oc, fields);
+    toast('OC actualizada.', 'success');
+    closeOCEdit();
+    render();
+  } catch (e) {
+    mocError('No se pudo guardar. ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+}
+
+async function deleteOC() {
+  const oc = ocByKey(editingKey);
+  if (!oc) return;
+  if (!confirm(`¿Borrar la OC ${oc.nroOC} (${fmtFull(oc.total, oc.moneda || 'ARS')})?\nEsta acción no se puede deshacer.`)) return;
+  const btn = $('moc-delete'); btn.disabled = true; btn.textContent = 'Borrando…';
+  try {
+    await deleteHistorialEntry(editingKey);
+    const i = ALL.indexOf(oc); if (i >= 0) ALL.splice(i, 1);
+    toast('OC borrada.', 'success');
+    closeOCEdit();
+    render();
+  } catch (e) {
+    mocError('No se pudo borrar. ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Borrar OC';
+  }
+}
+
+// ---- Unificar obras (fusión de nombres fragmentados) ----
+// Mapeo sugerido (canónico ← variantes). Se filtra a las que existan en los datos.
+const MERGE_PROPOSAL = [
+  { to: 'La Molienda II', from: [
+    'La Molienda II - Instalación Electríca Terrazas Bloque C y D',
+    'La Molienda II - Ductos ACC Locales Comerciales',
+    'La Molienda II - Ductos ACC Locales Comerciales+sondeo termostatos',
+    'La Molienda II - Varios',
+    'La Molienda II - Protección de carpinterías de chapa',
+  ] },
+  { to: 'La Molienda I',        from: ['La Molienda I - Yeso'] },
+  { to: 'Colectora Dean Funes', from: ['Dean Funes'] },
+  { to: 'UPC Capilla del Monte', from: ['UPC CAPILLA DEL MONTE'] },
+  { to: 'Oficina Técnica',      from: ['Oficina Tecnica'] },
+];
+
+function openMergeModal() {
+  const present  = new Set(ALL.map(o => o.obra).filter(Boolean));
+  const countFor = name => ALL.filter(o => o.obra === name).length;
+  const groups = MERGE_PROPOSAL
+    .map(g => ({ to: g.to, from: g.from.filter(f => present.has(f)) }))
+    .filter(g => g.from.length);
+
+  if (!groups.length) { toast('No hay fusiones sugeridas: las obras ya están unificadas.', 'info'); return; }
+
+  $('mmg-groups').innerHTML = groups.map((g, i) => `
+    <div class="mmg-group" data-gi="${i}">
+      <div class="mmg-head">
+        <input type="checkbox" class="mmg-chk" checked>
+        <span>Fusionar en:</span>
+        <input class="form-control mmg-to" value="${esc(g.to)}">
+      </div>
+      <ul class="mmg-from">
+        ${g.from.map(f => `<li>${esc(f)} <span class="mmg-cnt">${countFor(f)} OC</span></li>`).join('')}
+      </ul>
+    </div>`).join('');
+
+  $('modal-merge')._groups = groups;
+  $('mmg-error').classList.add('hidden');
+  $('modal-merge').classList.remove('hidden');
+}
+
+async function applyMerge() {
+  const modal  = $('modal-merge');
+  const groups = modal._groups || [];
+  const tasks  = [];
+
+  [...$('mmg-groups').querySelectorAll('.mmg-group')].forEach(el => {
+    if (!el.querySelector('.mmg-chk').checked) return;
+    const gi = Number(el.dataset.gi);
+    const to = el.querySelector('.mmg-to').value.trim();
+    if (!to) return;
+    groups[gi].from.forEach(from => {
+      ALL.filter(o => o.obra === from).forEach(o => tasks.push({ oc: o, to }));
+    });
+  });
+
+  if (!tasks.length) { modal.classList.add('hidden'); return; }
+
+  const btn = $('mmg-apply'); btn.disabled = true; btn.textContent = 'Aplicando…';
+  let ok = 0, fail = 0;
+  await Promise.all(tasks.map(async t => {
+    try { await patchHistorialEntry(histKeyOf(t.oc), { obra: t.to }); t.oc.obra = t.to; ok++; }
+    catch (_) { fail++; }
+  }));
+  btn.disabled = false; btn.textContent = 'Aplicar fusiones';
+  modal.classList.add('hidden');
+  toast(`${ok} OC reasignada(s)${fail ? `, ${fail} con error` : ''}.`, fail ? 'warning' : 'success');
+  render();
+}
+
 // ---- Cotización del día ----
 function renderDolarHoy() {
   const snap = typeof getDolarCached === 'function' ? getDolarCached() : null;
@@ -299,6 +468,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('rep-desde').value = ''; $('rep-hasta').value = '';
     render();
   });
+
+  // Modales de corrección (admin)
+  $('moc-close').addEventListener('click', closeOCEdit);
+  $('moc-cancel').addEventListener('click', closeOCEdit);
+  $('moc-save').addEventListener('click', saveOCEdit);
+  $('moc-delete').addEventListener('click', deleteOC);
+  $('moc-div1000').addEventListener('click', () => {
+    const v = parseNum($('moc-total').value);
+    if (isFinite(v)) $('moc-total').value = v / 1000;
+  });
+  $('btn-merge-obras').addEventListener('click', openMergeModal);
+  $('mmg-close').addEventListener('click',  () => $('modal-merge').classList.add('hidden'));
+  $('mmg-cancel').addEventListener('click', () => $('modal-merge').classList.add('hidden'));
+  $('mmg-apply').addEventListener('click', applyMerge);
+
+  // Nombres de obras para reasignación
+  try { OBRAS_ALL = (await getAllObras()).map(o => o.nombre); } catch (_) {}
 
   renderDolarHoy();
   if (typeof getDolarSnapshot === 'function') getDolarSnapshot().then(renderDolarHoy).catch(() => {});

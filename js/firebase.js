@@ -274,6 +274,12 @@
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
+
+  // Borra un registro del historial (corrección de datos, solo admin).
+  window.deleteHistorialEntry = async function (key) {
+    const resp = await fetch(_base() + '/historial/' + key + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
 })();
 
 // ─── Gestión de Equipos ─────────────────────────────
