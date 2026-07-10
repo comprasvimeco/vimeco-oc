@@ -6,6 +6,9 @@
    equipo, proveedor, responsable y mes. Reexpresa cada OC en ARS o USD
    usando la cotización guardada en la propia OC (cotizacion), con
    fallback al dólar del día para OC históricas sin snapshot.
+
+   Las secciones de Obra y Equipo son desplegables: al tocar una fila se
+   ven las OC individuales, con un flag "revisar" para montos anómalos.
    =================================================== */
 
 let ALL = [];   // todas las OC (admin)
@@ -17,8 +20,10 @@ const state = {
   hasta:  '',
   moneda: 'ARS',       // moneda de visualización
   rate:   'oficial',   // 'oficial' | 'blue' — qué cotización usar para convertir
-  incluirNoEmitidas: false, // incluir pendientes/rechazadas
+  incluirNoEmitidas: false,
 };
+
+const expanded = new Set(); // claves de filas desplegadas (por sección+key)
 
 function esc(s) {
   return String(s || '')
@@ -26,14 +31,23 @@ function esc(s) {
     .replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function fmtMoney(n, cur) {
+// Monto completo con separadores de miles.
+function fmtFull(n, cur) {
   const v = (Number(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   return (cur === 'USD' ? 'US$ ' : '$ ') + v;
 }
 
+// Monto compacto para barras: millones / miles.
+function fmtCompact(n, cur) {
+  const sign = n < 0 ? '-' : '';
+  const a = Math.abs(Number(n) || 0);
+  const s = (cur === 'USD' ? 'US$ ' : '$ ') + sign;
+  if (a >= 1e6) return s + (a / 1e6).toLocaleString('es-AR', { maximumFractionDigits: a >= 1e8 ? 0 : 1 }) + ' M';
+  if (a >= 1e3) return s + (a / 1e3).toLocaleString('es-AR', { maximumFractionDigits: 0 }) + ' mil';
+  return s + a.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+}
+
 // ---- Conversión de moneda por OC ----
-// Usa la cotización guardada en la OC; si no la tiene (OC histórica), cae al
-// dólar del día cacheado. Devuelve la cotización de venta o null si no hay dato.
 function rateFor(oc) {
   const snap = oc.cotizacion || (typeof getDolarCached === 'function' ? getDolarCached() : null);
   if (!snap) return null;
@@ -42,8 +56,6 @@ function rateFor(oc) {
   return r.venta || r.compra || null;
 }
 
-// Monto de la OC expresado en la moneda pedida. null si hace falta convertir
-// y no hay ninguna cotización disponible.
 function amountIn(oc, cur) {
   const total  = Number(oc.total) || 0;
   const moneda = oc.moneda === 'USD' ? 'USD' : 'ARS';
@@ -53,7 +65,6 @@ function amountIn(oc, cur) {
   return cur === 'ARS' ? total * rate : total / rate;
 }
 
-// ¿Se convirtió esta OC con el dólar de hoy (por no tener snapshot propio)?
 function usedFallback(oc) {
   const moneda = oc.moneda === 'USD' ? 'USD' : 'ARS';
   return moneda !== state.moneda && !oc.cotizacion;
@@ -73,19 +84,36 @@ function getFiltered() {
   });
 }
 
-// ---- Agrupación ----
-function groupSum(list, keyFn, labelFn) {
+// ---- Agrupación (con detalle de OC para drill-down) ----
+function groupAgg(list, keyFn, labelFn) {
   const map = new Map();
   list.forEach(oc => {
     const amt = amountIn(oc, state.moneda);
     if (amt == null) return;
     const k = keyFn(oc);
-    const row = map.get(k) || { label: labelFn(oc), total: 0, count: 0 };
+    const row = map.get(k) || { key: k, label: labelFn(oc), total: 0, count: 0, ocs: [] };
     row.total += amt;
     row.count += 1;
+    row.ocs.push({ oc, amt });
     map.set(k, row);
   });
   return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+function median(nums) {
+  if (!nums.length) return 0;
+  const s = [...nums].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+// Marca una OC como "posible error" si su monto supera 10× la mediana de la
+// obra/equipo (con al menos 3 OC en el grupo). Detecta los cargados ×1000.
+function flagOutliers(row) {
+  if (row.count < 3) return;
+  const med = median(row.ocs.map(x => x.amt));
+  if (med <= 0) return;
+  row.ocs.forEach(x => { x.flag = x.amt > med * 10; });
 }
 
 function monthKey(ts) {
@@ -98,7 +126,19 @@ function monthLabel(k) {
   return `${meses[Number(m) - 1] || m} ${y}`;
 }
 
-// ---- Render ----
+function estadoChip(oc) {
+  const e = oc.estado || 'emitida';
+  const map = {
+    emitida:    ['Emitida',    '#e8eef5', '#2b537d'],
+    autorizada: ['Autorizada', '#e3f5e8', '#1e7d3a'],
+    pendiente:  ['Pendiente',  '#fff4e0', '#9a6a00'],
+    rechazada:  ['Rechazada',  '#fde6e6', '#b02a2a'],
+  };
+  const [txt, bg, fg] = map[e] || map.emitida;
+  return `<span class="rep-chip" style="background:${bg};color:${fg}">${txt}</span>`;
+}
+
+// ---- Render de barras (con drill-down opcional) ----
 function renderBars(containerId, rows, opts = {}) {
   const el = $(containerId);
   if (!rows.length) {
@@ -107,18 +147,57 @@ function renderBars(containerId, rows, opts = {}) {
   }
   const shown = opts.limit ? rows.slice(0, opts.limit) : rows;
   const max   = Math.max(...shown.map(r => r.total)) || 1;
-  el.innerHTML = shown.map(r => {
-    const pct = Math.max(3, Math.round((r.total / max) * 100));
+  const grand = opts.grandTotal || max;
+
+  el.innerHTML = shown.map((r, i) => {
+    const pct  = Math.max(2, Math.round((r.total / max) * 100));
+    const share = Math.round((r.total / grand) * 100);
+    const rowKey = containerId + '|' + r.key;
+    const isOpen = opts.drill && expanded.has(rowKey);
+
+    let drillHtml = '';
+    if (opts.drill && isOpen) {
+      flagOutliers(r);
+      const ocs = [...r.ocs].sort((a, b) => b.amt - a.amt);
+      drillHtml = `<div class="rep-drill">${ocs.map(({ oc, amt, flag }) => `
+        <div class="rep-oc ${flag ? 'rep-oc-flag' : ''}">
+          <div class="rep-oc-main">
+            <span class="rep-oc-nro">${esc(oc.nroOC)}</span>
+            <span class="rep-oc-prov">${esc(oc.proveedor?.nombre || '—')}</span>
+          </div>
+          <div class="rep-oc-meta">
+            <span class="rep-oc-fecha">${esc(oc.fecha || '')}</span>
+            ${estadoChip(oc)}
+            ${flag ? '<span class="rep-flag" title="Monto muy por encima del resto — posible error de carga">⚠ revisar</span>' : ''}
+          </div>
+          <span class="rep-oc-total">${fmtFull(amt, state.moneda)}</span>
+        </div>`).join('')}</div>`;
+    }
+
     return `
-      <div class="rep-bar-row">
+      <div class="rep-bar-row ${opts.drill ? 'rep-clickable' : ''} ${isOpen ? 'rep-open' : ''}" data-rowkey="${esc(rowKey)}">
         <div class="rep-bar-head">
+          <span class="rep-bar-rank">${i + 1}</span>
+          ${opts.drill ? `<span class="rep-caret">${isOpen ? '▾' : '▸'}</span>` : ''}
           <span class="rep-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
-          <span class="rep-bar-val">${fmtMoney(r.total, state.moneda)}</span>
+          <span class="rep-bar-val" title="${esc(fmtFull(r.total, state.moneda))}">${fmtCompact(r.total, state.moneda)}</span>
         </div>
         <div class="rep-bar-track"><div class="rep-bar-fill" style="width:${pct}%"></div></div>
-        <div class="rep-bar-sub">${r.count} OC · ${Math.round((r.total / (opts.grandTotal || max)) * 100)}%</div>
+        <div class="rep-bar-sub">${r.count} OC · ${share}%</div>
+        ${drillHtml}
       </div>`;
   }).join('');
+
+  if (opts.drill && !el._wired) {
+    el._wired = true;
+    el.addEventListener('click', e => {
+      const row = e.target.closest('.rep-bar-row');
+      if (!row) return;
+      const k = row.dataset.rowkey;
+      if (expanded.has(k)) expanded.delete(k); else expanded.add(k);
+      render();
+    });
+  }
 }
 
 function render() {
@@ -126,18 +205,19 @@ function render() {
 
   // KPIs
   let total = 0, count = 0, noConv = 0, fallback = 0;
+  const amounts = [];
   list.forEach(oc => {
     const amt = amountIn(oc, state.moneda);
     if (amt == null) { noConv++; return; }
-    total += amt; count++;
+    total += amt; count++; amounts.push(amt);
     if (usedFallback(oc)) fallback++;
   });
 
-  $('kpi-total').textContent = fmtMoney(total, state.moneda);
+  $('kpi-total').textContent = fmtFull(total, state.moneda);
   $('kpi-count').textContent = count;
-  $('kpi-avg').textContent   = fmtMoney(count ? total / count : 0, state.moneda);
+  $('kpi-avg').textContent   = fmtCompact(count ? total / count : 0, state.moneda);
+  $('kpi-med').textContent   = fmtCompact(median(amounts), state.moneda);
 
-  // Nota de conversión aproximada / no convertibles
   const notes = [];
   if (fallback) notes.push(`${fallback} OC sin cotización propia — convertidas al dólar de hoy.`);
   if (noConv)   notes.push(`${noConv} OC no se pudieron convertir (sin cotización disponible).`);
@@ -145,51 +225,50 @@ function render() {
   if (notes.length) { noteEl.innerHTML = notes.map(esc).join('<br>'); noteEl.classList.remove('hidden'); }
   else noteEl.classList.add('hidden');
 
-  // Rankings
   const grand = total || 1;
-  renderBars('rep-obras', groupSum(list, oc => oc.obra || '—', oc => oc.obra || 'Sin obra'),
-    { grandTotal: grand, emptyMsg: 'No hay OC con obra en el rango.' });
 
-  renderBars('rep-equipos', groupSum(list,
+  renderBars('rep-obras', groupAgg(list, oc => oc.obra || '—', oc => oc.obra || 'Sin obra'),
+    { grandTotal: grand, drill: true, emptyMsg: 'No hay OC con obra en el rango.' });
+
+  renderBars('rep-equipos', groupAgg(list,
       oc => oc.equipo?.codigo || 'sin',
       oc => oc.equipo ? `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}` : 'Sin equipo'),
-    { grandTotal: grand, emptyMsg: 'No hay OC con equipo asignado.' });
+    { grandTotal: grand, drill: true, emptyMsg: 'No hay OC con equipo asignado.' });
 
-  renderBars('rep-proveedores', groupSum(list,
+  renderBars('rep-proveedores', groupAgg(list,
       oc => oc.proveedor?.nombre || '—',
       oc => oc.proveedor?.nombre || 'Sin proveedor'),
     { grandTotal: grand, limit: 10, emptyMsg: 'Sin proveedores en el rango.' });
 
-  renderBars('rep-responsables', groupSum(list,
+  renderBars('rep-responsables', groupAgg(list,
       oc => oc.responsable?.codigo || '—',
       oc => oc.responsable?.nombre || '—'),
     { grandTotal: grand, emptyMsg: 'Sin responsables en el rango.' });
 
-  // Evolución mensual (cronológico ascendente)
-  const meses = groupSum(list, oc => monthKey(oc.timestamp), oc => monthKey(oc.timestamp))
-    .map(r => ({ ...r, label: monthLabel(r.label), _k: r.label }))
-    .sort((a, b) => a._k.localeCompare(b._k));
+  const meses = groupAgg(list, oc => monthKey(oc.timestamp), oc => monthKey(oc.timestamp))
+    .map(r => ({ ...r, label: monthLabel(r.label), key: r.key }))
+    .sort((a, b) => a.key.localeCompare(b.key));
   renderBars('rep-meses', meses, { grandTotal: grand, emptyMsg: 'Sin movimientos.' });
 }
 
-// ---- Cotización del día (encabezado informativo) ----
+// ---- Cotización del día ----
 function renderDolarHoy() {
   const snap = typeof getDolarCached === 'function' ? getDolarCached() : null;
   const el = $('rep-dolar-hoy');
   if (!snap) { el.textContent = 'Cotización del día no disponible.'; return; }
   const o = snap.oficial?.venta, b = snap.blue?.venta;
-  el.innerHTML = `Dólar hoy — Oficial <strong>$ ${o ? fmtMoney(o, 'ARS').replace('$ ', '') : '—'}</strong> · Blue <strong>$ ${b ? fmtMoney(b, 'ARS').replace('$ ', '') : '—'}</strong>`;
+  const n = v => v ? Number(v).toLocaleString('es-AR', { maximumFractionDigits: 0 }) : '—';
+  el.innerHTML = `Dólar hoy · Oficial <strong>$${n(o)}</strong> · Blue <strong>$${n(b)}</strong>`;
 }
 
 // ---- Controles ----
-function setupSegmented(groupId, key, onChange) {
+function setupSegmented(groupId, key) {
   const grp = $(groupId);
   grp.addEventListener('click', e => {
     const btn = e.target.closest('[data-val]');
     if (!btn) return;
     state[key] = btn.dataset.val;
     [...grp.querySelectorAll('[data-val]')].forEach(b => b.classList.toggle('active', b === btn));
-    onChange && onChange();
     render();
   });
 }
@@ -204,14 +283,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('btn-back').addEventListener('click', () => { window.location.href = 'administracion.html'; });
 
-  // Gate admin
   let isAdmin = code === '0000';
   if (!isAdmin) {
     try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
   }
   if (!isAdmin) { window.location.href = 'menu.html'; return; }
 
-  // Controles
   setupSegmented('seg-moneda', 'moneda');
   setupSegmented('seg-rate',   'rate');
   $('rep-desde').addEventListener('change', () => { state.desde = $('rep-desde').value; render(); });
@@ -224,10 +301,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   renderDolarHoy();
-  // Refresca la cotización del día en cuanto llega (dolar.js hace warm en background)
   if (typeof getDolarSnapshot === 'function') getDolarSnapshot().then(renderDolarHoy).catch(() => {});
 
-  // Datos
   try {
     ALL = await getHistorial(code, true);
     $('rep-loading').classList.add('hidden');

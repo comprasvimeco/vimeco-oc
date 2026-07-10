@@ -9,60 +9,86 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .rep-wrap { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+    .rep-wrap { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
 
-    .rep-dolar { font-size: .8rem; color: var(--gray-500); text-align: right; margin-bottom: .75rem; }
-    .rep-dolar strong { color: var(--primary); }
+    .rep-dolar { font-size: .78rem; color: var(--gray-500); text-align: right; margin-bottom: .9rem; }
+    .rep-dolar strong { color: var(--primary); font-weight: 700; }
 
-    /* Toolbar de controles */
-    .rep-controls { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: flex-end;
+    /* ---- Toolbar de controles ---- */
+    .rep-controls { display: flex; flex-wrap: wrap; gap: .8rem 1.1rem; align-items: flex-end;
       background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
-      padding: .9rem 1rem; margin-bottom: 1rem; box-shadow: var(--shadow-sm); }
-    .rep-ctrl { display: flex; flex-direction: column; gap: .3rem; }
-    .rep-ctrl > label { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); font-weight: 600; }
-    .rep-ctrl input[type=date] { padding: .4rem .5rem; border: 1px solid var(--gray-300); border-radius: var(--radius); font: inherit; color: var(--gray-700); }
-    .rep-check { flex-direction: row; align-items: center; gap: .4rem; }
-    .rep-check label { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray-600); font-size: .82rem; }
+      padding: 1rem 1.15rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-sm); }
+    .rep-ctrl { display: flex; flex-direction: column; gap: .35rem; }
+    .rep-ctrl > label { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
+    .rep-ctrl input[type=date] { padding: .45rem .55rem; border: 1px solid var(--gray-300); border-radius: var(--radius); font: inherit; color: var(--gray-700); background: var(--white); }
+    .rep-check { flex-direction: row; align-items: center; gap: .45rem; padding-bottom: .5rem; }
+    .rep-check label { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray-600); font-size: .82rem; cursor: pointer; }
 
-    /* Segmented control */
     .seg { display: inline-flex; border: 1px solid var(--gray-300); border-radius: var(--radius); overflow: hidden; }
-    .seg button { border: none; background: var(--white); color: var(--gray-600); padding: .4rem .7rem; font: inherit; font-size: .82rem; cursor: pointer; }
+    .seg button { border: none; background: var(--white); color: var(--gray-600); padding: .45rem .8rem; font: inherit; font-size: .82rem; cursor: pointer; transition: background .15s; }
     .seg button + button { border-left: 1px solid var(--gray-300); }
-    .seg button.active { background: var(--primary); color: var(--white); font-weight: 600; }
+    .seg button.active { background: var(--primary); color: var(--white); font-weight: 700; }
 
-    /* KPIs */
-    .rep-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; margin-bottom: 1.25rem; }
-    .kpi { background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
-      padding: 1rem 1.1rem; box-shadow: var(--shadow-sm); }
-    .kpi-lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); font-weight: 600; }
-    .kpi-val { font-size: 1.5rem; font-weight: 800; color: var(--primary); margin-top: .25rem; line-height: 1.1; }
+    /* ---- KPIs ---- */
+    .rep-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .9rem; margin-bottom: 1.25rem; }
+    .kpi { position: relative; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+      padding: 1rem 1.15rem; box-shadow: var(--shadow-sm); overflow: hidden; }
+    .kpi::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--grad-header); }
+    .kpi-lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
+    .kpi-val { font-size: 1.45rem; font-weight: 800; color: var(--primary); margin-top: .3rem; line-height: 1.1; word-break: break-word; }
+    .kpi.kpi-accent .kpi-val { color: var(--accent); }
 
-    .rep-note { background: #fff4e0; color: #9a6a00; border: 1px solid #f0dca8;
-      border-radius: var(--radius); padding: .55rem .8rem; font-size: .8rem; margin-bottom: 1rem; }
+    .rep-note { display: flex; gap: .5rem; align-items: flex-start; background: #fff8ec; color: #8a5a00; border: 1px solid #f0dca8;
+      border-radius: var(--radius); padding: .6rem .85rem; font-size: .8rem; margin-bottom: 1.25rem; }
 
-    /* Secciones (grid 2 col en desktop) */
+    /* ---- Secciones ---- */
     .rep-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-    .rep-card { grid-column: span 1; }
+    .rep-card { grid-column: span 1; margin-bottom: 0; }
     .rep-card.rep-full { grid-column: 1 / -1; }
-    .rep-card .card-body { padding: 1rem 1.1rem; }
+    .rep-card .card-header { background: var(--white); border-bottom: 1px solid var(--gray-200); }
+    .rep-card .card-title { font-size: .9rem; }
+    .rep-card .card-body { padding: 1rem 1.15rem; }
 
-    /* Barras */
-    .rep-bar-row { margin-bottom: .8rem; }
-    .rep-bar-row:last-child { margin-bottom: 0; }
-    .rep-bar-head { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; margin-bottom: .25rem; }
-    .rep-bar-label { font-size: .85rem; color: var(--gray-700); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rep-bar-val { font-size: .85rem; font-weight: 700; color: var(--primary); white-space: nowrap; }
-    .rep-bar-track { background: var(--gray-100); border-radius: 999px; height: 9px; overflow: hidden; }
-    .rep-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--primary-light)); }
-    .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .2rem; }
+    /* ---- Barras ---- */
+    .rep-bar-row { padding: .55rem .1rem; border-radius: var(--radius); }
+    .rep-bar-row + .rep-bar-row { border-top: 1px solid var(--gray-100); }
+    .rep-clickable { cursor: pointer; transition: background .12s; }
+    .rep-clickable:hover { background: var(--gray-100); }
+    .rep-open { background: #f7f9fc; }
+    .rep-bar-head { display: flex; align-items: baseline; gap: .55rem; margin-bottom: .3rem; }
+    .rep-bar-rank { font-size: .72rem; font-weight: 700; color: var(--gray-400); min-width: 1.1rem; }
+    .rep-caret { color: var(--primary-light); font-size: .7rem; }
+    .rep-bar-label { flex: 1; font-size: .86rem; color: var(--gray-700); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rep-bar-val { font-size: .88rem; font-weight: 800; color: var(--primary); white-space: nowrap; }
+    .rep-bar-track { background: var(--gray-100); border-radius: 999px; height: 8px; overflow: hidden; margin-left: 1.65rem; }
+    .rep-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary-light), var(--primary)); }
+    .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .25rem; margin-left: 1.65rem; }
+
+    /* ---- Drill-down ---- */
+    .rep-drill { margin: .6rem 0 .2rem 1.65rem; border-left: 2px solid var(--gray-200); padding-left: .7rem; }
+    .rep-oc { display: grid; grid-template-columns: 1fr auto; gap: .1rem .6rem; align-items: center;
+      padding: .5rem .1rem; border-bottom: 1px dashed var(--gray-200); }
+    .rep-oc:last-child { border-bottom: none; }
+    .rep-oc-main { display: flex; flex-direction: column; min-width: 0; }
+    .rep-oc-nro { font-family: 'Courier New', monospace; font-size: .74rem; color: var(--gray-500); font-weight: 700; }
+    .rep-oc-prov { font-size: .82rem; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rep-oc-meta { grid-column: 1 / -1; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .rep-oc-fecha { font-size: .72rem; color: var(--gray-400); }
+    .rep-oc-total { grid-row: 1; grid-column: 2; font-size: .86rem; font-weight: 800; color: var(--primary); white-space: nowrap; text-align: right; }
+    .rep-oc-flag { background: #fff5f5; margin: 0 -.1rem; padding: .5rem .35rem; border-radius: var(--radius); border-bottom-color: #f5c6c6; }
+    .rep-oc-flag .rep-oc-total { color: #c02626; }
+    .rep-chip { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; }
+    .rep-flag { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; background: #fde6e6; color: #b02a2a; }
 
     .rep-empty { color: var(--gray-500); font-size: .85rem; padding: .5rem 0; }
-    .rep-loading { text-align: center; color: var(--gray-500); padding: 3rem 1rem; }
+    .rep-loading { text-align: center; color: var(--gray-500); padding: 3.5rem 1rem; }
 
-    @media (max-width: 768px) {
-      .rep-kpis { grid-template-columns: 1fr; }
+    @media (max-width: 820px) {
+      .rep-kpis { grid-template-columns: 1fr 1fr; }
       .rep-sections { grid-template-columns: 1fr; }
-      .kpi-val { font-size: 1.3rem; }
+    }
+    @media (max-width: 480px) {
+      .rep-kpis { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -127,13 +153,14 @@
         <div class="kpi"><div class="kpi-lbl">Total gastado</div><div class="kpi-val" id="kpi-total">—</div></div>
         <div class="kpi"><div class="kpi-lbl">Órdenes de compra</div><div class="kpi-val" id="kpi-count">—</div></div>
         <div class="kpi"><div class="kpi-lbl">Ticket promedio</div><div class="kpi-val" id="kpi-avg">—</div></div>
+        <div class="kpi kpi-accent"><div class="kpi-lbl">Ticket mediano</div><div class="kpi-val" id="kpi-med">—</div></div>
       </div>
 
       <div id="rep-note" class="rep-note hidden"></div>
 
       <div class="rep-sections">
         <div class="card rep-card rep-full">
-          <div class="card-header"><span class="card-title">Gasto por Obra</span></div>
+          <div class="card-header"><span class="card-title">Gasto por Obra</span><span class="rep-bar-sub" style="margin:0">tocá una obra para ver sus OC</span></div>
           <div class="card-body" id="rep-obras"></div>
         </div>
 
