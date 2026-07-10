@@ -262,13 +262,26 @@ function resetIVAToggle() {
 function setupMonedaToggle() {
   const checkbox = $('moneda-toggle');
   if (!checkbox) return;
-  checkbox.addEventListener('change', () => { monedaUSD = checkbox.checked; });
+  checkbox.addEventListener('change', () => {
+    monedaUSD = checkbox.checked;
+    updateMonedaLabels();
+  });
 }
 
 function resetMonedaToggle() {
   monedaUSD = false;
   const checkbox = $('moneda-toggle');
   if (checkbox) checkbox.checked = false;
+  updateMonedaLabels();
+}
+
+// Refleja la moneda elegida en los encabezados de la app: ($) ↔ (USD).
+function updateMonedaLabels() {
+  const sym = monedaUSD ? 'USD' : '$';
+  const set = (id, label) => { const el = $(id); if (el) el.textContent = `${label} (${sym})`; };
+  set('th-precio-unit', 'Precio Unit.');
+  set('th-importe',     'Importe');
+  set('th-monto',       'Monto');
 }
 
 // ---- Menú de usuario ----
@@ -1839,6 +1852,7 @@ function loadOCBase(oc) {
   monedaUSD = (oc.moneda === 'USD');
   const monedaChk = $('moneda-toggle');
   if (monedaChk) monedaChk.checked = monedaUSD;
+  updateMonedaLabels();
 
   clearFile();
   renderTable();
