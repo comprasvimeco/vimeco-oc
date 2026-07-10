@@ -10,18 +10,7 @@ let myFirma     = null;    // base64 de mi firma (o null si no tengo)
 let currentOC   = null;    // OC abierta en la vista previa
 let pendingSign = null;    // OC a firmar tras dibujar firma en el momento
 
-function toast(msg, type = 'info') {
-  const c  = $('toast-container');
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
-  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${esc(msg)}</span>`;
-  c.appendChild(el);
-  setTimeout(() => {
-    el.style.opacity = '0'; el.style.transition = 'opacity .3s';
-    setTimeout(() => el.remove(), 300);
-  }, 4500);
-}
+
 
 function esc(str) {
   return String(str || '')

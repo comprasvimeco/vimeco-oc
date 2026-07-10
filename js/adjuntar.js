@@ -7,19 +7,7 @@ let viewerIsAdmin = false; // 0000 o usuario con permiso admin
 
 const $ = id => document.getElementById(id);
 
-function toast(msg, type = 'info') {
-  const c  = $('toast-container');
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
-  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
-  c.appendChild(el);
-  setTimeout(() => {
-    el.style.opacity    = '0';
-    el.style.transition = 'opacity .3s';
-    setTimeout(() => el.remove(), 300);
-  }, 4500);
-}
+
 
 function fmtMoney(n) {
   return (parseFloat(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

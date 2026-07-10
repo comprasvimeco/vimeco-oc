@@ -110,17 +110,7 @@ const SEED_EQUIPOS = [
   ['VQ 218', 'Volqueta']
 ];
 
-function showToast(msg, type = 'success') {
-  const icons = { success: icSvg('checkSm'), error: icSvg('x'), warning: icSvg('alert'), info: icSvg('info') };
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type] || icons.info}</span><span>${msg}</span>`;
-  $('toast-container').appendChild(el);
-  setTimeout(() => {
-    el.style.opacity = '0'; el.style.transition = 'opacity .3s';
-    setTimeout(() => el.remove(), 300);
-  }, 4000);
-}
+
 
 function showConfirm(title, msg) {
   return new Promise(resolve => {

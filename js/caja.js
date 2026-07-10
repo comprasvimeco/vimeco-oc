@@ -27,16 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let movimientos  = [];
   let categorias   = [];
 
-  // ─── DOM refs ────────────────────────────────────────
-  const toastContainer = document.getElementById('toast-container');
-
-  function showToast(msg, type = '') {
-    const t = document.createElement('div');
-    t.className = 'toast' + (type ? ' ' + type : '');
-    t.textContent = msg;
-    toastContainer.appendChild(t);
-    setTimeout(() => t.remove(), 3500);
-  }
+  // showToast: provisto globalmente por js/ui.js
 
   function fmtMonto(n) {
     const s = Math.abs(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
