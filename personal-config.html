@@ -54,7 +54,7 @@
 <body>
 
 <header class="app-header">
-  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='menu.html'">
+  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
     <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
       onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
     <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
@@ -140,40 +140,40 @@
     </div>
     <div class="modal-body">
       <div style="display:flex;gap:.75rem;">
-        <div class="form-group" style="flex:1"><label for="p-nombre">Nombre *</label>
+        <div class="form-group u-flex-1"><label for="p-nombre">Nombre *</label>
           <input type="text" id="p-nombre" class="form-control" placeholder="Juan"></div>
-        <div class="form-group" style="flex:1"><label for="p-apellido">Apellido *</label>
+        <div class="form-group u-flex-1"><label for="p-apellido">Apellido *</label>
           <input type="text" id="p-apellido" class="form-control" placeholder="Pérez"></div>
       </div>
       <div style="display:flex;gap:.75rem;">
-        <div class="form-group" style="flex:1"><label for="p-dni">DNI</label>
+        <div class="form-group u-flex-1"><label for="p-dni">DNI</label>
           <input type="text" id="p-dni" class="form-control" inputmode="numeric" placeholder="30123456"></div>
-        <div class="form-group" style="flex:1"><label for="p-categoria">Categoría</label>
+        <div class="form-group u-flex-1"><label for="p-categoria">Categoría</label>
           <select id="p-categoria" class="form-control"></select></div>
       </div>
       <div style="display:flex;gap:.75rem;">
-        <div class="form-group" style="flex:1"><label for="p-telefono">Teléfono</label>
+        <div class="form-group u-flex-1"><label for="p-telefono">Teléfono</label>
           <input type="tel" id="p-telefono" class="form-control" inputmode="tel" placeholder="11 2345-6789"></div>
-        <div class="form-group" style="flex:1"><label for="p-domicilio">Domicilio</label>
+        <div class="form-group u-flex-1"><label for="p-domicilio">Domicilio</label>
           <input type="text" id="p-domicilio" class="form-control" placeholder="Calle 123, Localidad"></div>
       </div>
       <div style="display:flex;gap:.75rem;align-items:flex-end;">
-        <div class="form-group" style="flex:1;margin-bottom:0">
+        <div class="form-group u-flex-1 u-mb-0">
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
             <input type="checkbox" id="p-horas-extra" style="width:18px;height:18px;"> Horas extras
           </label>
         </div>
-        <div class="form-group" style="flex:1;margin-bottom:0"><label for="p-pct-extra">% extra</label>
+        <div class="form-group u-flex-1 u-mb-0"><label for="p-pct-extra">% extra</label>
           <input type="number" id="p-pct-extra" class="form-control" min="0" step="1" placeholder="0"></div>
       </div>
       <label style="font-size:.9rem;color:var(--gray-700);font-weight:500;">Foto del DNI</label>
       <div style="display:flex;gap:.75rem;margin-top:.35rem;">
-        <div class="form-group" style="flex:1;margin-bottom:0">
+        <div class="form-group u-flex-1 u-mb-0">
           <label for="p-foto-frente" style="font-size:.78rem;color:var(--gray-500);">Frente</label>
           <input type="file" id="p-foto-frente" class="form-control" accept="image/*">
           <div class="dni-preview" id="p-foto-frente-preview"></div>
         </div>
-        <div class="form-group" style="flex:1;margin-bottom:0">
+        <div class="form-group u-flex-1 u-mb-0">
           <label for="p-foto-dorso" style="font-size:.78rem;color:var(--gray-500);">Dorso</label>
           <input type="file" id="p-foto-dorso" class="form-control" accept="image/*">
           <div class="dni-preview" id="p-foto-dorso-preview"></div>

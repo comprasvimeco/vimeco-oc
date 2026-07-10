@@ -893,3 +893,8 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
 #scan-cancel { flex: 1; }
 .scan-btn.primary { flex: 2; background: #22c55e; border-color: #22c55e; color: #06240f; }
 body.scan-open { overflow: hidden; }
+
+/* ── Utilidades de layout (Fase 3: reemplazan inline styles repetidos) ── */
+.u-flex-1 { flex: 1; }
+.u-pointer { cursor: pointer; }
+.u-mb-0 { margin-bottom: 0; }
