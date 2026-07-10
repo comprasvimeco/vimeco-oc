@@ -1,0 +1,56 @@
+<!-- @dsCard group="Components" -->
+<!-- VIMECO Design System — Badges (.u-badge*, step-badge) y Toasts (.toast*) -->
+<style>
+  :root {
+    --primary: #234870; --gray-100: #f5f6f8; --gray-400: #9ca3af; --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827;
+    --white: #fff; --danger: #dc2626; --success: #16a34a; --warning: #d97706; --radius: 6px;
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--gray-700); background: #fff; padding: 28px; }
+  h1 { font-size: 1.05rem; color: var(--primary); margin-bottom: 2px; }
+  .sub { font-size: .78rem; color: var(--gray-500); margin-bottom: 22px; }
+  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-500); margin: 26px 0 12px; font-weight: 700; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .u-badge { display: inline-flex; align-items: center; padding: .15rem .5rem; border-radius: 999px; font-size: .7rem; font-weight: 600; }
+  .u-badge-activo   { background: #dcfce7; color: #166534; }
+  .u-badge-inactivo { background: #fee2e2; color: #991b1b; }
+  .u-badge-pwd-ok   { background: #dbeafe; color: #1e40af; }
+  .u-badge-pwd-none { background: #fef9c3; color: #854d0e; }
+  .step-badge { background: var(--primary); color: var(--white); width: 22px; height: 22px; border-radius: 50%; font-size: .72rem; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+
+  .toast-stack { display: flex; flex-direction: column; gap: .5rem; align-items: flex-start; }
+  .toast { color: var(--white); padding: .75rem 1.25rem; border-radius: var(--radius); box-shadow: var(--shadow-lg); font-size: .85rem; min-width: 250px; max-width: 380px; display: flex; align-items: center; gap: .6rem; background: var(--gray-900); }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--danger); }
+  .toast.warning { background: var(--warning); }
+</style>
+
+<h1>VIMECO — Badges & Toasts</h1>
+<div class="sub">Badges píldora (estados de usuario/obra) · toasts con ícono (js/ui.js, esquina inf-der)</div>
+
+<h2>Badges de estado</h2>
+<div class="row">
+  <span class="u-badge u-badge-activo">Activo</span>
+  <span class="u-badge u-badge-inactivo">Inactivo</span>
+  <span class="u-badge u-badge-pwd-ok">Con contraseña</span>
+  <span class="u-badge u-badge-pwd-none">Sin contraseña</span>
+</div>
+
+<h2>Step badge (secciones numeradas)</h2>
+<div class="row">
+  <span class="step-badge">1</span>
+  <span class="step-badge">2</span>
+  <span class="step-badge">3</span>
+  <span class="step-badge">4</span>
+</div>
+
+<h2>Toasts <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--gray-400)">— info / success / warning / error</span></h2>
+<div class="toast-stack">
+  <div class="toast"><span><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span><span>Extrayendo datos del documento…</span></div>
+  <div class="toast success"><span><svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>Orden de compra generada</span></div>
+  <div class="toast warning"><span><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span>Verificá el CUIT del proveedor</span></div>
+  <div class="toast error"><span><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span><span>No se pudo subir a Drive</span></div>
+</div>

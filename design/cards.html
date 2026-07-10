@@ -1,0 +1,91 @@
+<!-- @dsCard group="Components" -->
+<!-- VIMECO Design System — Cards (.card glass, card-header/title/step-badge, menu-card) -->
+<style>
+  :root {
+    --primary: #234870; --primary-dark: #1a3a5c; --primary-light: #2557a7;
+    --accent-2: #38bdf8;
+    --gray-100: #f5f6f8; --gray-200: #e8eaed; --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280; --gray-600: #4b5563; --gray-700: #374151;
+    --white: #fff; --warning: #d97706; --radius: 6px; --radius-lg: 10px;
+    --grad-header: linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 120%);
+    --grad-accent: linear-gradient(120deg, var(--primary-light), var(--accent-2));
+    --grad-app-bg: radial-gradient(1200px 700px at 12% -10%, #2557a722 0%, transparent 55%), radial-gradient(1000px 600px at 110% 0%, #38bdf81f 0%, transparent 50%), linear-gradient(160deg, #eef2f8 0%, #e7edf6 45%, #eaf1fb 100%);
+    --glass-bg-strong: rgba(255,255,255,.82); --glass-border: rgba(255,255,255,.7); --glass-blur: 16px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-glass: 0 8px 30px -8px rgba(26,58,92,.28), 0 2px 8px -2px rgba(26,58,92,.12);
+    --shadow-glow: 0 12px 40px -10px rgba(37,87,167,.45);
+    --ease-spring: cubic-bezier(.22,1,.36,1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--gray-700); background: var(--grad-app-bg); background-attachment: fixed; padding: 28px; }
+  h1 { font-size: 1.05rem; color: var(--primary); margin-bottom: 2px; }
+  .sub { font-size: .78rem; color: var(--gray-500); margin-bottom: 22px; }
+  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-500); margin: 26px 0 12px; font-weight: 700; }
+  .icon { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .card { background: var(--glass-bg-strong); border: 1px solid var(--glass-border); box-shadow: var(--shadow-glass); backdrop-filter: blur(var(--glass-blur)) saturate(140%); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.25rem; }
+  .card-header { padding: .9rem 1.25rem; border-bottom: 1px solid rgba(26,58,92,.08); display: flex; align-items: center; justify-content: space-between; background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0)); }
+  .card-title { font-size: .95rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: .5rem; }
+  .card-title .step-badge { background: var(--primary); color: var(--white); width: 22px; height: 22px; border-radius: 50%; font-size: .72rem; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+  .card-body { padding: 1.25rem; }
+
+  .field-label { display: block; font-size: .82rem; font-weight: 600; color: var(--gray-600); margin-bottom: .35rem; text-transform: uppercase; letter-spacing: .04em; }
+  .field { width: 100%; padding: .55rem .75rem; border: 1px solid var(--gray-300); border-radius: var(--radius); font-size: .9rem; color: var(--gray-700); background: #fff; }
+  .field::placeholder { color: var(--gray-400); }
+  .two { display: flex; gap: 1rem; } .two > div { flex: 1; }
+
+  .oc-number-display { display: flex; align-items: center; gap: 1rem; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .6rem 1rem; }
+  .oc-number-label { font-size: .75rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; }
+  .oc-number-value { font-size: 1.1rem; font-weight: 700; color: var(--primary); font-family: 'Courier New', monospace; letter-spacing: .05em; }
+
+  .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 560px; }
+  .menu-card { background: var(--glass-bg-strong); border: 1px solid var(--glass-border); box-shadow: var(--shadow-glass); backdrop-filter: blur(var(--glass-blur)) saturate(150%); border-radius: var(--radius-lg); padding: 1.4rem 1.25rem; position: relative; overflow: hidden; transition: transform .22s var(--ease-spring), box-shadow .22s, border-color .22s; cursor: pointer; }
+  .menu-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--grad-accent); opacity: 0; transition: opacity .22s; }
+  .menu-card:hover, .menu-card.is-hover { transform: translateY(-6px) scale(1.015); border-color: rgba(37,87,167,.4); box-shadow: var(--shadow-glow); }
+  .menu-card:hover::before, .menu-card.is-hover::before { opacity: 1; }
+  .menu-card-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; background: var(--grad-header); box-shadow: 0 6px 16px -6px rgba(37,87,167,.7); margin-bottom: .8rem; }
+  .menu-card.is-hover .menu-card-icon { background: var(--grad-accent); transform: scale(1.06) rotate(-3deg); }
+  .menu-card h3 { font-size: 1rem; color: var(--primary); margin-bottom: .2rem; }
+  .menu-card p { font-size: .8rem; color: var(--gray-500); }
+</style>
+
+<h1>VIMECO — Cards</h1>
+<div class="sub">Tarjetas glass (blanco .82 + blur 16px + shadow-glass) sobre el fondo gradiente real de la app</div>
+
+<h2>Card de contenido (sección numerada)</h2>
+<div class="card" style="max-width:620px">
+  <div class="card-header">
+    <div class="card-title"><span class="step-badge">2</span> Datos de la Orden</div>
+  </div>
+  <div class="card-body">
+    <div class="two">
+      <div>
+        <label class="field-label">Obra / Motivo *</label>
+        <input class="field" placeholder="Identificación de la obra">
+      </div>
+      <div>
+        <label class="field-label">Condición de pago</label>
+        <input class="field" placeholder="Ej: Contado, 30 días">
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>OC number display</h2>
+<div class="oc-number-display" style="max-width:340px">
+  <span class="oc-number-label">Próxima OC</span>
+  <span class="oc-number-value">0000-00000182</span>
+</div>
+
+<h2>Menu cards (dashboard) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--gray-400)">— la 2ª mostrada en hover</span></h2>
+<div class="menu-grid">
+  <div class="menu-card">
+    <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></div>
+    <h3>Compras</h3>
+    <p>Órdenes de compra, adjuntar e historial</p>
+  </div>
+  <div class="menu-card is-hover">
+    <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="12" x2="8.01" y2="12"/></svg></div>
+    <h3>Caja</h3>
+    <p>Caja chica: ingresos y egresos</p>
+  </div>
+</div>

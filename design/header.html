@@ -1,0 +1,93 @@
+<!-- @dsCard group="Components" -->
+<!-- VIMECO Design System — Header (.app-header y afines) de styles.css -->
+<style>
+  :root {
+    --primary: #234870; --primary-dark: #1a3a5c; --primary-light: #2557a7;
+    --gray-100: #f5f6f8; --gray-200: #e8eaed; --gray-400: #9ca3af; --gray-700: #374151; --gray-500: #6b7280;
+    --white: #fff; --danger: #dc2626; --radius: 6px; --radius-lg: 10px;
+    --grad-header: linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 120%);
+    --grad-gold: linear-gradient(120deg, #c8a852, #e6c878);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--gray-700); background: #eef2f8; padding: 28px; }
+  h1 { font-size: 1.05rem; color: var(--primary); margin-bottom: 2px; }
+  .sub { font-size: .78rem; color: var(--gray-500); margin-bottom: 22px; }
+  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-500); margin: 26px 0 10px; font-weight: 700; }
+  .icon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .app-header { background: var(--grad-header); color: var(--white); padding: 0 1.5rem; height: 60px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 6px 24px -8px rgba(26,58,92,.55); position: relative; border-radius: 10px 10px 0 0; }
+  .app-header::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--grad-gold); opacity: .85; }
+  .header-brand { display: flex; align-items: center; gap: .85rem; cursor: pointer; }
+  .header-logo-fallback { font-size: 1.1rem; font-weight: 800; letter-spacing: .05em; }
+  .header-title { font-size: .88rem; color: rgba(255,255,255,.65); font-weight: 400; margin-left: .25rem; border-left: 1px solid rgba(255,255,255,.25); padding-left: .85rem; }
+  .header-user { display: flex; align-items: center; gap: 1rem; }
+  .user-badge { display: flex; align-items: center; gap: .5rem; background: rgba(255,255,255,.12); border-radius: 20px; padding: .3rem .85rem; font-size: .82rem; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: none; border-radius: var(--radius); font-weight: 600; cursor: pointer; }
+  .btn-sm { padding: .35rem .7rem; font-size: .78rem; }
+  .btn-icon { padding: .35rem .5rem; }
+  .app-header .btn-outline { background: transparent; border: 1.5px solid rgba(255,255,255,.55); color: var(--white); }
+
+  .hdr-menu-wrap { position: relative; }
+  .hdr-dropdown { position: absolute; top: calc(100% + 8px); right: 0; z-index: 400; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); min-width: 170px; overflow: hidden; }
+  .hdr-drop-item { display: flex; align-items: center; gap: .5rem; width: 100%; text-align: left; padding: .65rem 1rem; font-size: .88rem; color: var(--gray-700); background: none; border: none; cursor: pointer; }
+  .hdr-drop-item:hover { background: var(--gray-100); }
+  .hdr-drop-version { padding: .35rem 1rem .45rem; font-size: .68rem; color: var(--gray-400); text-align: right; letter-spacing: .04em; }
+
+  .frame { position: relative; }
+</style>
+
+<h1>VIMECO — Header</h1>
+<div class="sub">Barra sticky con gradiente institucional + filo dorado inferior · brand (logo→menú) · user-badge píldora · menú/volver</div>
+
+<h2>Header completo (con dropdown abierto)</h2>
+<div class="frame">
+  <header class="app-header">
+    <div class="header-brand">
+      <span class="header-logo-fallback">VIMECO S.A.</span>
+      <span class="header-title">Órdenes de Compra</span>
+    </div>
+    <div class="header-user">
+      <div class="user-badge"><span>Juan Pérez</span></div>
+      <div class="hdr-menu-wrap">
+        <button class="btn btn-sm btn-outline btn-icon" aria-label="Menú">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="hdr-dropdown">
+          <button class="hdr-drop-item">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Mi firma
+          </button>
+          <div class="hdr-drop-version">v131</div>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline btn-icon" aria-label="Volver">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
+    </div>
+  </header>
+</div>
+
+<h2>Variante menú principal (solo "Salir")</h2>
+<header class="app-header">
+  <div class="header-brand">
+    <span class="header-logo-fallback">VIMECO S.A.</span>
+    <span class="header-title">Sistema de Gestión</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span>Juan Pérez</span></div>
+    <button class="btn btn-sm btn-outline">Salir</button>
+  </div>
+</header>
+
+<h2>Variante mobile (título oculto, badge compacto)</h2>
+<header class="app-header" style="max-width:360px">
+  <div class="header-brand">
+    <span class="header-logo-fallback">VIMECO S.A.</span>
+  </div>
+  <div class="header-user" style="gap:.4rem">
+    <div class="user-badge" style="padding:.25rem .55rem; font-size:.76rem"><span>JP</span></div>
+    <button class="btn btn-sm btn-outline btn-icon" aria-label="Volver">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </button>
+  </div>
+</header>

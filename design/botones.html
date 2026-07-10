@@ -1,0 +1,101 @@
+<!-- @dsCard group="Components" -->
+<!-- VIMECO Design System — Botones. Espejo de .btn* (base + capa glass/gradiente) de styles.css -->
+<style>
+  :root {
+    --primary: #234870; --primary-dark: #1a3a5c; --primary-light: #2557a7;
+    --accent: #c8a852; --accent-2: #38bdf8;
+    --gray-200: #e8eaed; --gray-300: #d1d5db; --gray-700: #374151; --gray-500: #6b7280;
+    --white: #fff; --danger: #dc2626; --success: #16a34a; --warning: #d97706;
+    --radius: 6px; --radius-lg: 10px;
+    --grad-header: linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-light) 120%);
+    --shadow-glow: 0 12px 40px -10px rgba(37,87,167,.45);
+    --ease-spring: cubic-bezier(.22,1,.36,1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--gray-700); background: #fff; padding: 28px; }
+  h1 { font-size: 1.05rem; color: var(--primary); margin-bottom: 2px; }
+  .sub { font-size: .78rem; color: var(--gray-500); margin-bottom: 22px; }
+  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-500); margin: 24px 0 10px; font-weight: 700; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .tag { font-size: .68rem; color: var(--gray-500); margin-left: 4px; }
+  .header-strip { background: var(--grad-header); border-radius: var(--radius-lg); padding: 16px; }
+
+  /* ── Base .btn (styles.css:79) ── */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .6rem 1.25rem; border: none; border-radius: var(--radius); font-size: .88rem; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; pointer-events: none; }
+  .btn-secondary { background: var(--gray-200); color: var(--gray-700); }
+  .btn-warning { background: var(--warning); color: var(--white); }
+  .btn-outline { background: transparent; border: 1.5px solid var(--primary); color: var(--primary); }
+  .btn-sm { padding: .4rem .75rem; font-size: .8rem; }
+  .btn-xs { padding: .2rem .4rem; font-size: .74rem; }
+  .btn-icon { padding: .35rem .5rem; }
+  .btn-generate { font-size: .95rem; padding: .7rem 1.75rem; }
+
+  /* ── Capa glass/gradiente (styles.css:724+, la que manda) ── */
+  .btn { position: relative; overflow: hidden; box-shadow: 0 2px 6px -2px rgba(26,58,92,.3); transition: transform .15s var(--ease-spring), box-shadow .2s, background .15s, filter .15s; }
+  .btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--shadow-glow); filter: brightness(1.04); }
+  .btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+  .btn-primary { background: var(--grad-header); color: var(--white); }
+  .btn-success { background: linear-gradient(120deg, #15803d, #22c55e); color: var(--white); }
+  .btn-danger  { background: linear-gradient(120deg, #b91c1c, #ef4444); color: var(--white); }
+
+  /* header context */
+  .header-strip .btn-outline { border-color: rgba(255,255,255,.55); color: var(--white); }
+
+  /* demostrar hover de forma estática */
+  .is-hover { transform: translateY(-1px); box-shadow: var(--shadow-glow); filter: brightness(1.04); }
+  .icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+</style>
+
+<h1>VIMECO — Botones</h1>
+<div class="sub">Gradiente + micro-interacción "spring" (hover: sube 1px + glow + brillo · active: scale .98)</div>
+
+<h2>Variantes</h2>
+<div class="row">
+  <button class="btn btn-primary">Primary</button>
+  <button class="btn btn-success">Success</button>
+  <button class="btn btn-danger">Danger</button>
+  <button class="btn btn-warning">Warning</button>
+  <button class="btn btn-secondary">Secondary</button>
+  <button class="btn btn-outline">Outline</button>
+</div>
+
+<h2>Estados <span class="tag">— primary</span></h2>
+<div class="row">
+  <button class="btn btn-primary">Normal</button>
+  <button class="btn btn-primary is-hover">Hover</button>
+  <button class="btn btn-primary" disabled>Disabled</button>
+</div>
+
+<h2>Tamaños</h2>
+<div class="row">
+  <button class="btn btn-primary btn-generate">Generar OC <span class="tag" style="color:rgba(255,255,255,.7)">btn-generate</span></button>
+  <button class="btn btn-primary">Default</button>
+  <button class="btn btn-primary btn-sm">Small (btn-sm)</button>
+  <button class="btn btn-primary btn-xs">XS (btn-xs)</button>
+  <button class="btn btn-outline btn-icon" aria-label="icono">
+    <svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+  </button>
+</div>
+
+<h2>Con ícono</h2>
+<div class="row">
+  <button class="btn btn-primary">
+    <svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    Imprimir
+  </button>
+  <button class="btn btn-success">
+    <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    Guardar
+  </button>
+</div>
+
+<h2>Outline sobre header <span class="tag">(borde/texto blancos)</span></h2>
+<div class="header-strip">
+  <div class="row">
+    <button class="btn btn-outline btn-sm">Adjuntar</button>
+    <button class="btn btn-outline btn-sm btn-icon" aria-label="volver">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    </button>
+  </div>
+</div>

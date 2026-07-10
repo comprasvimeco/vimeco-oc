@@ -1,0 +1,71 @@
+<!-- @dsCard group="Components" -->
+<!-- VIMECO Design System — Tablas (.items-table, total-row) y Modales (.modal-overlay/.modal) -->
+<style>
+  :root {
+    --primary: #234870; --primary-light: #2557a7;
+    --gray-100: #f5f6f8; --gray-200: #e8eaed; --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280; --gray-700: #374151; --gray-900: #111827;
+    --white: #fff; --danger: #dc2626; --radius: 6px; --radius-lg: 10px;
+    --shadow-glow: 0 12px 40px -10px rgba(37,87,167,.45);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--gray-700); background: #eef2f8; padding: 28px; }
+  h1 { font-size: 1.05rem; color: var(--primary); margin-bottom: 2px; }
+  .sub { font-size: .78rem; color: var(--gray-500); margin-bottom: 22px; }
+  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gray-500); margin: 26px 0 12px; font-weight: 700; }
+  .icon { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .text-right { text-align: right; }
+
+  .items-table { width: 100%; border-collapse: collapse; font-size: .85rem; background: #fff; border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .items-table th { background: var(--primary); color: var(--white); padding: .6rem .75rem; text-align: left; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+  .items-table td { padding: .55rem .75rem; border-bottom: 1px solid var(--gray-200); vertical-align: middle; }
+  .items-table tr:nth-child(even) td { background: var(--gray-100); }
+  .table-total-row td { background: var(--primary) !important; color: var(--white) !important; font-weight: 700; padding: .6rem .75rem; font-size: .9rem; }
+
+  /* Modal */
+  .modal-demo { position: relative; height: 340px; border-radius: var(--radius-lg); overflow: hidden; }
+  .modal-overlay { position: absolute; inset: 0; background: rgba(15,30,50,.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .modal { background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-glow); width: 100%; max-width: 420px; display: flex; flex-direction: column; }
+  .modal-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-weight: 700; font-size: 1rem; color: var(--gray-900); }
+  .modal-close { background: none; border: none; cursor: pointer; color: var(--gray-400); padding: .3rem; border-radius: var(--radius); display: flex; }
+  .modal-body { padding: 1.25rem; font-size: .9rem; color: var(--gray-600); }
+  .modal-footer { padding: .75rem 1.25rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end; gap: .5rem; }
+  .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1.1rem; border: none; border-radius: var(--radius); font-size: .85rem; font-weight: 600; cursor: pointer; }
+  .btn-secondary { background: var(--gray-200); color: var(--gray-700); }
+  .btn-danger { background: linear-gradient(120deg, #b91c1c, #ef4444); color: #fff; }
+</style>
+
+<h1>VIMECO — Tablas & Modales</h1>
+<div class="sub">Tabla de ítems (header azul, zebra, fila total) · modal (overlay oscuro con blur + popIn)</div>
+
+<h2>Tabla de ítems</h2>
+<table class="items-table">
+  <thead>
+    <tr><th>N°</th><th>Descripción</th><th>Unidad</th><th class="text-right">Cant.</th><th class="text-right">Precio unit. ($)</th><th class="text-right">Importe ($)</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>Cemento Portland x 50kg</td><td>bolsa</td><td class="text-right">120</td><td class="text-right">8.500,00</td><td class="text-right">1.020.000,00</td></tr>
+    <tr><td>2</td><td>Hierro nervurado Ø8</td><td>barra</td><td class="text-right">200</td><td class="text-right">6.200,00</td><td class="text-right">1.240.000,00</td></tr>
+    <tr><td>3</td><td>Arena gruesa</td><td>m³</td><td class="text-right">15</td><td class="text-right">18.000,00</td><td class="text-right">270.000,00</td></tr>
+  </tbody>
+  <tfoot>
+    <tr class="table-total-row"><td colspan="5" class="text-right">TOTAL</td><td class="text-right">2.530.000,00</td></tr>
+  </tfoot>
+</table>
+
+<h2>Modal</h2>
+<div class="modal-demo">
+  <div class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Eliminar proveedor</span>
+        <button class="modal-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="modal-body">¿Seguro que querés eliminar este proveedor del historial? Esta acción no se puede deshacer.</div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary">Cancelar</button>
+        <button class="btn btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
