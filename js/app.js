@@ -171,6 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupFirmaModalButtons();
   setupImportButtons();
   setupObraCombo();
+  setupEquipoCombo();
   setupProveedorCombo();
   setupOCNumberEdit();
   setupOCAccordion();
@@ -515,6 +516,87 @@ async function setupObraCombo() {
 
   $('lugar-entrega').addEventListener('input', () => {
     delete $('lugar-entrega').dataset.autoFilled;
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.combo-wrap')) dropdown.classList.add('hidden');
+  });
+}
+
+// ---- Equipo combo (opcional) ----
+// El equipo asignado a la OC. null = ninguno (no se muestra en el PDF).
+let selectedEquipo = null;
+
+function setEquipo(eq) {
+  selectedEquipo = (eq && eq.codigo) ? { codigo: eq.codigo, tipo: eq.tipo || '' } : null;
+  const input = $('equipo');
+  if (input) input.value = selectedEquipo ? `${selectedEquipo.codigo} — ${selectedEquipo.tipo}` : '';
+}
+
+async function setupEquipoCombo() {
+  const input    = $('equipo');
+  const arrow    = $('equipo-arrow');
+  const dropdown = $('equipo-dropdown');
+  if (!input) return;
+
+  let equipos = [];
+  try {
+    equipos = await getEquiposActivos();
+  } catch (e) {
+    console.warn('setupEquipoCombo:', e);
+  }
+
+  function buildOptions(list) {
+    dropdown.innerHTML = '';
+    // Opción para quitar el equipo asignado.
+    if (selectedEquipo) {
+      const clr = document.createElement('div');
+      clr.className = 'combo-option';
+      clr.style.color = 'var(--gray-400)';
+      clr.style.fontStyle = 'italic';
+      clr.textContent = 'Sin equipo';
+      clr.addEventListener('mousedown', e => {
+        e.preventDefault(); setEquipo(null); dropdown.classList.add('hidden');
+      });
+      dropdown.appendChild(clr);
+    }
+    list.forEach(eq => {
+      const div = document.createElement('div');
+      div.className = 'combo-option';
+      div.innerHTML = `<span>${eq.codigo}</span><span class="combo-option-sub">${eq.tipo}</span>`;
+      div.addEventListener('mousedown', e => {
+        e.preventDefault(); setEquipo(eq); dropdown.classList.add('hidden');
+      });
+      dropdown.appendChild(div);
+    });
+  }
+
+  arrow.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!dropdown.classList.contains('hidden')) { dropdown.classList.add('hidden'); return; }
+    buildOptions(equipos);
+    if (dropdown.children.length) dropdown.classList.remove('hidden');
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (!isTouch) input.focus();
+  });
+
+  input.addEventListener('input', () => {
+    // Al escribir se descarta la selección: sólo se asigna eligiendo del desplegable.
+    selectedEquipo = null;
+    const q = input.value.toLowerCase().trim();
+    const filtered = q
+      ? equipos.filter(x => x.codigo.toLowerCase().includes(q) || (x.tipo || '').toLowerCase().includes(q))
+      : equipos;
+    buildOptions(filtered);
+    dropdown.classList.toggle('hidden', !dropdown.children.length);
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      dropdown.classList.add('hidden');
+      // Si no quedó un equipo válido seleccionado, limpiar el texto suelto.
+      if (!selectedEquipo) input.value = '';
+    }, 150);
   });
 
   document.addEventListener('click', e => {
@@ -1362,6 +1444,7 @@ function buildOCData(numero, firma = null) {
       total:    roundCents((parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0))
     })),
     observaciones: $('observaciones').value.trim() || '',
+    equipo:      selectedEquipo ? { codigo: selectedEquipo.codigo, tipo: selectedEquipo.tipo } : null,
     impuestos:   pdfTotals,
     totalLetras: numberToWords(total),
     _total:      total,
@@ -1711,6 +1794,7 @@ function loadOCBase(oc) {
   $('condicion-iva-proveedor').value = prov.condicionIVA    || 'Resp. Inscripto';
   $('ref-presupuesto').value         = '';
   $('obra').value                    = oc.obra           || '';
+  setEquipo(oc.equipo || null);
   $('condicion-pago').value          = oc.condicionPago  || '';
   $('plazo-entrega').value           = '';
   $('lugar-entrega').value           = '';
@@ -1746,6 +1830,7 @@ function loadOCBase(oc) {
 function resetFormKeepProvider() {
   $('ref-presupuesto').value  = '';
   $('obra').value             = '';
+  setEquipo(null);
   $('condicion-pago').value   = '';
   $('plazo-entrega').value    = '';
   $('lugar-entrega').value    = '';
@@ -1779,6 +1864,7 @@ function resetForm() {
    'domicilio-proveedor','telefonos-proveedor',
    'ref-presupuesto','obra','condicion-pago','plazo-entrega','lugar-entrega','observaciones']
     .forEach(id => { $(id).value = ''; });
+  setEquipo(null);
   $('condicion-iva-proveedor').value = 'Resp. Inscripto';
 
   items     = [];

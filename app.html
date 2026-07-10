@@ -117,6 +117,14 @@
           <input type="text" id="condicion-pago" class="form-control" placeholder="Ej: Contado, 30 días, etc.">
         </div>
       </div>
+      <div class="form-group">
+        <label for="equipo">Equipo (opcional)</label>
+        <div class="combo-wrap">
+          <input type="text" id="equipo" class="form-control combo-input" placeholder="Buscar equipo por código o tipo" autocomplete="off">
+          <button type="button" class="combo-arrow" id="equipo-arrow" tabindex="-1" aria-label="Ver equipos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg></button>
+          <div class="combo-dropdown hidden" id="equipo-dropdown"></div>
+        </div>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label for="plazo-entrega">Plazo de Entrega</label>

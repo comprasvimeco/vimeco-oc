@@ -102,6 +102,7 @@
         ref:         clean(prov.ref)
       },
       obra:           prov.ubicacion,
+      equipo:         ocData.equipo || null,
       condicionPago:  clean(prov.pago),
       items:          ocData.items,
       impuestos:      ocData.impuestos,
@@ -265,6 +266,64 @@
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+})();
+
+// ─── Gestión de Equipos ─────────────────────────────
+(function () {
+  const _base = () => FIREBASE_CONFIG.databaseURL;
+  const _sort = (a, b) => a.codigo.localeCompare(b.codigo, 'es', { numeric: true });
+
+  // Equipos activos para el desplegable de nuevas OC.
+  window.getEquiposActivos = async function () {
+    const resp = await fetch(_base() + '/equipos.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, e]) => e && e.codigo && e.activo)
+      .map(([key, e]) => ({ key, codigo: e.codigo, tipo: e.tipo || '' }))
+      .sort(_sort);
+  };
+
+  // Todos los equipos (admin).
+  window.getAllEquipos = async function () {
+    const resp = await fetch(_base() + '/equipos.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .filter(([, e]) => e && e.codigo)
+      .map(([key, e]) => ({ key, ...e }))
+      .sort(_sort);
+  };
+
+  window.saveEquipo = async function (key, data) {
+    const resp = await fetch(_base() + '/equipos/' + key + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.patchEquipo = async function (key, fields) {
+    const resp = await fetch(_base() + '/equipos/' + key + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  // Alta masiva (importación de lista inicial). Usa PATCH para no borrar lo existente.
+  window.bulkSaveEquipos = async function (obj) {
+    const resp = await fetch(_base() + '/equipos.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(obj)
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };

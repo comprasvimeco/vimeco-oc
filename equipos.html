@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Gestión de Equipos</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand" style="cursor:pointer" onclick="window.location.href='menu.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Gestión de Equipos</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
+  </div>
+</header>
+
+<main class="app-main">
+  <div class="hist-page">
+    <div class="hist-toolbar">
+      <span style="font-weight:600;color:var(--gray-700);">Equipos del sistema</span>
+      <div style="display:flex;gap:.5rem;">
+        <button class="btn btn-secondary btn-sm hidden" id="btn-seed">Importar lista inicial</button>
+        <button class="btn btn-primary btn-sm" id="btn-add-equipo">+ Agregar equipo</button>
+      </div>
+    </div>
+    <div id="equipos-list" class="users-list">
+      <div class="hist-loading">Cargando equipos…</div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal: Agregar / Editar equipo -->
+<div class="modal-overlay hidden" id="modal-equipo">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-equipo-title">Agregar equipo</span>
+      <button class="modal-close" id="modal-equipo-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="equipo-codigo">Código *</label>
+        <input type="text" id="equipo-codigo" class="form-control" placeholder="Ej: C 172">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label for="equipo-tipo">Tipo / Descripción</label>
+        <input type="text" id="equipo-tipo" class="form-control" placeholder="Ej: Camion L111">
+      </div>
+      <div id="modal-equipo-error" class="alert alert-error hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-equipo-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-equipo-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar acción -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-confirm-title">Confirmar</span>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+      <p id="modal-confirm-msg" style="color:var(--gray-600);"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modal-confirm-no">Cancelar</button>
+      <button class="btn btn-primary" id="modal-confirm-yes">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/equipos.js"></script>
+</body>
+</html>

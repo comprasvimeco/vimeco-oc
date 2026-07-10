@@ -281,6 +281,29 @@ function drawProveedorTable(doc, data, y) {
   ubicLines.forEach((ln, i) => doc.text(ln, xs[1] + 1.5, ry + 4.5 + i * LINE_H));
   ry += R4H;
 
+  // Fila Equipo (solo si hay un equipo asignado a la OC)
+  const eq = data.equipo;
+  if (eq && eq.codigo) {
+    const eqW     = PROV_COLS[1] + PROV_COLS[2] + PROV_COLS[3];
+    const eqText  = `${eq.tipo || '—'}     |     Código: ${eq.codigo}`;
+    const eqLines = doc.splitTextToSize(eqText, eqW - 3);
+    const EQ_H    = Math.max(MIN_H, eqLines.length * LINE_H + 5);
+    const eqTy    = eqLines.length === 1 ? EQ_H / 2 + 1.5 : 4.5;
+
+    fillRect(doc, xs[0], ry, PROV_COLS[0], EQ_H, C.fondoLogo);
+    fillRect(doc, xs[1], ry, eqW,          EQ_H, C.blanco);
+    doc.rect(xs[0], ry, fullW, EQ_H, 'S');
+    doc.line(xs[1], ry, xs[1], ry + EQ_H);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...C.azul);
+    doc.text('Equipo:', xs[0] + 1.5, ry + eqTy);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...C.negro);
+    eqLines.forEach((ln, i) => doc.text(ln, xs[1] + 1.5, ry + eqTy + i * LINE_H));
+    ry += EQ_H;
+  }
+
   // Fila Observaciones (solo si hay contenido)
   const obs = (data.observaciones || '').trim();
   if (obs) {
