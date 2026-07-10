@@ -46,6 +46,7 @@ function ocDataFromRecord(oc) {
   return {
     nroOC:    oc.nroOC,
     fecha:    oc.fecha,
+    moneda:   oc.moneda || 'ARS',
     ejecutor: oc.responsable?.nombre || '',
     proveedor: {
       nombre:    prov.nombre       || '',

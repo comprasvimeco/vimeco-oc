@@ -152,6 +152,7 @@ async function regenerarPDF(oc, btn) {
     const ocData = oc._payload ? { ...oc._payload } : {
       nroOC:    oc.nroOC,
       fecha:    oc.fecha,
+      moneda:   oc.moneda || 'ARS',
       ejecutor: oc.responsable?.nombre || '',
       proveedor: {
         nombre:    prov.nombre       || '',

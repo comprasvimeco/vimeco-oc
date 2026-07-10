@@ -82,6 +82,7 @@ function setupOCNumberEdit() {
 let items            = [];
 let ivaActive        = false;
 let ivaPct           = 21;
+let monedaUSD        = false;
 let selectedFile     = null;
 let descuento        = { pct: null, monto: 0 };
 let noGravado        = { pct: null, monto: 0 };
@@ -115,6 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('verif-banner-close').addEventListener('click', hideVerifBanner);
   setupMenu();
   setupIVAToggle();
+  setupMonedaToggle();
 
   // ---- Descuento ----
   $('pct-descuento').addEventListener('input', e => {
@@ -252,6 +254,21 @@ function resetIVAToggle() {
     $('iva-pct-wrap').classList.add('hidden');
     $('iva-pct').value = '21';
   }
+}
+
+// ---- Toggle de moneda (USD) ----
+// Solo cambia la presentación de la OC: símbolo ($ → USD) y el texto
+// "Son PESOS…" → "Son DOLARES…". No altera los importes cargados.
+function setupMonedaToggle() {
+  const checkbox = $('moneda-toggle');
+  if (!checkbox) return;
+  checkbox.addEventListener('change', () => { monedaUSD = checkbox.checked; });
+}
+
+function resetMonedaToggle() {
+  monedaUSD = false;
+  const checkbox = $('moneda-toggle');
+  if (checkbox) checkbox.checked = false;
 }
 
 // ---- Menú de usuario ----
@@ -1421,6 +1438,7 @@ function buildOCData(numero, firma = null) {
   return {
     nroOC:    numero,
     fecha:    formatDateDisplay(new Date()),
+    moneda:   monedaUSD ? 'USD' : 'ARS',
     ejecutor: sessionStorage.getItem('responsable_name'),
     proveedor: {
       nombre:           proveedor,
@@ -1818,6 +1836,10 @@ function loadOCBase(oc) {
   $('pct-nogravado').value   = noGravado.pct  ? String(noGravado.pct)  : '';
   $('monto-nogravado').value = fmtMoneyDisplay(noGravado.monto);
 
+  monedaUSD = (oc.moneda === 'USD');
+  const monedaChk = $('moneda-toggle');
+  if (monedaChk) monedaChk.checked = monedaUSD;
+
   clearFile();
   renderTable();
   renderImpuestos();
@@ -1847,6 +1869,7 @@ function resetFormKeepProvider() {
   $('monto-nogravado').value = fmtMoneyDisplay(0);
 
   resetIVAToggle();
+  resetMonedaToggle();
   hideVerifBanner();
   clearFile();
   renderTable();
@@ -1878,6 +1901,7 @@ function resetForm() {
   $('monto-nogravado').value  = fmtMoneyDisplay(0);
 
   resetIVAToggle();
+  resetMonedaToggle();
   hideVerifBanner();
   clearFile();
   clearManualOCNumber();

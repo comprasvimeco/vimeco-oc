@@ -103,6 +103,7 @@
       },
       obra:           prov.ubicacion,
       equipo:         ocData.equipo || null,
+      moneda:         ocData.moneda || 'ARS',
       condicionPago:  clean(prov.pago),
       items:          ocData.items,
       impuestos:      ocData.impuestos,

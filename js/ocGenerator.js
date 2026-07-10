@@ -57,27 +57,30 @@ function buildOCDoc(data) {
   }
   const doc = new jsPDFClass({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
+  // Moneda: 'USD' → símbolo "USD" y "Son DOLARES…"; por defecto pesos.
+  const sym = data.moneda === 'USD' ? 'USD' : '$';
+
   let y = PG.mt;
   y = drawHeader(doc, data, y);
   y += 2;
   y = drawProveedorTable(doc, data, y);
   y += 2;
-  const itmColW = computeItemColWidths(doc, data.items);
-  y = drawItemsTable(doc, data.items, y, itmColW);
+  const itmColW = computeItemColWidths(doc, data.items, sym);
+  y = drawItemsTable(doc, data.items, y, itmColW, sym);
 
   // El bloque de cierre (totales + monto en letras + firmas) se mantiene junto.
   // Si no entra en lo que queda de la página, se pasa a una hoja nueva.
   const totalsH  = (data.impuestos || []).length * 7.5;
-  const closingH = totalsH + 2 + measureWordsHeight(doc, data.totalLetras) + 3
+  const closingH = totalsH + 2 + measureWordsHeight(doc, data.totalLetras, data.moneda) + 3
                  + measureFooterHeight(doc, data);
   if (y + closingH > PG.maxY) {
     doc.addPage();
     y = PG.mt;
   }
 
-  y = drawTotalsTable(doc, data, y, itmColW);
+  y = drawTotalsTable(doc, data, y, itmColW, sym);
   y += 2;
-  y = drawAmountInWords(doc, data.totalLetras, y);
+  y = drawAmountInWords(doc, data.totalLetras, y, data.moneda);
   y += 3;
   drawFooter(doc, data, y);
 
@@ -334,7 +337,7 @@ function drawProveedorTable(doc, data, y) {
    DESCRIPCIÓN toma el espacio restante y hace wrap.
    ===================================================== */
 
-function computeItemColWidths(doc, items) {
+function computeItemColWidths(doc, items, sym = '$') {
   const PAD      = 5;   // padding izq+der por columna
   const MIN_DESC = 55;  // mínimo para descripción
 
@@ -359,8 +362,8 @@ function computeItemColWidths(doc, items) {
 
     colW[1] = Math.max(colW[1], doc.getTextWidth(String(item.unidad || '—'))  + PAD);
     colW[2] = Math.max(colW[2], doc.getTextWidth(fmtQty(cant))                + PAD);
-    colW[3] = Math.max(colW[3], doc.getTextWidth(`$ ${formatARS(unitario)}`)  + PAD);
-    colW[4] = Math.max(colW[4], doc.getTextWidth(`$ ${formatARS(total)}`)     + PAD);
+    colW[3] = Math.max(colW[3], doc.getTextWidth(`${sym} ${formatARS(unitario)}`)  + PAD);
+    colW[4] = Math.max(colW[4], doc.getTextWidth(`${sym} ${formatARS(total)}`)     + PAD);
   });
 
   // Descripción recibe lo que sobra
@@ -368,7 +371,7 @@ function computeItemColWidths(doc, items) {
   return colW;
 }
 
-function drawItemsTable(doc, items, y, colW) {
+function drawItemsTable(doc, items, y, colW, sym = '$') {
   const { ml, cw } = PG;
   const HDR_H  = 8;
   const ROW_H  = 7;
@@ -431,8 +434,8 @@ function drawItemsTable(doc, items, y, colW) {
     descLines.forEach((ln, li) => doc.text(ln, xs[0] + 2, y + 4.5 + li * LINE_H));
     doc.text(String(item.unidad || '—'), textX(xs[1], colW[1], 'center'), cy, { align: 'center' });
     doc.text(fmtQty(cant),               textX(xs[2], colW[2], 'center'), cy, { align: 'center' });
-    doc.text(`$ ${formatARS(unitario)}`, textX(xs[3], colW[3], 'right'),  cy, { align: 'right'  });
-    doc.text(`$ ${formatARS(total)}`,    textX(xs[4], colW[4], 'right'),  cy, { align: 'right'  });
+    doc.text(`${sym} ${formatARS(unitario)}`, textX(xs[3], colW[3], 'right'),  cy, { align: 'right'  });
+    doc.text(`${sym} ${formatARS(total)}`,    textX(xs[4], colW[4], 'right'),  cy, { align: 'right'  });
 
     y += rowH;
   });
@@ -446,7 +449,7 @@ function drawItemsTable(doc, items, y, colW) {
    Fila TOTAL: fondo amarillo #E1AE3A, texto negro negrita
    Montos exactos, sin recalcular
    ===================================================== */
-function drawTotalsTable(doc, data, y, colW) {
+function drawTotalsTable(doc, data, y, colW, sym = '$') {
   const { ml, cw } = PG;
   const impuestos = data.impuestos || [];
   if (!impuestos.length) return y;
@@ -459,7 +462,7 @@ function drawTotalsTable(doc, data, y, colW) {
     const isTotal = imp.nombre.trim().toUpperCase() === 'TOTAL';
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(isTotal ? 9.5 : 8.5);
-    const w = doc.getTextWidth(`$ ${formatARS(imp.monto)}`);
+    const w = doc.getTextWidth(`${sym} ${formatARS(imp.monto)}`);
     if (w > maxAmtW) maxAmtW = w;
   });
   // sepX: max entre la posición natural de las columnas y lo necesario para el monto
@@ -487,7 +490,7 @@ function drawTotalsTable(doc, data, y, colW) {
     doc.text(nombre, sepX - 2, ty, { align: 'right' });
 
     // Descuento: monto negativo → mostrar con signo
-    const montoLabel = `$ ${formatARS(imp.monto)}`;
+    const montoLabel = `${sym} ${formatARS(imp.monto)}`;
     doc.text(montoLabel, ml + cw - 2, ty, { align: 'right' });
   });
 
@@ -497,9 +500,10 @@ function drawTotalsTable(doc, data, y, colW) {
 /* =====================================================
    5. MONTO EN LETRAS
    ===================================================== */
-function drawAmountInWords(doc, totalLetras, y) {
+function drawAmountInWords(doc, totalLetras, y, moneda) {
   const { ml, cw } = PG;
-  const text = `Son PESOS: ${totalLetras || ''}`;
+  const cur  = moneda === 'USD' ? 'DOLARES' : 'PESOS';
+  const text = `Son ${cur}: ${totalLetras || ''}`;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...C.azul);
@@ -624,8 +628,9 @@ function drawFooter(doc, data, y) {
    Replican el cálculo de alto de drawAmountInWords y drawFooter
    sin dibujar nada.
    ===================================================== */
-function measureWordsHeight(doc, totalLetras) {
-  const text = `Son PESOS: ${totalLetras || ''}`;
+function measureWordsHeight(doc, totalLetras, moneda) {
+  const cur  = moneda === 'USD' ? 'DOLARES' : 'PESOS';
+  const text = `Son ${cur}: ${totalLetras || ''}`;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   const wrapped = doc.splitTextToSize(text, PG.cw - 6);
