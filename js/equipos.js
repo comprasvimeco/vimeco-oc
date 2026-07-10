@@ -211,10 +211,9 @@ window.editEquipo = function (key) {
   $('modal-equipo-error').classList.add('hidden');
   $('equipo-codigo').value = eq.codigo || '';
   $('equipo-tipo').value   = eq.tipo   || '';
-  // El código es la clave: no se edita para no romper referencias.
-  $('equipo-codigo').disabled = true;
+  $('equipo-codigo').disabled = false;
   $('modal-equipo').classList.remove('hidden');
-  setTimeout(() => $('equipo-tipo').focus(), 50);
+  setTimeout(() => $('equipo-codigo').focus(), 50);
 };
 
 async function saveEquipoModal() {
@@ -234,7 +233,25 @@ async function saveEquipoModal() {
 
   try {
     if (editingKey) {
-      await patchEquipo(editingKey, { tipo });
+      const current = allEquipos.find(e => e.key === editingKey) || {};
+      const newKey  = equipoKey(codigo);
+      if (newKey === editingKey) {
+        // Mismo código: sólo se actualiza el tipo.
+        await patchEquipo(editingKey, { codigo, tipo });
+      } else {
+        // Cambió el código = cambió la clave: crear con la clave nueva y borrar la vieja.
+        if (allEquipos.some(e => e.key === newKey)) {
+          errEl.textContent = 'Ya existe un equipo con ese código.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        await saveEquipo(newKey, {
+          codigo, tipo,
+          activo:   current.activo !== false,
+          creadoEn: current.creadoEn || Date.now()
+        });
+        await deleteEquipo(editingKey);
+      }
     } else {
       const key = equipoKey(codigo);
       if (allEquipos.some(e => e.key === key)) {

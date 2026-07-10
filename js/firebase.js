@@ -318,6 +318,11 @@
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 
+  window.deleteEquipo = async function (key) {
+    const resp = await fetch(_base() + '/equipos/' + key + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
   // Alta masiva (importación de lista inicial). Usa PATCH para no borrar lo existente.
   window.bulkSaveEquipos = async function (obj) {
     const resp = await fetch(_base() + '/equipos.json', {
