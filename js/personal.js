@@ -10,29 +10,56 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function renderObras(list) {
+// Cuenta de personal activo por obra: { obraKey: n }. Una sola lectura del padrón
+// alcanza para todas las obras.
+async function contarPorObra() {
+  try {
+    const personal = await getPersonal();
+    const out = {};
+    personal.forEach(p => {
+      if (p.activo === false) return;
+      Object.keys(p.obras || {}).forEach(k => { if (p.obras[k]) out[k] = (out[k] || 0) + 1; });
+    });
+    return out;
+  } catch (_) {
+    return null;   // sin conteo: las cards se muestran igual, sin el chip
+  }
+}
+
+function renderObras(list, counts) {
   const cont = $('obras-list');
   if (!list.length) {
+    cont.className = '';
     cont.innerHTML = '<div class="hist-empty">No tenés obras asignadas. Pedile al administrador que te asigne una.</div>';
     return;
   }
-  cont.innerHTML = list.map(o => `
-    <div class="user-card" data-key="${esc(o.key)}" data-nombre="${esc(o.nombre)}" style="cursor:pointer;">
-      <div class="user-card-info">
-        <span class="user-card-name">${esc(o.nombre)}</span>
-        ${o.lugar_entrega ? `<span style="font-size:.8rem;color:var(--gray-500);">${esc(o.lugar_entrega)}</span>` : ''}
-      </div>
-      <div class="user-card-actions">
-        <svg class="icon" viewBox="0 0 24 24" style="color:var(--gray-400);"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-    </div>
-  `).join('');
+  cont.className = 'obra-grid';
+  cont.innerHTML = list.map(o => {
+    const n = counts ? (counts[o.key] || 0) : null;
+    const chip = n === null ? '' : `
+      <span class="obra-card-count ${n === 0 ? 'is-empty' : ''}">
+        ${icSvg('users')} ${n === 0 ? 'Sin personal' : n + ' en obra'}
+      </span>`;
+    return `
+      <div class="obra-card" data-key="${esc(o.key)}" data-nombre="${esc(o.nombre)}" role="button" tabindex="0">
+        <div class="obra-card-icon">${icSvg('building')}</div>
+        <div class="obra-card-body">
+          <div class="obra-card-name">${esc(o.nombre)}</div>
+          ${o.lugar_entrega ? `<div class="obra-card-sub">${esc(o.lugar_entrega)}</div>` : ''}
+          ${chip}
+        </div>
+      </div>`;
+  }).join('');
 
-  cont.querySelectorAll('.user-card').forEach(card => {
-    card.addEventListener('click', () => {
+  cont.querySelectorAll('.obra-card').forEach(card => {
+    const abrir = () => {
       const key    = card.dataset.key;
       const nombre = card.dataset.nombre;
       window.location.href = `personal-obra.html?obra=${encodeURIComponent(key)}&nombre=${encodeURIComponent(nombre)}`;
+    };
+    card.addEventListener('click', abrir);
+    card.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); }
     });
   });
 }
@@ -56,9 +83,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    const obras = esAdmin ? await getObrasActivas() : await getObrasDeJefe(_s.codigo);
-    renderObras(obras);
+    const [obras, counts] = await Promise.all([
+      esAdmin ? getObrasActivas() : getObrasDeJefe(_s.codigo),
+      contarPorObra()
+    ]);
+    renderObras(obras, counts);
   } catch (_) {
+    $('obras-list').className = '';
     $('obras-list').innerHTML = '<div class="hist-empty">Error al cargar las obras.</div>';
   }
 });

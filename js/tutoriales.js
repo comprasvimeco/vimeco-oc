@@ -52,14 +52,14 @@ window.TUTORIALES = {
 
   personal: {
     titulo: 'Cómo usar Personal',
-    version: 1,
+    version: 2,
     slides: [
       { icono: 'users', titulo: 'Personal',
         texto: 'Llevá el parte diario de tu cuadrilla, por obra y por quincena.' },
       { icono: 'building', titulo: 'Elegí la obra',
-        texto: 'Entrá a tu obra para ver la cuadrilla y el calendario de la quincena.' },
+        texto: 'Cada tarjeta es una obra y te muestra cuánta gente tiene asignada. Entrá para ver la cuadrilla y el calendario de la quincena.' },
       { icono: 'userPlus', titulo: 'Cargá tu cuadrilla',
-        texto: 'Sumá personal a la obra: si la persona ya está en el padrón, tocá "Padrón", la buscás y la agregás. Si es nueva, usá "Agregar personal" y cargás nombre, apellido, DNI, categoría y la foto del DNI (frente y dorso).' },
+        texto: 'Tocá "Agregar personal" y vas a ver todo el padrón con un buscador arriba. Elegí a quien necesites y tocá "Asignar". Cada persona muestra en qué obras ya está trabajando. Si es alguien nuevo, usá "Incorporar nuevo" y cargás nombre, apellido, DNI, categoría y la foto del DNI (frente y dorso).' },
       { icono: 'calendar', titulo: 'Parte del día',
         texto: 'Cargá horas, comida y viáticos de cada persona. Usá los estados (F, CM, CC, AC) para feriados, certificados médicos, clima o accidentes.' },
       { icono: 'checkSm', titulo: 'Validá el día',

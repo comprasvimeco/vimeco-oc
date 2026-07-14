@@ -223,10 +223,14 @@ let fotoDorso   = null;
 
 function dniFrente(p) { return p.fotoDniFrente || p.fotoDniUrl || ''; }
 
-function obrasDe(p) {
-  const keys = Object.keys(p.obras || {}).filter(k => p.obras[k]);
-  const nombres = keys.map(k => obrasMap[k] || k);
-  return nombres;
+// Chips de las obras donde la persona está activa.
+function obraChips(p) {
+  const nombres = Object.keys(p.obras || {})
+    .filter(k => p.obras[k])
+    .map(k => obrasMap[k] || k)
+    .sort((a, b) => a.localeCompare(b));
+  if (!nombres.length) return '<span class="obra-chip obra-chip--none">Sin obra</span>';
+  return `<span class="obra-chips">${nombres.map(n => `<span class="obra-chip">${esc(n)}</span>`).join('')}</span>`;
 }
 
 function renderPadron() {
@@ -254,8 +258,6 @@ function renderPadron() {
     const av = front
       ? `<div class="pad-avatar"><a href="${esc(front)}" target="_blank" rel="noopener"><img src="${esc(front)}" alt="DNI" onerror="this.parentNode.textContent='${esc(ini)}'"></a></div>`
       : `<div class="pad-avatar">${esc(ini) || icSvg('user')}</div>`;
-    const obras = obrasDe(p);
-    const obrasTxt = obras.length ? obras.join(', ') : 'sin obra';
     return `
       <div class="pad-item ${p.activo === false ? 'inactivo' : ''}" data-id="${esc(p.id)}">
         ${av}
@@ -265,7 +267,7 @@ function renderPadron() {
             ${p.activo === false ? '<span style="font-size:.72rem;color:#b91c1c">(inactivo)</span>' : ''}</div>
           <div class="pad-meta">
             ${categoriaLabel(p) ? `<span class="pad-cat">${esc(categoriaLabel(p))}</span> ` : ''}
-            ${p.dni ? `DNI ${esc(p.dni)}` : 'sin DNI'} · Obras: ${esc(obrasTxt)}
+            ${p.dni ? `DNI ${esc(p.dni)}` : 'sin DNI'} · ${obraChips(p)}
           </div>
         </div>
         <div class="pad-actions">

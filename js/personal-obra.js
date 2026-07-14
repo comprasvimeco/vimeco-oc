@@ -28,6 +28,9 @@ const obraNombre = params.get('nombre') || 'Obra';
 
 let categorias  = [];
 let cuadrilla   = [];   // personal asignado a esta obra (objetos completos)
+let padronAll     = [];    // padrón completo, cargado al abrir el modal de agregar
+let padronCargado = false; // evita renderizar el modal mientras se carga
+let obrasMap    = {};   // { obraKey: nombre } — para los chips de obras
 let editingId   = null;
 let fotoFrente  = null; // archivo DNI frente elegido en el modal
 let fotoDorso   = null; // archivo DNI dorso elegido en el modal
@@ -84,6 +87,19 @@ function avatar(p) {
   return `<div class="crew-avatar">${esc(ini.toUpperCase()) || icSvg('user')}</div>`;
 }
 
+// Obras (activas) donde está una persona. `excluir` saca una obra del listado:
+// en la cuadrilla no tiene sentido repetir la obra en la que ya estás parado.
+function obraChips(p, excluir) {
+  const nombres = Object.keys(p.obras || {})
+    .filter(k => p.obras[k] && k !== excluir)
+    .map(k => obrasMap[k] || k)
+    .sort((a, b) => a.localeCompare(b));
+  if (!nombres.length) {
+    return excluir ? '' : '<span class="obra-chip obra-chip--none">Sin obra</span>';
+  }
+  return `<span class="obra-chips">${nombres.map(n => `<span class="obra-chip">${esc(n)}</span>`).join('')}</span>`;
+}
+
 // Links a frente/dorso del DNI para la fila
 function dniLinks(p) {
   const front = dniFrente(p);
@@ -101,7 +117,9 @@ function renderCuadrilla() {
     cont.innerHTML = '<div class="hist-empty">Sin personal en esta obra. Agregá o traé del padrón.</div>';
     return;
   }
-  cont.innerHTML = cuadrilla.map(p => `
+  cont.innerHTML = cuadrilla.map(p => {
+    const otras = obraChips(p, obraKey);
+    return `
     <div class="crew-item" data-id="${esc(p.id)}">
       ${avatar(p)}
       <div class="crew-info">
@@ -112,14 +130,15 @@ function renderCuadrilla() {
           ${categoriaLabel(p) ? `<span class="crew-cat">${esc(categoriaLabel(p))}</span> ` : ''}
           ${p.dni ? `DNI ${esc(p.dni)}` : '<span style="color:var(--gray-400)">sin DNI</span>'}
           ${dniLinks(p)}
+          ${otras ? ` · También en: ${otras}` : ''}
         </div>
       </div>
       <div class="crew-actions">
         <button class="btn btn-sm btn-outline btn-edit-p">Editar</button>
         <button class="btn btn-sm btn-danger btn-quitar-p">Quitar</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   cont.querySelectorAll('.crew-item').forEach(item => {
     const id = item.dataset.id;
@@ -140,9 +159,19 @@ function ordenJerarquia(list) {
     (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre));
 }
 
+// Nombres de obra para los chips. Se cargan una sola vez por sesión de página.
+async function ensureObrasMap() {
+  if (Object.keys(obrasMap).length) return;
+  try {
+    const obras = await getAllObras();
+    obras.forEach(o => { obrasMap[o.key] = o.nombre; });
+  } catch (_) {}
+}
+
 async function loadCuadrilla() {
   try {
-    cuadrilla = ordenJerarquia(await getPersonalDeObra(obraKey));
+    const [personal] = await Promise.all([getPersonalDeObra(obraKey), ensureObrasMap()]);
+    cuadrilla = ordenJerarquia(personal);
     renderCuadrilla();
   } catch (_) {
     $('crew-list').innerHTML = '<div class="hist-empty">Error al cargar la cuadrilla.</div>';
@@ -298,45 +327,88 @@ async function quitarDeObra(id) {
   }
 }
 
-// ───────── Traer del padrón ─────────
+// ───────── Agregar personal (padrón) ─────────
+// Muestra el padrón completo con buscador. Los que ya están en esta obra se
+// filtran (para sacarlos está "Quitar" en la cuadrilla) y los inactivos quedan
+// ocultos salvo que se pida verlos.
+function renderPadronModal() {
+  if (!padronCargado) return;
+  const cont = $('padron-list');
+  const q    = ($('padron-search').value || '').trim().toLowerCase();
+  const verInactivos = $('padron-ver-inactivos').checked;
+
+  if (!padronAll.length) {
+    cont.innerHTML = '<div class="hist-empty">El padrón está vacío. Incorporá a la primera persona.</div>';
+    return;
+  }
+
+  const disponibles = padronAll.filter(p => !(p.obras && p.obras[obraKey]));
+  const visibles = disponibles.filter(p => {
+    if (!verInactivos && p.activo === false) return false;
+    if (!q) return true;
+    return `${p.apellido} ${p.nombre}`.toLowerCase().includes(q) || String(p.dni || '').includes(q);
+  });
+
+  if (!disponibles.length) {
+    cont.innerHTML = '<div class="hist-empty">Todo el padrón ya está en esta obra. Incorporá a alguien nuevo.</div>';
+    return;
+  }
+  if (!visibles.length) {
+    const hayInactivos = !verInactivos && disponibles.some(p => p.activo === false);
+    cont.innerHTML = `<div class="hist-empty">Sin resultados${hayInactivos ? '. Probá marcando "Ver inactivos".' : ' para la búsqueda.'}</div>`;
+    return;
+  }
+
+  cont.innerHTML = visibles.map(p => `
+    <div class="crew-item ${p.activo === false ? 'inactivo' : ''}" data-id="${esc(p.id)}">
+      <div class="crew-info">
+        <div class="crew-name">${esc(p.apellido)}, ${esc(p.nombre)}
+          ${p.activo === false ? '<span class="crew-inact">(inactivo)</span>' : ''}</div>
+        <div class="crew-meta">${p.categoria ? esc(p.categoria) + ' · ' : ''}${p.dni ? 'DNI ' + esc(p.dni) : 'sin DNI'}</div>
+        <div class="crew-meta crew-obras">${obraChips(p)}</div>
+      </div>
+      <button class="btn btn-sm btn-success btn-asignar">Asignar</button>
+    </div>
+  `).join('');
+
+  cont.querySelectorAll('.crew-item').forEach(item => {
+    const p = padronAll.find(x => x.id === item.dataset.id);
+    item.querySelector('.btn-asignar').addEventListener('click', () => asignarDelPadron(p, item));
+  });
+}
+
 async function openPadron() {
   $('modal-padron').classList.remove('hidden');
+  $('padron-search').value = '';
+  $('padron-ver-inactivos').checked = false;
+  padronCargado = false;
   const cont = $('padron-list');
   cont.innerHTML = '<div class="hist-loading">Cargando padrón…</div>';
   try {
-    const all = await getPersonal();
-    const disponibles = all.filter(p => !(p.obras && p.obras[obraKey]));
-    if (!disponibles.length) {
-      cont.innerHTML = '<div class="hist-empty">No hay personal disponible en el padrón.</div>';
-      return;
-    }
-    cont.innerHTML = disponibles.map(p => `
-      <div class="crew-item" data-id="${esc(p.id)}">
-        <div class="crew-info">
-          <div class="crew-name">${esc(p.apellido)}, ${esc(p.nombre)}</div>
-          <div class="crew-meta">${p.categoria ? esc(p.categoria) + ' · ' : ''}${p.dni ? 'DNI ' + esc(p.dni) : ''}</div>
-        </div>
-        <button class="btn btn-sm btn-success btn-asignar">Asignar</button>
-      </div>
-    `).join('');
-    cont.querySelectorAll('.crew-item').forEach(item => {
-      const id = item.dataset.id;
-      const p  = disponibles.find(x => x.id === id);
-      item.querySelector('.btn-asignar').addEventListener('click', () => asignarDelPadron(p, item));
-    });
+    const [personal] = await Promise.all([getPersonal(), ensureObrasMap()]);
+    padronAll     = personal;
+    padronCargado = true;
+    renderPadronModal();
+    setTimeout(() => $('padron-search').focus(), 50);
   } catch (_) {
     cont.innerHTML = '<div class="hist-empty">Error al cargar el padrón.</div>';
   }
 }
 
+// Asignar desde el padrón. Si estaba inactivo, se reactiva al asignarlo.
 async function asignarDelPadron(p, item) {
   const btn = item.querySelector('.btn-asignar');
   btn.disabled = true; btn.textContent = 'Asignando…';
-  const nuevasObras = { ...(p.obras || {}), [obraKey]: true };
+  const reactivar = p.activo === false;
+  const fields = { obras: { ...(p.obras || {}), [obraKey]: true } };
+  if (reactivar) fields.activo = true;
   try {
-    await patchPersonal(p.id, { obras: nuevasObras });
-    item.remove();
-    showToast(`${p.apellido}, ${p.nombre} asignado.`);
+    await patchPersonal(p.id, fields);
+    Object.assign(p, fields);   // mantener el padrón en memoria al día
+    renderPadronModal();
+    showToast(reactivar
+      ? `${p.apellido}, ${p.nombre} asignado y reactivado.`
+      : `${p.apellido}, ${p.nombre} asignado.`);
     await loadCuadrilla();
   } catch (_) {
     btn.disabled = false; btn.textContent = 'Asignar';
@@ -1628,7 +1700,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Modal personal
-  $('btn-add-personal').addEventListener('click', openAddPersonal);
+  $('btn-add-personal').addEventListener('click', openPadron);
   $('modal-personal-close').addEventListener('click',  () => $('modal-personal').classList.add('hidden'));
   $('modal-personal-cancel').addEventListener('click', () => $('modal-personal').classList.add('hidden'));
   $('modal-personal-save').addEventListener('click', savePersonalModal);
@@ -1642,9 +1714,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Modal padrón
-  $('btn-padron').addEventListener('click', openPadron);
   $('modal-padron-close').addEventListener('click',  () => $('modal-padron').classList.add('hidden'));
   $('modal-padron-cancel').addEventListener('click', () => $('modal-padron').classList.add('hidden'));
+  $('padron-search').addEventListener('input', renderPadronModal);
+  $('padron-ver-inactivos').addEventListener('change', renderPadronModal);
+  $('btn-incorporar').addEventListener('click', () => {
+    $('modal-padron').classList.add('hidden');
+    openAddPersonal();
+  });
 
   // Modal parte del día
   $('modal-parte-close').addEventListener('click', () => $('modal-parte').classList.add('hidden'));

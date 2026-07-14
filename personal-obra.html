@@ -34,6 +34,15 @@
     .crew-name { font-weight:600; color:var(--gray-800); }
     .crew-meta { font-size:.82rem; color:var(--gray-500); }
     .crew-cat { display:inline-block; background:var(--gray-100); border-radius:999px; padding:.1rem .5rem; font-size:.72rem; color:var(--gray-600); }
+    /* Modal del padrón: buscador + alta nueva + filtro de inactivos */
+    .pad-tools { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.5rem; }
+    .pad-tools input { flex:1; min-width:160px; }
+    .padron-inactivos { display:flex; align-items:center; gap:.4rem; font-size:.8rem; color:var(--gray-500); margin-bottom:.5rem; cursor:pointer; }
+    .padron-inactivos input { margin:0; }
+    #padron-list { max-height:52vh; overflow-y:auto; }
+    .crew-obras { margin-top:.25rem; }
+    .crew-item.inactivo .crew-info { opacity:.6; }
+    .crew-inact { font-size:.72rem; color:#b91c1c; font-weight:600; }
     .dni-preview { margin-top:.5rem; }
     .dni-preview img { max-width:100%; max-height:160px; border-radius:8px; border:1px solid var(--gray-200); }
 
@@ -160,7 +169,6 @@
     <div class="sec-body">
       <div class="crew-actions">
         <button class="btn btn-primary btn-sm" id="btn-add-personal">+ Agregar personal</button>
-        <button class="btn btn-outline btn-sm" id="btn-padron">Traer del padrón</button>
       </div>
       <div id="crew-list"><div class="hist-loading">Cargando cuadrilla…</div></div>
     </div>
@@ -245,15 +253,21 @@
   </div>
 </div>
 
-<!-- Modal: Traer del padrón -->
+<!-- Modal: Agregar personal (padrón + alta nueva) -->
 <div class="modal-overlay hidden" id="modal-padron">
   <div class="modal modal--sm">
     <div class="modal-header">
-      <span class="modal-title">Traer del padrón</span>
+      <span class="modal-title">Agregar personal</span>
       <button class="modal-close" id="modal-padron-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--gray-500);font-size:.85rem;margin-top:0;">Personal ya cargado en otras obras que podés asignar a esta.</p>
+      <div class="pad-tools">
+        <input type="text" id="padron-search" class="form-control" placeholder="Nombre o DNI…" autocomplete="off">
+        <button class="btn btn-outline btn-sm" id="btn-incorporar">+ Incorporar nuevo</button>
+      </div>
+      <label class="padron-inactivos">
+        <input type="checkbox" id="padron-ver-inactivos"> Ver inactivos
+      </label>
       <div id="padron-list"><div class="hist-loading">Cargando padrón…</div></div>
     </div>
     <div class="modal-footer">
