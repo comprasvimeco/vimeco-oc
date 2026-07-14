@@ -37,6 +37,8 @@ const STATIC_ASSETS = [
   BASE + '/js/adjuntar.js',
   BASE + '/js/icons.js',
   BASE + '/js/ui.js',
+  BASE + '/js/tutoriales.js',
+  BASE + '/js/tour.js',
   BASE + '/js/caja.js',
   BASE + '/js/scanner.js',
   BASE + '/actividad.html',

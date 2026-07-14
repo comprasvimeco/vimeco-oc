@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
 </head>
-<body>
+<body data-tour="caja">
 
 <!-- ===== HEADER ===== -->
 <header class="app-header">
@@ -34,6 +34,7 @@
         <button class="hdr-drop-item hidden" id="btn-categorias">
           <svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Categorías
         </button>
+        <button class="hdr-drop-item" id="btn-ayuda"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Ayuda</button>
         <div class="hdr-drop-version">v133</div>
       </div>
     </div>
@@ -316,6 +317,8 @@
 
 <script src="js/icons.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/tutoriales.js"></script>
+<script src="js/tour.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>

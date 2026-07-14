@@ -432,6 +432,23 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hdr-drop-danger:hover { background: #fef2f2 !important; }
 .hdr-drop-version { padding: .35rem 1rem .45rem; font-size: .68rem; color: var(--gray-400); text-align: right; letter-spacing: .04em; }
 
+/* ===== TUTORIAL: badge "Nuevo" ===== */
+.hdr-badge { position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--white); pointer-events: none; }
+.hdr-drop-new { display: inline-block; margin-left: .4rem; padding: 0 .4rem; font-size: .6rem; font-weight: 700; line-height: 1.5; border-radius: 999px; background: var(--danger); color: var(--white); vertical-align: middle; letter-spacing: .03em; }
+
+/* ===== TUTORIAL: carrusel de slides ===== */
+.modal--tour { max-width: 440px; }
+.tour-body { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .85rem; padding: 1.75rem 1.5rem .5rem; }
+.tour-illustration { width: 82px; height: 82px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--grad-accent); color: var(--white); flex-shrink: 0; }
+.tour-illustration .icon { width: 38px; height: 38px; stroke-width: 1.6; }
+.tour-slide-title { font-size: 1.05rem; font-weight: 700; color: var(--primary); }
+.tour-slide-text { font-size: .9rem; line-height: 1.5; color: var(--gray-700); max-width: 34ch; }
+.tour-dots { display: flex; justify-content: center; gap: .4rem; padding: .5rem 0 0; }
+.tour-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray-300); transition: width .2s, background .2s; }
+.tour-dot.active { background: var(--primary); width: 20px; border-radius: 999px; }
+.tour-footer { justify-content: space-between; }
+.tour-footer .btn { display: inline-flex; align-items: center; gap: .25rem; }
+
 /* ===== FIRMA CANVAS ===== */
 .firma-canvas-wrap {
   border: 2px solid var(--gray-300); border-radius: var(--radius);
