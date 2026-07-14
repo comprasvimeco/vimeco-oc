@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
 </head>
-<body>
+<body data-tour="compras" data-tour-menu="self">
 
 <header class="app-header">
   <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
@@ -24,6 +24,12 @@
   <div class="header-user">
     <div class="user-badge">
       <span id="hdr-name">—</span>
+    </div>
+    <div class="hdr-menu-wrap">
+      <button class="btn btn-sm btn-outline" id="btn-menu" title="Menú"><svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <div class="hdr-dropdown hidden" id="hdr-dropdown">
+        <button class="hdr-drop-item" id="btn-ayuda"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Ayuda</button>
+      </div>
     </div>
     <button class="btn btn-sm btn-outline btn-icon" aria-label="Volver" title="Volver" onclick="window.location.href='menu.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
@@ -62,6 +68,10 @@
   </div>
 </main>
 
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/tutoriales.js"></script>
+<script src="js/tour.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script>
