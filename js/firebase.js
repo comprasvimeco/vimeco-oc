@@ -489,12 +489,13 @@
   };
 
   // Devuelve los eventos de los últimos `dias` días, más recientes primero.
+  // `dias = null` devuelve el feed completo (la página filtra por fecha).
   window.getActividad = async function (dias = 7) {
     const resp = await fetch(_base() + '/actividad.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     if (!data) return [];
-    const desde = Date.now() - dias * 86400000;
+    const desde = dias ? Date.now() - dias * 86400000 : 0;
     return Object.entries(data)
       .map(([key, e]) => ({ key, ...e }))
       .filter(e => e && (e.timestamp || 0) >= desde)

@@ -15,11 +15,30 @@
       font-size: .88rem; font-weight: 600;
     }
     .act-filters { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .25rem; }
-    .act-filter {
+    /* act-chip es sólo el aspecto; act-filter y act-range son los hooks de JS. */
+    .act-chip {
       border: 1px solid var(--gray-300); background: #fff; color: var(--gray-600);
       border-radius: 999px; padding: .35rem .85rem; font-size: .82rem; cursor: pointer;
     }
-    .act-filter.active { background: var(--primary, #1a3a5c); color: #fff; border-color: var(--primary, #1a3a5c); }
+    .act-chip.active { background: var(--primary, #1a3a5c); color: #fff; border-color: var(--primary, #1a3a5c); }
+
+    /* ---- Rango de fechas ---- */
+    .act-dates {
+      display: flex; flex-wrap: wrap; gap: .5rem .9rem; align-items: center;
+      justify-content: space-between; margin: .55rem 0 .9rem;
+      padding-bottom: .8rem; border-bottom: 1px solid var(--gray-200);
+    }
+    .act-ranges { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .act-custom { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+    .act-custom label {
+      font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--gray-500); font-weight: 700;
+    }
+    .act-custom input[type=date] {
+      padding: .3rem .45rem; border: 1px solid var(--gray-300);
+      border-radius: var(--radius); font: inherit; font-size: .8rem;
+      color: var(--gray-700); background: #fff;
+    }
     .act-day {
       font-size: .78rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: .04em; color: var(--gray-500); margin: 1.1rem .15rem .45rem;
@@ -29,6 +48,8 @@
     .act-card-unseen { border-left: 3px solid var(--primary, #1a3a5c); }
     .act-card-seen { background: #eef7f1; }
     .act-card-seen .act-title, .act-card-seen .act-detalle { color: var(--gray-500); }
+    /* Fuera de la ventana de novedades: es historial, no reclama atención. */
+    .act-card-old .act-title, .act-card-old .act-detalle { color: var(--gray-500); }
     .act-row { display: flex; align-items: center; gap: .7rem; }
     .act-badge {
       display: inline-flex; align-items: center; gap: .3rem; flex: 0 0 auto;
@@ -85,12 +106,27 @@
 
     <div class="hist-toolbar">
       <div class="act-filters">
-        <button class="act-filter active" data-filter="all">Todas</button>
-        <button class="act-filter" data-filter="oc">Órdenes de Compra</button>
-        <button class="act-filter" data-filter="adjunto">Adjuntos</button>
-        <button class="act-filter" data-filter="caja">Caja</button>
+        <button class="act-chip act-filter active" data-filter="all">Todas</button>
+        <button class="act-chip act-filter" data-filter="oc">Órdenes de Compra</button>
+        <button class="act-chip act-filter" data-filter="adjunto">Adjuntos</button>
+        <button class="act-chip act-filter" data-filter="caja">Caja</button>
       </div>
       <span class="hist-count" id="act-count"></span>
+    </div>
+
+    <div class="act-dates">
+      <div class="act-ranges">
+        <button class="act-chip act-range" data-range="7">7 días</button>
+        <button class="act-chip act-range active" data-range="30">30 días</button>
+        <button class="act-chip act-range" data-range="90">90 días</button>
+        <button class="act-chip act-range" data-range="all">Todo</button>
+      </div>
+      <div class="act-custom">
+        <label for="act-desde">Desde</label>
+        <input type="date" id="act-desde">
+        <label for="act-hasta">Hasta</label>
+        <input type="date" id="act-hasta">
+      </div>
     </div>
 
     <div id="act-list" class="hist-list">

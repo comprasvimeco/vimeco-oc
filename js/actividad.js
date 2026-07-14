@@ -2,13 +2,20 @@
 
 const $ = id => document.getElementById(id);
 
-const RETENTION_DAYS = 7;
+// Ventana en la que una novedad todavía cuenta como "sin ver". El feed se puede
+// mirar hacia atrás sin límite, pero lo viejo ya no reclama atención (ni infla
+// el badge del menú).
+const UNSEEN_DAYS = 7;
 
-let allEvents     = [];
+let allEvents     = [];          // feed completo; el rango se aplica al mostrar
 let currentFilter = 'all';
 let seenKey       = 'vimeco_actividad_vistas';
+let rangeKey      = 'vimeco_actividad_rango';
 let seen          = new Set();   // claves de eventos marcados como vistos
 let isSuper       = false;       // solo Administración (código 0000) puede borrar
+
+// preset: '7' | '30' | '90' | 'all' | 'custom'
+const range = { preset: '30', desde: '', hasta: '' };
 
 function esc(str) {
   return String(str || '')
@@ -49,17 +56,29 @@ function dayLabel(ts) {
   const diff = Math.round((today - d) / 86400000);
   if (diff === 0) return 'Hoy';
   if (diff === 1) return 'Ayer';
-  return new Date(ts).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const opts = { weekday: 'long', day: 'numeric', month: 'long' };
+  // Al mirar hacia atrás varios años, el día sin año es ambiguo.
+  if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric';
+  return new Date(ts).toLocaleDateString('es-AR', opts);
 }
 
 function fmtHora(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Persiste las vistas, podando claves que ya no están en el feed actual.
+// Un evento sólo puede estar "sin ver" mientras es reciente.
+function esReciente(e) {
+  return (Date.now() - (e.timestamp || 0)) <= UNSEEN_DAYS * 86400000;
+}
+function sinVer(e) {
+  return esReciente(e) && !seen.has(e.key);
+}
+
+// Persiste las vistas. Sólo se guardan las de eventos recientes: pasada la
+// ventana el evento ya no cuenta como sin ver, así que la clave no hace falta.
 function persistSeen() {
-  const validas = new Set(allEvents.map(e => e.key));
-  const arr = [...seen].filter(k => validas.has(k));
+  const vigentes = new Set(allEvents.filter(esReciente).map(e => e.key));
+  const arr = [...seen].filter(k => vigentes.has(k));
   seen = new Set(arr);
   try { localStorage.setItem(seenKey, JSON.stringify(arr)); } catch (_) {}
 }
@@ -72,30 +91,59 @@ function marcarVista(key) {
 }
 
 function updateBanner() {
-  const sinVer = allEvents.filter(e => !seen.has(e.key)).length;
+  const n = allEvents.filter(sinVer).length;
   const banner = $('act-banner');
-  if (sinVer > 0) {
-    banner.textContent = `${sinVer} novedad${sinVer !== 1 ? 'es' : ''} sin ver`;
+  if (n > 0) {
+    banner.textContent = `${n} novedad${n !== 1 ? 'es' : ''} sin ver`;
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
   }
 }
 
+// Límites del rango elegido, en timestamps.
+function rangeBounds() {
+  if (range.preset === 'all') return { from: 0, to: Infinity };
+  if (range.preset === 'custom') {
+    return {
+      from: range.desde ? new Date(range.desde + 'T00:00:00').getTime() : 0,
+      to:   range.hasta ? new Date(range.hasta + 'T23:59:59').getTime() : Infinity
+    };
+  }
+  return { from: Date.now() - Number(range.preset) * 86400000, to: Infinity };
+}
+
+function rangeLabel() {
+  if (range.preset === 'all')    return 'en el historial';
+  if (range.preset === 'custom') return 'en el rango elegido';
+  return `en los últimos ${range.preset} días`;
+}
+
+function getVisible() {
+  const { from, to } = rangeBounds();
+  return allEvents.filter(e => {
+    const ts = e.timestamp || 0;
+    if (ts < from || ts > to) return false;
+    return currentFilter === 'all' || e.tipo === currentFilter;
+  });
+}
+
+function persistRange() {
+  try { localStorage.setItem(rangeKey, JSON.stringify(range)); } catch (_) {}
+}
+
 function render() {
   const list   = $('act-list');
-  const events = currentFilter === 'all'
-    ? allEvents
-    : allEvents.filter(e => e.tipo === currentFilter);
+  const events = getVisible();
 
   $('act-count').textContent = events.length
-    ? `${events.length} operación${events.length !== 1 ? 'es' : ''}`
+    ? `${events.length} ${events.length !== 1 ? 'operaciones' : 'operación'}`
     : '';
 
   updateBanner();
 
   if (!events.length) {
-    list.innerHTML = '<div class="hist-empty">No hay operaciones en los últimos 7 días.</div>';
+    list.innerHTML = `<div class="hist-empty">No hay operaciones ${esc(rangeLabel())}.</div>`;
     return;
   }
 
@@ -107,19 +155,23 @@ function render() {
       html += `<div class="act-day">${esc(dayLabel(e.timestamp))}</div>`;
       lastDay = dk;
     }
-    const meta   = tipoMeta(e.tipo);
-    const vista  = seen.has(e.key);
+    const meta     = tipoMeta(e.tipo);
+    const reciente = esReciente(e);
+    const vista    = !sinVer(e);
     const drive  = e.driveUrl
       ? `<a class="btn btn-sm btn-primary act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener">Abrir en Drive</a>`
       : '<span class="act-nodrive">sin link</span>';
-    const accion = vista
-      ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
-      : `<button class="btn btn-sm btn-outline act-mark" data-key="${esc(e.key)}">Marcar vista</button>`;
+    // Fuera de la ventana de novedades no se ofrece "marcar vista": ya no aplica.
+    const accion = !reciente ? ''
+      : vista
+        ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
+        : `<button class="btn btn-sm btn-outline act-mark" data-key="${esc(e.key)}">Marcar vista</button>`;
     const borrar = isSuper
       ? `<button class="btn btn-sm btn-danger act-del" data-key="${esc(e.key)}">Borrar</button>`
       : '';
+    const cardCls = !reciente ? 'act-card-old' : (vista ? 'act-card-seen' : 'act-card-unseen');
     html += `
-      <div class="hist-card act-card ${vista ? 'act-card-seen' : 'act-card-unseen'}">
+      <div class="hist-card act-card ${cardCls}">
         <div class="act-row">
           <span class="act-badge ${meta.cls}">${icSvg(meta.icon)} ${meta.label}</span>
           <div class="act-body">
@@ -167,6 +219,31 @@ function setFilter(f) {
   render();
 }
 
+function syncRangeUI() {
+  document.querySelectorAll('.act-range').forEach(b =>
+    b.classList.toggle('active', b.dataset.range === range.preset));
+  $('act-desde').value = range.desde;
+  $('act-hasta').value = range.hasta;
+}
+
+function setRange(preset) {
+  range.preset = preset;
+  if (preset !== 'custom') { range.desde = ''; range.hasta = ''; }
+  syncRangeUI();
+  persistRange();
+  render();
+}
+
+// Tocar una fecha implica rango a medida.
+function onCustomDate() {
+  range.desde  = $('act-desde').value;
+  range.hasta  = $('act-hasta').value;
+  range.preset = (range.desde || range.hasta) ? 'custom' : '30';
+  syncRangeUI();
+  persistRange();
+  render();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   let sess = null;
   try { sess = JSON.parse(localStorage.getItem('vimeco_session')); } catch (_) {}
@@ -187,14 +264,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Solo Administración (super-admin 0000) puede borrar novedades para todos.
   isSuper = code === '0000';
 
-  seenKey = `vimeco_actividad_vistas_${code}`;
+  seenKey  = `vimeco_actividad_vistas_${code}`;
+  rangeKey = `vimeco_actividad_rango_${code}`;
   try { seen = new Set(JSON.parse(localStorage.getItem(seenKey) || '[]')); } catch (_) { seen = new Set(); }
+  try { Object.assign(range, JSON.parse(localStorage.getItem(rangeKey) || 'null') || {}); } catch (_) {}
 
   document.querySelectorAll('.act-filter').forEach(b =>
     b.addEventListener('click', () => setFilter(b.dataset.filter)));
+  document.querySelectorAll('.act-range').forEach(b =>
+    b.addEventListener('click', () => setRange(b.dataset.range)));
+  $('act-desde').addEventListener('change', onCustomDate);
+  $('act-hasta').addEventListener('change', onCustomDate);
+  syncRangeUI();
 
   try {
-    allEvents = await getActividad(RETENTION_DAYS);
+    // Se baja el feed completo; el rango elegido se aplica al mostrar.
+    allEvents = await getActividad(null);
   } catch (e) {
     $('act-list').innerHTML = '<div class="hist-empty">No se pudo cargar la actividad. Revisá tu conexión.</div>';
     console.error('getActividad:', e);

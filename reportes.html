@@ -9,12 +9,12 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .rep-wrap { max-width: 1120px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    .rep-wrap { max-width: 1180px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
 
-    .rep-dolar { font-size: .78rem; color: var(--gray-500); text-align: right; margin-bottom: .9rem; }
+    .rep-dolar { font-size: .78rem; color: var(--gray-500); text-align: right; margin-bottom: .7rem; }
     .rep-dolar strong { color: var(--primary); font-weight: 700; }
 
-    /* ---- Toolbar de controles ---- */
+    /* ---- Toolbar de controles: una sola fila, alcanza a todo lo de abajo ---- */
     .rep-controls { display: flex; flex-wrap: wrap; gap: .8rem 1.1rem; align-items: flex-end;
       background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
       padding: 1rem 1.15rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-sm); }
@@ -23,31 +23,90 @@
     .rep-ctrl input[type=date] { padding: .45rem .55rem; border: 1px solid var(--gray-300); border-radius: var(--radius); font: inherit; color: var(--gray-700); background: var(--white); }
     .rep-check { flex-direction: row; align-items: center; gap: .45rem; padding-bottom: .5rem; }
     .rep-check label { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray-600); font-size: .82rem; cursor: pointer; }
+    .rep-spacer { flex: 1 1 auto; }
 
     .seg { display: inline-flex; border: 1px solid var(--gray-300); border-radius: var(--radius); overflow: hidden; }
     .seg button { border: none; background: var(--white); color: var(--gray-600); padding: .45rem .8rem; font: inherit; font-size: .82rem; cursor: pointer; transition: background .15s; }
     .seg button + button { border-left: 1px solid var(--gray-300); }
     .seg button.active { background: var(--primary); color: var(--white); font-weight: 700; }
 
+    /* ---- Hero: el total es el titular del panel ---- */
+    .rep-hero {
+      position: relative; overflow: hidden;
+      background: var(--grad-header, linear-gradient(120deg, #1a3a5c, #234870 55%, #2557a7 120%));
+      border-radius: var(--radius-lg); color: #fff;
+      padding: 1.6rem 1.5rem; margin-bottom: 1rem;
+      box-shadow: var(--shadow-glow, 0 12px 40px -10px rgba(37,87,167,.45));
+    }
+    /* Halo decorativo; no codifica ningún dato. */
+    .rep-hero::after {
+      content: ''; position: absolute; right: -80px; top: -110px;
+      width: 340px; height: 340px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(200,168,82,.30) 0%, transparent 68%);
+      pointer-events: none;
+    }
+    .rep-hero-lbl {
+      font-size: .7rem; text-transform: uppercase; letter-spacing: .1em;
+      font-weight: 700; color: rgba(255,255,255,.72);
+    }
+    .rep-hero-val {
+      font-size: clamp(2.3rem, 6vw, 3.6rem); font-weight: 800; line-height: 1.05;
+      margin: .35rem 0 .3rem; letter-spacing: -.02em; word-break: break-word;
+    }
+    .rep-hero-sub { font-size: .84rem; color: rgba(255,255,255,.78); font-weight: 500; }
+
     /* ---- KPIs ---- */
     .rep-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .9rem; margin-bottom: 1.25rem; }
     .kpi { position: relative; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
-      padding: 1rem 1.15rem; box-shadow: var(--shadow-sm); overflow: hidden; }
+      padding: .9rem 1.05rem; box-shadow: var(--shadow-sm); overflow: hidden; }
     .kpi::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--grad-header); }
-    .kpi-lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
-    .kpi-val { font-size: 1.45rem; font-weight: 800; color: var(--primary); margin-top: .3rem; line-height: 1.1; word-break: break-word; }
-    .kpi.kpi-accent .kpi-val { color: var(--accent); }
+    .kpi-lbl { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
+    .kpi-val { font-size: 1.35rem; font-weight: 800; color: var(--primary); margin-top: .25rem; line-height: 1.1; word-break: break-word; }
+    .kpi.kpi-accent::before { background: var(--grad-gold, linear-gradient(120deg,#c8a852,#e6c878)); }
+    .kpi.kpi-accent .kpi-val { color: #9a7c1f; }
 
     .rep-note { display: flex; gap: .5rem; align-items: flex-start; background: #fff8ec; color: #8a5a00; border: 1px solid #f0dca8;
       border-radius: var(--radius); padding: .6rem .85rem; font-size: .8rem; margin-bottom: 1.25rem; }
 
     /* ---- Secciones ---- */
-    .rep-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    /* align-items:start evita que una tarjeta corta se estire al alto de su vecina. */
+    .rep-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
     .rep-card { grid-column: span 1; margin-bottom: 0; }
     .rep-card.rep-full { grid-column: 1 / -1; }
     .rep-card .card-header { background: var(--white); border-bottom: 1px solid var(--gray-200); }
     .rep-card .card-title { font-size: .9rem; }
     .rep-card .card-body { padding: 1rem 1.15rem; }
+
+    /* ---- Participación por obra (part-to-whole) ---- */
+    .rep-share-track { display: flex; gap: 2px; height: 26px; border-radius: 6px; overflow: hidden; margin-bottom: .9rem; }
+    .rep-share-seg { min-width: 3px; transition: filter .15s; }
+    .rep-share-seg:hover { filter: brightness(1.12); }
+    .rep-share-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .35rem .9rem; }
+    .rep-share-item { display: flex; align-items: center; gap: .45rem; font-size: .8rem; min-width: 0; }
+    .rep-share-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+    .rep-share-lbl { color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+    .rep-share-pct { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
+    .rep-share-val { color: var(--gray-500); font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    /* ---- Evolución mensual ---- */
+    .rep-line { position: relative; }
+    .rep-line-svg { display: block; max-width: 100%; }
+    .rep-grid { stroke: var(--gray-200); stroke-width: 1; }
+    .rep-axis { fill: var(--gray-500); font-size: 10px; font-family: inherit; }
+    .rep-line-svg .rep-line { fill: none; stroke: #2557a7; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .rep-dot { fill: #2557a7; stroke: var(--white); stroke-width: 2; }
+    .rep-dot-last { fill: var(--accent, #c8a852); }
+    .rep-dot-on { r: 5.5; }
+    .rep-cross { stroke: var(--gray-300); stroke-width: 1; }
+    .rep-tip {
+      position: absolute; pointer-events: none; z-index: 5;
+      background: var(--gray-900, #111827); color: #fff; border-radius: 6px;
+      padding: .4rem .6rem; font-size: .76rem; line-height: 1.35;
+      display: flex; flex-direction: column; white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+    .rep-tip strong { font-weight: 700; }
+    .rep-tip-sub { color: rgba(255,255,255,.65); font-size: .7rem; }
 
     /* ---- Barras ---- */
     .rep-bar-row { padding: .55rem .1rem; border-radius: var(--radius); }
@@ -56,36 +115,64 @@
     .rep-clickable:hover { background: var(--gray-100); }
     .rep-open { background: #f7f9fc; }
     .rep-bar-head { display: flex; align-items: baseline; gap: .55rem; margin-bottom: .3rem; }
-    .rep-bar-rank { font-size: .72rem; font-weight: 700; color: var(--gray-400); min-width: 1.1rem; }
-    .rep-caret { color: var(--primary-light); font-size: .7rem; }
+    .rep-bar-rank { font-size: .72rem; font-weight: 700; color: var(--gray-400); min-width: 1.1rem; font-variant-numeric: tabular-nums; }
+    .rep-caret { color: var(--primary-light); display: inline-flex; transition: transform .18s var(--ease-spring, ease); }
+    .rep-caret .icon { width: 13px; height: 13px; }
+    .rep-open .rep-caret { transform: rotate(90deg); }
     .rep-bar-label { flex: 1; font-size: .86rem; color: var(--gray-700); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rep-bar-val { font-size: .88rem; font-weight: 800; color: var(--primary); white-space: nowrap; }
+    .rep-bar-val { font-size: .88rem; font-weight: 800; color: var(--primary); white-space: nowrap; font-variant-numeric: tabular-nums; }
     .rep-bar-track { background: var(--gray-100); border-radius: 999px; height: 8px; overflow: hidden; margin-left: 1.65rem; }
-    .rep-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary-light), var(--primary)); }
+    .rep-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary-light), var(--primary));
+      animation: repGrow .5s var(--ease-spring, cubic-bezier(.22,1,.36,1)) both; transform-origin: left; }
+    @keyframes repGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @media (prefers-reduced-motion: reduce) { .rep-bar-fill { animation: none; } }
     .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .25rem; margin-left: 1.65rem; }
 
-    /* ---- Drill-down ---- */
+    /* ---- Drill-down: cada OC abre su ficha ---- */
     .rep-drill { margin: .6rem 0 .2rem 1.65rem; border-left: 2px solid var(--gray-200); padding-left: .7rem; }
-    .rep-oc { display: grid; grid-template-columns: 1fr auto; gap: .1rem .6rem; align-items: center;
-      padding: .5rem .1rem; border-bottom: 1px dashed var(--gray-200); }
+    .rep-oc { display: grid; grid-template-columns: 1fr auto auto; gap: .1rem .6rem; align-items: center;
+      padding: .5rem .35rem; border-bottom: 1px dashed var(--gray-200); width: 100%;
+      background: none; border-top: none; border-left: none; border-right: none;
+      font: inherit; text-align: left; cursor: pointer; border-radius: var(--radius); transition: background .12s; }
+    .rep-oc:hover { background: #eef3fa; }
     .rep-oc:last-child { border-bottom: none; }
     .rep-oc-main { display: flex; flex-direction: column; min-width: 0; }
     .rep-oc-nro { font-family: 'Courier New', monospace; font-size: .74rem; color: var(--gray-500); font-weight: 700; }
     .rep-oc-prov { font-size: .82rem; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rep-oc-meta { grid-column: 1 / -1; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
     .rep-oc-fecha { font-size: .72rem; color: var(--gray-400); }
-    .rep-oc-total { grid-row: 1; grid-column: 2; font-size: .86rem; font-weight: 800; color: var(--primary); white-space: nowrap; text-align: right; }
-    .rep-oc-flag { background: #fff5f5; margin: 0 -.1rem; padding: .5rem .35rem; border-radius: var(--radius); border-bottom-color: #f5c6c6; }
+    .rep-oc-total { grid-row: 1; grid-column: 2; font-size: .86rem; font-weight: 800; color: var(--primary); white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+    .rep-oc-go { grid-row: 1; grid-column: 3; display: inline-flex; color: var(--gray-400); }
+    .rep-oc-go .icon { width: 15px; height: 15px; }
+    .rep-oc:hover .rep-oc-go { color: var(--primary); }
+    .rep-oc-drv { display: inline-flex; color: #1e7d3a; }
+    .rep-oc-drv .icon { width: 13px; height: 13px; }
+    .rep-oc-flag { background: #fff5f5; border-bottom-color: #f5c6c6; }
     .rep-oc-flag .rep-oc-total { color: #c02626; }
     .rep-chip { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; }
-    .rep-flag { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; background: #fde6e6; color: #b02a2a; }
-
-    .rep-oc-edit { margin-left: auto; background: var(--white); border: 1px solid var(--gray-300); color: var(--primary);
-      font: inherit; font-size: .72rem; font-weight: 700; padding: .12rem .55rem; border-radius: 999px; cursor: pointer; }
-    .rep-oc-edit:hover { background: var(--primary); color: var(--white); border-color: var(--primary); }
+    .rep-flag { display: inline-flex; align-items: center; gap: .2rem; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; background: #fde6e6; color: #b02a2a; }
+    .rep-flag .icon { width: 11px; height: 11px; }
 
     .rep-empty { color: var(--gray-500); font-size: .85rem; padding: .5rem 0; }
     .rep-loading { text-align: center; color: var(--gray-500); padding: 3.5rem 1rem; }
+
+    /* ---- Ficha de la OC ---- */
+    .foc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .5rem .9rem; margin-bottom: 1rem; }
+    .foc-f { display: flex; flex-direction: column; min-width: 0; }
+    .foc-k { font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
+    .foc-v { font-size: .86rem; color: var(--gray-700); font-weight: 600; word-break: break-word; }
+    .foc-items { width: 100%; border-collapse: collapse; font-size: .8rem; margin-bottom: .9rem; }
+    .foc-items th { text-align: left; font-size: .64rem; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--gray-500); border-bottom: 1px solid var(--gray-200); padding: .35rem .4rem; white-space: nowrap; }
+    .foc-items td { padding: .4rem; border-bottom: 1px solid var(--gray-100); color: var(--gray-700); vertical-align: top; }
+    .foc-items .foc-n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .foc-tot { margin-left: auto; max-width: 340px; }
+    .foc-t { display: flex; justify-content: space-between; gap: 1rem; font-size: .82rem; color: var(--gray-600); padding: .2rem 0; font-variant-numeric: tabular-nums; }
+    .foc-t-grand { border-top: 1px solid var(--gray-300); margin-top: .3rem; padding-top: .45rem;
+      font-size: 1rem; font-weight: 800; color: var(--primary); }
+    .foc-conv { margin-top: .9rem; background: #f2f6fb; border: 1px solid #d9e5f3; color: #2b537d;
+      border-radius: var(--radius); padding: .5rem .7rem; font-size: .78rem; }
+    .foc-nodrive { font-size: .76rem; color: var(--gray-500); font-style: italic; }
 
     /* ---- Modal unificar obras ---- */
     .mmg-group { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .7rem .8rem; margin-bottom: .8rem; }
@@ -100,7 +187,23 @@
       .rep-sections { grid-template-columns: 1fr; }
     }
     @media (max-width: 480px) {
-      .rep-kpis { grid-template-columns: 1fr; }
+      .rep-kpis { grid-template-columns: 1fr 1fr; }
+      .rep-hero { padding: 1.2rem 1.1rem; }
+    }
+
+    /* ---- Exportar: el navegador imprime o guarda como PDF ---- */
+    @media print {
+      @page { size: A4 portrait; margin: 12mm; }
+      body { background: #fff; }
+      .app-header, .rep-controls, .modal-overlay, .toast-container,
+      #btn-merge-obras, .rep-loading { display: none !important; }
+      .app-main, .rep-wrap { padding: 0; max-width: none; }
+      .rep-sections { grid-template-columns: 1fr 1fr; gap: .6rem; }
+      .rep-card, .rep-hero, .kpi { break-inside: avoid; box-shadow: none; }
+      .rep-hero { color: #fff; }
+      .rep-bar-fill { animation: none; }
+      /* Sin esto el hero y las barras salen en blanco. */
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -126,11 +229,11 @@
 
     <div class="rep-controls">
       <div class="rep-ctrl">
-        <label>Desde</label>
+        <label for="rep-desde">Desde</label>
         <input type="date" id="rep-desde">
       </div>
       <div class="rep-ctrl">
-        <label>Hasta</label>
+        <label for="rep-hasta">Hasta</label>
         <input type="date" id="rep-hasta">
       </div>
       <div class="rep-ctrl">
@@ -155,15 +258,26 @@
         <input type="checkbox" id="chk-no-emitidas">
         <label for="chk-no-emitidas">Incluir pendientes / rechazadas</label>
       </div>
+      <div class="rep-spacer"></div>
+      <div class="rep-ctrl">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary btn-sm" id="btn-export" title="Imprimir o guardar como PDF">Exportar</button>
+      </div>
     </div>
 
     <div id="rep-loading" class="rep-loading">Cargando órdenes de compra…</div>
 
     <div id="rep-content" class="hidden">
 
+      <div class="rep-hero">
+        <div class="rep-hero-lbl">Total gastado</div>
+        <div class="rep-hero-val" id="kpi-total">—</div>
+        <div class="rep-hero-sub" id="hero-sub"></div>
+      </div>
+
       <div class="rep-kpis">
-        <div class="kpi"><div class="kpi-lbl">Total gastado</div><div class="kpi-val" id="kpi-total">—</div></div>
         <div class="kpi"><div class="kpi-lbl">Órdenes de compra</div><div class="kpi-val" id="kpi-count">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Obras con gasto</div><div class="kpi-val" id="kpi-obras">—</div></div>
         <div class="kpi"><div class="kpi-lbl">Ticket promedio</div><div class="kpi-val" id="kpi-avg">—</div></div>
         <div class="kpi kpi-accent"><div class="kpi-lbl">Ticket mediano</div><div class="kpi-val" id="kpi-med">—</div></div>
       </div>
@@ -171,6 +285,16 @@
       <div id="rep-note" class="rep-note hidden"></div>
 
       <div class="rep-sections">
+        <div class="card rep-card rep-full">
+          <div class="card-header"><span class="card-title" id="rep-linea-title">Evolución</span></div>
+          <div class="card-body"><div class="rep-line" id="rep-linea"></div></div>
+        </div>
+
+        <div class="card rep-card rep-full">
+          <div class="card-header"><span class="card-title">Participación por obra</span></div>
+          <div class="card-body" id="rep-share"></div>
+        </div>
+
         <div class="card rep-card rep-full">
           <div class="card-header">
             <span class="card-title">Gasto por Obra</span>
@@ -185,16 +309,11 @@
         </div>
 
         <div class="card rep-card">
-          <div class="card-header"><span class="card-title">Evolución mensual</span></div>
-          <div class="card-body" id="rep-meses"></div>
-        </div>
-
-        <div class="card rep-card">
           <div class="card-header"><span class="card-title">Top proveedores</span></div>
           <div class="card-body" id="rep-proveedores"></div>
         </div>
 
-        <div class="card rep-card">
+        <div class="card rep-card rep-full">
           <div class="card-header"><span class="card-title">Por responsable</span></div>
           <div class="card-body" id="rep-responsables"></div>
         </div>
@@ -204,33 +323,22 @@
   </div>
 </main>
 
-<!-- Modal: Editar / corregir OC -->
+<!-- Modal: Ficha de la OC -->
 <div class="modal-overlay hidden" id="modal-oc">
-  <div class="modal modal--sm">
+  <div class="modal">
     <div class="modal-header">
-      <span class="modal-title" id="moc-title">Editar OC</span>
-      <button class="modal-close" id="moc-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <span class="modal-title" id="foc-title">OC</span>
+      <span id="foc-estado"></span>
+      <button class="modal-close" id="foc-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label for="moc-obra">Obra</label>
-        <input type="text" id="moc-obra" class="form-control" list="moc-obras-list" placeholder="Nombre de la obra">
-        <datalist id="moc-obras-list"></datalist>
-      </div>
-      <div class="form-group u-mb-0">
-        <label for="moc-total">Total (<span id="moc-moneda">ARS</span>)</label>
-        <div style="display:flex;gap:.5rem;align-items:center;">
-          <input type="text" id="moc-total" class="form-control" inputmode="decimal">
-          <button class="btn btn-secondary btn-sm" id="moc-div1000" title="Dividir por 1000 — corrige el error de escala habitual" style="white-space:nowrap;">÷ 1000</button>
-        </div>
-      </div>
-      <div id="moc-error" class="alert alert-error hidden"></div>
-    </div>
-    <div class="modal-footer" style="justify-content:space-between;">
-      <button class="btn btn-danger btn-sm" id="moc-delete">Borrar OC</button>
-      <div style="display:flex;gap:.5rem;">
-        <button class="btn btn-secondary" id="moc-cancel">Cancelar</button>
-        <button class="btn btn-primary" id="moc-save">Guardar</button>
+    <div class="modal-body" id="foc-body"></div>
+    <div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+      <button class="btn btn-danger btn-sm" id="foc-delete">Borrar OC</button>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        <span class="foc-nodrive hidden" id="foc-nodrive">Respaldo en Drive pendiente</span>
+        <a class="btn btn-outline btn-sm hidden" id="foc-drive" target="_blank" rel="noopener">Abrir en Drive</a>
+        <button class="btn btn-secondary btn-sm" id="foc-pdf">Ver PDF</button>
+        <button class="btn btn-primary btn-sm" id="foc-cerrar">Cerrar</button>
       </div>
     </div>
   </div>
@@ -246,7 +354,6 @@
     <div class="modal-body">
       <p style="font-size:.83rem;color:var(--gray-600);margin-bottom:.9rem;">
         Cada variante se reasignará al nombre destino. Revisá y desmarcá las que no correspondan.
-        Las obras basura (“X”) se reasignan por OC desde el botón <strong>Editar</strong> en el detalle.
       </p>
       <div id="mmg-groups"></div>
       <div id="mmg-error" class="alert alert-error hidden"></div>
@@ -258,13 +365,30 @@
   </div>
 </div>
 
+<!-- Modal: Confirmar acción -->
+<div class="modal-overlay hidden" id="modal-confirm">
+  <div class="modal modal--sm">
+    <div class="modal-header"><span class="modal-title" id="mcf-title">Confirmar</span></div>
+    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+      <p id="mcf-msg" style="color:var(--gray-600);"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="mcf-no">Cancelar</button>
+      <button class="btn btn-danger" id="mcf-yes">Borrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
+<script src="js/jspdf.umd.min.js"></script>
+<script src="js/logoBase64.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/config.js"></script>
 <script src="js/dolar.js"></script>
 <script src="js/firebase.js"></script>
+<script src="js/ocGenerator.js"></script>
 <script src="js/reportes.js"></script>
 </body>
 </html>
