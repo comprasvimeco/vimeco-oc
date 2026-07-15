@@ -287,4 +287,75 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   render();
+
+  // El panel de OC sin respaldo no depende del feed ni de sus filtros: se carga
+  // aparte para no demorar las novedades si /historial tarda o falla.
+  cargarSinRespaldo(code);
 });
+
+// ===================================================
+//  OC sin respaldo en Drive
+// ===================================================
+
+let sinRespaldoOCs = [];
+
+async function cargarSinRespaldo(code) {
+  try {
+    sinRespaldoOCs = ocsSinRespaldo(await getHistorial(code, true));
+  } catch (e) {
+    console.warn('sin respaldo:', e);
+    return;
+  }
+  renderSinRespaldo();
+}
+
+function renderSinRespaldo() {
+  const box = $('act-sinrespaldo');
+  if (!sinRespaldoOCs.length) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+
+  // dayLabel() da "miércoles, 18 de junio": demasiado largo para un chip.
+  const fecha = ts => new Date(ts || 0).toLocaleDateString('es-AR');
+
+  const chips = sinRespaldoOCs.map(oc => `
+    <div class="act-alert-oc">
+      <b>${esc(oc.nroOC)}</b>
+      <span>${esc(oc.obra || 'Sin obra')} · ${esc(fecha(oc.timestamp))}</span>
+    </div>`).join('');
+
+  const n = sinRespaldoOCs.length;
+  box.innerHTML = `
+    <div class="act-alert-hd">${icSvg('alert')} ${n} ${n === 1 ? 'orden sin respaldo' : 'órdenes sin respaldo'} en Drive</div>
+    <div class="act-alert-sub">Su PDF no quedó archivado en Drive, o se archivó pero no se registró dónde.</div>
+    <div class="act-alert-list">${chips}</div>
+    <div class="act-alert-actions">
+      <button class="btn btn-sm btn-secondary" id="act-resubir">${icSvg('folder')} Resubir a Drive</button>
+    </div>`;
+
+  $('act-resubir').addEventListener('click', resubirTodas);
+}
+
+async function resubirTodas() {
+  if (typeof uploadToDrive !== 'function') { toast('Drive no está configurado.', 'error'); return; }
+  const list = [...sinRespaldoOCs];
+  if (!list.length) return;
+
+  const btn = $('act-resubir');
+  btn.disabled = true;
+
+  let ok = 0;
+  const fallaron = [];
+  for (const [i, oc] of list.entries()) {
+    btn.innerHTML = `<span class="spinner"></span> Subiendo ${i + 1} de ${list.length}…`;
+    try { await resubirOC(oc); ok++; }
+    catch (e) { fallaron.push(`${oc.nroOC} (${e.message})`); }
+  }
+
+  sinRespaldoOCs = list.filter(oc => !driveFolderId(oc));
+  btn.disabled = false;
+  btn.innerHTML = icSvg('folder') + ' Resubir a Drive';
+  renderSinRespaldo();
+
+  if (fallaron.length) toast(`${ok} subidas. Fallaron: ${fallaron.join(', ')}`, 'warning');
+  else toast(`Listo: ${ok} ${ok === 1 ? 'orden subida' : 'órdenes subidas'} a Drive.`, 'success');
+}
