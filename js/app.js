@@ -396,13 +396,51 @@ function logOCActivity(nroOC, proveedor, obra, total, folderId) {
   });
 }
 
+// Guarda en el historial las carpetas de Drive de una OC. Si el PATCH falla, la
+// OC queda figurando "sin respaldo" aunque el PDF esté subido (le pasó a la OC
+// 0007-00000106), así que se reintenta y, si igual falla, se deja rastro.
+async function saveDriveIds(histKey, obrasFolderId, proveedoresFolderId, nroOC) {
+  const fields = {
+    drive_folder_obras_id:       obrasFolderId       || null,
+    drive_folder_proveedores_id: proveedoresFolderId || null
+  };
+  for (let intento = 0; intento < 3; intento++) {
+    try { await patchHistorialEntry(histKey, fields); return true; }
+    catch (_) { await new Promise(r => setTimeout(r, 600 * (intento + 1))); }
+  }
+  logDriveIdsError(nroOC, histKey);
+  return false;
+}
+
+function logDriveIdsError(nroOC, histKey) {
+  const key = (nroOC || 'unknown').replace(/[^a-z0-9]/gi, '');
+  fetch(`${FIREBASE_CONFIG.databaseURL}/drive_errors/${key}.json`, {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({
+      nroOC,
+      error:     'PDF subido a Drive pero no se pudieron guardar las carpetas en el historial (' + histKey + ')',
+      timestamp: Date.now()
+    })
+  }).catch(() => {});
+}
+
 // ---- Cola offline Drive ----
+// El candado evita que dos disparos simultáneos (carga + 'online' + reintento
+// programado) suban el mismo PDF dos veces.
+let _reintentandoCola = false;
+
 async function retryDriveQueue() {
   if (typeof driveQueue === 'undefined' || typeof uploadToDrive !== 'function') return;
+  if (_reintentandoCola) return;
   let items;
   try { items = await driveQueue.getAll(); } catch { return; }
   if (!items.length) return;
+  _reintentandoCola = true;
+  try { await _procesarCola(items); } finally { _reintentandoCola = false; }
+}
 
+async function _procesarCola(items) {
   for (const item of items) {
     try {
       const pdfBlob = new Blob([item.pdfBuf], { type: 'application/pdf' });
@@ -415,7 +453,7 @@ async function retryDriveQueue() {
       );
       await driveQueue.dequeue(item.histKey);
       if (obrasFolderId || proveedoresFolderId)
-        patchHistorialEntry(item.histKey, { drive_folder_obras_id: obrasFolderId, drive_folder_proveedores_id: proveedoresFolderId }).catch(() => {});
+        await saveDriveIds(item.histKey, obrasFolderId, proveedoresFolderId, item.nroOC);
       logOCActivity(item.nroOC, item.proveedor, item.obra, item.total, obrasFolderId || proveedoresFolderId);
       toast(`OC ${item.nroOC} subida a Drive.`, 'success');
     } catch (_) {
@@ -483,16 +521,38 @@ async function loadLogo() {
 }
 
 // ---- Obra combo ----
+// Lista cerrada a propósito: mientras el campo fue de texto libre el padrón se
+// fue partiendo ("Dean Funes" vs "Colectora Dean Funes", "Polo 52 -L27"), y con
+// él las carpetas de Drive, que se crean con el nombre de la obra.
+let obrasDisponibles = [];
+
+function normalizarObra(s) {
+  return String(s || '').trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
+// Devuelve la obra del padrón que corresponde a `nombre`, o null si no está.
+// Tolera diferencias de mayúsculas y acentos para poder recuperar OC viejas.
+function buscarObra(nombre) {
+  const n = normalizarObra(nombre);
+  if (!n) return null;
+  return obrasDisponibles.find(o => normalizarObra(o.nombre) === n) || null;
+}
+
+// Asigna el campo sólo si el nombre existe en el padrón, y siempre con la
+// escritura oficial. Devuelve true si quedó cargado.
+function setObraValue(nombre) {
+  const obra = buscarObra(nombre);
+  $('obra').value = obra ? obra.nombre : '';
+  return !!obra;
+}
+
 async function setupObraCombo() {
   const input    = $('obra');
   const arrow    = $('obra-arrow');
   const dropdown = $('obra-dropdown');
 
-  let obrasActivas = [];
-  let todasObras   = [];
-
   try {
-    [obrasActivas, todasObras] = await Promise.all([getObrasActivas(), getAllObras()]);
+    obrasDisponibles = await getObrasActivas();
   } catch (e) {
     console.warn('setupObraCombo:', e);
   }
@@ -507,41 +567,37 @@ async function setupObraCombo() {
     }
   }
 
-  function buildOptions(list) {
+  function buildOptions() {
     dropdown.innerHTML = '';
-    list.forEach(obra => {
+    if (!obrasDisponibles.length) {
+      const vacio = document.createElement('div');
+      vacio.className = 'combo-option';
+      vacio.style.color = 'var(--gray-500)';
+      vacio.textContent = 'No hay obras activas — cargalas en Administración';
+      dropdown.appendChild(vacio);
+      return;
+    }
+    obrasDisponibles.forEach(obra => {
       const div = document.createElement('div');
       div.className = 'combo-option';
       div.textContent = obra.nombre;
-      if (!obra.activa) {
-        div.style.color = 'var(--gray-400)';
-        div.style.fontStyle = 'italic';
-      }
       div.addEventListener('mousedown', e => { e.preventDefault(); selectObra(obra); });
       dropdown.appendChild(div);
     });
   }
 
-  arrow.addEventListener('click', e => {
+  function toggleDropdown(e) {
     e.stopPropagation();
     if (!dropdown.classList.contains('hidden')) { dropdown.classList.add('hidden'); return; }
-    buildOptions(obrasActivas);
-    if (dropdown.children.length) dropdown.classList.remove('hidden');
-    // En táctil NO enfocar: el teclado taparía el desplegable. En desktop sí, para poder filtrar.
-    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (!isTouch) input.focus();
-  });
+    buildOptions();
+    dropdown.classList.remove('hidden');
+  }
 
-  input.addEventListener('input', () => {
-    const q = input.value.toLowerCase();
-    if (!q) { dropdown.classList.add('hidden'); return; }
-    const filtered = todasObras.filter(o => o.nombre.toLowerCase().includes(q));
-    buildOptions(filtered);
-    dropdown.classList.toggle('hidden', !dropdown.children.length);
-  });
-
-  input.addEventListener('blur', () => {
-    setTimeout(() => dropdown.classList.add('hidden'), 150);
+  input.addEventListener('click', toggleDropdown);
+  arrow.addEventListener('click', toggleDropdown);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') toggleDropdown(e);
+    else if (e.key === 'Escape') dropdown.classList.add('hidden');
   });
 
   $('lugar-entrega').addEventListener('input', () => {
@@ -924,7 +980,9 @@ function applyExtractionResult(r) {
   fillIfEmpty('condicion-iva-proveedor', r.condicion_iva_proveedor);
   fillIfEmpty('ref-presupuesto',         r.ref_presupuesto);
   fillIfEmpty('condicion-pago',          r.condicion_pago);
-  fillIfEmpty('obra',                    r.ubicacion);
+  // La ubicación que saca la IA del presupuesto es texto libre: sólo sirve si
+  // coincide con una obra del padrón. Si no, el campo queda para elegir a mano.
+  if (!$('obra').value.trim() && r.ubicacion) setObraValue(r.ubicacion);
   fillIfEmpty('plazo-entrega',           r.plazo_entrega);
   fillIfEmpty('lugar-entrega',           r.lugar_entrega);
 
@@ -1422,7 +1480,8 @@ function validateOCForm() {
   if (!proveedor)     { toast('Ingresá la razón social del proveedor.', 'error'); revealAndFocus('proveedor'); return false; }
   if (!cuit)          { toast('Ingresá el CUIT del proveedor.', 'error'); revealAndFocus('cuit-proveedor'); return false; }
   if (!condicionPago) { toast('Ingresá la condición de pago.', 'error'); revealAndFocus('condicion-pago'); return false; }
-  if (!obra)          { toast('Ingresá la obra / proyecto.', 'error'); revealAndFocus('obra'); return false; }
+  if (!obra)          { toast('Elegí la obra / motivo de la lista.', 'error'); revealAndFocus('obra'); return false; }
+  if (!buscarObra(obra)) { toast(`"${obra}" no está en el padrón de obras. Elegí una de la lista.`, 'error'); revealAndFocus('obra'); return false; }
   if (!items.length)  { toast('Agregá al menos un ítem a la orden.', 'error'); return false; }
   if (items.some(it => !it.descripcion.trim())) { toast('Completá la descripción de todos los ítems.', 'error'); return false; }
   return true;
@@ -1430,7 +1489,10 @@ function validateOCForm() {
 
 function buildOCData(numero, firma = null) {
   const proveedor = $('proveedor').value.trim();
-  const obra      = $('obra').value.trim();
+  // Siempre la escritura oficial del padrón: es la que termina nombrando la
+  // carpeta de Drive, y una variante de mayúsculas crea una carpeta paralela.
+  const obraSel   = buscarObra($('obra').value);
+  const obra      = obraSel ? obraSel.nombre : $('obra').value.trim();
   const total     = calcTotal();
   const descMonto = roundCents(descuento.monto || 0);
   const ngMonto   = roundCents(noGravado.monto || 0);
@@ -1634,28 +1696,38 @@ async function handleGenerate() {
 
   // Subir a Drive en background (espera historial para evitar race condition en PATCH)
   if (typeof uploadToDrive === 'function') {
-    const driveObra  = ($('obra').value || '').trim() || 'Sin obra';
+    const driveObra  = (buscarObra($('obra').value)?.nombre || '').trim() || 'Sin obra';
     const driveFecha = new Date().toISOString().slice(0, 10);
     const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
     histSaved.then(saved =>
       uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
         .then(({ obrasFolderId, proveedoresFolderId }) => {
           if (saved && (obrasFolderId || proveedoresFolderId))
-            patchHistorialEntry(histKey, { drive_folder_obras_id: obrasFolderId, drive_folder_proveedores_id: proveedoresFolderId }).catch(() => {});
+            saveDriveIds(histKey, obrasFolderId, proveedoresFolderId, numero);
           logOCActivity(numero, driveProv, driveObra, ocData._total, obrasFolderId || proveedoresFolderId);
         })
         .catch(async () => {
-          if (!navigator.onLine && typeof driveQueue !== 'undefined') {
-            toast('Sin conexión. Se subirá a Drive cuando haya red.', 'warning');
+          // Encolar ante CUALQUIER fallo, no sólo sin conexión: los errores de
+          // Drive con red (token vencido, 5xx, carpeta perdida) quedaban sin
+          // reintento y la OC sin respaldo.
+          let encolada = false;
+          if (typeof driveQueue !== 'undefined') {
             try {
               await driveQueue.enqueue({
                 histKey, pdfBlob: blob, pdfName: fname,
                 obra: driveObra, fecha: driveFecha, proveedor: driveProv,
                 nroOC: numero, total: ocData._total, sourceFile: selectedFile
               });
+              encolada = true;
             } catch (_) {}
-          } else {
-            toast('No se pudo subir a Drive. Se registró el error.', 'warning');
+          }
+          if (!encolada) toast('No se pudo subir a Drive. Se registró el error.', 'warning');
+          else if (!navigator.onLine) toast('Sin conexión. Se subirá a Drive cuando haya red.', 'warning');
+          else {
+            toast('Falló la subida a Drive. Se reintentará automáticamente.', 'warning');
+            // Con red, esperar al próximo 'online' o a recargar la página sería
+            // dejarla colgada: reintentar dentro de la misma sesión.
+            setTimeout(() => retryDriveQueue().catch(() => {}), 60000);
           }
         })
     );
@@ -1720,7 +1792,7 @@ async function solicitarAutorizacion(autorizador) {
     return;
   }
 
-  const driveObra  = ($('obra').value || '').trim() || 'Sin obra';
+  const driveObra  = (buscarObra($('obra').value)?.nombre || '').trim() || 'Sin obra';
   const driveFecha = new Date().toISOString().slice(0, 10);
   const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
 
@@ -1824,7 +1896,9 @@ function loadOCBase(oc) {
   $('telefonos-proveedor').value     = prov.telefonos       || '';
   $('condicion-iva-proveedor').value = prov.condicionIVA    || 'Resp. Inscripto';
   $('ref-presupuesto').value         = '';
-  $('obra').value                    = oc.obra           || '';
+  // Una OC vieja puede traer un nombre de obra que ya no está en el padrón
+  // (renombrada o unificada): en ese caso el campo queda vacío para reelegir.
+  setObraValue(oc.obra);
   setEquipo(oc.equipo || null);
   $('condicion-pago').value          = oc.condicionPago  || '';
   $('plazo-entrega').value           = '';

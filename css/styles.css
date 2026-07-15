@@ -395,6 +395,8 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
   display: flex; align-items: center; justify-content: center;
   transition: background .15s;
 }
+/* Campo de lista cerrada: no se escribe, se elige. No debe verse deshabilitado. */
+.combo-locked { cursor: pointer; background: var(--white); }
 .combo-arrow svg { width: 16px; height: 16px; display: block; }
 .combo-arrow:hover { background: var(--gray-200); color: var(--primary); }
 .combo-dropdown {

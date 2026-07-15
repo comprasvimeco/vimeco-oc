@@ -44,7 +44,17 @@
     return access_token;
   }
 
+  // Drive archiva en la raíz de "Mi unidad" —sin dar error— cuando `parents`
+  // llega nulo: JSON.stringify({parents:[undefined]}) produce {"parents":[null]}.
+  // Así se filtraron OC sueltas en Mi unidad durante junio/julio 2026. Cualquier
+  // id de carpeta vacío tiene que reventar acá, nunca llegar a la API.
+  function _requireFolderId(id, contexto) {
+    if (!id) throw new Error(`Drive: carpeta destino desconocida (${contexto})`);
+    return id;
+  }
+
   async function getOrCreateFolder(token, name, parentId) {
+    _requireFolderId(parentId, `padre de "${name}"`);
     const safe = (name || 'Sin nombre').replace(/[/\\]/g, '-').trim().substring(0, 120);
     const q    = `name=${JSON.stringify(safe)} and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
     const s    = await fetch(
@@ -53,7 +63,7 @@
     );
     if (!s.ok) throw new Error(`Drive search (${s.status})`);
     const { files } = await s.json();
-    if (files.length) return files[0].id;
+    if (files && files.length) return _requireFolderId(files[0].id, `búsqueda de "${safe}"`);
 
     const c = await fetch('https://www.googleapis.com/drive/v3/files', {
       method:  'POST',
@@ -65,12 +75,25 @@
       })
     });
     if (!c.ok) throw new Error(`Drive mkdir (${c.status})`);
-    return (await c.json()).id;
+    return _requireFolderId((await c.json()).id, `creación de "${safe}"`);
   }
 
   function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+  // Reubica un archivo que Drive archivó fuera de su carpeta. Devuelve true si
+  // quedó en su lugar.
+  async function _moveToFolder(token, fileId, folderId, fromParents) {
+    const qs = `?addParents=${folderId}` +
+               (fromParents && fromParents.length ? `&removeParents=${fromParents.join(',')}` : '') +
+               '&fields=id';
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}${qs}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}` }
+    });
+    return r.ok;
+  }
+
   async function uploadFile(token, blob, name, mimeType, folderId) {
+    _requireFolderId(folderId, `subida de "${name}"`);
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify({ name, parents: [folderId], mimeType });
     const enc      = new TextEncoder();
@@ -86,7 +109,7 @@
     body.set(content, pre.length);
     body.set(post, pre.length + content.length);
 
-    const url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+    const url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,parents';
     // Reintentos con backoff: en móvil la subida falla a veces por cortes de red
     // transitorios ("Load failed") o respuestas 5xx/429. Reintentar las absorbe.
     let lastErr;
@@ -102,7 +125,17 @@
           body
         });
         if (resp.ok) {
-          try { return (await resp.json()).id; } catch (_) { return null; }
+          let info;
+          try { info = await resp.json(); } catch (_) { return null; }
+          // Confirmar que cayó donde pedimos: un 200 no alcanza como garantía.
+          // Si quedó en otro lado (p. ej. la raíz de Mi unidad), reubicarlo.
+          if (info.parents && !info.parents.includes(folderId)) {
+            const movido = await _moveToFolder(token, info.id, folderId, info.parents);
+            // No reintentar la subida: el archivo ya está en Drive y otro intento
+            // sólo dejaría una copia más suelta.
+            if (!movido) { lastErr = new Error(`Upload: "${name}" quedó fuera de su carpeta`); break; }
+          }
+          return info.id;
         }
         lastErr = new Error(`Upload (${resp.status})`);
         if (resp.status < 500 && resp.status !== 429) break;  // 4xx no transitorio → no reintentar
@@ -348,6 +381,7 @@
     }
 
     // Crear nuevo archivo
+    _requireFolderId(typeFolder, `caja de ${userName || userId}`);
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify({ name: file.name, parents: [typeFolder], mimeType });
     const enc      = new TextEncoder();
@@ -432,6 +466,7 @@
 
   // Sube un blob a una carpeta y devuelve { fileId, url }
   async function _uploadReturningId(token, file, name, folderId) {
+    _requireFolderId(folderId, `subida de "${name}"`);
     const mimeType = file.type || 'application/octet-stream';
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify({ name, parents: [folderId], mimeType });
@@ -442,12 +477,14 @@
     const body     = new Uint8Array(pre.length + content.length + post.length);
     body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
     const resp = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,parents',
       { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
     );
     if (!resp.ok) throw new Error(`Upload (${resp.status})`);
-    const fileId = (await resp.json()).id;
-    return { fileId, url: `https://drive.google.com/file/d/${fileId}/view` };
+    const info = await resp.json();
+    if (info.parents && !info.parents.includes(folderId))
+      await _moveToFolder(token, info.id, folderId, info.parents);
+    return { fileId: info.id, url: `https://drive.google.com/file/d/${info.id}/view` };
   }
 
   // Estructura Personal: PERSONAL → Padron → {label} → dni_{lado}.{ext}
@@ -479,6 +516,7 @@
       }
     } catch (_) {}
 
+    if (!existingId) _requireFolderId(personFolder, `DNI de ${label}`);
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify(existingId
       ? { name: fname, mimeType }
@@ -529,6 +567,7 @@
       if (s.ok) { const { files } = await s.json(); if (files?.length) existingId = files[0].id; }
     } catch (_) {}
 
+    if (!existingId) _requireFolderId(obraId, `parte de ${obra}`);
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify(existingId
       ? { name: file.name, mimeType }

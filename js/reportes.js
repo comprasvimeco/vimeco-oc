@@ -560,6 +560,90 @@ function render() {
 }
 
 // ===================================================
+//  OC sin respaldo en Drive
+// ===================================================
+
+// Una OC sin carpeta de Drive registrada es una OC cuyo PDF probablemente no se
+// archivó. Hasta v139 esto no se veía en ningún lado: las fallas de subida se
+// registraban en /drive_errors y ni eso (9 de 10 no dejaron rastro).
+function sinRespaldo() {
+  return ALL.filter(oc => !driveFolderId(oc))
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
+
+function renderSinRespaldo() {
+  const box  = $('rep-sinrespaldo');
+  const list = sinRespaldo();
+  if (!list.length) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+
+  const chips = list.map(oc => `
+    <div class="rep-alert-oc" data-key="${esc(histKeyOf(oc))}" role="button" tabindex="0">
+      <b>${esc(oc.nroOC)}</b>
+      <span>${esc(oc.obra || 'Sin obra')}</span>
+    </div>`).join('');
+
+  box.innerHTML = `
+    <div class="rep-alert-hd">${icSvg('alert')} ${list.length} ${list.length === 1 ? 'OC sin respaldo' : 'OC sin respaldo'} en Drive</div>
+    <div class="rep-alert-sub">El PDF de estas órdenes no quedó archivado en Drive, o se archivó pero no se registró dónde. Tocá una para ver la ficha.</div>
+    <div class="rep-alert-list">${chips}</div>
+    <div class="rep-alert-actions">
+      <button class="btn btn-sm btn-secondary" id="rep-resubir">${icSvg('folder')} Resubir a Drive</button>
+    </div>
+    <div class="rep-alert-msg hidden" id="rep-resubir-msg"></div>`;
+
+  box.querySelectorAll('.rep-alert-oc').forEach(el => {
+    el.addEventListener('click', () => openOCDetail(el.dataset.key));
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openOCDetail(el.dataset.key); }
+    });
+  });
+  $('rep-resubir').addEventListener('click', resubirTodas);
+}
+
+async function resubirTodas() {
+  if (typeof uploadToDrive !== 'function') { toast('Drive no está configurado.', 'error'); return; }
+  const list = sinRespaldo();
+  if (!list.length) return;
+
+  const btn = $('rep-resubir');
+  const msg = $('rep-resubir-msg');
+  btn.disabled = true;
+  msg.classList.remove('hidden');
+
+  let ok = 0, fallaron = [];
+  for (const [i, oc] of list.entries()) {
+    btn.innerHTML = `<span class="spinner"></span> Subiendo ${i + 1} de ${list.length}…`;
+    try {
+      const blob  = generateOCBlob(await ocDataDe(oc));
+      const fname = `OC_${oc.nroOC}_${sanitize(oc.proveedor?.nombre || 'SinProveedor')}.pdf`;
+      // La fecha de la OC, no la de hoy: la carpeta destino se llama
+      // "{fecha} | {proveedor}" y tiene que ser la de la orden original.
+      const fecha = new Date(oc.timestamp || Date.now()).toISOString().slice(0, 10);
+      const { obrasFolderId, proveedoresFolderId } = await uploadToDrive(blob, fname, {
+        obra: oc.obra || 'Sin obra', fecha, proveedor: oc.proveedor?.nombre || 'Sin proveedor', nroOC: oc.nroOC
+      }, null);
+      await patchHistorialEntry(histKeyOf(oc), {
+        drive_folder_obras_id:       obrasFolderId       || null,
+        drive_folder_proveedores_id: proveedoresFolderId || null
+      });
+      oc.drive_folder_obras_id       = obrasFolderId;
+      oc.drive_folder_proveedores_id = proveedoresFolderId;
+      ok++;
+    } catch (e) {
+      fallaron.push(`${oc.nroOC} (${e.message})`);
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = icSvg('folder') + ' Resubir a Drive';
+  msg.textContent = fallaron.length
+    ? `${ok} subidas. Fallaron: ${fallaron.join(', ')}`
+    : `Listo: ${ok} ${ok === 1 ? 'OC subida' : 'OC subidas'} a Drive.`;
+  renderSinRespaldo();
+}
+
+// ===================================================
 //  Ficha de la OC
 // ===================================================
 
@@ -660,16 +744,12 @@ function closeOCDetail() {
   detailKey = null;
 }
 
-// Regenera el PDF a partir del payload guardado (idéntico al original) o, para
-// registros viejos, reconstruyéndolo desde los campos sueltos.
-async function verPDF() {
-  const oc = ocByKey(detailKey);
-  if (!oc) return;
-  const btn = $('foc-pdf');
-  btn.disabled = true;
-  try {
-    const prov = oc.proveedor || {};
-    const ocData = oc._payload ? { ...oc._payload } : {
+// Reconstruye el payload que espera generateOCBlob a partir del registro del
+// historial. Las OC nuevas guardan `_payload` y se regeneran idénticas; las
+// viejas se rearman campo por campo.
+async function ocDataDe(oc) {
+  const prov = oc.proveedor || {};
+  const ocData = oc._payload ? { ...oc._payload } : {
       nroOC:    oc.nroOC,
       fecha:    oc.fecha,
       moneda:   oc.moneda || 'ARS',
@@ -700,13 +780,22 @@ async function verPDF() {
       _impuestosExtra: oc.impuestosExtra || []
     };
 
-    if (oc.estado === 'autorizada' && oc.autorizacion) {
-      ocData._firmante = oc.autorizacion.firmante || ocData.ejecutor;
-      if (oc.autorizacion.firmaCodigo && typeof getFirma === 'function') {
-        try { ocData._firma = await getFirma(oc.autorizacion.firmaCodigo); } catch (_) {}
-      }
+  if (oc.estado === 'autorizada' && oc.autorizacion) {
+    ocData._firmante = oc.autorizacion.firmante || ocData.ejecutor;
+    if (oc.autorizacion.firmaCodigo && typeof getFirma === 'function') {
+      try { ocData._firma = await getFirma(oc.autorizacion.firmaCodigo); } catch (_) {}
     }
+  }
+  return ocData;
+}
 
+async function verPDF() {
+  const oc = ocByKey(detailKey);
+  if (!oc) return;
+  const btn = $('foc-pdf');
+  btn.disabled = true;
+  try {
+    const ocData = await ocDataDe(oc);
     const blob = generateOCBlob(ocData);
     // Se abre en una pestaña para verla; el navegador ofrece descargar desde ahí.
     const url = URL.createObjectURL(blob);
@@ -913,6 +1002,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('rep-loading').classList.add('hidden');
     $('rep-content').classList.remove('hidden');
     render();
+    // Fuera de render(): es una alerta sobre el archivo en Drive, no cambia con
+    // los filtros de fecha ni de moneda del reporte.
+    renderSinRespaldo();
   } catch (e) {
     console.error('getHistorial:', e);
     $('rep-loading').innerHTML = 'No se pudieron cargar las órdenes. Revisá tu conexión y recargá.';
