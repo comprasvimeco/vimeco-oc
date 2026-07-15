@@ -38,13 +38,29 @@ function driveCutoff(list) {
   return conRespaldo.length ? Math.min(...conRespaldo) : 0;
 }
 
-// OC que deberían tener respaldo y no lo tienen: posteriores al corte, sin
-// carpeta registrada y sin contar las obras de prueba. Más recientes primero.
+// Una OC pendiente de autorización todavía no tiene PDF, y una rechazada nunca
+// lo va a tener: no se les puede reclamar respaldo ni resubirlas (hacerlo
+// emitiría el PDF de una orden sin autorizar).
+const SIN_PDF = new Set(['pendiente', 'rechazada']);
+
+// OC que deberían tener respaldo y no lo tienen: emitidas, posteriores al corte,
+// sin carpeta registrada y sin contar las obras de prueba. Más recientes primero.
 function ocsSinRespaldo(list) {
   const corte = driveCutoff(list);
   return list
-    .filter(oc => (oc.timestamp || 0) >= corte && !driveFolderId(oc) && !esObraPrueba(oc))
+    .filter(oc => (oc.timestamp || 0) >= corte &&
+                  !SIN_PDF.has(oc.estado) &&
+                  !driveFolderId(oc) &&
+                  !esObraPrueba(oc))
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
+
+// OC esperando que alguien las autorice. Más recientes primero.
+function ocsPendientes(list) {
+  return list
+    .filter(oc => oc.estado === 'pendiente' && oc.autorizacion?.solicitadoA && !esObraPrueba(oc))
+    .sort((a, b) => (b.autorizacion?.solicitadoEn || b.timestamp || 0) -
+                    (a.autorizacion?.solicitadoEn || a.timestamp || 0));
 }
 
 // Reconstruye el payload que espera generateOCBlob a partir del registro del

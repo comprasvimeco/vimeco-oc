@@ -288,25 +288,60 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   render();
 
-  // El panel de OC sin respaldo no depende del feed ni de sus filtros: se carga
+  // Los paneles de arriba no dependen del feed ni de sus filtros: se cargan
   // aparte para no demorar las novedades si /historial tarda o falla.
-  cargarSinRespaldo(code);
+  cargarPaneles(code);
 });
 
 // ===================================================
-//  OC sin respaldo en Drive
+//  Paneles de estado (arriba del feed)
 // ===================================================
 
 let sinRespaldoOCs = [];
+let pendientesOCs  = [];
+let miCodigo       = null;
 
-async function cargarSinRespaldo(code) {
-  try {
-    sinRespaldoOCs = ocsSinRespaldo(await getHistorial(code, true));
-  } catch (e) {
-    console.warn('sin respaldo:', e);
-    return;
-  }
+// Un solo /historial para los dos paneles.
+async function cargarPaneles(code) {
+  let hist;
+  try { hist = await getHistorial(code, true); }
+  catch (e) { console.warn('paneles:', e); return; }
+  miCodigo       = code;
+  sinRespaldoOCs = ocsSinRespaldo(hist);
+  pendientesOCs  = ocsPendientes(hist);
   renderSinRespaldo();
+  renderPendientes();
+}
+
+// ---- OC esperando autorización ----
+// No son un evento del feed (pedir autorización no registra novedad) sino un
+// estado: por eso van en un panel y no en la lista.
+function renderPendientes() {
+  const box = $('act-pendientes');
+  if (!pendientesOCs.length) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+
+  const fecha = ts => new Date(ts || 0).toLocaleDateString('es-AR');
+  const chips = pendientesOCs.map(oc => `
+    <div class="act-pend-oc">
+      <b>${esc(oc.nroOC)}</b>
+      <span>${esc(oc.proveedor?.nombre || 'Sin proveedor')} · espera a ${esc(oc.autorizacion.solicitadoA.nombre || '—')}
+        · ${esc(fecha(oc.autorizacion.solicitadoEn || oc.timestamp))}</span>
+    </div>`).join('');
+
+  const n = pendientesOCs.length;
+  const mias = pendientesOCs.filter(oc => oc.autorizacion.solicitadoA.codigo === miCodigo).length;
+
+  box.innerHTML = `
+    <div class="act-pend-hd">${icSvg('clip')} ${n} ${n === 1 ? 'orden esperando autorización' : 'órdenes esperando autorización'}</div>
+    <div class="act-pend-sub">Todavía no se emitió su PDF: quedan reservadas hasta que quien las tiene a cargo las firme o las rechace.</div>
+    <div class="act-pend-list">${chips}</div>
+    ${mias ? `<div class="act-pend-actions">
+      <button class="btn btn-sm btn-primary" id="act-ir-autorizar">
+        ${mias === 1 ? 'Tenés 1 orden para autorizar' : `Tenés ${mias} órdenes para autorizar`}
+      </button></div>` : ''}`;
+
+  if (mias) $('act-ir-autorizar').addEventListener('click', () => { window.location.href = 'autorizaciones.html'; });
 }
 
 function renderSinRespaldo() {

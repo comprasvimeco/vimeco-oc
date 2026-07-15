@@ -514,24 +514,24 @@ function render() {
   renderBars('rep-obras', obras,
     { grandTotal: grand, drill: true, emptyMsg: 'No hay OC con obra en el rango.' });
 
-  // Si ninguna OC tiene equipo, la única barra sería "Sin equipo · 100%": no
-  // informa nada y ocupa la tarjeta. Mejor decirlo con palabras.
-  const equipos = groupAgg(list,
-    oc => oc.equipo?.codigo || 'sin',
-    oc => oc.equipo ? `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}` : 'Sin equipo');
-  const soloSinEquipo = equipos.length === 1 && equipos[0].key === 'sin';
-  renderBars('rep-equipos', soloSinEquipo ? [] : equipos,
+  // El equipo es opcional: las OC sin equipo no son un equipo llamado "Sin
+  // equipo", simplemente no pertenecen a esta vista. Los % siguen midiéndose
+  // contra el gasto total, así que no suman 100 — es a propósito.
+  const conEquipo = list.filter(oc => oc.equipo?.codigo);
+  renderBars('rep-equipos', groupAgg(conEquipo,
+      oc => oc.equipo.codigo,
+      oc => `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}`),
     { grandTotal: grand, drill: true, emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   renderBars('rep-proveedores', groupAgg(list,
       oc => oc.proveedor?.nombre || '—',
       oc => oc.proveedor?.nombre || 'Sin proveedor'),
-    { grandTotal: grand, limit: 10, emptyMsg: 'Sin proveedores en el rango.' });
+    { grandTotal: grand, limit: 10, drill: true, emptyMsg: 'Sin proveedores en el rango.' });
 
   renderBars('rep-responsables', groupAgg(list,
       oc => oc.responsable?.codigo || '—',
       oc => oc.responsable?.nombre || '—'),
-    { grandTotal: grand, emptyMsg: 'Sin responsables en el rango.' });
+    { grandTotal: grand, drill: true, emptyMsg: 'Sin responsables en el rango.' });
 }
 
 // ===================================================
