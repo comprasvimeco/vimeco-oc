@@ -862,10 +862,14 @@ const MERGE_PROPOSAL = [
     'La Molienda II - Varios',
     'La Molienda II - Protección de carpinterías de chapa',
   ] },
-  { to: 'La Molienda I',        from: ['La Molienda I - Yeso'] },
+  // "La Molienda" salió del padrón el 15/07/2026 y su carpeta de Drive se fusionó
+  // con la de "La Molienda I": las OC que quedaron con el nombre viejo van ahí.
+  { to: 'La Molienda I',        from: ['La Molienda I - Yeso', 'La Molienda'] },
   { to: 'Colectora Dean Funes', from: ['Dean Funes'] },
   { to: 'UPC Capilla del Monte', from: ['UPC CAPILLA DEL MONTE'] },
   { to: 'Oficina Técnica',      from: ['Oficina Tecnica'] },
+  { to: 'Administración - RRHH', from: ['Administración', 'Administracion - RR.HH'] },
+  { to: 'Hangar Pueblo Nativo', from: ['Pueblo Nativo'] },
 ];
 
 function openMergeModal() {
