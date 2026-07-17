@@ -343,6 +343,37 @@
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
+
+  // Un solo equipo por su key (para la ficha).
+  window.getEquipo = async function (key) {
+    const resp = await fetch(_base() + '/equipos/' + key + '.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const e = await resp.json();
+    return e ? { key, ...e } : null;
+  };
+
+  // Foto del equipo (dataURL base64). Se guarda en un nodo aparte
+  // (/equipos_fotos/{key}) para no engordar el listado, que baja todos los equipos.
+  window.getEquipoFoto = async function (key) {
+    const resp = await fetch(_base() + '/equipos_fotos/' + key + '.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    return data && data.foto ? data.foto : null;
+  };
+
+  window.saveEquipoFoto = async function (key, dataURL) {
+    const resp = await fetch(_base() + '/equipos_fotos/' + key + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ foto: dataURL })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.deleteEquipoFoto = async function (key) {
+    const resp = await fetch(_base() + '/equipos_fotos/' + key + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
 })();
 
 // ─── Gestión de Usuarios ────────────────────────────

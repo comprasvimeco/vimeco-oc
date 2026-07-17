@@ -150,13 +150,13 @@ function renderEquipos(list) {
   seedBtn.classList.add('hidden');
   container.innerHTML = list.map(e => `
     <div class="user-card ${e.activo ? '' : 'user-card--inactive'}">
-      <div class="user-card-info">
+      <div class="user-card-info eq-open u-pointer" title="Abrir ficha">
         <span class="user-card-name">${esc(e.codigo)}</span>
         ${e.tipo ? `<span style="font-size:.8rem;color:var(--gray-500);">${esc(e.tipo)}</span>` : ''}
         <span class="u-badge ${e.activo ? 'u-badge-activo' : 'u-badge-inactivo'}">${e.activo ? 'Activo' : 'Inactivo'}</span>
       </div>
       <div class="user-card-actions">
-        <button class="btn btn-sm btn-outline btn-edit-eq">Editar</button>
+        <button class="btn btn-sm btn-outline eq-open">Abrir ficha</button>
         <button class="btn btn-sm ${e.activo ? 'btn-danger' : 'btn-success'} btn-toggle-eq">
           ${e.activo ? 'Desactivar' : 'Activar'}
         </button>
@@ -166,10 +166,15 @@ function renderEquipos(list) {
 
   container.querySelectorAll('.user-card').forEach((card, i) => {
     const e = list[i];
-    card.querySelector('.btn-edit-eq').addEventListener('click', () => editEquipo(e.key));
+    card.querySelectorAll('.eq-open').forEach(el =>
+      el.addEventListener('click', () => openFicha(e.key)));
     card.querySelector('.btn-toggle-eq').addEventListener('click', () =>
       toggleActivo(e.key, e.activo, e.codigo));
   });
+}
+
+function openFicha(key) {
+  window.location.href = 'equipo.html?key=' + encodeURIComponent(key);
 }
 
 async function loadEquipos() {
@@ -181,10 +186,7 @@ async function loadEquipos() {
   }
 }
 
-let editingKey = null;
-
 function openAddModal() {
-  editingKey = null;
   $('modal-equipo-title').textContent = 'Agregar equipo';
   $('modal-equipo-error').classList.add('hidden');
   $('equipo-codigo').value = '';
@@ -194,18 +196,7 @@ function openAddModal() {
   setTimeout(() => $('equipo-codigo').focus(), 50);
 }
 
-window.editEquipo = function (key) {
-  const eq = allEquipos.find(e => e.key === key) || {};
-  editingKey = key;
-  $('modal-equipo-title').textContent = 'Editar equipo';
-  $('modal-equipo-error').classList.add('hidden');
-  $('equipo-codigo').value = eq.codigo || '';
-  $('equipo-tipo').value   = eq.tipo   || '';
-  $('equipo-codigo').disabled = false;
-  $('modal-equipo').classList.remove('hidden');
-  setTimeout(() => $('equipo-codigo').focus(), 50);
-};
-
+// Alta rápida (código + tipo). La foto y los repuestos se cargan luego en la ficha.
 async function saveEquipoModal() {
   const codigo = $('equipo-codigo').value.trim();
   const tipo   = $('equipo-tipo').value.trim();
@@ -217,43 +208,22 @@ async function saveEquipoModal() {
     return;
   }
 
+  const key = equipoKey(codigo);
+  if (allEquipos.some(e => e.key === key)) {
+    errEl.textContent = 'Ya existe un equipo con ese código.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   const saveBtn = $('modal-equipo-save');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Guardando…';
 
   try {
-    if (editingKey) {
-      const current = allEquipos.find(e => e.key === editingKey) || {};
-      const newKey  = equipoKey(codigo);
-      if (newKey === editingKey) {
-        // Mismo código: sólo se actualiza el tipo.
-        await patchEquipo(editingKey, { codigo, tipo });
-      } else {
-        // Cambió el código = cambió la clave: crear con la clave nueva y borrar la vieja.
-        if (allEquipos.some(e => e.key === newKey)) {
-          errEl.textContent = 'Ya existe un equipo con ese código.';
-          errEl.classList.remove('hidden');
-          return;
-        }
-        await saveEquipo(newKey, {
-          codigo, tipo,
-          activo:   current.activo !== false,
-          creadoEn: current.creadoEn || Date.now()
-        });
-        await deleteEquipo(editingKey);
-      }
-    } else {
-      const key = equipoKey(codigo);
-      if (allEquipos.some(e => e.key === key)) {
-        errEl.textContent = 'Ya existe un equipo con ese código.';
-        errEl.classList.remove('hidden');
-        return;
-      }
-      await saveEquipo(key, { codigo, tipo, activo: true, creadoEn: Date.now() });
-    }
+    await saveEquipo(key, { codigo, tipo, activo: true, creadoEn: Date.now() });
     $('modal-equipo').classList.add('hidden');
-    showToast(editingKey ? 'Equipo actualizado.' : 'Equipo creado.');
-    await loadEquipos();
+    showToast('Equipo creado.');
+    openFicha(key);
   } catch (_) {
     errEl.textContent = 'Error al guardar. Intentá de nuevo.';
     errEl.classList.remove('hidden');
@@ -306,14 +276,23 @@ async function seedEquipos() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch (_) { return null; } })();
   const code = _s?.codigo || sessionStorage.getItem('responsable_code');
   const name = _s?.nombre || sessionStorage.getItem('responsable_name');
-  if (!code || code !== '0000') { window.location.href = 'index.html'; return; }
+  if (!code) { window.location.href = 'index.html'; return; }
+
+  // Acceso: super-admin (0000) o Jefe de taller.
+  let allowed = code === '0000';
+  if (!allowed) {
+    try { const u = await getUsuario(code); allowed = !!(u && u.jefeTaller); } catch (_) {}
+  }
+  if (!allowed) { window.location.href = 'menu.html'; return; }
 
   $('hdr-name').textContent = name || '—';
-  $('btn-back').addEventListener('click', () => { window.location.href = 'administracion.html'; });
+  $('btn-back').addEventListener('click', () => {
+    window.location.href = code === '0000' ? 'administracion.html' : 'menu.html';
+  });
   $('btn-add-equipo').addEventListener('click', openAddModal);
   $('btn-seed').addEventListener('click', seedEquipos);
   $('modal-equipo-close').addEventListener('click',  () => $('modal-equipo').classList.add('hidden'));

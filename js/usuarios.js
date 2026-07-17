@@ -33,22 +33,19 @@ function renderUsers(list) {
     const esSuper = u.codigo === '0000';
     const cajaBadge = esSuper
       ? `<span class="u-badge u-badge-activo">${icSvg('calc')} Caja (admin)</span>`
-      : `<span class="u-badge ${u.caja ? 'u-badge-activo' : 'u-badge-inactivo'}">${icSvg('calc')} ${u.caja ? 'Caja' : 'Sin caja'}</span>`;
+      : (u.caja ? `<span class="u-badge u-badge-activo">${icSvg('calc')} Caja</span>` : '');
     const adminBadge = esSuper
       ? `<span class="u-badge u-badge-activo">${icSvg('settings')} Admin (super)</span>`
       : (u.admin ? `<span class="u-badge u-badge-activo">${icSvg('settings')} Admin</span>` : '');
     const jefeBadge = (!esSuper && u.jefeObra)
       ? `<span class="u-badge u-badge-activo">${icSvg('user')} Jefe de Obra</span>`
       : '';
-    const jefeBtn = esSuper
+    const tallerBadge = (!esSuper && u.jefeTaller)
+      ? `<span class="u-badge u-badge-activo">${icSvg('layers')} Jefe de Taller</span>`
+      : '';
+    const permBtn = esSuper
       ? ''
-      : `<button class="btn btn-sm ${u.jefeObra ? 'btn-warning' : 'btn-success'} btn-toggle-jefe">${u.jefeObra ? 'Quitar jefe' : 'Dar jefe'}</button>`;
-    const cajaBtn = esSuper
-      ? ''
-      : `<button class="btn btn-sm ${u.caja ? 'btn-warning' : 'btn-success'} btn-toggle-caja">${u.caja ? 'Quitar caja' : 'Dar caja'}</button>`;
-    const adminBtn = esSuper
-      ? ''
-      : `<button class="btn btn-sm ${u.admin ? 'btn-warning' : 'btn-success'} btn-toggle-admin">${u.admin ? 'Quitar admin' : 'Dar admin'}</button>`;
+      : `<button class="btn btn-sm btn-outline btn-permisos">Permisos</button>`;
     return `
     <div class="user-card ${u.activo ? '' : 'user-card--inactive'}">
       <div class="user-card-info">
@@ -59,13 +56,12 @@ function renderUsers(list) {
         ${cajaBadge}
         ${adminBadge}
         ${jefeBadge}
+        ${tallerBadge}
       </div>
       <div class="user-card-actions">
         <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
         <button class="btn btn-sm btn-secondary btn-reset-pwd">Reset pwd</button>
-        ${cajaBtn}
-        ${adminBtn}
-        ${jefeBtn}
+        ${permBtn}
         <button class="btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'} btn-toggle-user">
           ${u.activo ? 'Desactivar' : 'Activar'}
         </button>
@@ -79,9 +75,7 @@ function renderUsers(list) {
     card.querySelector('.btn-edit-user').addEventListener('click',   () => editUser(u.codigo, u.nombre));
     card.querySelector('.btn-reset-pwd').addEventListener('click',   () => resetPwd(u.codigo, u.nombre));
     card.querySelector('.btn-toggle-user').addEventListener('click', () => toggleActivo(u.codigo, u.activo, u.nombre));
-    card.querySelector('.btn-toggle-caja')?.addEventListener('click',  () => toggleCaja(u.codigo, u.caja, u.nombre));
-    card.querySelector('.btn-toggle-admin')?.addEventListener('click', () => toggleAdmin(u.codigo, u.admin, u.nombre));
-    card.querySelector('.btn-toggle-jefe')?.addEventListener('click',  () => toggleJefe(u.codigo, u.jefeObra, u.nombre));
+    card.querySelector('.btn-permisos')?.addEventListener('click',   () => openPermisos(u));
   });
 }
 
@@ -182,56 +176,44 @@ window.resetPwd = async function (codigo, nombre) {
   }
 };
 
-window.toggleAdmin = async function (codigo, enabled, nombre) {
-  const ok = await showConfirm(
-    enabled ? 'Quitar admin' : 'Dar admin',
-    enabled
-      ? `¿Quitar los permisos de administrador a ${nombre}?`
-      : `¿Dar permisos de administrador a ${nombre}? Tendrá las funciones de admin (incluida la gestión completa de Caja de todos los usuarios), salvo el menú de Administración.`
-  );
-  if (!ok) return;
-  try {
-    await patchUsuario(codigo, { admin: !enabled });
-    showToast(`Admin ${enabled ? 'quitado' : 'otorgado'} a ${nombre}.`);
-    await loadUsers();
-  } catch (_) {
-    showToast('Error al actualizar el permiso de admin.', 'error');
-  }
+// ---- Permisos (modal unificado) ----
+let permisosCodigo = null;
+
+window.openPermisos = function (u) {
+  permisosCodigo = u.codigo;
+  $('modal-permisos-name').textContent = u.nombre;
+  $('perm-caja').checked       = !!u.caja;
+  $('perm-admin').checked      = !!u.admin;
+  $('perm-jefeObra').checked   = !!u.jefeObra;
+  $('perm-jefeTaller').checked = !!u.jefeTaller;
+  $('modal-permisos-error').classList.add('hidden');
+  $('modal-permisos').classList.remove('hidden');
 };
 
-window.toggleJefe = async function (codigo, enabled, nombre) {
-  const ok = await showConfirm(
-    enabled ? 'Quitar Jefe de Obra' : 'Dar Jefe de Obra',
-    enabled
-      ? `¿Quitar el rol de Jefe de Obra a ${nombre}? Dejará de ver el módulo Personal.`
-      : `¿Dar el rol de Jefe de Obra a ${nombre}? Podrá gestionar la cuadrilla y los partes de las obras que se le asignen.`
-  );
-  if (!ok) return;
+async function savePermisos() {
+  if (!permisosCodigo) return;
+  const fields = {
+    caja:       $('perm-caja').checked,
+    admin:      $('perm-admin').checked,
+    jefeObra:   $('perm-jefeObra').checked,
+    jefeTaller: $('perm-jefeTaller').checked
+  };
+  const btn = $('modal-permisos-save');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
   try {
-    await patchUsuario(codigo, { jefeObra: !enabled });
-    showToast(`Jefe de Obra ${enabled ? 'quitado' : 'otorgado'} a ${nombre}.`);
+    await patchUsuario(permisosCodigo, fields);
+    $('modal-permisos').classList.add('hidden');
+    showToast('Permisos actualizados.');
     await loadUsers();
   } catch (_) {
-    showToast('Error al actualizar el rol de Jefe de Obra.', 'error');
+    $('modal-permisos-error').textContent = 'Error al guardar los permisos.';
+    $('modal-permisos-error').classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar';
   }
-};
-
-window.toggleCaja = async function (codigo, enabled, nombre) {
-  const ok = await showConfirm(
-    enabled ? 'Quitar acceso a Caja' : 'Habilitar Caja',
-    enabled
-      ? `¿Quitar el acceso a Caja Chica de ${nombre}?`
-      : `¿Habilitar Caja Chica para ${nombre}? Podrá registrar ingresos y egresos de su propia caja.`
-  );
-  if (!ok) return;
-  try {
-    await patchUsuario(codigo, { caja: !enabled });
-    showToast(`Caja ${enabled ? 'deshabilitada' : 'habilitada'} para ${nombre}.`);
-    await loadUsers();
-  } catch (_) {
-    showToast('Error al actualizar el permiso de Caja.', 'error');
-  }
-};
+}
 
 window.toggleActivo = async function (codigo, activo, nombre) {
   const ok = await showConfirm(
@@ -264,6 +246,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('modal-user-cancel').addEventListener('click', () => $('modal-user').classList.add('hidden'));
   $('modal-user-save').addEventListener('click', saveUser);
   $('user-nombre').addEventListener('keydown', e => { if (e.key === 'Enter') saveUser(); });
+  $('modal-permisos-close').addEventListener('click',  () => $('modal-permisos').classList.add('hidden'));
+  $('modal-permisos-cancel').addEventListener('click', () => $('modal-permisos').classList.add('hidden'));
+  $('modal-permisos-save').addEventListener('click', savePermisos);
 
   loadUsers();
 });

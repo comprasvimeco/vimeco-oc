@@ -24,6 +24,8 @@ const STATIC_ASSETS = [
   BASE + '/js/obras.js',
   BASE + '/equipos.html',
   BASE + '/js/equipos.js',
+  BASE + '/equipo.html',
+  BASE + '/js/equipo.js',
   BASE + '/usuarios.html',
   BASE + '/js/usuarios.js',
   BASE + '/manifest.json',
