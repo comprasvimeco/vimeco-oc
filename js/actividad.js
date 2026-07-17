@@ -149,7 +149,8 @@ function render() {
 
   let html    = '';
   let lastDay = null;
-  events.forEach(e => {
+  // `act-count` sigue contando todo el rango; acá se pinta sólo la página.
+  pager.take('act', events).forEach(e => {
     const dk = dayKey(e.timestamp);
     if (dk !== lastDay) {
       html += `<div class="act-day">${esc(dayLabel(e.timestamp))}</div>`;
@@ -192,6 +193,8 @@ function render() {
     b.addEventListener('click', () => marcarVista(b.dataset.key)));
   list.querySelectorAll('.act-del').forEach(b =>
     b.addEventListener('click', () => borrarNovedad(b.dataset.key)));
+
+  pager.footer('act', list, events, render);
 }
 
 async function borrarNovedad(key) {
@@ -214,6 +217,7 @@ async function borrarNovedad(key) {
 
 function setFilter(f) {
   currentFilter = f;
+  pager.reset('act');   // otro filtro → otra lista, se vuelve a la primera página
   document.querySelectorAll('.act-filter').forEach(b =>
     b.classList.toggle('active', b.dataset.filter === f));
   render();
@@ -229,6 +233,7 @@ function syncRangeUI() {
 function setRange(preset) {
   range.preset = preset;
   if (preset !== 'custom') { range.desde = ''; range.hasta = ''; }
+  pager.reset('act');
   syncRangeUI();
   persistRange();
   render();
@@ -239,6 +244,7 @@ function onCustomDate() {
   range.desde  = $('act-desde').value;
   range.hasta  = $('act-hasta').value;
   range.preset = (range.desde || range.hasta) ? 'custom' : '30';
+  pager.reset('act');
   syncRangeUI();
   persistRange();
   render();

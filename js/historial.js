@@ -44,7 +44,8 @@ function renderCards(ocs) {
   const canRegen = typeof generateOCBlob === 'function';
 
   list.innerHTML = '';
-  ocs.forEach(oc => {
+  // `hist-count` sigue mostrando el total del filtro; acá se pinta sólo la página.
+  pager.take('hist', ocs).forEach(oc => {
     const card = document.createElement('div');
     card.className = 'hist-card';
 
@@ -82,6 +83,8 @@ function renderCards(ocs) {
 
     list.appendChild(card);
   });
+
+  pager.footer('hist', list, ocs, () => renderCards(ocs));
 }
 
 function displayToISODate(d) {
@@ -101,6 +104,8 @@ function sanitizeStr(str) {
 
 // ---- Filtros ----
 function applyFilters() {
+  // Filtro nuevo → la lista es otra, se vuelve a la primera página.
+  pager.reset('hist');
   const q     = ($('hist-search').value || '').toLowerCase().trim();
   const desde = $('hist-desde').value; // YYYY-MM-DD
   const hasta = $('hist-hasta').value;

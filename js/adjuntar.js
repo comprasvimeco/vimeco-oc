@@ -191,8 +191,10 @@ function renderPrimaryList(filter = '') {
         (oc.obra || '').toLowerCase().includes(q) ||
         (oc.nroOC || '').toLowerCase().includes(q))
     : allOCs;
-  $('adj-oc-list-main').innerHTML = renderPrimaryListItems(list);
+  const box = $('adj-oc-list-main');
+  box.innerHTML = renderPrimaryListItems(pager.take('adj', list));
   bindPickButtons();
+  pager.footer('adj', box, list, () => renderPrimaryList(filter));
 }
 
 function bindPickButtons() {
@@ -376,7 +378,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
   // Buscador de la lista principal
-  $('adj-search-main').addEventListener('input', e => renderPrimaryList(e.target.value));
+  $('adj-search-main').addEventListener('input', e => {
+    pager.reset('adj');   // búsqueda nueva → volver a la primera página
+    renderPrimaryList(e.target.value);
+  });
 
   // Adjuntar manual: archivo elegido tras tocar "Adjuntar" en una OC
   $('manual-file').addEventListener('change', e => {

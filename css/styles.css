@@ -488,6 +488,10 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-responsable { font-size: .75rem; color: var(--gray-400); }
 .hist-actions { display: flex; gap: .4rem; }
 .hist-empty { text-align: center; padding: 3rem 1rem; color: var(--gray-400); font-size: .95rem; }
+/* Botón "Ver más" del paginador (js/ui.js → pager.footer).
+   Márgenes auto y no align-self: la lista de Adjuntar es un div block y las de
+   Historial/Novedades son flex column; `margin: auto` centra en los dos casos. */
+.pager-more { display: flex; margin: .75rem auto .25rem; min-height: 44px; }
 .hist-loading { text-align: center; padding: 2.5rem 1rem; color: var(--gray-500); }
 .hist-offline-notice { background: #fff8e1; border: 1px solid #ffe082; border-radius: var(--radius); padding: .55rem .85rem; font-size: .82rem; color: #795548; margin-bottom: .6rem; }
 .attach-banner {
@@ -648,9 +652,14 @@ tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 .menu-card-sub   { font-size: .82rem; color: var(--gray-500); text-align: center; }
 @media (max-width: 500px) {
   .menu-grid { grid-template-columns: 1fr; }
-  .menu-card { padding: 1.75rem 1.25rem; flex-direction: row; gap: 1rem; text-align: left; }
+  /* justify-content: flex-start y no el `center` de la regla base: en fila, centrar
+     alinea el bloque ícono+título como unidad, así que el ícono se corre según cuánto
+     mida el texto y la columna de íconos queda en escalera (78 px entre COMPRAS y
+     ADMINISTRACIÓN). Anclados a la izquierda, el texto fluye y los íconos alinean. */
+  .menu-card { padding: 1.75rem 1.25rem; flex-direction: row; justify-content: flex-start; gap: 1rem; text-align: left; }
   .menu-card-icon { width: 52px; height: 52px; flex-shrink: 0; }
   .menu-card-icon svg { width: 26px; height: 26px; }
+  .menu-card-title { text-align: left; }
   .menu-card-sub { text-align: left; }
 }
 
