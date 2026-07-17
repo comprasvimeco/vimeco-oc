@@ -468,18 +468,22 @@
   const _base = () => FIREBASE_CONFIG.databaseURL;
 
   // Registra un evento de actividad. Best-effort: nunca debe romper el flujo
-  // que lo invoca (si falla la red, se descarta silenciosamente).
+  // que lo invoca. Reintenta ante un corte de red breve (le pasó a la OC
+  // 0005-00000194: se subió bien a Drive pero la novedad se perdió sin dejar
+  // rastro porque el único intento coincidió con un corte transitorio).
   // evento = { tipo:'oc'|'adjunto'|'caja', usuario:{codigo,nombre}, titulo, detalle, driveUrl }
-  window.logActivity = function (evento) {
-    try {
-      const body = JSON.stringify({ ...evento, timestamp: evento.timestamp || Date.now() });
-      // POST → Firebase genera una push-key única, evitando colisiones
-      return fetch(_base() + '/actividad.json', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body
-      }).catch(() => {});
-    } catch (_) { return Promise.resolve(); }
+  window.logActivity = async function (evento) {
+    const body = JSON.stringify({ ...evento, timestamp: evento.timestamp || Date.now() });
+    // POST → Firebase genera una push-key única, evitando colisiones
+    const post = () => fetch(_base() + '/actividad.json', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    });
+    for (let intento = 0; intento < 3; intento++) {
+      try { return await post(); }
+      catch (_) { await new Promise(r => setTimeout(r, 600 * (intento + 1))); }
+    }
   };
 
   // Borra un evento de actividad (solo Administración). Afecta a todos.
