@@ -516,6 +516,12 @@ function normalizarObra(s) {
   return String(s || '').trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 }
 
+// El super-admin (0000) puede escribir obras fuera del padrón (p. ej. "x" para
+// pruebas). El resto sigue atado a la lista cerrada de /obras activas.
+function isSuperAdmin() {
+  return (sessionStorage.getItem('responsable_code') || '') === '0000';
+}
+
 // Devuelve la obra del padrón que corresponde a `nombre`, o null si no está.
 // Tolera diferencias de mayúsculas y acentos para poder recuperar OC viejas.
 function buscarObra(nombre) {
@@ -541,6 +547,12 @@ async function setupObraCombo() {
     obrasDisponibles = await getObrasActivas();
   } catch (e) {
     console.warn('setupObraCombo:', e);
+  }
+
+  // Super-admin: obra "X" de prueba, elegible del listado aunque no esté en el
+  // padrón. Normaliza a "x" → queda excluida de reportes/novedades (esObraPrueba).
+  if (isSuperAdmin() && !obrasDisponibles.some(o => normalizarObra(o.nombre) === 'x')) {
+    obrasDisponibles.push({ key: '__prueba_x', nombre: 'X', lugar_entrega: '' });
   }
 
   function selectObra(obra) {

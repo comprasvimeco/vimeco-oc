@@ -220,6 +220,21 @@
                     oc.autorizacion.solicitadoA.codigo === codigo)
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   };
+
+  // Espejo de la anterior, del lado del solicitante: OC cuya autorización pedí YO
+  // (cualquier estado: pendiente / autorizada / rechazada), para ver en qué quedó.
+  window.getMisSolicitudes = async function (codigo) {
+    const resp = await fetch(_base() + '/historial.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([key, oc]) => ({ _key: key, ...oc }))
+      .filter(oc => oc && oc.autorizacion && oc.autorizacion.solicitadoPor &&
+                    oc.autorizacion.solicitadoPor.codigo === codigo)
+      .sort((a, b) => (b.autorizacion.solicitadoEn || b.timestamp || 0) -
+                      (a.autorizacion.solicitadoEn || a.timestamp || 0));
+  };
 })();
 
 // ─── Gestión de Obras ───────────────────────────────
@@ -542,6 +557,24 @@
   window.deleteActividad = async function (key) {
     const resp = await fetch(_base() + '/actividad/' + key + '.json', { method: 'DELETE' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  // "Lápida": marca una OC para que la reconciliación NO regenere su novedad
+  // después de que un admin la borró a propósito. Sin esto, toda OC que siga en
+  // /historial (típico de las de prueba con obra libre) revive su novedad al
+  // reabrir Novedades. Clave = nroOC (los guiones son válidos en Firebase).
+  window.tombstoneNovedadOC = async function (nroOC) {
+    if (!nroOC) return;
+    await fetch(_base() + '/actividad_oc_borradas/' + nroOC + '.json', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
+    }).catch(() => {});
+  };
+
+  window.getNovedadesOCBorradas = async function () {
+    const resp = await fetch(_base() + '/actividad_oc_borradas.json');
+    if (!resp.ok) return new Set();
+    const data = await resp.json();
+    return new Set(Object.keys(data || {}));
   };
 
   // Devuelve los eventos de los últimos `dias` días, más recientes primero.

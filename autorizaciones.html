@@ -18,6 +18,21 @@
     .aut-total { font-weight:700; color:var(--gray-800); }
     .aut-actions { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.75rem; }
     .aut-bottom { display:flex; justify-content:space-between; align-items:center; margin-top:.5rem; }
+    /* Tabs: Para firmar / Mis pedidos */
+    .aut-tabs { display:flex; gap:.5rem; margin-bottom:.9rem; }
+    .aut-tab { flex:1; padding:.6rem .5rem; font-size:.9rem; font-weight:600;
+      border:1px solid var(--gray-300); border-radius:var(--radius); background:var(--white);
+      color:var(--gray-600); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; }
+    .aut-tab.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .aut-tab-n { min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:#d64545;
+      color:#fff; font-size:.7rem; font-weight:700; line-height:18px; text-align:center; }
+    .aut-tab.active .aut-tab-n { background:rgba(255,255,255,.32); }
+    /* Chip de estado del pedido */
+    .aut-estado { display:inline-block; padding:.1rem .55rem; border-radius:999px; font-size:.72rem; font-weight:700; }
+    .aut-estado-espera { background:#fff4e0; color:#9a6a00; }
+    .aut-estado-aprob  { background:#e3f5e8; color:#1e7d3a; }
+    .aut-estado-rech   { background:#fde6e6; color:#b02a2a; }
+    .aut-motivo { color:var(--gray-600); font-size:.85rem; margin-top:.45rem; font-style:italic; }
   </style>
 </head>
 <body>
@@ -39,12 +54,29 @@
 
 <main class="app-main">
   <div class="hist-page">
-    <div class="hist-toolbar">
-      <span class="card-title">OC pendientes de tu autorización</span>
-      <span class="hist-count" id="aut-count"></span>
+    <div class="aut-tabs">
+      <button class="aut-tab active" id="tab-firmar" data-tab="firmar">Para firmar <span class="aut-tab-n hidden" id="n-firmar"></span></button>
+      <button class="aut-tab" id="tab-pedidos" data-tab="pedidos">Mis pedidos <span class="aut-tab-n hidden" id="n-pedidos"></span></button>
     </div>
-    <div id="aut-list" class="hist-list">
-      <div class="hist-loading">Cargando…</div>
+
+    <div id="pane-firmar">
+      <div class="hist-toolbar">
+        <span class="card-title">OC pendientes de tu autorización</span>
+        <span class="hist-count" id="aut-count"></span>
+      </div>
+      <div id="aut-list" class="hist-list">
+        <div class="hist-loading">Cargando…</div>
+      </div>
+    </div>
+
+    <div id="pane-pedidos" class="hidden">
+      <div class="hist-toolbar">
+        <span class="card-title">Estado de tus pedidos de autorización</span>
+        <span class="hist-count" id="ped-count"></span>
+      </div>
+      <div id="ped-list" class="hist-list">
+        <div class="hist-loading">Cargando…</div>
+      </div>
     </div>
   </div>
 </main>

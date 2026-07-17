@@ -993,11 +993,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('btn-back').addEventListener('click', () => { window.location.href = 'administracion.html'; });
 
-  let isAdmin = code === '0000';
-  if (!isAdmin) {
-    try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
+  let puedeVer = code === '0000';
+  if (!puedeVer) {
+    try { const u = await getUsuario(code); puedeVer = !!(u && (u.admin || u.reportes)); } catch (_) {}
   }
-  if (!isAdmin) { window.location.href = 'menu.html'; return; }
+  if (!puedeVer) { window.location.href = 'menu.html'; return; }
 
   setupSegmented('seg-moneda', 'moneda');
   setupSegmented('seg-rate',   'rate');

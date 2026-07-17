@@ -206,6 +206,10 @@ async function borrarNovedad(key) {
   if (!ok) return;
   try {
     await deleteActividad(key);
+    // Lápida: si es una novedad de OC, que la reconciliación no la reviva.
+    if (ev && ev.tipo === 'oc' && ev.nroOC && typeof tombstoneNovedadOC === 'function') {
+      await tombstoneNovedadOC(ev.nroOC);
+    }
     allEvents = allEvents.filter(e => e.key !== key);
     persistSeen();
     render();
@@ -326,7 +330,14 @@ async function cargarPaneles(code) {
 // así el feed no depende de que cada aviso puntual haya llegado bien.
 async function reconciliarNovedadesOC(hist) {
   if (typeof ocsSinNovedad !== 'function' || typeof logOCActivity !== 'function') return;
-  const faltantes = ocsSinNovedad(hist, allEvents);
+  let faltantes = ocsSinNovedad(hist, allEvents);
+  // No revivir las novedades que un admin borró a propósito (lápidas).
+  if (typeof getNovedadesOCBorradas === 'function') {
+    try {
+      const borradas = await getNovedadesOCBorradas();
+      faltantes = faltantes.filter(oc => !borradas.has(oc.nroOC));
+    } catch (_) {}
+  }
   if (!faltantes.length) return;
 
   for (const oc of faltantes) {

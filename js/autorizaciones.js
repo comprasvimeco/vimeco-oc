@@ -3,7 +3,8 @@
 
 const $ = id => document.getElementById(id);
 
-let pendientes  = [];      // OC en estado 'pendiente' dirigidas a mí
+let pendientes  = [];      // OC en estado 'pendiente' dirigidas a mí (para firmar)
+let misPedidos  = [];      // OC cuya autorización pedí yo (para ver el estado)
 let myCode      = '';
 let myName      = '';
 let myFirma     = null;    // base64 de mi firma (o null si no tengo)
@@ -100,6 +101,92 @@ function render() {
     card.querySelector('.btn-rechazar-rapido').addEventListener('click', () => { currentOC = oc; abrirRechazo(); });
     list.appendChild(card);
   });
+}
+
+// ---- "Mis pedidos": estado de las OC que YO mandé a autorizar ----
+const SEEN_KEY = () => 'vimeco_solicitudes_vistas_' + myCode;
+
+function estadoPedido(oc) {
+  if (oc.estado === 'autorizada') return ['aprob',  'Aprobada'];
+  if (oc.estado === 'rechazada')  return ['rech',   'Rechazada'];
+  return ['espera', 'En espera'];
+}
+
+// Resueltas (aprobada/rechazada) que todavía no vi — alimenta el globito.
+function pedidosSinVer() {
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem(SEEN_KEY()) || '[]'); } catch (_) {}
+  return misPedidos.filter(oc =>
+    (oc.estado === 'autorizada' || oc.estado === 'rechazada') && !seen.includes(oc._key)).length;
+}
+
+// Al abrir la bandeja se dan por vistas: el globito del menú se limpia.
+function marcarPedidosVistos() {
+  const resueltas = misPedidos
+    .filter(oc => oc.estado === 'autorizada' || oc.estado === 'rechazada')
+    .map(oc => oc._key);
+  try {
+    const prev   = JSON.parse(localStorage.getItem(SEEN_KEY()) || '[]');
+    const merged = [...new Set([...prev, ...resueltas])];
+    localStorage.setItem(SEEN_KEY(), JSON.stringify(merged));
+  } catch (_) {}
+}
+
+function renderPedidos() {
+  const list = $('ped-list');
+  $('ped-count').textContent = misPedidos.length
+    ? `${misPedidos.length} pedido${misPedidos.length !== 1 ? 's' : ''}` : '';
+
+  if (!misPedidos.length) {
+    list.innerHTML = '<div class="hist-empty">No mandaste ninguna OC a autorizar.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  misPedidos.forEach(oc => {
+    const [cls, txt] = estadoPedido(oc);
+    const a     = oc.autorizacion || {};
+    const total = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
+    const quien = a.solicitadoA?.nombre || '—';
+    let extra = '';
+    if (oc.estado === 'rechazada' && a.motivoRechazo) {
+      extra = `<div class="aut-motivo">Motivo: ${esc(a.motivoRechazo)}</div>`;
+    } else if (oc.estado === 'autorizada' && a.firmante) {
+      extra = `<div class="aut-meta">Firmó: ${esc(a.firmante)}</div>`;
+    }
+    const card = document.createElement('div');
+    card.className = 'hist-card';
+    card.innerHTML = `
+      <div class="aut-card-top">
+        <span class="aut-nro">${esc(oc.nroOC)}</span>
+        <span class="aut-estado aut-estado-${cls}">${txt}</span>
+      </div>
+      <div class="aut-prov">${esc(oc.proveedor?.nombre || '—')}</div>
+      <div class="aut-obra">${esc(oc.obra || '—')}</div>
+      <div class="aut-bottom">
+        <span class="aut-total">${total}</span>
+        <span class="aut-meta">A: ${esc(quien)}</span>
+      </div>
+      ${extra}`;
+    list.appendChild(card);
+  });
+}
+
+// ---- Tabs ----
+function showTab(tab) {
+  const firmar = tab === 'firmar';
+  $('pane-firmar').classList.toggle('hidden', !firmar);
+  $('pane-pedidos').classList.toggle('hidden', firmar);
+  $('tab-firmar').classList.toggle('active', firmar);
+  $('tab-pedidos').classList.toggle('active', !firmar);
+}
+
+function setTabCounts(sinVer) {
+  const nf = $('n-firmar'), np = $('n-pedidos');
+  if (pendientes.length) { nf.textContent = pendientes.length; nf.classList.remove('hidden'); }
+  else nf.classList.add('hidden');
+  if (sinVer) { np.textContent = sinVer; np.classList.remove('hidden'); }
+  else np.classList.add('hidden');
 }
 
 // ---- Vista previa ----
@@ -344,16 +431,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   setupFirmaModal();
 
+  // Tabs
+  $('tab-firmar').addEventListener('click', () => showTab('firmar'));
+  $('tab-pedidos').addEventListener('click', () => showTab('pedidos'));
+
   // Mi firma (para autorizar sin volver a dibujarla)
   getFirma(myCode).then(f => { myFirma = f || null; }).catch(() => {});
 
-  // Cargar pendientes
+  // Cargar ambas bandejas: lo que me piden firmar y lo que yo pedí.
   try {
-    pendientes = await getAutorizacionesPendientes(myCode);
+    [pendientes, misPedidos] = await Promise.all([
+      getAutorizacionesPendientes(myCode),
+      (typeof getMisSolicitudes === 'function' ? getMisSolicitudes(myCode) : Promise.resolve([])).catch(() => [])
+    ]);
   } catch (e) {
     $('aut-list').innerHTML = '<div class="hist-empty">No se pudieron cargar las autorizaciones. Revisá tu conexión.</div>';
     console.error('getAutorizacionesPendientes:', e);
     return;
   }
+
+  const sinVer = pedidosSinVer();   // antes de marcarlos vistos
   render();
+  renderPedidos();
+  setTabCounts(sinVer);
+  // Abre en la pestaña con algo para hacer: firmar si tengo pendientes, si no mis pedidos.
+  showTab(pendientes.length ? 'firmar' : (misPedidos.length ? 'pedidos' : 'firmar'));
+  marcarPedidosVistos();
 });

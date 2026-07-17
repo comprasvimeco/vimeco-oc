@@ -43,6 +43,9 @@ function renderUsers(list) {
     const tallerBadge = (!esSuper && u.jefeTaller)
       ? `<span class="u-badge u-badge-activo">${icSvg('layers')} Jefe de Taller</span>`
       : '';
+    const reportesBadge = (!esSuper && u.reportes)
+      ? `<span class="u-badge u-badge-activo">${icSvg('sheet')} Reportes</span>`
+      : '';
     const permBtn = esSuper
       ? ''
       : `<button class="btn btn-sm btn-outline btn-permisos">Permisos</button>`;
@@ -57,6 +60,7 @@ function renderUsers(list) {
         ${adminBadge}
         ${jefeBadge}
         ${tallerBadge}
+        ${reportesBadge}
       </div>
       <div class="user-card-actions">
         <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
@@ -186,6 +190,7 @@ window.openPermisos = function (u) {
   $('perm-admin').checked      = !!u.admin;
   $('perm-jefeObra').checked   = !!u.jefeObra;
   $('perm-jefeTaller').checked = !!u.jefeTaller;
+  $('perm-reportes').checked   = !!u.reportes;
   $('modal-permisos-error').classList.add('hidden');
   $('modal-permisos').classList.remove('hidden');
 };
@@ -196,7 +201,8 @@ async function savePermisos() {
     caja:       $('perm-caja').checked,
     admin:      $('perm-admin').checked,
     jefeObra:   $('perm-jefeObra').checked,
-    jefeTaller: $('perm-jefeTaller').checked
+    jefeTaller: $('perm-jefeTaller').checked,
+    reportes:   $('perm-reportes').checked
   };
   const btn = $('modal-permisos-save');
   btn.disabled = true;

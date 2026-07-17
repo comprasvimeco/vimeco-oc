@@ -105,6 +105,17 @@
       </div>
       <div class="menu-card-title">Equipos</div>
     </a>
+    <a href="reportes.html" class="menu-card" id="menu-card-reportes" style="display:none">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="19" x2="18" y2="10"/>
+          <line x1="12" y1="19" x2="12" y2="4"/>
+          <line x1="6" y1="19" x2="6" y2="14"/>
+          <line x1="3" y1="20" x2="21" y2="20"/>
+        </svg>
+      </div>
+      <div class="menu-card-title">Reportes</div>
+    </a>
     <a href="administracion.html" class="menu-card" id="menu-card-admin" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -136,15 +147,28 @@
       document.getElementById('menu-card-admin').style.display = '';
       // Equipos: el admin lo ve en el menú igual que un Jefe de Taller.
       document.getElementById('menu-card-equipos').style.display = '';
+      document.getElementById('menu-card-reportes').style.display = '';
     }
 
-    // Autorizaciones: visible para cualquier usuario con OC pendientes de su firma.
-    if (typeof getAutorizacionesPendientes === 'function') {
-      getAutorizacionesPendientes(_s.codigo).then(pend => {
-        if (pend && pend.length) {
+    // Autorizaciones: visible si tengo OC para firmar (me las pidieron) o si yo
+    // pedí autorización de alguna. El globito cuenta lo accionable: pendientes de
+    // mi firma + pedidos míos ya resueltos (aprobados/rechazados) que no vi.
+    if (typeof getAutorizacionesPendientes === 'function' && typeof getMisSolicitudes === 'function') {
+      Promise.all([
+        getAutorizacionesPendientes(_s.codigo).catch(() => []),
+        getMisSolicitudes(_s.codigo).catch(() => [])
+      ]).then(([paraFirmar, misPedidos]) => {
+        let seen = [];
+        try { seen = JSON.parse(localStorage.getItem('vimeco_solicitudes_vistas_' + _s.codigo) || '[]'); } catch (_) {}
+        const resueltasSinVer = misPedidos.filter(oc =>
+          (oc.estado === 'autorizada' || oc.estado === 'rechazada') && !seen.includes(oc._key)).length;
+        if (paraFirmar.length || misPedidos.length) {
           document.getElementById('menu-card-autorizaciones').style.display = '';
+        }
+        const n = paraFirmar.length + resueltasSinVer;
+        if (n > 0) {
           const b = document.getElementById('autorizaciones-badge');
-          b.textContent = pend.length > 99 ? '99+' : String(pend.length);
+          b.textContent = n > 99 ? '99+' : String(n);
           b.classList.remove('hidden');
         }
       }).catch(() => {});
@@ -184,6 +208,7 @@
             if (u && (u.caja || u.admin)) cajaCard.style.display = '';
             if (u && (u.admin || u.jefeObra)) personalCard.style.display = '';
             if (u && u.jefeTaller) document.getElementById('menu-card-equipos').style.display = '';
+            if (u && (u.admin || u.reportes)) document.getElementById('menu-card-reportes').style.display = '';
             if (u && u.admin) revealNovedades();
           })
           .catch(() => {});
