@@ -55,10 +55,10 @@
     <a href="equipos.html" class="menu-card">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 17h13v-6H3z"/>
-          <path d="M16 13h3l2 3v1h-5z"/>
-          <circle cx="6.5" cy="18.5" r="1.8"/>
-          <circle cx="18" cy="18.5" r="1.8"/>
+          <rect x="1" y="3" width="15" height="13"/>
+          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+          <circle cx="5.5" cy="18.5" r="2.5"/>
+          <circle cx="18.5" cy="18.5" r="2.5"/>
         </svg>
       </div>
       <div class="menu-card-title">Equipos</div>
@@ -66,9 +66,12 @@
     <a href="reportes.html" class="menu-card">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10"/>
-          <line x1="12" y1="20" x2="12" y2="4"/>
-          <line x1="6" y1="20" x2="6" y2="14"/>
+          <!-- Las barras terminan en 19 y no en 20: con stroke-linecap="round" el
+               trazo se extiende media pluma más allá del extremo, así que apoyadas
+               sobre el eje (y=20) asomaban por debajo y el ícono se leía como una reja. -->
+          <line x1="18" y1="19" x2="18" y2="10"/>
+          <line x1="12" y1="19" x2="12" y2="4"/>
+          <line x1="6" y1="19" x2="6" y2="14"/>
           <line x1="3" y1="20" x2="21" y2="20"/>
         </svg>
       </div>
