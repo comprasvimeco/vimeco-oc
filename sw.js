@@ -137,8 +137,11 @@ self.addEventListener('fetch', event => {
     (event.request.mode === 'navigate' || /\.(html|js|css|json)$/i.test(path));
 
   if (appCode) {
+    // no-store: se saltea la caché HTTP del navegador (GitHub Pages sirve
+    // max-age=600) y siempre revalida contra la red, así el deploy nuevo se ve
+    // enseguida. Offline: cae a la caché del SW por el catch.
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: 'no-store' })
         .then(response => {
           if (response && response.status === 200 && response.type !== 'opaque') {
             const clone = response.clone();
