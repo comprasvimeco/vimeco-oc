@@ -332,12 +332,17 @@
     } catch (_) {}
 
     if (!cajasId) {
-      cajasId = await getOrCreateFolder(token, 'CAJAS', DRIVE_CONFIG.folderId);
+      // CAJAS vive como hermana de COMPRAS (no adentro), igual que PERSONAL.
+      const parent = (await getComprasParentId(token)) || DRIVE_CONFIG.folderId;
+      cajasId = await getOrCreateFolder(token, 'CAJAS', parent);
       fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/cajasId.json', {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(cajasId)
       }).catch(() => {});
+    } else {
+      // Si ya existía (dentro de COMPRAS), moverla afuera una vez.
+      _ensureOutsideCompras(token, cajasId, 'cajasMovedOut');
     }
 
     const mes        = fecha ? fecha.substring(0, 7) : new Date().toISOString().substring(0, 7);
@@ -411,34 +416,35 @@
     } catch (_) { return null; }
   }
 
-  function _setPersonalMovedFlag() {
-    fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalMovedOut.json', {
+  function _setMovedOutFlag(flagKey) {
+    fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/' + flagKey + '.json', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true'
     }).catch(() => {});
   }
 
-  // Migración única: si PERSONAL quedó dentro de COMPRAS, la mueve al padre de COMPRAS.
-  // Best-effort y guardada por flag para no chequear en cada subida.
-  async function _ensurePersonalOutsideCompras(token, personalId) {
+  // Migración única: si una carpeta raíz quedó dentro de COMPRAS, la mueve al padre
+  // de COMPRAS (para que quede como hermana). Best-effort y guardada por flag para
+  // no chequear en cada subida.
+  async function _ensureOutsideCompras(token, folderId, flagKey) {
     try {
-      const f = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/personalMovedOut.json');
+      const f = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/' + flagKey + '.json');
       if (f.ok && (await f.json()) === true) return;
 
       const r = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${personalId}?fields=parents&supportsAllDrives=true`,
+        `https://www.googleapis.com/drive/v3/files/${folderId}?fields=parents&supportsAllDrives=true`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!r.ok) return;
       const parents = (await r.json()).parents || [];
-      if (!parents.includes(DRIVE_CONFIG.folderId)) { _setPersonalMovedFlag(); return; }
+      if (!parents.includes(DRIVE_CONFIG.folderId)) { _setMovedOutFlag(flagKey); return; }
 
       const target = await getComprasParentId(token);
       if (!target || target === DRIVE_CONFIG.folderId) return;
       const upd = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${personalId}?addParents=${target}&removeParents=${DRIVE_CONFIG.folderId}&supportsAllDrives=true&fields=id`,
+        `https://www.googleapis.com/drive/v3/files/${folderId}?addParents=${target}&removeParents=${DRIVE_CONFIG.folderId}&supportsAllDrives=true&fields=id`,
         { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } }
       );
-      if (upd.ok) _setPersonalMovedFlag();
+      if (upd.ok) _setMovedOutFlag(flagKey);
     } catch (_) {}
   }
 
@@ -460,7 +466,7 @@
       return id;
     }
     // Si ya existía (probablemente dentro de COMPRAS), moverla afuera una vez.
-    _ensurePersonalOutsideCompras(token, id);
+    _ensureOutsideCompras(token, id, 'personalMovedOut');
     return id;
   }
 

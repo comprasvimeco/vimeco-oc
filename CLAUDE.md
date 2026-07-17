@@ -31,14 +31,21 @@ PWA estática (HTML/CSS/JS). Deploy en GitHub Pages vía GitHub Actions (`deploy
 
 ## Drive — estructura de carpetas
 
+`COMPRAS`, `CAJAS` y `PERSONAL` son carpetas hermanas (mismo nivel).
+
 ```
 COMPRAS/
   OBRAS/{Obra}/{YYYY-MM-DD | Proveedor}/
   PROVEEDORES/{Proveedor}/{YYYY-MM-DD | Proveedor}/
-  CAJAS/{Usuario}/{YYYY-MM}/Fotos|Archivos|planilla.xlsx
+CAJAS/{Usuario}/{YYYY-MM}/Fotos|Archivos|planilla.xlsx
+PERSONAL/...
 ```
 
 IDs de OBRAS/PROVEEDORES/CAJAS se cachean en Firebase `/drive_config/`.
+
+`CAJAS` y `PERSONAL` originalmente vivían dentro de COMPRAS. Una migración única
+best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags
+`/drive_config/cajasMovedOut` y `personalMovedOut`) las mueve al padre de COMPRAS.
 
 ## Caja Chica — lógica por mes
 
