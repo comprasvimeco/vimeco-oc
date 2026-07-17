@@ -68,6 +68,29 @@
     .rep-note { display: flex; gap: .5rem; align-items: flex-start; background: #fff8ec; color: #8a5a00; border: 1px solid #f0dca8;
       border-radius: var(--radius); padding: .6rem .85rem; font-size: .8rem; margin-bottom: 1.25rem; }
 
+    /* ---- OC duplicadas ---- */
+    /* Tono de alerta (mismo ámbar que .rep-note) para separarla de las tarjetas
+       de análisis: es algo a corregir, no a leer. */
+    #rep-dup-card { border: 1px solid #f0dca8; }
+    #rep-dup-card .card-header { background: #fff8ec; border-bottom: 1px solid #f0dca8; }
+    #rep-dup-card .card-title { color: #8a5a00; }
+    .rep-dup-count { font-size: .74rem; font-weight: 700; color: #8a5a00; }
+    .rep-dup-g { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .5rem .6rem; margin-bottom: .6rem; }
+    .rep-dup-g:last-child { margin-bottom: 0; }
+    .rep-dup-head { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem;
+      flex-wrap: wrap; margin-bottom: .4rem; }
+    .rep-dup-prov { font-size: .84rem; font-weight: 800; color: var(--gray-700); }
+    .rep-dup-meta { font-size: .74rem; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+    .rep-dup-oc { display: flex; align-items: center; gap: .5rem; padding: .3rem 0;
+      border-top: 1px solid var(--gray-100); }
+    .rep-dup-ver { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start;
+      gap: .1rem; background: none; border: none; padding: .2rem; cursor: pointer; text-align: left; border-radius: 6px; }
+    .rep-dup-ver:hover { background: #eef3fa; }
+    .rep-dup-nro { font-family: 'Courier New', monospace; font-size: .76rem; font-weight: 700; color: var(--primary); }
+    .rep-dup-sub { font-size: .72rem; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .rep-dup-del { flex-shrink: 0; }
+    @media print { #rep-dup-card { break-inside: avoid; } .rep-dup-del { display: none !important; } }
+
     /* ---- Secciones ---- */
     /* align-items:start evita que una tarjeta corta se estire al alto de su vecina. */
     .rep-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
@@ -285,6 +308,14 @@
       <div id="rep-note" class="rep-note hidden"></div>
 
       <div class="rep-sections">
+        <div class="card rep-card rep-full hidden" id="rep-dup-card">
+          <div class="card-header">
+            <span class="card-title">OC duplicadas</span>
+            <span class="rep-dup-count" id="rep-dup-count"></span>
+          </div>
+          <div class="card-body" id="rep-dup"></div>
+        </div>
+
         <div class="card rep-card rep-full">
           <div class="card-header"><span class="card-title" id="rep-linea-title">Evolución</span></div>
           <div class="card-body"><div class="rep-line" id="rep-linea"></div></div>

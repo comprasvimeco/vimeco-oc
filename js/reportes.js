@@ -139,6 +139,64 @@ function groupAgg(list, keyFn, labelFn) {
   return [...map.values()].sort((a, b) => b.total - a.total);
 }
 
+// ---- Identidad del proveedor ----
+// El CUIT es la identidad real; `proveedor.nombre` es un snapshot de texto libre
+// que varía entre OC del mismo proveedor ("MARCU SA" vs "MARCU S.A", "SOPPE
+// INGENIERIA S.R.L." vs "...S.R.L"). Agrupar por nombre partía un proveedor en
+// varias filas del ranking (SOPPE salía #5 y #7 en vez de #2) aunque todas esas
+// OC ya traían el mismo CUIT. Gemelo de normalizeProvName() en app.js.
+function normProvName(s) {
+  return String(s || '').toLowerCase()
+    .replace(/\b(s\.a\.s\.|s\.r\.l\.|s\.a\.|s\.a\.s|s\.r\.l|s\.a|sas|srl|sa)\b/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Un CUIT de menos de 10 dígitos no es un CUIT: el OCR a veces mete el código
+// interno del proveedor en ese campo (una OC de GER-VIAL guardó "00003658").
+function cuitDigits(oc) {
+  const d = String(oc.proveedor?.cuit || '').replace(/\D/g, '');
+  return d.length >= 10 ? d : '';
+}
+
+let _provAlias = new Map();   // nombre normalizado → clave de CUIT
+let _provCanon = new Map();   // clave → { name, score }
+
+// Se reconstruye en cada render(): provKey() depende de _provAlias.
+function buildProvIndex(list) {
+  // Alias: una OC sin CUIT válido se pega al grupo del mismo nombre que sí lo
+  // tiene, en vez de quedar como un proveedor aparte.
+  _provAlias = new Map();
+  list.forEach(oc => {
+    const d = cuitDigits(oc);
+    const n = normProvName(oc.proveedor?.nombre);
+    if (d && n) _provAlias.set(n, 'c' + d);
+  });
+
+  // Nombre a mostrar: gana el de la base maestra (el que trae codigoInterno);
+  // si ninguna OC del grupo pasó por la base, la más reciente.
+  _provCanon = new Map();
+  list.forEach(oc => {
+    const k     = provKey(oc);
+    const score = (oc.proveedor?.codigoInterno ? 1e15 : 0) + (oc.timestamp || 0);
+    const cur   = _provCanon.get(k);
+    if (!cur || score > cur.score) _provCanon.set(k, { name: oc.proveedor?.nombre || 'Sin proveedor', score });
+  });
+}
+
+function provKey(oc) {
+  const d = cuitDigits(oc);
+  if (d) return 'c' + d;
+  const n = normProvName(oc.proveedor?.nombre);
+  if (!n) return '—';
+  return _provAlias.get(n) || ('n' + n);
+}
+
+function provLabel(oc) {
+  return _provCanon.get(provKey(oc))?.name || oc.proveedor?.nombre || 'Sin proveedor';
+}
+
 function median(nums) {
   if (!nums.length) return 0;
   const s = [...nums].sort((a, b) => a - b);
@@ -505,6 +563,9 @@ function render() {
   const total = renderHero(list);
   const grand = total || 1;
 
+  buildProvIndex(list);
+  renderDuplicados(list);
+
   const obras = groupAgg(list, oc => oc.obra || '—', oc => oc.obra || 'Sin obra');
 
   renderShare('rep-share', obras, total);
@@ -523,15 +584,107 @@ function render() {
       oc => `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}`),
     { grandTotal: grand, drill: true, emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
-  renderBars('rep-proveedores', groupAgg(list,
-      oc => oc.proveedor?.nombre || '—',
-      oc => oc.proveedor?.nombre || 'Sin proveedor'),
+  renderBars('rep-proveedores', groupAgg(list, provKey, provLabel),
     { grandTotal: grand, limit: 10, drill: true, emptyMsg: 'Sin proveedores en el rango.' });
 
   renderBars('rep-responsables', groupAgg(list,
       oc => oc.responsable?.codigo || '—',
       oc => oc.responsable?.nombre || '—'),
     { grandTotal: grand, drill: true, emptyMsg: 'Sin responsables en el rango.' });
+}
+
+// ===================================================
+//  OC duplicadas
+// ===================================================
+// Mismo proveedor + misma fecha + mismo monto = la misma compra emitida dos
+// veces (doble clic, o "parecía que falló y la hice de nuevo"). La huella es que
+// los números suelen salir consecutivos: 0004-00000157 y 158, con 10 ítems
+// idénticos cada una.
+//
+// A propósito NO se usa una ventana de días: mismo proveedor y monto en fechas
+// distintas puede ser una compra recurrente real (nafta, lubricantes del taller)
+// y marcarla como duplicado sería gritar en falso.
+//
+// El monto se compara en su moneda original, no en la de visualización: el toggle
+// ARS/USD no puede cambiar qué es un duplicado.
+function grupoDuplicados(list) {
+  const map = new Map();
+  list.forEach(oc => {
+    const monto = Math.round((parseFloat(oc.total) || 0) * 100);
+    if (!monto) return;                       // una OC en $0 no es un duplicado
+    const k = [provKey(oc), oc.fecha || '', oc.moneda || 'ARS', monto].join('|');
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(oc);
+  });
+  return [...map.values()]
+    .filter(g => g.length > 1)
+    .map(g => [...g].sort((a, b) => String(a.nroOC).localeCompare(String(b.nroOC))))
+    .sort((a, b) => (parseFloat(b[0].total) || 0) - (parseFloat(a[0].total) || 0));
+}
+
+function renderDuplicados(list) {
+  const card   = $('rep-dup-card');
+  const grupos = grupoDuplicados(list);
+
+  if (!grupos.length) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+
+  // Lo que se ahorra si cada grupo queda con una sola OC.
+  const enJuego = grupos.reduce((s, g) =>
+    s + (amountIn(g[0], state.moneda) || 0) * (g.length - 1), 0);
+  $('rep-dup-count').textContent =
+    `${grupos.length} grupo${grupos.length > 1 ? 's' : ''} · ${fmtCompact(enJuego, state.moneda)} contados de más`;
+
+  $('rep-dup').innerHTML = grupos.map(g => {
+    const head = g[0];
+    return `
+      <div class="rep-dup-g">
+        <div class="rep-dup-head">
+          <span class="rep-dup-prov">${esc(provLabel(head))}</span>
+          <span class="rep-dup-meta">${esc(head.fecha || '')} · ${esc(fmtFull(head.total, head.moneda || 'ARS'))} · ×${g.length}</span>
+        </div>
+        ${g.map(oc => `
+          <div class="rep-dup-oc">
+            <button class="rep-dup-ver" data-ockey="${esc(histKeyOf(oc))}"
+                    title="Ver la ficha completa de la OC ${esc(oc.nroOC)}">
+              <span class="rep-dup-nro">${esc(oc.nroOC)}</span>
+              <span class="rep-dup-sub">${esc(oc.obra || 'Sin obra')} · ${esc(oc.responsable?.nombre || '—')}</span>
+            </button>
+            <button class="btn btn-sm btn-danger rep-dup-del" data-delkey="${esc(histKeyOf(oc))}"
+                    title="Borrar la OC ${esc(oc.nroOC)} del historial">Borrar</button>
+          </div>`).join('')}
+      </div>`;
+  }).join('');
+
+  if (!$('rep-dup')._wired) {
+    $('rep-dup')._wired = true;
+    $('rep-dup').addEventListener('click', e => {
+      const del = e.target.closest('[data-delkey]');
+      if (del) { borrarDuplicado(del.dataset.delkey); return; }
+      const ver = e.target.closest('[data-ockey]');
+      if (ver) openOCDetail(ver.dataset.ockey);
+    });
+  }
+}
+
+async function borrarDuplicado(key) {
+  const oc = ocByKey(key);
+  if (!oc) return;
+  const ok = await showConfirm('Borrar OC duplicada',
+    `¿Borrar la OC ${oc.nroOC} (${fmtFull(oc.total, oc.moneda || 'ARS')}) del historial? ` +
+    `No se puede deshacer. El PDF en Drive no se toca: si esta OC ya se le mandó al proveedor, ` +
+    `borrarla acá no la da de baja.`);
+  if (!ok) return;
+
+  try {
+    await deleteHistorialEntry(key);
+    const i = ALL.indexOf(oc);     if (i >= 0) ALL.splice(i, 1);
+    const j = ALL_RAW.indexOf(oc); if (j >= 0) ALL_RAW.splice(j, 1);
+    toast('OC borrada.', 'success');
+    render();
+  } catch (e) {
+    toast('No se pudo borrar. ' + e.message, 'error');
+  }
 }
 
 // ===================================================
