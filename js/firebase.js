@@ -486,6 +486,27 @@
     }
   };
 
+  // Registra la creación/autorización de una OC en el feed. Centralizado acá
+  // (no en app.js) para que lo puedan usar tanto el flujo de generar como el
+  // de autorizar (antes solo el primero avisaba: una OC firmada nunca dejaba
+  // novedad). `opts.usuario`/`opts.timestamp` permiten rellenar con los datos
+  // originales al reconciliar novedades faltantes contra /historial.
+  window.logOCActivity = function (nroOC, proveedor, obra, total, folderId, opts = {}) {
+    const monto = (parseFloat(total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return logActivity({
+      tipo:    'oc',
+      nroOC,
+      usuario: opts.usuario || {
+        codigo: sessionStorage.getItem('responsable_code') || '',
+        nombre: sessionStorage.getItem('responsable_name') || ''
+      },
+      titulo:    `OC ${nroOC} — ${proveedor || 'Sin proveedor'}`,
+      detalle:   `${obra || 'Sin obra'} · $ ${monto}`,
+      driveUrl:  folderId ? `https://drive.google.com/drive/folders/${folderId}` : '',
+      timestamp: opts.timestamp || Date.now()
+    });
+  };
+
   // Borra un evento de actividad (solo Administración). Afecta a todos.
   window.deleteActividad = async function (key) {
     const resp = await fetch(_base() + '/actividad/' + key + '.json', { method: 'DELETE' });

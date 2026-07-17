@@ -379,22 +379,8 @@ function setupFirmaModalButtons() {
   });
 }
 
-// ---- Feed de actividad ----
-// Registra la creación de una OC en el feed de Novedades (best-effort).
-function logOCActivity(nroOC, proveedor, obra, total, folderId) {
-  if (typeof logActivity !== 'function') return;
-  const monto = (parseFloat(total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  logActivity({
-    tipo:    'oc',
-    usuario: {
-      codigo: sessionStorage.getItem('responsable_code') || '',
-      nombre: sessionStorage.getItem('responsable_name') || ''
-    },
-    titulo:   `OC ${nroOC} — ${proveedor || 'Sin proveedor'}`,
-    detalle:  `${obra || 'Sin obra'} · $ ${monto}`,
-    driveUrl: folderId ? `https://drive.google.com/drive/folders/${folderId}` : ''
-  });
-}
+// logOCActivity vive en firebase.js (la usan también autorizaciones.js y la
+// reconciliación de actividad.js).
 
 // Guarda en el historial las carpetas de Drive de una OC. Si el PATCH falla, la
 // OC queda figurando "sin respaldo" aunque el PDF esté subido (le pasó a la OC

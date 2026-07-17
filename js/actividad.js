@@ -317,6 +317,30 @@ async function cargarPaneles(code) {
   pendientesOCs  = ocsPendientes(hist);
   renderSinRespaldo();
   renderPendientes();
+  await reconciliarNovedadesOC(hist);
+}
+
+// Autocorrección: cualquier OC con PDF emitido que no haya dejado su tarjeta
+// en el feed (aviso perdido, o un flujo que nunca avisó) se rellena acá con
+// sus datos y fecha originales. Se corre cada vez que un admin abre Novedades,
+// así el feed no depende de que cada aviso puntual haya llegado bien.
+async function reconciliarNovedadesOC(hist) {
+  if (typeof ocsSinNovedad !== 'function' || typeof logOCActivity !== 'function') return;
+  const faltantes = ocsSinNovedad(hist, allEvents);
+  if (!faltantes.length) return;
+
+  for (const oc of faltantes) {
+    try {
+      await logOCActivity(oc.nroOC, oc.proveedor?.nombre, oc.obra, oc.total, driveFolderId(oc), {
+        usuario:   oc.responsable,
+        timestamp: oc.timestamp
+      });
+    } catch (_) { /* se reintenta sola en la próxima carga */ }
+  }
+
+  try { allEvents = await getActividad(null); } catch (_) { return; }
+  render();
+  showToast(`Se completaron ${faltantes.length} novedad${faltantes.length !== 1 ? 'es' : ''} que faltaban.`);
 }
 
 // ---- OC esperando autorización ----

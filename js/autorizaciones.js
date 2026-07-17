@@ -213,6 +213,12 @@ async function firmarOC(oc) {
     return;
   }
 
+  if (typeof logOCActivity === 'function') {
+    const folderId = folderIds.obrasFolderId || folderIds.proveedoresFolderId ||
+                      oc.drive_folder_obras_id || oc.drive_folder_proveedores_id;
+    logOCActivity(oc.nroOC, ocData.proveedor.nombre, oc.obra, oc.total, folderId);
+  }
+
   quitarDeLista(oc);
   cerrarPreview();
   if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Firmar y autorizar'; }

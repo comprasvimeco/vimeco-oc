@@ -55,6 +55,30 @@ function ocsSinRespaldo(list) {
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
+// OC con PDF real emitido (directo o por autorización): son las que deberían
+// tener su tarjeta en el feed de novedades.
+const CON_PDF = new Set(['emitida', 'autorizada']);
+
+// OC que deberían tener novedad y no la tienen. El feed se arma con llamadas
+// "fire and forget" (logActivity) desde varios puntos del código — cualquiera
+// de ellos puede perderse por un corte de red, o directamente no haberse
+// escrito nunca (le pasó a las OC autorizadas antes de que autorizaciones.js
+// avisara). Se reconcilia contra /historial, la fuente de verdad, en vez de
+// confiar en que cada aviso haya llegado.
+function ocsSinNovedad(list, actEvents) {
+  const conNovedad = new Set(
+    (actEvents || []).filter(e => e.tipo === 'oc').map(e => e.nroOC).filter(Boolean)
+  );
+  // Eventos viejos (previos al campo nroOC) sólo se pueden matchear por texto.
+  const titulos = (actEvents || []).filter(e => e.tipo === 'oc').map(e => e.titulo || '');
+  return list.filter(oc =>
+    CON_PDF.has(oc.estado) &&
+    !esObraPrueba(oc) &&
+    !conNovedad.has(oc.nroOC) &&
+    !titulos.some(t => t.includes(oc.nroOC))
+  );
+}
+
 // OC esperando que alguien las autorice. Más recientes primero.
 function ocsPendientes(list) {
   return list
