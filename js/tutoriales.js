@@ -1,9 +1,12 @@
 /* VIMECO S.A. — Contenido de los tutoriales (SOLO datos).
  *
- * Para actualizar un tutorial: editá sus `slides`.
- * Cuando agregues funciones nuevas, SUBÍ el número `version` del módulo:
- *   - reaparece el badge "Nuevo" en el menú (☰) de esa pantalla, y
- *   - el tutorial se vuelve a mostrar solo la próxima vez que el usuario entre.
+ * Para actualizar un tutorial: editá sus `slides` y listo. tour.js detecta el cambio
+ * solo (hashea el contenido): reaparece el badge "Nuevo" y el tutorial se muestra una
+ * vez más, únicamente a quien ya lo había visto con el texto viejo. Un deploy que no
+ * toca este archivo no le muestra el tutorial a nadie.
+ *
+ * `version` NO hace falta subirla más: quedó sólo para migrar el estado de los usuarios
+ * que venían del esquema viejo (se guardaba el número de versión visto). Ver tour.js.
  *
  * `icono` es una clave de js/icons.js (window.ic). Nunca usar emojis.
  */

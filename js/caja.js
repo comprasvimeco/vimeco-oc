@@ -30,9 +30,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // showToast: provisto globalmente por js/ui.js
 
+  // Magnitud, sin signo: quien muestra +/- según el tipo de movimiento lo antepone.
   function fmtMonto(n) {
     const s = Math.abs(n).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return '$ ' + s;
+  }
+
+  // Firmado, para los totales que sí pueden dar negativo: saldo y excedente anterior.
+  // El rojo solo no alcanza —"-$ 5.000" y "$ 5.000" se ven idénticos sin el signo, y
+  // el color se pierde en una captura, impreso o con daltonismo—.
+  function fmtSaldo(n) {
+    // El signo se decide sobre el valor YA redondeado: -0,004 no debe salir "-$ 0,00".
+    const v = Math.round((Number(n) || 0) * 100) / 100;
+    return (v < 0 ? '-' : '') + fmtMonto(v);
   }
 
   function fmtFecha(iso) {
@@ -55,21 +65,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Anima un número desde su valor actual hasta `to` (con formato de monto)
+  // Anima un número desde su valor actual hasta `to` (con formato de monto firmado:
+  // los tableros de arriba son los únicos que muestran totales que pueden dar negativo)
   const _countTimers = new WeakMap();
   function countUp(el, to) {
     if (!el) return;
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const from = el._cuVal || 0;
-    if (reduce || from === to) { el.textContent = fmtMonto(to); el._cuVal = to; return; }
+    if (reduce || from === to) { el.textContent = fmtSaldo(to); el._cuVal = to; return; }
     if (_countTimers.has(el)) cancelAnimationFrame(_countTimers.get(el));
     const dur = 650, t0 = performance.now();
     const step = (now) => {
       const p = Math.min(1, (now - t0) / dur);
       const eased = 1 - Math.pow(1 - p, 3);          // easeOutCubic
-      el.textContent = fmtMonto(from + (to - from) * eased);
+      el.textContent = fmtSaldo(from + (to - from) * eased);
       if (p < 1) { _countTimers.set(el, requestAnimationFrame(step)); }
-      else { el.textContent = fmtMonto(to); el._cuVal = to; }
+      else { el.textContent = fmtSaldo(to); el._cuVal = to; }
     };
     _countTimers.set(el, requestAnimationFrame(step));
   }

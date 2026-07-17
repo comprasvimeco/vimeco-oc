@@ -11,9 +11,15 @@
  *                                 tour.js se encarga de abrir/cerrar #hdr-dropdown.
  *
  * Estado "visto" por usuario en localStorage:
- *   vimeco_tour_visto_{codigo} = { compras: <version>, caja: <version>, personal: <version> }
- * Se guarda la VERSIÓN vista (no un booleano): al subir `version` en tutoriales.js
- * reaparece el badge "Nuevo" y el tutorial se vuelve a mostrar una vez.
+ *   vimeco_tour_visto_{codigo} = { compras: <hash>, caja: <hash>, personal: <hash> }
+ *
+ * Se guarda un HASH DEL CONTENIDO de los slides, no un número de versión: el tutorial
+ * reaparece (con el badge "Nuevo") si y sólo si su texto cambió. Antes dependía de que
+ * alguien se acordara de subir `version` a mano en tutoriales.js — y de que nadie la
+ * subiera de más por un cambio que no tocaba el tutorial. Ahora no hay número que tocar.
+ *
+ * `version` en tutoriales.js quedó sólo para migrar el estado viejo (ver debeMostrar);
+ * no hace falta subirla más.
  */
 (function () {
   'use strict';
@@ -30,6 +36,30 @@
     const s = readSeen();
     s[mod] = version;
     try { localStorage.setItem(storeKey(), JSON.stringify(s)); } catch (_) {}
+  }
+
+  // Huella del contenido de un tutorial (djb2 sobre los slides). El prefijo 'h' la
+  // hace inconfundible con el número de `version` que guardaba el formato viejo.
+  function contentHash(t) {
+    const s = JSON.stringify(t.slides || []);
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return 'h' + h.toString(36);
+  }
+
+  // ¿Hay que auto-abrirlo? Sólo si su contenido cambió desde la última vez que se cerró.
+  function debeMostrar(mod, t) {
+    const stored = readSeen()[mod];
+    const hash   = contentHash(t);
+    if (typeof stored === 'number') {
+      // Estado anterior al hash: guardaba el número de versión visto. Si ya vio la
+      // última versión manual, entonces vio este mismo texto → se anota su hash y el
+      // número no se vuelve a mirar. Si no, el tutorial se muestra y al cerrarlo el
+      // hash pisa al número.
+      if (stored >= (t.version || 1)) { markSeen(mod, hash); return false; }
+      return true;
+    }
+    return stored !== hash;
   }
 
   // ---- Estado del carrusel en curso ----
@@ -114,7 +144,7 @@
     const t = (window.TUTORIALES || {})[mod];
     if (!t || !t.slides || !t.slides.length) return;
     if (_overlay) close();
-    _mod = mod; _slides = t.slides; _version = t.version || 1; _i = 0;
+    _mod = mod; _slides = t.slides; _version = contentHash(t); _i = 0;
     _overlay = buildOverlay();
     _overlay.querySelector('#tour-title').textContent = t.titulo || 'Tutorial';
     render();
@@ -170,10 +200,8 @@
       window.openTour(mod);
     });
 
-    // Badge + auto-abrir en el primer uso (o al subir la versión del tutorial)
-    const version = window.TUTORIALES[mod].version || 1;
-    const seen = readSeen()[mod] || 0;
-    if (seen < version) {
+    // Badge + auto-abrir en el primer uso, o si el texto del tutorial cambió
+    if (debeMostrar(mod, window.TUTORIALES[mod])) {
       showBadge();
       setTimeout(() => window.openTour(mod), 700);
     }
