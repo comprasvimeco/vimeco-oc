@@ -173,6 +173,9 @@
     .rep-oc-flag { background: #fff5f5; border-bottom-color: #f5c6c6; }
     .rep-oc-flag .rep-oc-total { color: #c02626; }
     .rep-chip { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; }
+    .rep-catsum { display: flex; flex-wrap: wrap; gap: .5rem .9rem; padding: .1rem .1rem .55rem; }
+    .rep-catsum-i { display: inline-flex; align-items: center; gap: .35rem; font-size: .82rem; color: var(--gray-600); }
+    .rep-catsum-i b { color: var(--gray-800); font-weight: 700; }
     .rep-flag { display: inline-flex; align-items: center; gap: .2rem; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; background: #fde6e6; color: #b02a2a; }
     .rep-flag .icon { width: 11px; height: 11px; }
 
@@ -337,6 +340,11 @@
         <div class="card rep-card">
           <div class="card-header"><span class="card-title">Gasto por Equipo</span></div>
           <div class="card-body" id="rep-equipos"></div>
+        </div>
+
+        <div class="card rep-card">
+          <div class="card-header"><span class="card-title">Repuestos vs Mantenimiento</span></div>
+          <div class="card-body" id="rep-categorias"></div>
         </div>
 
         <div class="card rep-card">

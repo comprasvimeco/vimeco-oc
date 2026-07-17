@@ -598,11 +598,24 @@ async function setupObraCombo() {
 // ---- Equipo combo (opcional) ----
 // El equipo asignado a la OC. null = ninguno (no se muestra en el PDF).
 let selectedEquipo = null;
+// Categoría de la compra del equipo: 'Repuestos' | 'Mantenimiento' | null.
+// Sólo aplica si hay equipo elegido.
+let selectedCategoria = null;
 
 function setEquipo(eq) {
   selectedEquipo = (eq && eq.codigo) ? { codigo: eq.codigo, tipo: eq.tipo || '' } : null;
   const input = $('equipo');
   if (input) input.value = selectedEquipo ? `${selectedEquipo.codigo} — ${selectedEquipo.tipo}` : '';
+  const catGroup = $('equipo-cat-group');
+  if (catGroup) catGroup.classList.toggle('hidden', !selectedEquipo);
+  // Sin equipo no hay categoría: se limpia (cubre resetForm y "Sin equipo").
+  if (!selectedEquipo) setCategoria(null);
+}
+
+function setCategoria(cat) {
+  selectedCategoria = cat || null;
+  document.querySelectorAll('#equipo-cat .cat-seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.val === selectedCategoria));
 }
 
 async function setupEquipoCombo() {
@@ -637,11 +650,24 @@ async function setupEquipoCombo() {
       div.className = 'combo-option';
       div.innerHTML = `<span>${eq.codigo}</span><span class="combo-option-sub">${eq.tipo}</span>`;
       div.addEventListener('mousedown', e => {
-        e.preventDefault(); setEquipo(eq); dropdown.classList.add('hidden');
+        // Equipo nuevo → se re-elige la categoría a propósito.
+        e.preventDefault(); setEquipo(eq); setCategoria(null); dropdown.classList.add('hidden');
       });
       dropdown.appendChild(div);
     });
   }
+
+  // El botón de la flecha no debe robar el foco del input: si lo hace, se dispara
+  // el `blur` del input (abajo) y su timer esconde el desplegable apenas se abre.
+  // Este era el bug de desktop "no anda si el cursor está en el buscador".
+  arrow.addEventListener('mousedown', e => e.preventDefault());
+
+  // Selector de categoría (Repuestos / Mantenimiento).
+  const catBox = $('equipo-cat');
+  if (catBox) catBox.addEventListener('click', e => {
+    const btn = e.target.closest('.cat-seg-btn');
+    if (btn) setCategoria(btn.dataset.val);
+  });
 
   arrow.addEventListener('click', e => {
     e.stopPropagation();
@@ -1468,6 +1494,11 @@ function validateOCForm() {
   if (!condicionPago) { toast('Ingresá la condición de pago.', 'error'); revealAndFocus('condicion-pago'); return false; }
   if (!obra)          { toast('Elegí la obra / motivo de la lista.', 'error'); revealAndFocus('obra'); return false; }
   if (!buscarObra(obra)) { toast(`"${obra}" no está en el padrón de obras. Elegí una de la lista.`, 'error'); revealAndFocus('obra'); return false; }
+  if (selectedEquipo && !selectedCategoria) {
+    toast('Elegí la categoría de la compra del equipo (Repuestos o Mantenimiento).', 'error');
+    $('equipo-cat-group').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
   if (!items.length)  { toast('Agregá al menos un ítem a la orden.', 'error'); return false; }
   if (items.some(it => !it.descripcion.trim())) { toast('Completá la descripción de todos los ítems.', 'error'); return false; }
   return true;
@@ -1523,7 +1554,7 @@ function buildOCData(numero, firma = null) {
       total:    roundCents((parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0))
     })),
     observaciones: $('observaciones').value.trim() || '',
-    equipo:      selectedEquipo ? { codigo: selectedEquipo.codigo, tipo: selectedEquipo.tipo } : null,
+    equipo:      selectedEquipo ? { codigo: selectedEquipo.codigo, tipo: selectedEquipo.tipo, categoria: selectedCategoria || null } : null,
     impuestos:   pdfTotals,
     totalLetras: numberToWords(total),
     _total:      total,
@@ -1886,6 +1917,7 @@ function loadOCBase(oc) {
   // (renombrada o unificada): en ese caso el campo queda vacío para reelegir.
   setObraValue(oc.obra);
   setEquipo(oc.equipo || null);
+  setCategoria(oc.equipo?.categoria || null);
   $('condicion-pago').value          = oc.condicionPago  || '';
   $('plazo-entrega').value           = '';
   $('lugar-entrega').value           = '';

@@ -273,6 +273,17 @@ function estadoChip(oc) {
   return `<span class="rep-chip" style="background:${bg};color:${fg}">${txt}</span>`;
 }
 
+// Chip de categoría de la compra de un equipo (Repuestos / Mantenimiento).
+function catChip(cat) {
+  if (!cat) return '';
+  const map = {
+    'Repuestos':     ['#e8eef5', '#2b537d'],
+    'Mantenimiento': ['#f3ecfb', '#5b3a9c'],
+  };
+  const [bg, fg] = map[cat] || ['#eceff3', '#5b6472'];
+  return `<span class="rep-chip" style="background:${bg};color:${fg}">${esc(cat)}</span>`;
+}
+
 // ===================================================
 //  Gráficos
 // ===================================================
@@ -473,7 +484,20 @@ function renderBars(containerId, rows, opts = {}) {
     if (opts.drill && isOpen) {
       flagOutliers(r);
       const ocs = [...r.ocs].sort((a, b) => b.amt - a.amt);
-      drillHtml = `<div class="rep-drill">${ocs.map(({ oc, amt, flag }) => `
+      // Resumen Repuestos vs Mantenimiento del equipo (split por categoría).
+      let sumHtml = '';
+      if (opts.catSplit) {
+        const byCat = new Map();
+        r.ocs.forEach(({ oc, amt }) => {
+          const c = oc.equipo?.categoria || 'Sin categoría';
+          byCat.set(c, (byCat.get(c) || 0) + amt);
+        });
+        sumHtml = `<div class="rep-catsum">${[...byCat.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([c, v]) => `<span class="rep-catsum-i">${catChip(c) || esc(c)}<b>${esc(fmtFull(v, state.moneda))}</b></span>`)
+          .join('')}</div>`;
+      }
+      drillHtml = `<div class="rep-drill">${sumHtml}${ocs.map(({ oc, amt, flag }) => `
         <button class="rep-oc ${flag ? 'rep-oc-flag' : ''}" data-ockey="${esc(histKeyOf(oc))}"
                 title="Ver la ficha completa de la OC ${esc(oc.nroOC)}">
           <div class="rep-oc-main">
@@ -482,6 +506,7 @@ function renderBars(containerId, rows, opts = {}) {
           </div>
           <div class="rep-oc-meta">
             <span class="rep-oc-fecha">${esc(oc.fecha || '')}</span>
+            ${opts.catChip ? catChip(oc.equipo?.categoria) : ''}
             ${estadoChip(oc)}
             ${flag ? `<span class="rep-flag">${icSvg('alert')} revisar</span>` : ''}
             ${driveFolderId(oc) ? `<span class="rep-oc-drv" title="Respaldada en Drive">${icSvg('folder')}</span>` : ''}
@@ -582,7 +607,16 @@ function render() {
   renderBars('rep-equipos', groupAgg(conEquipo,
       oc => oc.equipo.codigo,
       oc => `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}`),
-    { grandTotal: grand, drill: true, emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
+    { grandTotal: grand, drill: true, catChip: true, catSplit: true,
+      emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
+
+  // Repuestos vs Mantenimiento: sólo las OC con equipo llevan categoría. Las
+  // que aún no la tienen (previas a esta función) caen en "Sin categoría".
+  renderBars('rep-categorias', groupAgg(conEquipo,
+      oc => oc.equipo.categoria || 'Sin categoría',
+      oc => oc.equipo.categoria || 'Sin categoría'),
+    { grandTotal: grand, drill: true, catChip: true,
+      emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   renderBars('rep-proveedores', groupAgg(list, provKey, provLabel),
     { grandTotal: grand, limit: 10, drill: true, emptyMsg: 'Sin proveedores en el rango.' });
@@ -760,6 +794,7 @@ function openOCDetail(key) {
       ${fichaRow('Cond. IVA', prov.condicionIVA)}
       ${fichaRow('Cond. pago', oc.condicionPago)}
       ${fichaRow('Equipo', oc.equipo ? `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}` : '')}
+      ${fichaRow('Categoría', oc.equipo?.categoria)}
       ${fichaRow('Responsable', oc.responsable?.nombre)}
       ${fichaRow('Moneda', cur)}
     </div>
