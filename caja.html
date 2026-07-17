@@ -113,6 +113,7 @@
               <th>Fecha</th>
               <th>Tipo</th>
               <th>Categoría</th>
+              <th>Obra</th>
               <th>Proveedor / Detalle</th>
               <th>Descripción</th>
               <th class="text-right">Monto</th>
@@ -186,6 +187,12 @@
         </div>
       </div>
       <div class="form-group">
+        <label for="gasto-obra">Obra *</label>
+        <select id="gasto-obra" class="form-control">
+          <option value="">— Seleccioná —</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label for="gasto-proveedor">Proveedor</label>
         <input type="text" id="gasto-proveedor" class="form-control" placeholder="Nombre del comercio o proveedor">
       </div>
@@ -220,8 +227,8 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label for="recarga-mes">Mes *</label>
-        <select id="recarga-mes" class="form-control"></select>
+        <label for="recarga-fecha">Fecha *</label>
+        <input type="date" id="recarga-fecha" class="form-control">
       </div>
       <div class="form-group">
         <label for="recarga-monto">Monto *</label>

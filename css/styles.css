@@ -704,6 +704,11 @@ tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 .caja-mov-monto { font-size: 1rem; font-weight: 800; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 .caja-mov-desc { font-size: .9rem; font-weight: 600; color: var(--gray-700); margin-bottom: .15rem; }
 .caja-mov-prov { font-size: .78rem; color: var(--gray-500); margin-bottom: .4rem; }
+/* Obra imputada del egreso. Línea propia y no un tag al lado de la categoría:
+   los nombres son largos ("Administración - RRHH") y apretarían el monto. */
+.caja-mov-obra { display: inline-block; margin-bottom: .3rem; padding: .1rem .45rem; border-radius: 4px;
+  background: var(--glass-bg-strong); border: 1px solid var(--glass-border);
+  font-size: .72rem; font-weight: 600; color: var(--primary-dark); }
 .caja-mov-foot { display: flex; align-items: center; justify-content: space-between; }
 .caja-mov-fecha { font-size: .75rem; color: var(--gray-400); }
 .caja-cat-tag { display: inline-block; margin-left: .3rem; padding: .1rem .4rem; background: var(--gray-200); border-radius: 4px; font-size: .68rem; color: var(--gray-600); }

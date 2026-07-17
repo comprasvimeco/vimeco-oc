@@ -47,7 +47,10 @@ IDs de OBRAS/PROVEEDORES/CAJAS se cachean en Firebase `/drive_config/`.
   El "Excedente anterior" es el neto de todos los movimientos de meses previos al seleccionado.
 - El Excel sincronizado a Drive refleja el mismo cálculo (fila "Excedente anterior" + saldo acumulado)
 - Excel se sincroniza automáticamente a Drive tras cada movimiento
-- Recargas (Ingresos) almacenan fecha como primer día del mes seleccionado
+- Ingresos y Egresos guardan **fecha puntual** (el mes del arrastre sale de esa fecha).
+  Hasta v145 el Ingreso elegía mes y se guardaba como día 1: los ingresos previos tienen fecha `-01`.
+- Cada **Egreso** se imputa a una **obra** (obligatoria, lista de `/obras` activas). Los egresos
+  previos a v146 no tienen obra: se muestran como "—" y suman en "Sin obra" en el Excel.
 
 ## Navegación
 

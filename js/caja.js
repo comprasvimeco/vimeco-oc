@@ -1,6 +1,6 @@
 /* global getCajaMovimientos, saveCajaMovimiento, deleteCajaMovimiento,
           patchCajaMovimiento, getCategoriasCaja, saveCategoriasCaja,
-          getAllUsuarios, getUsuario, uploadToCajaDrive */
+          getAllUsuarios, getUsuario, getObrasActivas, uploadToCajaDrive */
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let targetNombre = userNombre;
   let movimientos  = [];
   let categorias   = [];
+  let obras        = [];   // nombres de /obras activas, para imputar cada egreso
 
   // showToast: provisto globalmente por js/ui.js
 
@@ -49,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       tipo:    'caja',
       usuario: { codigo: userCodigo, nombre: userNombre },
       titulo:   `${label} de caja — ${fmtMonto(mov.monto || 0)}${cuenta}`,
-      detalle:  [mov.categoria, mov.descripcion].filter(Boolean).join(' · ') || '—',
+      detalle:  [mov.obra, mov.categoria, mov.descripcion].filter(Boolean).join(' · ') || '—',
       driveUrl: fileId ? `https://drive.google.com/file/d/${fileId}/view` : ''
     });
   }
@@ -107,6 +108,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // ─── Load obras ──────────────────────────────────────
+  // Cada egreso se imputa a una obra. La lista es la misma de /obras que usa la OC
+  // (lista cerrada desde v139), y ya incluye los centros de costo que no son obra de
+  // construcción —Taller, Oficina Técnica, Administración - RRHH—, así que un gasto
+  // de oficina también tiene dónde ir y no hace falta una opción "General".
+  async function loadObras() {
+    try {
+      obras = (await getObrasActivas()).map(o => o.nombre);
+    } catch (_) { obras = []; }
+    fillObraSelect();
+  }
+
+  function fillObraSelect(extra) {
+    const sel = document.getElementById('gasto-obra');
+    const lista = extra && !obras.includes(extra) ? [...obras, extra] : obras;
+    sel.innerHTML = '<option value="">— Seleccioná —</option>';
+    lista.forEach(n => {
+      const o = document.createElement('option');
+      o.value = o.textContent = n;
+      sel.appendChild(o);
+    });
+  }
+
   // ─── Admin: selector de usuario ──────────────────────
   if (isAdmin) {
     document.getElementById('admin-selector-card').classList.remove('hidden');
@@ -140,25 +164,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('modal-recarga').addEventListener('click', e => { if (e.target === e.currentTarget) closeRecargaModal(); });
 
     document.getElementById('btn-recarga-guardar').addEventListener('click', async () => {
-      const errorEl    = document.getElementById('recarga-error');
-      const mesRecarga  = document.getElementById('recarga-mes').value;
+      const errorEl     = document.getElementById('recarga-error');
+      const fechaRec    = document.getElementById('recarga-fecha').value;
       const comentario  = document.getElementById('recarga-comentario').value.trim();
       const monto       = parseMonto(document.getElementById('recarga-monto').value);
-      const MESES_R = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-      const [ry, rm]  = mesRecarga.split('-');
-      const labelMes  = `Recarga ${MESES_R[parseInt(rm, 10)]} ${ry}`;
-      const descripcion = comentario ? `${labelMes} — ${comentario}` : labelMes;
       errorEl.classList.add('hidden');
 
+      if (!fechaRec) {
+        errorEl.textContent = 'Ingresá la fecha.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
       if (!monto || monto <= 0) {
         errorEl.textContent = 'Ingresá un monto válido.';
         errorEl.classList.remove('hidden');
         return;
       }
 
+      // El mes sale de la fecha elegida: es el que manda para el arrastre del saldo
+      // y para saber qué planilla resincronizar.
+      const mesRecarga  = fechaRec.substring(0, 7);
+      const [ry, rm]    = mesRecarga.split('-');
+      const labelMes    = `Recarga ${MESES_LBL[parseInt(rm, 10)]} ${ry}`;
+      const descripcion = comentario ? `${labelMes} — ${comentario}` : labelMes;
+
       const btn = document.getElementById('btn-recarga-guardar');
       btn.disabled = true;
-      const mov = { tipo: 'ingreso', descripcion, fecha: mesRecarga + '-01', monto };
+      const mov = { tipo: 'ingreso', descripcion, fecha: fechaRec, monto };
       try {
         if (editIngreso) {
           const prevMes = editIngreso.fecha?.substring(0, 7);
@@ -316,6 +348,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>${fmtFecha(m.fecha)}</td>
         <td><span class="caja-badge ${isIngreso ? 'caja-badge-ingreso' : 'caja-badge-gasto'}">${isIngreso ? 'Ingreso' : 'Gasto'}</span></td>
         <td>${m.categoria || '—'}</td>
+        <td>${m.obra || '—'}</td>
         <td>${m.proveedor || '—'}</td>
         <td>${m.descripcion || '—'}</td>
         <td class="text-right" style="font-weight:700;color:${isIngreso ? 'var(--success)' : 'var(--danger)'};">${isIngreso ? '+' : '-'}${fmtMonto(m.monto || 0)}</td>
@@ -342,6 +375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <span class="caja-mov-monto" style="color:${isIngreso ? 'var(--success)' : 'var(--danger)'};">${isIngreso ? '+' : '-'}${fmtMonto(m.monto || 0)}</span>
         </div>
         <div class="caja-mov-desc">${m.descripcion || '—'}</div>
+        ${m.obra ? `<div class="caja-mov-obra">${m.obra}</div>` : ''}
         ${m.proveedor ? `<div class="caja-mov-prov">${m.proveedor}</div>` : ''}
         <div class="caja-mov-foot">
           <span class="caja-mov-fecha">${fmtFecha(m.fecha)}</span>
@@ -384,6 +418,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     editGasto = mov || null;
     clearGastoFile();
     document.getElementById('gasto-categoria').value   = mov?.categoria   || '';
+    // Un egreso viejo puede apuntar a una obra que después se desactivó: se la agrega
+    // a la lista para no perder el dato al editar por otra razón.
+    fillObraSelect(mov?.obra);
+    document.getElementById('gasto-obra').value        = mov?.obra        || '';
     document.getElementById('gasto-fecha').value       = mov?.fecha       || new Date().toISOString().split('T')[0];
     document.getElementById('gasto-proveedor').value   = mov?.proveedor   || '';
     document.getElementById('gasto-descripcion').value = mov?.descripcion || '';
@@ -498,12 +536,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorEl.classList.add('hidden');
 
     const categoria   = document.getElementById('gasto-categoria').value;
+    const obra        = document.getElementById('gasto-obra').value;
     const fecha       = document.getElementById('gasto-fecha').value;
     const proveedor   = document.getElementById('gasto-proveedor').value.trim();
     const descripcion = document.getElementById('gasto-descripcion').value.trim();
     const monto       = parseMonto(document.getElementById('gasto-monto').value);
 
     if (!categoria)   { errorEl.textContent = 'Seleccioná una categoría.';   errorEl.classList.remove('hidden'); return; }
+    if (!obra)        { errorEl.textContent = 'Seleccioná la obra.';         errorEl.classList.remove('hidden'); return; }
     if (!fecha)       { errorEl.textContent = 'Ingresá la fecha.';           errorEl.classList.remove('hidden'); return; }
     if (!descripcion) { errorEl.textContent = 'Ingresá una descripción.';    errorEl.classList.remove('hidden'); return; }
     if (!monto || monto <= 0) { errorEl.textContent = 'Ingresá un monto válido.'; errorEl.classList.remove('hidden'); return; }
@@ -512,7 +552,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.disabled = true;
     btn.textContent = 'Guardando…';
 
-    const mov = { tipo: 'gasto', categoria, proveedor: proveedor || null, descripcion, fecha, monto };
+    const mov = { tipo: 'gasto', categoria, obra, proveedor: proveedor || null, descripcion, fecha, monto };
 
     if (gastoFile && typeof uploadToCajaDrive === 'function') {
       try {
@@ -569,25 +609,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openRecargaModal(mov) {
     editIngreso = mov || null;
-    const sel = document.getElementById('recarga-mes');
-    sel.innerHTML = '';
-    const now = new Date();
-    const meses = [];
-    for (let i = 0; i < 13; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      meses.push(d.toISOString().substring(0, 7));
-    }
-    const editMes = mov?.fecha?.substring(0, 7);
-    if (editMes && !meses.includes(editMes)) meses.push(editMes);
-    meses.sort().reverse();
-    meses.forEach((val, idx) => {
-      const [y, m] = val.split('-');
-      const o = document.createElement('option');
-      o.value = val;
-      o.textContent = `${MESES_LBL[parseInt(m, 10)]} ${y}`;
-      o.selected = editMes ? (val === editMes) : (idx === 0);
-      sel.appendChild(o);
-    });
+    // Fecha puntual del ingreso. Antes se elegía el mes y se guardaba el día 1; los
+    // ingresos anteriores a este cambio tienen todos fecha `-01` y se editan como tales.
+    document.getElementById('recarga-fecha').value = mov?.fecha || new Date().toISOString().split('T')[0];
     // Comentario: lo que sigue al "Recarga {Mes} {Año} — " si existe
     let comentario = '';
     if (mov?.descripcion) {
@@ -718,6 +742,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cats    = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
     const numCats = cats.length;
 
+    // Gastos por obra. Los egresos anteriores a la obra obligatoria no la tienen:
+    // caen en "Sin obra" en vez de desaparecer del corte.
+    const porObra = {};
+    gastosFilt.forEach(mv => {
+      const o = mv.obra || 'Sin obra';
+      porObra[o] = (porObra[o] || 0) + (mv.monto || 0);
+    });
+    const obrasRows = Object.entries(porObra).sort((a, b) => b[1] - a[1]);
+    const numObras  = obrasRows.length;
+
     // ─── Índices de filas (0-based) ─────────────────────
     const R_TITLE    = 0;
     const R_USER     = 1;
@@ -732,9 +766,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const R_CAT_HDR  = 12;
     const R_CAT_D0   = 13;
     const R_CAT_TOT  = 13 + numCats;
-    const R_DET_TTL  = 15 + numCats;
-    const R_DET_HDR  = 16 + numCats;
-    const R_DET_D0   = 17 + numCats;
+    const R_OBR_TTL  = 15 + numCats;
+    const R_OBR_HDR  = 16 + numCats;
+    const R_OBR_D0   = 17 + numCats;
+    const R_OBR_TOT  = 17 + numCats + numObras;
+    const R_DET_TTL  = 19 + numCats + numObras;
+    const R_DET_HDR  = 20 + numCats + numObras;
+    const R_DET_D0   = 21 + numCats + numObras;
 
     // Filas Excel 1-based para fórmulas
     const XF = (r) => r + 1;
@@ -742,6 +780,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const detLast  = XF(R_DET_D0 + filtered.length - 1);
     const hasData  = filtered.length > 0;
 
+    // Columnas del detalle: A Fecha · B Tipo · C Categoría · D Obra · E Proveedor ·
+    // F Descripción · G Monto. Las fórmulas de arriba apuntan acá, así que mover una
+    // columna del detalle obliga a mover su letra en los SUMIF.
     const dr = (col) => hasData ? `$${col}$${detFirst}:$${col}$${detLast}` : `$${col}$${detFirst}:$${col}$${detFirst}`;
     const sumif = (typeVal, col) => hasData
       ? `SUMIF(${dr('B')},"${typeVal}",${dr(col)})`
@@ -756,7 +797,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const f = (v, formula) => ({ t: 'n', v, f: formula });
 
     // ─── Filas ──────────────────────────────────────────
-    const E = ['', '', '', '', '', ''];
+    const E = ['', '', '', '', '', '', ''];
+    const kv = (label, val) => [label, val, '', '', '', '', ''];
     const rows = [];
     rows[R_TITLE]   = [`VIMECO S.A. — Caja Chica`, ...E.slice(1)];
     rows[R_USER]    = [`Usuario: ${targetNombre}`,  ...E.slice(1)];
@@ -764,27 +806,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     rows[R_GEN]     = [`Generado: ${hoy.toLocaleDateString('es-AR')}`, ...E.slice(1)];
     rows[4]         = [...E];
     rows[R_RESUMEN] = [`RESUMEN — ${periodo}`, ...E.slice(1)];
-    rows[R_EXC]     = ['Excedente anterior', valExc, '', '', '', ''];
-    rows[R_INGR]    = ['Ingresos',  f(valIngr,        sumif('Ingreso', 'F')),          '', '', '', ''];
-    rows[R_GAST]    = ['Gastos',    f(valGast,         hasData ? `ABS(${sumif('Gasto','F')})` : '0'), '', '', '', ''];
-    rows[R_SALDO]   = ['Saldo',     f(valExc+valIngr-valGast, `B${XF(R_EXC)}+B${XF(R_INGR)}-B${XF(R_GAST)}`), '', '', '', ''];
+    rows[R_EXC]     = kv('Excedente anterior', valExc);
+    rows[R_INGR]    = kv('Ingresos', f(valIngr, sumif('Ingreso', 'G')));
+    rows[R_GAST]    = kv('Gastos',   f(valGast,  hasData ? `ABS(${sumif('Gasto','G')})` : '0'));
+    rows[R_SALDO]   = kv('Saldo',    f(valExc+valIngr-valGast, `B${XF(R_EXC)}+B${XF(R_INGR)}-B${XF(R_GAST)}`));
     rows[10]        = [...E];
     rows[R_CAT_TTL] = [`GASTOS POR CATEGORÍA`, ...E.slice(1)];
-    rows[R_CAT_HDR] = ['Categoría', 'Monto ($)', '', '', '', ''];
+    rows[R_CAT_HDR] = kv('Categoría', 'Monto ($)');
     cats.forEach(([cat, val], i) => {
-      const fCat = hasData ? `ABS(SUMIF(${dr('C')},"${cat.replace(/"/g,'""')}",${dr('F')}))` : '0';
-      rows[R_CAT_D0 + i] = [cat, f(val, fCat), '', '', '', ''];
+      const fCat = hasData ? `ABS(SUMIF(${dr('C')},"${cat.replace(/"/g,'""')}",${dr('G')}))` : '0';
+      rows[R_CAT_D0 + i] = kv(cat, f(val, fCat));
     });
     const catSumFormula = numCats > 0 ? `SUM(B${XF(R_CAT_D0)}:B${XF(R_CAT_D0 + numCats - 1)})` : '0';
-    rows[R_CAT_TOT] = ['TOTAL GASTOS', f(valGast, catSumFormula), '', '', '', ''];
+    rows[R_CAT_TOT] = kv('TOTAL GASTOS', f(valGast, catSumFormula));
     rows[14 + numCats] = [...E];
+    rows[R_OBR_TTL] = [`GASTOS POR OBRA`, ...E.slice(1)];
+    rows[R_OBR_HDR] = kv('Obra', 'Monto ($)');
+    obrasRows.forEach(([obr, val], i) => {
+      // "Sin obra" no es un valor guardado: es el bucket de los egresos previos a la
+      // obra obligatoria. Su celda va sin fórmula (SUMIF por "" no los junta).
+      const fObr = hasData && obr !== 'Sin obra'
+        ? `ABS(SUMIF(${dr('D')},"${obr.replace(/"/g,'""')}",${dr('G')}))`
+        : null;
+      rows[R_OBR_D0 + i] = kv(obr, fObr ? f(val, fObr) : val);
+    });
+    const obrSumFormula = numObras > 0 ? `SUM(B${XF(R_OBR_D0)}:B${XF(R_OBR_D0 + numObras - 1)})` : '0';
+    rows[R_OBR_TOT] = kv('TOTAL GASTOS', f(valGast, obrSumFormula));
+    rows[18 + numCats + numObras] = [...E];
     rows[R_DET_TTL] = [`DETALLE — ${periodo}`, ...E.slice(1)];
-    rows[R_DET_HDR] = ['Fecha', 'Tipo', 'Categoría', 'Proveedor', 'Descripción', 'Monto ($)'];
+    rows[R_DET_HDR] = ['Fecha', 'Tipo', 'Categoría', 'Obra', 'Proveedor', 'Descripción', 'Monto ($)'];
     filtered.forEach((mv, i) => {
       rows[R_DET_D0 + i] = [
         mv.fecha       || '',
         mv.tipo === 'ingreso' ? 'Ingreso' : 'Gasto',
         mv.categoria   || '',
+        mv.obra        || '',
         mv.proveedor   || '',
         mv.descripcion || '',
         mv.tipo === 'ingreso' ? (mv.monto || 0) : -(mv.monto || 0)
@@ -795,15 +851,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
 
-    ws['!cols'] = [{ wch: 32 }, { wch: 14 }, { wch: 18 }, { wch: 26 }, { wch: 36 }, { wch: 14 }];
+    ws['!cols'] = [{ wch: 32 }, { wch: 14 }, { wch: 18 }, { wch: 24 }, { wch: 26 }, { wch: 36 }, { wch: 14 }];
 
     ws['!merges'] = [
-      R_TITLE, R_USER, R_PERIODO, R_GEN, R_RESUMEN, R_CAT_TTL, R_DET_TTL
-    ].map(r => ({ s: { r, c: 0 }, e: { r, c: 5 } }));
+      R_TITLE, R_USER, R_PERIODO, R_GEN, R_RESUMEN, R_CAT_TTL, R_OBR_TTL, R_DET_TTL
+    ].map(r => ({ s: { r, c: 0 }, e: { r, c: 6 } }));
 
     ws['!rows'] = [];
     ws['!rows'][R_TITLE]   = { hpt: 22 };
-    ws['!rows'][R_RESUMEN] = ws['!rows'][R_CAT_TTL] = ws['!rows'][R_DET_TTL] = { hpt: 18 };
+    ws['!rows'][R_RESUMEN] = ws['!rows'][R_CAT_TTL] = ws['!rows'][R_OBR_TTL] = ws['!rows'][R_DET_TTL] = { hpt: 18 };
 
     // ─── Estilos (colores en ARGB de 8 chars requerido por xlsx) ────────────────
     const a    = h => 'FF' + h;
@@ -849,7 +905,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       cs(r, 0, { font: { sz: 10, color: { rgb: WHITE } }, fill: solid(MBLUE) })
     );
     // Secciones
-    [R_RESUMEN, R_CAT_TTL, R_DET_TTL].forEach(r =>
+    [R_RESUMEN, R_CAT_TTL, R_OBR_TTL, R_DET_TTL].forEach(r =>
       cs(r, 0, { font: { bold: true, sz: 11, color: { rgb: WHITE } }, fill: solid(MBLUE) })
     );
     // Resumen
@@ -868,15 +924,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Total categorías
     cs(R_CAT_TOT, 0, { font: { bold: true, sz: 10, color: { rgb: RED } }, fill: solid(YELW), border: thin() });
     cs(R_CAT_TOT, 1, numStyle(YELW, RED, true));
+    // Cabecera tabla obras
+    [0, 1].forEach(c => cs(R_OBR_HDR, c, { font: { bold: true, sz: 10, color: { rgb: WHITE } }, fill: solid(TEAL), border: thin(), alignment: { horizontal: c === 1 ? 'right' : 'left' } }));
+    // Filas obras
+    obrasRows.forEach((_, i) => {
+      const bg = i % 2 === 0 ? WHITE : LGRAY;
+      cs(R_OBR_D0 + i, 0, lblStyle(bg));
+      cs(R_OBR_D0 + i, 1, numStyle(bg, RED));
+    });
+    // Total obras
+    cs(R_OBR_TOT, 0, { font: { bold: true, sz: 10, color: { rgb: RED } }, fill: solid(YELW), border: thin() });
+    cs(R_OBR_TOT, 1, numStyle(YELW, RED, true));
     // Cabecera tabla detalle
-    for (let c = 0; c < 6; c++)
-      cs(R_DET_HDR, c, { font: { bold: true, sz: 10, color: { rgb: WHITE } }, fill: solid(TEAL), border: thin(), alignment: { horizontal: c === 5 ? 'right' : 'left' } });
+    for (let c = 0; c < 7; c++)
+      cs(R_DET_HDR, c, { font: { bold: true, sz: 10, color: { rgb: WHITE } }, fill: solid(TEAL), border: thin(), alignment: { horizontal: c === 6 ? 'right' : 'left' } });
     // Filas detalle
     filtered.forEach((mv, i) => {
       const bg = i % 2 === 0 ? WHITE : LGRAY;
       const isI = mv.tipo === 'ingreso';
-      for (let c = 0; c < 6; c++)
-        cs(R_DET_D0 + i, c, c === 5
+      for (let c = 0; c < 7; c++)
+        cs(R_DET_D0 + i, c, c === 6
           ? numStyle(bg, isI ? GREEN : RED)
           : { font: { sz: 10, color: { rgb: '333333' } }, fill: solid(bg), border: thin() });
     });
@@ -905,5 +972,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── Init ────────────────────────────────────────────
   await loadCategorias();
+  await loadObras();
   await loadMovimientos();
 });

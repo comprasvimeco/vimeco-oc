@@ -33,18 +33,20 @@ window.TUTORIALES = {
 
   caja: {
     titulo: 'Cómo usar Caja',
-    version: 1,
+    version: 2,
     slides: [
       { icono: 'dollar', titulo: 'Caja Chica',
         texto: 'Registrá ingresos y egresos. Trabajás mes a mes y el saldo arrastra el excedente del mes anterior.' },
       { icono: 'camera', titulo: 'Cargá un gasto',
-        texto: 'Registrá un egreso adjuntando la foto del ticket. La app recorta los bordes y mejora la imagen para que quede prolija. Completás el monto y la categoría.' },
+        texto: 'Registrá un egreso adjuntando la foto del ticket. La app recorta los bordes y mejora la imagen para que quede prolija. Completás el monto, la categoría y la obra.' },
+      { icono: 'building', titulo: 'Cada gasto va a una obra',
+        texto: 'Elegí a qué obra corresponde el egreso. Es obligatorio: así se sabe cuánto gastó la caja en cada obra. Si el gasto no es de una obra de construcción, imputalo a Taller, Oficina Técnica o Administración - RRHH.' },
       { icono: 'layers', titulo: 'Categorías',
         texto: 'Clasificá cada gasto por categoría para tener el detalle ordenado y facilitar los reportes.' },
       { icono: 'calc', titulo: 'Saldo del mes',
         texto: 'Saldo = excedente anterior + ingresos − egresos del mes. Cambiá de mes para revisar cada período.' },
       { icono: 'plus', titulo: 'Ingresos',
-        texto: 'Cuando te entregan plata para la caja, registralo como ingreso con el monto que recibiste. Así el saldo refleja lo que tenés disponible.' },
+        texto: 'Cuando te entregan plata para la caja, registralo como ingreso con la fecha en que lo recibiste y el monto. Así el saldo refleja lo que tenés disponible.' },
       { icono: 'folder', titulo: 'Todo va a Drive',
         texto: 'Cada movimiento sincroniza un Excel y las fotos a Google Drive automáticamente.' },
     ],
