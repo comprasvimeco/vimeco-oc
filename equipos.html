@@ -21,6 +21,17 @@
     .eq-row--inactive { opacity:.55; }
     .eq-code { font-weight:700; color:var(--gray-800); font-size:.95rem; white-space:nowrap; flex-shrink:0; }
     .eq-tipo { color:var(--gray-500); font-size:.88rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .eq-ubic { flex-shrink:0; display:inline-flex; align-items:center; gap:.25rem; font-size:.76rem; font-weight:600;
+      color:var(--primary); background:var(--gray-100); border-radius:999px; padding:.16rem .55rem;
+      max-width:42%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .eq-ubic svg { width:12px; height:12px; flex-shrink:0; }
+    .eq-ubic--none { color:var(--gray-400); font-weight:500; background:transparent; padding-left:0; padding-right:0; }
+    .eq-search { position:relative; margin:.25rem 0 .6rem; }
+    .eq-search svg { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--gray-400); pointer-events:none; }
+    .eq-search input { padding-left:2.15rem; }
+    .eq-filter-bar { display:flex; align-items:center; gap:.5rem; margin:.25rem 0 .9rem; }
+    .eq-filter-bar label { font-size:.85rem; color:var(--gray-600); flex-shrink:0; }
+    .eq-filter-bar select { max-width:340px; }
     .eq-row .u-badge { flex-shrink:0; }
     .eq-chev { color:var(--gray-300); flex-shrink:0; display:flex; }
     .eq-chev svg { width:20px; height:20px; }
@@ -50,6 +61,16 @@
         <button class="btn btn-secondary btn-sm hidden" id="btn-seed">Importar lista inicial</button>
         <button class="btn btn-primary btn-sm" id="btn-add-equipo">+ Agregar equipo</button>
       </div>
+    </div>
+    <div class="eq-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="buscar-equipo" class="form-control" placeholder="Buscar por código o tipo…" autocomplete="off">
+    </div>
+    <div class="eq-filter-bar">
+      <label for="filtro-obra">Ubicación</label>
+      <select id="filtro-obra" class="form-control">
+        <option value="">Todas las ubicaciones</option>
+      </select>
     </div>
     <div id="equipos-list" class="eq-list">
       <div class="hist-loading">Cargando equipos…</div>

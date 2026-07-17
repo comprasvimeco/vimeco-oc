@@ -138,20 +138,34 @@ function equipoKey(codigo) {
 }
 
 let allEquipos = [];
+let obrasMap   = {};   // key de obra → nombre (para mostrar la ubicación)
+
+const PIN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+
+function ubicChip(e) {
+  if (!e.ubicacion) return '<span class="eq-ubic eq-ubic--none">Sin ubicación</span>';
+  const nombre = obrasMap[e.ubicacion] || 'Obra dada de baja';
+  return `<span class="eq-ubic" title="${esc(nombre)}">${PIN_SVG}${esc(nombre)}</span>`;
+}
 
 function renderEquipos(list) {
   const container = $('equipos-list');
   const seedBtn   = $('btn-seed');
-  if (!list.length) {
+  if (!allEquipos.length) {
     container.innerHTML = '<div class="hist-empty">No hay equipos cargados.</div>';
     seedBtn.classList.remove('hidden');
     return;
   }
   seedBtn.classList.add('hidden');
+  if (!list.length) {
+    container.innerHTML = '<div class="hist-empty">No se encontraron equipos.</div>';
+    return;
+  }
   container.innerHTML = list.map(e => `
     <div class="eq-row ${e.activo ? '' : 'eq-row--inactive'}" title="Abrir ficha">
       <span class="eq-code">${esc(e.codigo)}</span>
       <span class="eq-tipo">${esc(e.tipo || '')}</span>
+      ${ubicChip(e)}
       ${e.activo ? '' : '<span class="u-badge u-badge-inactivo">Inactivo</span>'}
       <span class="eq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
     </div>
@@ -161,14 +175,46 @@ function renderEquipos(list) {
     row.addEventListener('click', () => openFicha(list[i].key)));
 }
 
+// Filtro por ubicación: solo muestra obras que tienen al menos un equipo.
+function populateFilter() {
+  const sel    = $('filtro-obra');
+  const usadas = new Set(allEquipos.map(e => e.ubicacion).filter(Boolean));
+  const opts   = Object.entries(obrasMap)
+    .filter(([k]) => usadas.has(k))
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  let html = '<option value="">Todas las ubicaciones</option>';
+  html += opts.map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join('');
+  if (allEquipos.some(e => !e.ubicacion)) html += '<option value="__none">Sin asignar</option>';
+  sel.innerHTML = html;
+}
+
+function applyFilter() {
+  const v = $('filtro-obra').value;
+  const q = ($('buscar-equipo').value || '').trim().toLowerCase();
+  let list = allEquipos;
+  if (v === '__none')  list = list.filter(e => !e.ubicacion);
+  else if (v)          list = list.filter(e => e.ubicacion === v);
+  if (q) list = list.filter(e =>
+    (e.codigo || '').toLowerCase().includes(q) ||
+    (e.tipo   || '').toLowerCase().includes(q));
+  renderEquipos(list);
+}
+
 function openFicha(key) {
   window.location.href = 'equipo.html?key=' + encodeURIComponent(key);
 }
 
 async function loadEquipos() {
   try {
-    allEquipos = await getAllEquipos();
-    renderEquipos(allEquipos);
+    const [equipos, obras] = await Promise.all([
+      getAllEquipos(),
+      getAllObras().catch(() => [])
+    ]);
+    allEquipos = equipos;
+    obrasMap = {};
+    obras.forEach(o => { obrasMap[o.key] = o.nombre; });
+    populateFilter();
+    applyFilter();
   } catch (_) {
     $('equipos-list').innerHTML = '<div class="hist-empty">Error al cargar equipos.</div>';
   }
@@ -264,6 +310,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
   $('btn-add-equipo').addEventListener('click', openAddModal);
   $('btn-seed').addEventListener('click', seedEquipos);
+  $('filtro-obra').addEventListener('change', applyFilter);
+  $('buscar-equipo').addEventListener('input', applyFilter);
   $('modal-equipo-close').addEventListener('click',  () => $('modal-equipo').classList.add('hidden'));
   $('modal-equipo-cancel').addEventListener('click', () => $('modal-equipo').classList.add('hidden'));
   $('modal-equipo-save').addEventListener('click', saveEquipoModal);

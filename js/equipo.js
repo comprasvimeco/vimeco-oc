@@ -58,6 +58,7 @@ function compressImage(file, maxDim = 1000, quality = 0.7) {
 // ---- Estado ----
 let currentKey = null;
 let equipo     = null;   // datos del equipo cargado
+let obras      = [];     // obras para el selector de ubicación
 let fotoActual = null;   // dataURL guardado en Firebase (para saber si cambió)
 let fotoNueva  = null;   // dataURL elegido en esta sesión (null = sin cambios)
 let fotoQuitar = false;  // se pidió borrar la foto
@@ -156,6 +157,23 @@ async function habilitarEdicionDatos() {
   if (ok) setDatosEditables(true);
 }
 
+// ---- Ubicación ----
+// La ubicación se guarda como referencia (key de la obra), no como texto: así
+// el día que las obras tengan coordenadas el mapa sale directo, sin migrar datos.
+function pintarUbicacion() {
+  const sel     = $('eq-ubicacion');
+  const actual  = equipo.ubicacion || '';
+  const activas = obras.filter(o => o.activa);
+  // Si la obra actual ya no está activa (se cerró), incluirla igual para no perderla.
+  const extra = actual && !activas.some(o => o.key === actual)
+    ? obras.filter(o => o.key === actual)
+    : [];
+  const opts = [...activas, ...extra].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  sel.innerHTML = '<option value="">Sin asignar</option>' +
+    opts.map(o => `<option value="${esc(o.key)}">${esc(o.nombre)}</option>`).join('');
+  sel.value = actual;
+}
+
 // ---- Repuestos ----
 function addItemRow(valor = '') {
   const row = document.createElement('div');
@@ -202,10 +220,12 @@ async function loadFicha() {
       return;
     }
     fotoActual = await getEquipoFoto(currentKey).catch(() => null);
+    obras      = await getAllObras().catch(() => []);
 
     $('eq-codigo').value = equipo.codigo || '';
     $('eq-tipo').value   = equipo.tipo || '';
     pintarEstado();
+    pintarUbicacion();
 
     (equipo.items || []).forEach(it => addItemRow(it));
     refreshItemsEmpty();
@@ -222,11 +242,12 @@ async function loadFicha() {
 
 // ---- Guardar ----
 async function save() {
-  const codigo = $('eq-codigo').value.trim();
-  const tipo   = $('eq-tipo').value.trim();
-  const activo = equipo.activo !== false;
-  const items  = collectItems();
-  const errEl  = $('eq-error');
+  const codigo    = $('eq-codigo').value.trim();
+  const tipo      = $('eq-tipo').value.trim();
+  const activo    = equipo.activo !== false;
+  const ubicacion = $('eq-ubicacion').value || null;
+  const items     = collectItems();
+  const errEl     = $('eq-error');
   errEl.classList.add('hidden');
 
   if (!codigo) {
@@ -252,13 +273,13 @@ async function save() {
         return;
       }
       await saveEquipo(newKey, {
-        codigo, tipo, activo, items,
+        codigo, tipo, activo, ubicacion, items,
         creadoEn: equipo.creadoEn || Date.now()
       });
       await deleteEquipo(currentKey);
       keyFinal = newKey;
     } else {
-      await patchEquipo(currentKey, { codigo, tipo, activo, items });
+      await patchEquipo(currentKey, { codigo, tipo, activo, ubicacion, items });
     }
 
     // Foto
@@ -280,7 +301,7 @@ async function save() {
       return;
     }
     // Refrescar estado local
-    equipo = { key: keyFinal, codigo, tipo, activo, items, creadoEn: equipo.creadoEn };
+    equipo = { key: keyFinal, codigo, tipo, activo, ubicacion, items, creadoEn: equipo.creadoEn };
     if (fotoNueva) fotoActual = fotoNueva;
     else if (fotoQuitar) fotoActual = null;
     fotoNueva = null; fotoQuitar = false;
@@ -315,7 +336,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('hdr-name').textContent = name || '—';
   $('btn-back').addEventListener('click', () => { window.location.href = 'equipos.html'; });
   $('btn-foto').addEventListener('click', () => $('eq-file').click());
+  $('btn-foto-cam').addEventListener('click', () => $('eq-file-cam').click());
   $('eq-file').addEventListener('change', onFotoElegida);
+  $('eq-file-cam').addEventListener('change', onFotoElegida);
   $('btn-foto-del').addEventListener('click', onQuitarFoto);
   $('btn-edit-datos').addEventListener('click', habilitarEdicionDatos);
   $('btn-toggle-activo').addEventListener('click', toggleActivo);

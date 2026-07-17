@@ -21,8 +21,8 @@
     }
     .eq-foto img { width:100%; height:100%; object-fit:cover; }
     .eq-foto svg { width:56px; height:56px; }
-    .eq-foto-actions { display:flex; gap:.5rem; }
-    #eq-file { display:none; }
+    .eq-foto-actions { display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center; }
+    #eq-file, #eq-file-cam { display:none; }
 
     /* Ficha (campos) */
     .eq-card { background:#fff; border:1px solid var(--gray-200); border-radius:12px; padding:1rem 1.1rem; margin-bottom:1rem; }
@@ -70,7 +70,12 @@
         </svg>
       </div>
       <input type="file" id="eq-file" accept="image/*">
+      <input type="file" id="eq-file-cam" accept="image/*" capture="environment">
       <div class="eq-foto-actions">
+        <button class="btn btn-sm btn-outline" id="btn-foto-cam">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Sacar foto
+        </button>
         <button class="btn btn-sm btn-outline" id="btn-foto">Agregar foto</button>
         <button class="btn btn-sm btn-danger" id="btn-foto-del" style="display:none">Quitar</button>
       </div>
@@ -93,6 +98,17 @@
       <div class="eq-estado-row">
         <span class="eq-estado-lbl">Estado: <span id="eq-estado-badge" class="u-badge">—</span></span>
         <button class="btn btn-sm" id="btn-toggle-activo">—</button>
+      </div>
+    </div>
+
+    <!-- Ubicación -->
+    <div class="eq-card">
+      <h2>Ubicación actual</h2>
+      <div class="form-group u-mb-0" style="margin-top:.75rem">
+        <label for="eq-ubicacion">Obra donde se encuentra</label>
+        <select id="eq-ubicacion" class="form-control">
+          <option value="">Sin asignar</option>
+        </select>
       </div>
     </div>
 
