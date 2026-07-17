@@ -149,28 +149,20 @@ function renderEquipos(list) {
   }
   seedBtn.classList.add('hidden');
   container.innerHTML = list.map(e => `
-    <div class="user-card ${e.activo ? '' : 'user-card--inactive'}">
-      <div class="user-card-info eq-open u-pointer" title="Abrir ficha">
+    <div class="user-card eq-open u-pointer ${e.activo ? '' : 'user-card--inactive'}" title="Abrir ficha">
+      <div class="user-card-info">
         <span class="user-card-name">${esc(e.codigo)}</span>
         ${e.tipo ? `<span style="font-size:.8rem;color:var(--gray-500);">${esc(e.tipo)}</span>` : ''}
         <span class="u-badge ${e.activo ? 'u-badge-activo' : 'u-badge-inactivo'}">${e.activo ? 'Activo' : 'Inactivo'}</span>
       </div>
       <div class="user-card-actions">
-        <button class="btn btn-sm btn-outline eq-open">Abrir ficha</button>
-        <button class="btn btn-sm ${e.activo ? 'btn-danger' : 'btn-success'} btn-toggle-eq">
-          ${e.activo ? 'Desactivar' : 'Activar'}
-        </button>
+        <button class="btn btn-sm btn-outline">Abrir ficha</button>
       </div>
     </div>
   `).join('');
 
-  container.querySelectorAll('.user-card').forEach((card, i) => {
-    const e = list[i];
-    card.querySelectorAll('.eq-open').forEach(el =>
-      el.addEventListener('click', () => openFicha(e.key)));
-    card.querySelector('.btn-toggle-eq').addEventListener('click', () =>
-      toggleActivo(e.key, e.activo, e.codigo));
-  });
+  container.querySelectorAll('.eq-open').forEach((card, i) =>
+    card.addEventListener('click', () => openFicha(list[i].key)));
 }
 
 function openFicha(key) {
@@ -232,23 +224,6 @@ async function saveEquipoModal() {
     saveBtn.textContent = 'Guardar';
   }
 }
-
-window.toggleActivo = async function (key, activo, codigo) {
-  const ok = await showConfirm(
-    activo ? 'Desactivar equipo' : 'Activar equipo',
-    activo
-      ? `¿Desactivar "${codigo}"? No aparecerá al asignar equipos en nuevas OC.`
-      : `¿Activar "${codigo}"?`
-  );
-  if (!ok) return;
-  try {
-    await patchEquipo(key, { activo: !activo });
-    showToast(`Equipo ${activo ? 'desactivado' : 'activado'}.`);
-    await loadEquipos();
-  } catch (_) {
-    showToast('Error al actualizar el equipo.', 'error');
-  }
-};
 
 async function seedEquipos() {
   const ok = await showConfirm(

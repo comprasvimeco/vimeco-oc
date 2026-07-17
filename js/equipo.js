@@ -72,9 +72,9 @@ function pintarFoto(dataURL) {
   } else {
     box.innerHTML = `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="5" width="18" height="14" rx="2"/>
-        <circle cx="8.5" cy="10" r="1.5"/>
-        <path d="M21 17l-5-5-4 4-2-2-7 7"/>
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
       </svg>`;
     $('btn-foto').textContent = 'Agregar foto';
     $('btn-foto-del').style.display = 'none';
@@ -99,6 +99,61 @@ function onQuitarFoto() {
   fotoNueva  = null;
   fotoQuitar = true;
   pintarFoto(null);
+}
+
+// ---- Estado (activo / inactivo) ----
+function pintarEstado() {
+  const activo = equipo.activo !== false;
+  const badge  = $('eq-estado-badge');
+  badge.textContent = activo ? 'Activo' : 'Inactivo';
+  badge.className   = 'u-badge ' + (activo ? 'u-badge-activo' : 'u-badge-inactivo');
+  const btn = $('btn-toggle-activo');
+  btn.textContent = activo ? 'Desactivar' : 'Activar';
+  btn.className   = 'btn btn-sm ' + (activo ? 'btn-danger' : 'btn-success');
+}
+
+async function toggleActivo() {
+  const activo = equipo.activo !== false;
+  const ok = await showConfirm(
+    activo ? 'Desactivar equipo' : 'Activar equipo',
+    activo
+      ? `¿Desactivar "${equipo.codigo}"? No aparecerá al asignar equipos en nuevas OC.`
+      : `¿Activar "${equipo.codigo}"?`
+  );
+  if (!ok) return;
+  const btn = $('btn-toggle-activo');
+  btn.disabled = true;
+  try {
+    await patchEquipo(currentKey, { activo: !activo });
+    equipo.activo = !activo;
+    pintarEstado();
+    showToast(`Equipo ${activo ? 'desactivado' : 'activado'}.`);
+  } catch (_) {
+    showToast('Error al actualizar el estado.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---- Edición protegida de código / descripción ----
+let editandoDatos = false;
+
+function setDatosEditables(on) {
+  editandoDatos = on;
+  $('eq-codigo').readOnly = !on;
+  $('eq-tipo').readOnly   = !on;
+  $('btn-edit-datos').textContent = on ? 'Editando…' : 'Editar';
+  $('btn-edit-datos').disabled = on;
+  if (on) $('eq-codigo').focus();
+}
+
+async function habilitarEdicionDatos() {
+  if (editandoDatos) return;
+  const ok = await showConfirm(
+    'Editar datos del equipo',
+    'Vas a habilitar la edición del código y la descripción. Cambiar el código renombra el equipo. ¿Continuar?'
+  );
+  if (ok) setDatosEditables(true);
 }
 
 // ---- Repuestos ----
@@ -148,9 +203,9 @@ async function loadFicha() {
     }
     fotoActual = await getEquipoFoto(currentKey).catch(() => null);
 
-    $('eq-codigo').value  = equipo.codigo || '';
-    $('eq-tipo').value    = equipo.tipo || '';
-    $('eq-activo').checked = equipo.activo !== false;
+    $('eq-codigo').value = equipo.codigo || '';
+    $('eq-tipo').value   = equipo.tipo || '';
+    pintarEstado();
 
     (equipo.items || []).forEach(it => addItemRow(it));
     refreshItemsEmpty();
@@ -169,7 +224,7 @@ async function loadFicha() {
 async function save() {
   const codigo = $('eq-codigo').value.trim();
   const tipo   = $('eq-tipo').value.trim();
-  const activo = $('eq-activo').checked;
+  const activo = equipo.activo !== false;
   const items  = collectItems();
   const errEl  = $('eq-error');
   errEl.classList.add('hidden');
@@ -229,6 +284,7 @@ async function save() {
     if (fotoNueva) fotoActual = fotoNueva;
     else if (fotoQuitar) fotoActual = null;
     fotoNueva = null; fotoQuitar = false;
+    setDatosEditables(false);
     document.querySelector('.header-title').textContent = codigo;
   } catch (_) {
     errEl.textContent = 'Error al guardar. Intentá de nuevo.';
@@ -261,6 +317,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-foto').addEventListener('click', () => $('eq-file').click());
   $('eq-file').addEventListener('change', onFotoElegida);
   $('btn-foto-del').addEventListener('click', onQuitarFoto);
+  $('btn-edit-datos').addEventListener('click', habilitarEdicionDatos);
+  $('btn-toggle-activo').addEventListener('click', toggleActivo);
   $('btn-add-item').addEventListener('click', () => addItemRow().querySelector('input').focus());
   $('btn-save').addEventListener('click', save);
 
