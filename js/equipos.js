@@ -261,9 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!allowed) { window.location.href = 'menu.html'; return; }
 
   $('hdr-name').textContent = name || '—';
-  $('btn-back').addEventListener('click', () => {
-    window.location.href = code === '0000' ? 'administracion.html' : 'menu.html';
-  });
+  $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
   $('btn-add-equipo').addEventListener('click', openAddModal);
   $('btn-seed').addEventListener('click', seedEquipos);
   $('modal-equipo-close').addEventListener('click',  () => $('modal-equipo').classList.add('hidden'));

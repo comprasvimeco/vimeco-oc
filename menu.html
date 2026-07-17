@@ -134,6 +134,8 @@
     // Administración: solo super-admin (0000).
     if (_s.codigo === '0000') {
       document.getElementById('menu-card-admin').style.display = '';
+      // Equipos: el admin lo ve en el menú igual que un Jefe de Taller.
+      document.getElementById('menu-card-equipos').style.display = '';
     }
 
     // Autorizaciones: visible para cualquier usuario con OC pendientes de su firma.
