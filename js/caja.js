@@ -68,11 +68,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Anima un número desde su valor actual hasta `to` (con formato de monto firmado:
   // los tableros de arriba son los únicos que muestran totales que pueden dar negativo)
   const _countTimers = new WeakMap();
-  function countUp(el, to) {
+  // Achica la fuente del saldo hero si el número (con separadores) no entra en una sola línea.
+  function fitSaldoFont(el) {
+    el.style.fontSize = '';
+    const avail = el.clientWidth;
+    if (!avail) return;
+    const ratio = avail / el.scrollWidth;
+    if (ratio < 1) {
+      const natural = parseFloat(getComputedStyle(el).fontSize);
+      const min = 22; // px, piso legible
+      el.style.fontSize = Math.max(min, Math.floor(natural * ratio * 0.97)) + 'px';
+    }
+  }
+
+  function countUp(el, to, fit) {
     if (!el) return;
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const from = el._cuVal || 0;
-    if (reduce || from === to) { el.textContent = fmtSaldo(to); el._cuVal = to; return; }
+    if (reduce || from === to) {
+      el.textContent = fmtSaldo(to); el._cuVal = to;
+      if (fit) fitSaldoFont(el);
+      return;
+    }
     if (_countTimers.has(el)) cancelAnimationFrame(_countTimers.get(el));
     const dur = 650, t0 = performance.now();
     const step = (now) => {
@@ -80,7 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const eased = 1 - Math.pow(1 - p, 3);          // easeOutCubic
       el.textContent = fmtSaldo(from + (to - from) * eased);
       if (p < 1) { _countTimers.set(el, requestAnimationFrame(step)); }
-      else { el.textContent = fmtSaldo(to); el._cuVal = to; }
+      else { el.textContent = fmtSaldo(to); el._cuVal = to; if (fit) fitSaldoFont(el); }
     };
     _countTimers.set(el, requestAnimationFrame(step));
   }
@@ -288,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     countUp(document.getElementById('val-ingresos'), totalIngresos);
     countUp(document.getElementById('val-gastos'),   totalGastos);
     const valSaldoEl = document.getElementById('val-saldo');
-    countUp(valSaldoEl, saldo);
+    countUp(valSaldoEl, saldo, true);
     valSaldoEl.classList.toggle('neg', saldo < 0);
 
     const elEmpty = document.getElementById('movimientos-empty');

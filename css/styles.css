@@ -797,7 +797,7 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
 .caja-hero::before { content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(56,189,248,.45), transparent 70%); top: -120px; right: -60px; animation: floatBlob 9s ease-in-out infinite; pointer-events: none; }
 .caja-hero::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--grad-gold); }
 .caja-hero-label { font-size: .72rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: rgba(255,255,255,.75); margin-bottom: .35rem; }
-.caja-hero-saldo { font-size: clamp(3rem, 12vw, 4.6rem); font-weight: 800; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; line-height: 1.02; letter-spacing: -.02em; text-shadow: 0 2px 16px rgba(0,0,0,.28); }
+.caja-hero-saldo { font-size: clamp(3rem, 12vw, 4.6rem); font-weight: 800; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; line-height: 1.02; letter-spacing: -.02em; text-shadow: 0 2px 16px rgba(0,0,0,.28); white-space: nowrap; overflow: hidden; }
 .caja-hero-saldo.neg { color: #fecaca; }
 
 /* ---- CAJA: 3 líneas resumen (excedente / ingresos / egresos) ---- */
