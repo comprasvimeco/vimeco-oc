@@ -8,6 +8,24 @@
   <link rel="icon" type="image/png" href="icono_app.png">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
+  <style>
+    .eq-list { display:flex; flex-direction:column; gap:.4rem; }
+    .eq-row {
+      display:flex; align-items:center; gap:.65rem;
+      background:#fff; border:1px solid var(--gray-200); border-radius:10px;
+      padding:.7rem .9rem; cursor:pointer;
+      transition: border-color .15s, box-shadow .15s, transform .05s;
+    }
+    .eq-row:hover { border-color:var(--primary); box-shadow:0 2px 8px rgba(35,72,112,.10); }
+    .eq-row:active { transform:scale(.995); }
+    .eq-row--inactive { opacity:.55; }
+    .eq-code { font-weight:700; color:var(--gray-800); font-size:.95rem; white-space:nowrap; flex-shrink:0; }
+    .eq-tipo { color:var(--gray-500); font-size:.88rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .eq-row .u-badge { flex-shrink:0; }
+    .eq-chev { color:var(--gray-300); flex-shrink:0; display:flex; }
+    .eq-chev svg { width:20px; height:20px; }
+    .eq-row:hover .eq-chev { color:var(--primary); }
+  </style>
 </head>
 <body>
 
@@ -33,7 +51,7 @@
         <button class="btn btn-primary btn-sm" id="btn-add-equipo">+ Agregar equipo</button>
       </div>
     </div>
-    <div id="equipos-list" class="users-list">
+    <div id="equipos-list" class="eq-list">
       <div class="hist-loading">Cargando equipos…</div>
     </div>
   </div>

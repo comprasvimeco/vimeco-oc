@@ -149,20 +149,16 @@ function renderEquipos(list) {
   }
   seedBtn.classList.add('hidden');
   container.innerHTML = list.map(e => `
-    <div class="user-card eq-open u-pointer ${e.activo ? '' : 'user-card--inactive'}" title="Abrir ficha">
-      <div class="user-card-info">
-        <span class="user-card-name">${esc(e.codigo)}</span>
-        ${e.tipo ? `<span style="font-size:.8rem;color:var(--gray-500);">${esc(e.tipo)}</span>` : ''}
-        <span class="u-badge ${e.activo ? 'u-badge-activo' : 'u-badge-inactivo'}">${e.activo ? 'Activo' : 'Inactivo'}</span>
-      </div>
-      <div class="user-card-actions">
-        <button class="btn btn-sm btn-outline">Abrir ficha</button>
-      </div>
+    <div class="eq-row ${e.activo ? '' : 'eq-row--inactive'}" title="Abrir ficha">
+      <span class="eq-code">${esc(e.codigo)}</span>
+      <span class="eq-tipo">${esc(e.tipo || '')}</span>
+      ${e.activo ? '' : '<span class="u-badge u-badge-inactivo">Inactivo</span>'}
+      <span class="eq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
     </div>
   `).join('');
 
-  container.querySelectorAll('.eq-open').forEach((card, i) =>
-    card.addEventListener('click', () => openFicha(list[i].key)));
+  container.querySelectorAll('.eq-row').forEach((row, i) =>
+    row.addEventListener('click', () => openFicha(list[i].key)));
 }
 
 function openFicha(key) {
