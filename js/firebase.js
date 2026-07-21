@@ -135,6 +135,14 @@
     }).catch(() => {});
   };
 
+  // Borra una entrada del índice de proveedores vistos (se rearma solo con la
+  // próxima OC). Se usa al migrar la key por cambio de CUIT para no dejar la copia
+  // vieja resurgiendo como sugerencia duplicada.
+  window.deleteProveedorSeen = async function (key) {
+    const resp = await fetch(_base() + '/proveedores/' + key + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
   window.getProveedores = async function () {
     const resp = await fetch(_base() + '/proveedores.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -143,7 +151,11 @@
     return Object.values(data).filter(p => p && p.nombre);
   };
 
-  // Base maestra de proveedores (importada del ERP) — solo lectura desde la app.
+  // Base maestra de proveedores (importada del ERP). Editable desde la app con
+  // confirmación (ver saveProveedorToBase en app.js).
+  // Preserva la key del nodo en `_key`: es la identidad canónica del proveedor
+  // (siempre `cuit_<dígitos>`), aun si el campo `cuit` interno quedó desalineado
+  // por una edición manual en la consola.
   // Defensiva: si el nodo no existe o no hay permiso, devuelve [] y la app sigue igual.
   window.getProveedoresBase = async function () {
     try {
@@ -151,8 +163,26 @@
       if (!resp.ok) return [];
       const data = await resp.json();
       if (!data) return [];
-      return Object.values(data).filter(p => p && p.nombre);
+      return Object.entries(data)
+        .filter(([, p]) => p && p.nombre)
+        .map(([k, p]) => ({ ...p, _key: k }));
     } catch (_) { return []; }
+  };
+
+  // Escribe (crea o pisa) un proveedor en la base maestra bajo la key dada.
+  window.saveProveedorBase = async function (key, obj) {
+    const resp = await fetch(_base() + '/proveedores_base/' + key + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(obj)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  // Borra un nodo de la base maestra (se usa al migrar la key por cambio de CUIT).
+  window.deleteProveedorBase = async function (key) {
+    const resp = await fetch(_base() + '/proveedores_base/' + key + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 
   // Busca un proveedor en la base por CUIT (normalizado a dígitos). null si no está.

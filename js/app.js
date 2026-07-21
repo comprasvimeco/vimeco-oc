@@ -715,6 +715,10 @@ async function setupEquipoCombo() {
 }
 
 // ---- Caché y autocompletado de proveedores ----
+// CUIT (solo dígitos) con el que se cargó el proveedor actual desde la caché/base.
+// Sirve para detectar un cambio de CUIT al guardar en la base (migración de key).
+let _loadedProvCuit = null;
+
 // Une la base maestra (/proveedores_base, prioritaria) con los proveedores
 // vistos en OC (/proveedores). Excluye inactivos de las sugerencias.
 async function buildProveedoresCache() {
@@ -726,9 +730,22 @@ async function buildProveedoresCache() {
     const d = (p.cuit || '').replace(/\D/g, '');
     return d.length >= 10 ? 'c' + d : 'n' + (p.nombre || '').toLowerCase();
   };
+  // Identidad de un proveedor de la base: la key del nodo (`cuit_<dígitos>`), no el
+  // campo `cuit`. Si una edición manual desalineó el campo respecto de la key, así
+  // el registro sigue matcheando al proveedor visto y no se parte en dos.
+  const baseKeyOf = p => {
+    const kd = (p._key || '').replace(/\D/g, '');
+    return kd.length >= 10 ? 'c' + kd : keyOf(p);
+  };
   const byKey = new Map();
   seen.forEach(p => { if (p && p.nombre) byKey.set(keyOf(p), p); });
-  base.forEach(p => { if (p && p.nombre && !p.inactivo) byKey.set(keyOf(p), p); }); // la base pisa
+  base.forEach(p => {                          // la base pisa
+    if (!(p && p.nombre && !p.inactivo)) return;
+    const bk = baseKeyOf(p);
+    byKey.set(bk, p);
+    const ck = keyOf(p);                        // limpia el duplicado visto si el campo
+    if (ck !== bk) byKey.delete(ck);            // cuit no coincide con la key del nodo
+  });
   return [...byKey.values()];
 }
 
@@ -792,6 +809,8 @@ function applyProveedorBase(p) {
   if (p.telefonos)    $('telefonos-proveedor').value     = p.telefonos;
   if (p.condicionIVA) $('condicion-iva-proveedor').value = p.condicionIVA;
   if (p.condicionPago && !$('condicion-pago').value) $('condicion-pago').value = p.condicionPago;
+  // Identidad canónica: la key del nodo si la conocemos, si no el campo cuit.
+  _loadedProvCuit = ((p._key || p.cuit || '').replace(/\D/g, '')) || null;
 }
 
 // Cruza con la base: 1°) por CUIT (confiable), 2°) por nombre (presupuestos
@@ -844,6 +863,7 @@ function setupProveedorCombo() {
     $('telefonos-proveedor').value      = p.telefonos       || '';
     $('condicion-iva-proveedor').value  = p.condicionIVA    || '';
     if (p.condicionPago) $('condicion-pago').value = p.condicionPago;
+    _loadedProvCuit = ((p._key || p.cuit || '').replace(/\D/g, '')) || null;
   }
 
   function buildOptions(query) {
@@ -879,6 +899,110 @@ function setupProveedorCombo() {
 
   // Al tipear/pegar un CUIT, buscarlo en la base maestra (prioridad de base)
   $('cuit-proveedor').addEventListener('change', () => enrichFromBase({ notify: true }));
+
+  // Guardar/corregir el proveedor en la base maestra desde la app.
+  const btnSave = $('btn-save-proveedor-base');
+  if (btnSave) {
+    btnSave.innerHTML = icSvg('edit') + ' Guardar en base';
+    btnSave.addEventListener('click', saveProveedorToBase);
+    // Mostrar el botón solo cuando el usuario edita algún dato del proveedor.
+    // Los autocompletados setean .value por código y no disparan 'input', así que
+    // el botón queda oculto hasta que hay una edición manual real.
+    ['proveedor', 'cuit-proveedor', 'nombre-proveedor', 'domicilio-proveedor',
+     'telefonos-proveedor', 'condicion-iva-proveedor']
+      .forEach(id => $(id).addEventListener('input', () => btnSave.classList.remove('hidden')));
+  }
+}
+
+// Oculta el botón "Guardar en base" (sin ediciones pendientes).
+function hideSaveProvBtn() {
+  const b = $('btn-save-proveedor-base');
+  if (b) b.classList.add('hidden');
+}
+
+// Modal de confirmación genérico (promesa). `okLabel` personaliza el botón de acción.
+function showConfirm(title, msg, okLabel = 'Aceptar') {
+  return new Promise(resolve => {
+    $('modal-confirm-title').textContent = title;
+    $('modal-confirm-msg').textContent   = msg;
+    const yes   = $('modal-confirm-yes');
+    const no    = $('modal-confirm-no');
+    const modal = $('modal-confirm');
+    yes.textContent = okLabel;
+    modal.classList.remove('hidden');
+    const close = val => { modal.classList.add('hidden'); yes.onclick = no.onclick = null; resolve(val); };
+    no.onclick  = () => close(false);
+    yes.onclick = () => close(true);
+  });
+}
+
+// Formatea 11 dígitos como XX-XXXXXXXX-X (para mostrar en el aviso).
+function _fmtCuit(dig) {
+  const d = (dig || '').replace(/\D/g, '');
+  return d.length === 11 ? `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}` : (dig || '');
+}
+
+// Guarda/corrige el proveedor del formulario en la base maestra (/proveedores_base),
+// con confirmación. Si el CUIT cambió respecto del proveedor cargado, migra la key:
+// crea el nodo bajo la key nueva (cuit_<dígitos>) y borra el viejo.
+async function saveProveedorToBase() {
+  if (typeof saveProveedorBase !== 'function') { toast('No disponible sin conexión.', 'error'); return; }
+
+  const nombre  = $('proveedor').value.trim();
+  const cuitRaw = $('cuit-proveedor').value.trim();
+  const dig     = cuitRaw.replace(/\D/g, '');
+
+  if (!nombre)         { toast('Falta la razón social.', 'error'); revealAndFocus('proveedor'); return; }
+  if (dig.length !== 11) { toast('CUIT inválido (deben ser 11 dígitos): no se puede guardar en la base.', 'error'); revealAndFocus('cuit-proveedor'); return; }
+
+  const newKey = 'cuit_' + dig;
+  const oldDig = (_loadedProvCuit && _loadedProvCuit !== dig) ? _loadedProvCuit : null;
+
+  const [existing, oldNode] = await Promise.all([
+    getProveedorBaseByCuit(cuitRaw).catch(() => null),
+    oldDig ? getProveedorBaseByCuit(oldDig).catch(() => null) : Promise.resolve(null)
+  ]);
+  const migrating = !!(oldDig && oldNode);
+
+  const record = {
+    nombre,
+    cuit:          cuitRaw,
+    codigoInterno: $('codigo-interno-proveedor').value.trim(),
+    domicilio:     $('domicilio-proveedor').value.trim(),
+    telefonos:     $('telefonos-proveedor').value.trim(),
+    condicionIVA:  $('condicion-iva-proveedor').value.trim()
+  };
+  const contacto = $('nombre-proveedor').value.trim();
+  if (contacto) record.nombre_contacto = contacto;
+  const cpago = $('condicion-pago').value.trim();
+  if (cpago) record.condicionPago = cpago;
+
+  // Preservar campos que el formulario no edita (localidad, provincia, cp, inactivo).
+  const prev = migrating ? oldNode : (existing || {});
+  ['localidad', 'provincia', 'cp'].forEach(f => { if (prev[f]) record[f] = prev[f]; });
+  if (prev.inactivo) record.inactivo = prev.inactivo;
+
+  let msg;
+  if (migrating)     msg = `Vas a cambiar el CUIT de "${nombre}".\nSe moverá el registro de ${_fmtCuit(oldDig)} a ${cuitRaw} en la base de proveedores.`;
+  else if (existing) msg = `Vas a actualizar los datos de "${nombre}" (CUIT ${cuitRaw}) en la base de proveedores.`;
+  else               msg = `Vas a agregar "${nombre}" (CUIT ${cuitRaw}) a la base de proveedores.`;
+
+  if (!await showConfirm('Guardar proveedor en la base', msg, 'Guardar')) return;
+
+  try {
+    await saveProveedorBase(newKey, record);
+    if (migrating) {
+      try { await deleteProveedorBase('cuit_' + oldDig); } catch (_) {}
+      if (typeof deleteProveedorSeen === 'function') { try { await deleteProveedorSeen('cuit_' + oldDig); } catch (_) {} }
+    }
+    _loadedProvCuit = dig;
+    hideSaveProvBtn();
+    await updateProveedoresCache();
+    toast(migrating ? 'Proveedor guardado y CUIT migrado en la base.' : 'Proveedor guardado en la base.', 'success');
+  } catch (e) {
+    console.warn('saveProveedorToBase:', e);
+    toast('No se pudo guardar en la base. Reintentá.', 'error');
+  }
 }
 
 // ---- Acordeón de secciones (solo mobile) ----
@@ -2006,6 +2130,8 @@ function resetForm() {
    'ref-presupuesto','obra','condicion-pago','plazo-entrega','lugar-entrega','observaciones']
     .forEach(id => { $(id).value = ''; });
   setEquipo(null);
+  _loadedProvCuit = null;
+  hideSaveProvBtn();
   $('condicion-iva-proveedor').value = 'Resp. Inscripto';
 
   items     = [];
