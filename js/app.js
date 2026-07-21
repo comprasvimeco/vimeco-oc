@@ -724,6 +724,7 @@ let _loadedProvCuit = null;
 const PROV_FIELDS = ['proveedor', 'cuit-proveedor', 'nombre-proveedor',
                      'domicilio-proveedor', 'telefonos-proveedor', 'condicion-iva-proveedor'];
 let _provSnapshot = {};
+let _provDirtyWarned = false;   // el aviso "editaste datos" ya se mostró en esta edición
 
 // Une la base maestra (/proveedores_base, prioritaria) con los proveedores
 // vistos en OC (/proveedores). Excluye inactivos de las sugerencias.
@@ -930,6 +931,7 @@ function setupProveedorCombo() {
 function snapshotProvider() {
   _provSnapshot = {};
   PROV_FIELDS.forEach(id => { _provSnapshot[id] = ($(id).value || '').trim(); });
+  _provDirtyWarned = false;
   hideSaveProvBtn();
 }
 
@@ -939,11 +941,21 @@ function provIsDirty() {
 }
 
 // Muestra el botón solo si hay cambios reales y no se está buscando en el desplegable.
+// Si editaste un proveedor que ya venías usando, avisa (una vez) que la OC saldrá
+// con lo cargado y que la base no se toca — sin forzar ninguna recarga.
 function refreshSaveProvBtn() {
   const b = $('btn-save-proveedor-base');
   if (!b) return;
   const buscando = !$('proveedor-dropdown').classList.contains('hidden');
-  b.classList.toggle('hidden', buscando || !provIsDirty());
+  const dirty    = provIsDirty();
+  b.classList.toggle('hidden', buscando || !dirty);
+  if (!dirty) { _provDirtyWarned = false; return; }
+  // Solo avisa si había un proveedor cargado (snapshot con razón social), no al
+  // tipear un proveedor nuevo desde cero.
+  if (!buscando && !_provDirtyWarned && _provSnapshot['proveedor']) {
+    _provDirtyWarned = true;
+    toast('Editaste los datos del proveedor. La OC saldrá con lo que cargaste; la base no se modifica. Usá "Guardar en base" si querés actualizarla.', 'warning');
+  }
 }
 
 // Oculta el botón "Guardar en base".
