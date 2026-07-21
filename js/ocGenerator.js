@@ -39,7 +39,7 @@ const PG = {
 
 // ─── Anchos de columna en mm ─────────────────────────
 const HDR_COLS  = [55.0, 80.0, 55.0];              // sum=190 
-const PROV_COLS = [26.0, 102.0, 22.0, 40.0];       // sum=190
+const PROV_COLS = [29.0, 99.0, 22.0, 40.0];        // sum=190
 const FTR_COLS  = [74.0, 57.0, 59.0];              // sum=190
 
 const HDR_R1H = 20;   // fila 1 — logo + título  (ajustado a datos fiscales)
@@ -139,12 +139,17 @@ function drawHeader(doc, data, y) {
       const maxW = HDR_COLS[0] - pad * 2;
       const maxH = HDR_R1H - 6;
 
+      // Logo real: 400×82 px → relación 82/400 ≈ 0.205. El fallback debe usar
+      // esa relación; con 0.30 el logo salía comprimido de los costados cuando
+      // __logoDims aún no estaba cargado.
+      const LOGO_RATIO = 82 / 400;
       let lw = maxW, lh;
       if (window.__logoDims && window.__logoDims.w) {
         lh = lw * (window.__logoDims.h / window.__logoDims.w);
         if (lh > maxH) { lh = maxH; lw = lh * (window.__logoDims.w / window.__logoDims.h); }
       } else {
-        lh = lw * 0.30;
+        lh = lw * LOGO_RATIO;
+        if (lh > maxH) { lh = maxH; lw = lh / LOGO_RATIO; }
       }
       lw = Math.round(lw * 10) / 10;
       lh = Math.round(lh * 10) / 10;
@@ -266,10 +271,12 @@ function drawProveedorTable(doc, data, y) {
     ry += rowH;
   });
 
-  // Fila 4: Ubicación / Motivo — alto variable según contenido
+  // Fila 4: Ubicación / Motivo — alto variable según contenido.
+  // La etiqueta "Obra / Motivo:" entra en una línea (col izquierda ensanchada).
   const ubicW     = PROV_COLS[1] + PROV_COLS[2] + PROV_COLS[3];
   const ubicLines = doc.splitTextToSize(p.ubicacion || '—', ubicW - 3);
-  const R4H       = Math.max(LINE_H * 2 + 5, ubicLines.length * LINE_H + 5);
+  const R4H       = Math.max(MIN_H, ubicLines.length * LINE_H + 5);
+  const ty4       = ubicLines.length === 1 ? ry + R4H / 2 + 1.5 : ry + 4.5;
 
   fillRect(doc, xs[0], ry, PROV_COLS[0], R4H, C.fondoLogo);
   fillRect(doc, xs[1], ry, ubicW,         R4H, C.blanco);
@@ -278,10 +285,10 @@ function drawProveedorTable(doc, data, y) {
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...C.azul);
-  doc.text('Obra /\nMotivo:', xs[0] + 1.5, ry + 4.5, { lineHeightFactor: 1.4 });
+  doc.text('Obra / Motivo:', xs[0] + 1.5, ty4);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...C.negro);
-  ubicLines.forEach((ln, i) => doc.text(ln, xs[1] + 1.5, ry + 4.5 + i * LINE_H));
+  ubicLines.forEach((ln, i) => doc.text(ln, xs[1] + 1.5, ty4 + i * LINE_H));
   ry += R4H;
 
   // Fila Equipo (solo si hay un equipo asignado a la OC)
