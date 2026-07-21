@@ -719,6 +719,12 @@ async function setupEquipoCombo() {
 // Sirve para detectar un cambio de CUIT al guardar en la base (migración de key).
 let _loadedProvCuit = null;
 
+// Campos del proveedor que se persisten a la base + snapshot del último estado
+// "conocido" (cargado, guardado o vacío) para detectar ediciones reales.
+const PROV_FIELDS = ['proveedor', 'cuit-proveedor', 'nombre-proveedor',
+                     'domicilio-proveedor', 'telefonos-proveedor', 'condicion-iva-proveedor'];
+let _provSnapshot = {};
+
 // Une la base maestra (/proveedores_base, prioritaria) con los proveedores
 // vistos en OC (/proveedores). Excluye inactivos de las sugerencias.
 async function buildProveedoresCache() {
@@ -811,6 +817,7 @@ function applyProveedorBase(p) {
   if (p.condicionPago && !$('condicion-pago').value) $('condicion-pago').value = p.condicionPago;
   // Identidad canónica: la key del nodo si la conocemos, si no el campo cuit.
   _loadedProvCuit = ((p._key || p.cuit || '').replace(/\D/g, '')) || null;
+  snapshotProvider();
 }
 
 // Cruza con la base: 1°) por CUIT (confiable), 2°) por nombre (presupuestos
@@ -864,6 +871,7 @@ function setupProveedorCombo() {
     $('condicion-iva-proveedor').value  = p.condicionIVA    || '';
     if (p.condicionPago) $('condicion-pago').value = p.condicionPago;
     _loadedProvCuit = ((p._key || p.cuit || '').replace(/\D/g, '')) || null;
+    snapshotProvider();
   }
 
   function buildOptions(query) {
@@ -905,16 +913,37 @@ function setupProveedorCombo() {
   if (btnSave) {
     btnSave.innerHTML = icSvg('edit') + ' Guardar en base';
     btnSave.addEventListener('click', saveProveedorToBase);
-    // Mostrar el botón solo cuando el usuario edita algún dato del proveedor.
-    // Los autocompletados setean .value por código y no disparan 'input', así que
-    // el botón queda oculto hasta que hay una edición manual real.
-    ['proveedor', 'cuit-proveedor', 'nombre-proveedor', 'domicilio-proveedor',
-     'telefonos-proveedor', 'condicion-iva-proveedor']
-      .forEach(id => $(id).addEventListener('input', () => btnSave.classList.remove('hidden')));
+    // El botón aparece solo cuando los datos difieren del snapshot (proveedor
+    // cargado/guardado/vacío). Elegir uno del listado toma un snapshot nuevo, así
+    // que no cuenta como edición. Tipear en Razón Social (que es la caja de
+    // búsqueda) no lo muestra mientras el desplegable está abierto.
+    PROV_FIELDS.forEach(id => $(id).addEventListener('input', refreshSaveProvBtn));
+    $('proveedor').addEventListener('blur', () => setTimeout(refreshSaveProvBtn, 200));
+    snapshotProvider();   // estado inicial (form vacío) = limpio
   }
 }
 
-// Oculta el botón "Guardar en base" (sin ediciones pendientes).
+// Fija el estado actual del proveedor como "limpio" (sin cambios pendientes).
+function snapshotProvider() {
+  _provSnapshot = {};
+  PROV_FIELDS.forEach(id => { _provSnapshot[id] = ($(id).value || '').trim(); });
+  hideSaveProvBtn();
+}
+
+// ¿Cambió algún dato del proveedor respecto del snapshot?
+function provIsDirty() {
+  return PROV_FIELDS.some(id => ($(id).value || '').trim() !== (_provSnapshot[id] || ''));
+}
+
+// Muestra el botón solo si hay cambios reales y no se está buscando en el desplegable.
+function refreshSaveProvBtn() {
+  const b = $('btn-save-proveedor-base');
+  if (!b) return;
+  const buscando = !$('proveedor-dropdown').classList.contains('hidden');
+  b.classList.toggle('hidden', buscando || !provIsDirty());
+}
+
+// Oculta el botón "Guardar en base".
 function hideSaveProvBtn() {
   const b = $('btn-save-proveedor-base');
   if (b) b.classList.add('hidden');
@@ -996,7 +1025,7 @@ async function saveProveedorToBase() {
       if (typeof deleteProveedorSeen === 'function') { try { await deleteProveedorSeen('cuit_' + oldDig); } catch (_) {} }
     }
     _loadedProvCuit = dig;
-    hideSaveProvBtn();
+    snapshotProvider();
     await updateProveedoresCache();
     toast(migrating ? 'Proveedor guardado y CUIT migrado en la base.' : 'Proveedor guardado en la base.', 'success');
   } catch (e) {
@@ -2131,8 +2160,8 @@ function resetForm() {
     .forEach(id => { $(id).value = ''; });
   setEquipo(null);
   _loadedProvCuit = null;
-  hideSaveProvBtn();
   $('condicion-iva-proveedor').value = 'Resp. Inscripto';
+  snapshotProvider();
 
   items     = [];
   descuento = { pct: null, monto: 0 };
