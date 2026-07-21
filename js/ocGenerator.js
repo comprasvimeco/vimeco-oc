@@ -307,8 +307,13 @@ function drawProveedorTable(doc, data, y) {
     ry += EQ_H;
   }
 
-  // Fila Observaciones (solo si hay contenido)
-  const obs = (data.observaciones || '').trim();
+  // Fila Observaciones. Si la OC tiene equipo con categoría (Repuestos /
+  // Mantenimiento), se antepone al comentario: "Repuestos ; <texto>". Sin
+  // texto libre queda sólo la categoría. La categoría no se muta en el dato
+  // guardado (sigue en oc.equipo.categoria); se compone acá al renderizar.
+  const obsTxt = (data.observaciones || '').trim();
+  const cat    = (eq && eq.codigo) ? (eq.categoria || '').trim() : '';
+  const obs    = cat ? (obsTxt ? `${cat} ; ${obsTxt}` : cat) : obsTxt;
   if (obs) {
     const obsW     = PROV_COLS[1] + PROV_COLS[2] + PROV_COLS[3];
     const obsLines = doc.splitTextToSize(obs, obsW - 3);
