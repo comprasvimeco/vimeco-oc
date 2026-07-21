@@ -824,6 +824,7 @@ function applyProveedorBase(p) {
 // sin CUIT). Si ninguno coincide, queda como "no cargado". Devuelve true si matcheó.
 async function enrichFromBase(opts = {}) {
   if (typeof getProveedorBaseByCuit !== 'function') return false;
+  const { notify = false, byName = true, quietMissing = false } = opts;
   const cuit   = $('cuit-proveedor').value.trim();
   const nombre = $('proveedor').value.trim();
 
@@ -832,18 +833,20 @@ async function enrichFromBase(opts = {}) {
     try { p = await getProveedorBaseByCuit(cuit); } catch (_) {}
     if (p) via = 'cuit';
   }
-  if (!p) {                       // sin CUIT o CUIT no cargado → probar por nombre
+  // El fallback por nombre solo se usa al importar (extracción): al editar el CUIT
+  // a mano no debe pisar los datos con el proveedor viejo que matchea por nombre.
+  if (!p && byName) {
     p = findProveedorByName(nombre);
     if (p) via = 'nombre';
   }
 
   if (!p) {
-    if (opts.notify) toast('Proveedor no está en la base — sin código interno.', 'warning');
+    if (notify && !quietMissing) toast('Proveedor no está en la base — sin código interno.', 'warning');
     return false;
   }
 
   applyProveedorBase(p);
-  if (opts.notify) {
+  if (notify) {
     if (via === 'cuit')
       toast('Proveedor en base — código ' + (p.codigoInterno || '—') + '.', 'success');
     else
@@ -906,7 +909,7 @@ function setupProveedorCombo() {
   });
 
   // Al tipear/pegar un CUIT, buscarlo en la base maestra (prioridad de base)
-  $('cuit-proveedor').addEventListener('change', () => enrichFromBase({ notify: true }));
+  $('cuit-proveedor').addEventListener('change', () => enrichFromBase({ notify: true, byName: false, quietMissing: true }));
 
   // Guardar/corregir el proveedor en la base maestra desde la app.
   const btnSave = $('btn-save-proveedor-base');
