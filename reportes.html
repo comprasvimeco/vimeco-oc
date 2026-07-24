@@ -58,7 +58,9 @@
     /* ---- KPIs ---- */
     .rep-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .9rem; margin-bottom: 1.25rem; }
     .kpi { position: relative; background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
-      padding: .9rem 1.05rem; box-shadow: var(--shadow-sm); overflow: hidden; }
+      padding: .9rem 1.05rem; box-shadow: var(--shadow-sm); overflow: hidden;
+      transition: transform .15s var(--ease-spring, ease), box-shadow .15s; }
+    .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow, 0 8px 24px -8px rgba(26,58,92,.28)); }
     .kpi::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background: var(--grad-header); }
     .kpi-lbl { font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
     .kpi-val { font-size: 1.35rem; font-weight: 800; color: var(--primary); margin-top: .25rem; line-height: 1.1; word-break: break-word; }
@@ -92,21 +94,27 @@
     @media print { #rep-dup-card { break-inside: avoid; } .rep-dup-del { display: none !important; } }
 
     /* ---- Secciones ---- */
-    /* align-items:start evita que una tarjeta corta se estire al alto de su vecina. */
-    .rep-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
-    .rep-card { grid-column: span 1; margin-bottom: 0; }
-    .rep-card.rep-full { grid-column: 1 / -1; }
+    /* Las tarjetas grandes (hero de análisis) van a ancho completo, apiladas.
+       Los rankings secundarios van en una grilla masonry (columnas que se
+       rellenan por altura) para que no queden huecos al lado de una tarjeta
+       corta — lo que pasaba con "Repuestos vs Mant." al lado de "Gasto Equipo". */
+    .rep-sections { display: flex; flex-direction: column; gap: 1.25rem; }
+    .rep-card { margin-bottom: 0; }
+    .rep-masonry { column-count: 2; column-gap: 1.25rem; }
+    .rep-masonry > .rep-card { break-inside: avoid; display: inline-block; width: 100%;
+      vertical-align: top; margin: 0 0 1.25rem; }
     .rep-card .card-header { background: var(--white); border-bottom: 1px solid var(--gray-200); }
     .rep-card .card-title { font-size: .9rem; }
     .rep-card .card-body { padding: 1rem 1.15rem; }
 
     /* ---- Participación por obra (part-to-whole) ---- */
-    .rep-share-track { display: flex; gap: 2px; height: 26px; border-radius: 6px; overflow: hidden; margin-bottom: .9rem; }
+    .rep-share-track { display: flex; gap: 2px; height: 32px; border-radius: 8px; overflow: hidden; margin-bottom: 1rem;
+      box-shadow: inset 0 1px 2px rgba(17,24,39,.12); }
     .rep-share-seg { min-width: 3px; transition: filter .15s; }
     .rep-share-seg:hover { filter: brightness(1.12); }
-    .rep-share-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .35rem .9rem; }
-    .rep-share-item { display: flex; align-items: center; gap: .45rem; font-size: .8rem; min-width: 0; }
-    .rep-share-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+    .rep-share-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .45rem .9rem; }
+    .rep-share-item { display: flex; align-items: center; gap: .45rem; font-size: .82rem; min-width: 0; }
+    .rep-share-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; box-shadow: 0 1px 2px rgba(17,24,39,.2); }
     .rep-share-lbl { color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
     .rep-share-pct { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
     .rep-share-val { color: var(--gray-500); font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -116,7 +124,7 @@
     .rep-line-svg { display: block; max-width: 100%; }
     .rep-grid { stroke: var(--gray-200); stroke-width: 1; }
     .rep-axis { fill: var(--gray-500); font-size: 10px; font-family: inherit; }
-    .rep-line-svg .rep-line { fill: none; stroke: #2557a7; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .rep-line-svg .rep-line { fill: none; stroke: #2557a7; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
     .rep-dot { fill: #2557a7; stroke: var(--white); stroke-width: 2; }
     .rep-dot-last { fill: var(--accent, #c8a852); }
     .rep-dot-on { r: 5.5; }
@@ -131,28 +139,40 @@
     .rep-tip strong { font-weight: 700; }
     .rep-tip-sub { color: rgba(255,255,255,.65); font-size: .7rem; }
 
-    /* ---- Barras ---- */
-    .rep-bar-row { padding: .55rem .1rem; border-radius: var(--radius); }
+    /* ---- Barras (ranking "heat": color e intensidad por magnitud) ---- */
+    /* Grid [rango | cuerpo]: la pastilla de rango y el cuerpo quedan alineados
+       en todas las filas, sin importar el largo de la etiqueta. */
+    .rep-bar-row { display: grid; grid-template-columns: auto 1fr; gap: .7rem;
+      align-items: start; padding: .6rem .5rem; border-radius: var(--radius); }
     .rep-bar-row + .rep-bar-row { border-top: 1px solid var(--gray-100); }
     .rep-clickable { cursor: pointer; transition: background .12s; }
-    .rep-clickable:hover { background: var(--gray-100); }
-    .rep-open { background: #f7f9fc; }
-    .rep-bar-head { display: flex; align-items: baseline; gap: .55rem; margin-bottom: .3rem; }
-    .rep-bar-rank { font-size: .72rem; font-weight: 700; color: var(--gray-400); min-width: 1.1rem; font-variant-numeric: tabular-nums; }
-    .rep-caret { color: var(--primary-light); display: inline-flex; transition: transform .18s var(--ease-spring, ease); }
+    .rep-clickable:hover { background: #f2f6fb; }
+    .rep-open { background: #f2f6fb; }
+    /* Rango: círculo con borde (sin relleno), número centrado. Estilo único
+       para todas las filas; el degradé queda sólo en la barra. */
+    .rep-bar-rank { width: 24px; height: 24px; border-radius: 50%; display: inline-flex;
+      align-items: center; justify-content: center; font-size: .76rem; font-weight: 700;
+      line-height: 1; font-variant-numeric: tabular-nums; flex: 0 0 auto; margin-top: 1px;
+      color: var(--primary); border: 1.5px solid var(--primary-light); background: transparent; }
+    .rep-bar-body { min-width: 0; }
+    .rep-bar-head { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .4rem; }
+    .rep-caret { color: var(--primary-light); display: inline-flex; flex: 0 0 auto;
+      transition: transform .18s var(--ease-spring, ease); }
     .rep-caret .icon { width: 13px; height: 13px; }
     .rep-open .rep-caret { transform: rotate(90deg); }
-    .rep-bar-label { flex: 1; font-size: .86rem; color: var(--gray-700); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rep-bar-val { font-size: .88rem; font-weight: 800; color: var(--primary); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .rep-bar-track { background: var(--gray-100); border-radius: 999px; height: 8px; overflow: hidden; margin-left: 1.65rem; }
-    .rep-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary-light), var(--primary));
-      animation: repGrow .5s var(--ease-spring, cubic-bezier(.22,1,.36,1)) both; transform-origin: left; }
+    .rep-bar-label { flex: 1; font-size: .9rem; color: var(--gray-800); font-weight: 700;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.01em; }
+    .rep-bar-val { font-size: .98rem; font-weight: 800; color: var(--primary); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .rep-bar-track { background: var(--gray-100); border-radius: 999px; height: 11px; overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(17,24,39,.06); }
+    .rep-bar-fill { height: 100%; border-radius: 999px;
+      animation: repGrow .55s var(--ease-spring, cubic-bezier(.22,1,.36,1)) both; transform-origin: left; }
     @keyframes repGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
     @media (prefers-reduced-motion: reduce) { .rep-bar-fill { animation: none; } }
-    .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .25rem; margin-left: 1.65rem; }
+    .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .3rem; font-variant-numeric: tabular-nums; }
 
     /* ---- Drill-down: cada OC abre su ficha ---- */
-    .rep-drill { margin: .6rem 0 .2rem 1.65rem; border-left: 2px solid var(--gray-200); padding-left: .7rem; }
+    .rep-drill { margin: .7rem 0 .2rem; border-left: 2px solid var(--gray-200); padding-left: .7rem; }
     .rep-oc { display: grid; grid-template-columns: 1fr auto auto; gap: .1rem .6rem; align-items: center;
       padding: .5rem .35rem; border-bottom: 1px dashed var(--gray-200); width: 100%;
       background: none; border-top: none; border-left: none; border-right: none;
@@ -210,7 +230,7 @@
 
     @media (max-width: 820px) {
       .rep-kpis { grid-template-columns: 1fr 1fr; }
-      .rep-sections { grid-template-columns: 1fr; }
+      .rep-masonry { column-count: 1; }
     }
     @media (max-width: 480px) {
       .rep-kpis { grid-template-columns: 1fr 1fr; }
@@ -224,7 +244,9 @@
       .app-header, .rep-controls, .modal-overlay, .toast-container,
       #btn-merge-obras, .rep-loading { display: none !important; }
       .app-main, .rep-wrap { padding: 0; max-width: none; }
-      .rep-sections { grid-template-columns: 1fr 1fr; gap: .6rem; }
+      .rep-sections { gap: .6rem; }
+      .rep-masonry { column-gap: .6rem; }
+      .rep-masonry > .rep-card { margin-bottom: .6rem; }
       .rep-card, .rep-hero, .kpi { break-inside: avoid; box-shadow: none; }
       .rep-hero { color: #fff; }
       .rep-bar-fill { animation: none; }
@@ -337,24 +359,26 @@
           <div class="card-body" id="rep-obras"></div>
         </div>
 
-        <div class="card rep-card">
-          <div class="card-header"><span class="card-title">Gasto por Equipo</span></div>
-          <div class="card-body" id="rep-equipos"></div>
-        </div>
+        <div class="rep-masonry">
+          <div class="card rep-card">
+            <div class="card-header"><span class="card-title">Top proveedores</span></div>
+            <div class="card-body" id="rep-proveedores"></div>
+          </div>
 
-        <div class="card rep-card">
-          <div class="card-header"><span class="card-title">Repuestos vs Mantenimiento</span></div>
-          <div class="card-body" id="rep-categorias"></div>
-        </div>
+          <div class="card rep-card">
+            <div class="card-header"><span class="card-title">Gasto por Equipo</span></div>
+            <div class="card-body" id="rep-equipos"></div>
+          </div>
 
-        <div class="card rep-card">
-          <div class="card-header"><span class="card-title">Top proveedores</span></div>
-          <div class="card-body" id="rep-proveedores"></div>
-        </div>
+          <div class="card rep-card">
+            <div class="card-header"><span class="card-title">Por responsable</span></div>
+            <div class="card-body" id="rep-responsables"></div>
+          </div>
 
-        <div class="card rep-card rep-full">
-          <div class="card-header"><span class="card-title">Por responsable</span></div>
-          <div class="card-body" id="rep-responsables"></div>
+          <div class="card rep-card">
+            <div class="card-header"><span class="card-title">Repuestos vs Mantenimiento</span></div>
+            <div class="card-body" id="rep-categorias"></div>
+          </div>
         </div>
       </div>
 

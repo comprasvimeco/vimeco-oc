@@ -16,6 +16,12 @@ function esObraPrueba(oc) {
   return OBRAS_PRUEBA.has((oc.obra || '').trim().toLowerCase());
 }
 
+// Mismo criterio para el proveedor: una OC cargada contra "X" (o "x") es una
+// prueba, no una compra real. Ningún proveedor real se llama con una sola letra.
+function esProveedorPrueba(oc) {
+  return (oc.proveedor?.nombre || '').trim().toLowerCase() === 'x';
+}
+
 // Clave del registro en /historial (así se guarda en saveOCToHistory).
 function histKeyOf(oc) { return (oc.nroOC || '').replace(/-/g, ''); }
 

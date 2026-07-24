@@ -295,6 +295,24 @@ function catChip(cat) {
 const SHARE_COLORS = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7'];
 const SHARE_OTHER  = '#9ca3af';
 
+// ---- Rampa "heat" para los rankings (sequential = magnitud) ----
+// Un solo tono: el que más gastó va azul VIMECO intenso, y la intensidad cae
+// con el monto hasta apagarse en un gris-azulado. El ancho de la barra ya
+// codifica la magnitud; el color la refuerza (encoding redundante, a propósito).
+// Azul de marca de punta a punta (sin gris): frío = celeste claro saturado
+// (#a9c9ef) → caliente = azul marino (#16375a, primary-dark).
+const HEAT_COLD = [169, 201, 239];
+const HEAT_HOT  = [22, 55, 90];
+function _mix(a, b, t) { return [
+  Math.round(a[0] + (b[0] - a[0]) * t),
+  Math.round(a[1] + (b[1] - a[1]) * t),
+  Math.round(a[2] + (b[2] - a[2]) * t),
+]; }
+function _hex(rgb) { return '#' + rgb.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join(''); }
+// gamma < 1 estira el rango alto: sin esto sólo el #1 se vería intenso.
+function heatRgb(t) { return _mix(HEAT_COLD, HEAT_HOT, Math.pow(Math.max(0, Math.min(1, t)), 0.6)); }
+function heatColor(t) { return _hex(heatRgb(t)); }
+
 // ---- Barra de participación (part-to-whole, top 5 + Otras) ----
 function renderShare(containerId, rows, grand) {
   const el = $(containerId);
@@ -386,7 +404,8 @@ function renderLine(containerId, serie) {
          aria-label="Evolución mensual del gasto">
       <defs>
         <linearGradient id="repAreaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stop-color="#2557a7" stop-opacity=".28"/>
+          <stop offset="0%"   stop-color="#2557a7" stop-opacity=".34"/>
+          <stop offset="55%"  stop-color="#2557a7" stop-opacity=".12"/>
           <stop offset="100%" stop-color="#2557a7" stop-opacity="0"/>
         </linearGradient>
       </defs>
@@ -516,17 +535,26 @@ function renderBars(containerId, rows, opts = {}) {
         </button>`).join('')}</div>`;
     }
 
+    // Heat por magnitud: color e intensidad de la barra salen del monto relativo.
+    const t   = max ? r.total / max : 0;
+    const hc  = heatColor(t);
+    const hcL = _hex(_mix(heatRgb(t), [255, 255, 255], 0.34));
+
     return `
       <div class="rep-bar-row ${opts.drill ? 'rep-clickable' : ''} ${isOpen ? 'rep-open' : ''}" data-rowkey="${esc(rowKey)}">
-        <div class="rep-bar-head">
-          <span class="rep-bar-rank">${i + 1}</span>
-          ${opts.drill ? `<span class="rep-caret">${icSvg('chevR')}</span>` : ''}
-          <span class="rep-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
-          <span class="rep-bar-val" title="${esc(fmtFull(r.total, state.moneda))}">${fmtCompact(r.total, state.moneda)}</span>
+        <span class="rep-bar-rank">${i + 1}</span>
+        <div class="rep-bar-body">
+          <div class="rep-bar-head">
+            ${opts.drill ? `<span class="rep-caret">${icSvg('chevR')}</span>` : ''}
+            <span class="rep-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
+            <span class="rep-bar-val" title="${esc(fmtFull(r.total, state.moneda))}">${fmtCompact(r.total, state.moneda)}</span>
+          </div>
+          <div class="rep-bar-track">
+            <div class="rep-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${hcL},${hc})"></div>
+          </div>
+          <div class="rep-bar-sub">${r.count} OC · ${share}%</div>
+          ${drillHtml}
         </div>
-        <div class="rep-bar-track"><div class="rep-bar-fill" style="width:${pct}%"></div></div>
-        <div class="rep-bar-sub">${r.count} OC · ${share}%</div>
-        ${drillHtml}
       </div>`;
   }).join('');
 
@@ -573,7 +601,7 @@ function renderHero(list) {
 
   const notes = [];
   if (excluidas) notes.push(`${excluidas} OC anteriores al respaldo en Drive quedan fuera del reporte.`);
-  if (dePrueba)  notes.push(`${dePrueba} OC de obras de prueba quedan fuera del reporte.`);
+  if (dePrueba)  notes.push(`${dePrueba} OC de prueba quedan fuera del reporte.`);
   if (fallback)  notes.push(`${fallback} OC sin cotización propia — convertidas al dólar de hoy.`);
   if (noConv)    notes.push(`${noConv} OC no se pudieron convertir (sin cotización disponible).`);
   const noteEl = $('rep-note');
@@ -590,6 +618,10 @@ function render() {
 
   buildProvIndex(list);
   renderDuplicados(list);
+
+  // El botón "Unificar obras" sólo aparece si hay fusiones que proponer.
+  const btnMerge = $('btn-merge-obras');
+  if (btnMerge) btnMerge.classList.toggle('hidden', !mergeGroupsPresent().length);
 
   const obras = groupAgg(list, oc => oc.obra || '—', oc => oc.obra || 'Sin obra');
 
@@ -906,12 +938,18 @@ const MERGE_PROPOSAL = [
   { to: 'Hangar Pueblo Nativo', from: ['Pueblo Nativo'] },
 ];
 
-function openMergeModal() {
-  const present  = new Set(ALL.map(o => o.obra).filter(Boolean));
-  const countFor = name => ALL.filter(o => o.obra === name).length;
-  const groups = MERGE_PROPOSAL
+// Fusiones sugeridas presentes en los datos actuales. Vacío = nada que unificar,
+// y ahí el botón no se muestra (no tiene sentido abrir un modal sin propuestas).
+function mergeGroupsPresent() {
+  const present = new Set(ALL.map(o => o.obra).filter(Boolean));
+  return MERGE_PROPOSAL
     .map(g => ({ to: g.to, from: g.from.filter(f => present.has(f)) }))
     .filter(g => g.from.length);
+}
+
+function openMergeModal() {
+  const countFor = name => ALL.filter(o => o.obra === name).length;
+  const groups = mergeGroupsPresent();
 
   if (!groups.length) { toast('No hay fusiones sugeridas: las obras ya están unificadas.', 'info'); return; }
 
@@ -1035,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     cutoffTs  = driveCutoff(ALL_RAW);
     const conRespaldo = ALL_RAW.filter(oc => (oc.timestamp || 0) >= cutoffTs);
     excluidas = ALL_RAW.length - conRespaldo.length;
-    ALL       = conRespaldo.filter(oc => !esObraPrueba(oc));
+    ALL       = conRespaldo.filter(oc => !esObraPrueba(oc) && !esProveedorPrueba(oc));
     dePrueba  = conRespaldo.length - ALL.length;
     $('rep-loading').classList.add('hidden');
     $('rep-content').classList.remove('hidden');
