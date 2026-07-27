@@ -138,22 +138,61 @@ async function ocDataDe(oc) {
   return ocData;
 }
 
-// Regenera el PDF de una OC y lo sube a sus dos carpetas, registrando los ids en
-// el historial. Muta `oc` para que quien la tenga en memoria la vea respaldada.
-async function resubirOC(oc) {
-  const blob  = generateOCBlob(await ocDataDe(oc));
-  const fname = `OC_${oc.nroOC}_${sanitize(oc.proveedor?.nombre || 'SinProveedor')}.pdf`;
-  // La fecha de la OC, no la de hoy: la carpeta destino se llama
-  // "{fecha} | {proveedor}" y tiene que ser la de la orden original.
-  const fecha = new Date(oc.timestamp || Date.now()).toISOString().slice(0, 10);
-  const { obrasFolderId, proveedoresFolderId } = await uploadToDrive(blob, fname, {
-    obra: oc.obra || 'Sin obra', fecha,
-    proveedor: oc.proveedor?.nombre || 'Sin proveedor', nroOC: oc.nroOC
-  }, null);
+// Deja registrado en el historial dónde quedó archivada la OC y muta `oc` para
+// que quien la tenga en memoria la vea respaldada.
+async function registrarCarpetasOC(oc, obrasFolderId, proveedoresFolderId) {
   await patchHistorialEntry(histKeyOf(oc), {
     drive_folder_obras_id:       obrasFolderId       || null,
     drive_folder_proveedores_id: proveedoresFolderId || null
   });
   oc.drive_folder_obras_id       = obrasFolderId;
   oc.drive_folder_proveedores_id = proveedoresFolderId;
+}
+
+// Respalda una OC que figura sin respaldo. Antes de subir nada mira si el PDF
+// ya está en Drive: la causa más común de "sin respaldo" no es que la subida
+// haya fallado sino que llegó y el registro de las carpetas no (le pasó a la OC
+// 0004-00000218, archivada el 24/07 y reclamada igual). En ese caso sólo se
+// registran las carpetas, sin dejar una segunda copia del PDF en la misma
+// carpeta. Devuelve { yaEstaba } para poder decirlo en pantalla.
+async function resubirOC(oc) {
+  const fname = `OC_${oc.nroOC}_${sanitize(oc.proveedor?.nombre || 'SinProveedor')}.pdf`;
+  // La fecha de la OC, no la de hoy: la carpeta destino se llama
+  // "{fecha} | {proveedor}" y tiene que ser la de la orden original.
+  const fecha = new Date(oc.timestamp || Date.now()).toISOString().slice(0, 10);
+  const meta  = {
+    obra: oc.obra || 'Sin obra', fecha,
+    proveedor: oc.proveedor?.nombre || 'Sin proveedor', nroOC: oc.nroOC
+  };
+
+  // El PDF se regenera siempre porque hay que tenerlo listo por si falta alguna
+  // copia; uploadOCIfMissing decide qué subir (y no sube nada si ya está todo).
+  const blob = generateOCBlob(await ocDataDe(oc));
+  const { obrasFolderId, proveedoresFolderId, yaEstaba } =
+    await uploadOCIfMissing(blob, fname, meta, null);
+
+  await registrarCarpetasOC(oc, obrasFolderId, proveedoresFolderId);
+  return { yaEstaba };
+}
+
+// La tarjeta de una novedad guarda el link a la carpeta en el momento de
+// crearse: si la OC se respaldó (o se registró su carpeta) después, queda "sin
+// link" para siempre aunque el PDF esté en Drive. Rellena esas tarjetas contra
+// /historial y devuelve cuántas corrigió. Muta los eventos recibidos.
+async function completarLinksNovedades(hist, eventos) {
+  if (typeof patchActividad !== 'function') return 0;
+  const porNro = new Map((hist || []).map(oc => [oc.nroOC, oc]));
+  // Los eventos viejos (previos al campo nroOC) sólo se pueden matchear por texto.
+  const ocDe = e => porNro.get(e.nroOC) ||
+    (hist || []).find(oc => oc.nroOC && (e.titulo || '').includes(oc.nroOC)) || {};
+  const huerfanos = (eventos || []).filter(e =>
+    e.tipo === 'oc' && !e.driveUrl && driveUrlOf(ocDe(e)));
+
+  let ok = 0;
+  for (const e of huerfanos) {
+    const url = driveUrlOf(ocDe(e));
+    try { await patchActividad(e.key, { driveUrl: url }); e.driveUrl = url; ok++; }
+    catch (_) { /* se reintenta sola en la próxima carga */ }
+  }
+  return ok;
 }

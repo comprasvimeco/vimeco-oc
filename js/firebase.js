@@ -583,6 +583,40 @@
     });
   };
 
+  // Igual que logOCActivity pero para los caminos de reintento (cola offline):
+  // si la OC ya tiene su tarjeta —la pudo crear la reconciliación de Novedades
+  // mientras la subida seguía pendiente— no publica otra, sólo le completa el
+  // link a Drive si le faltaba. Best-effort, como todo el feed.
+  window.logOCActivityOnce = async function (nroOC, proveedor, obra, total, folderId) {
+    let previa = null;
+    try {
+      const eventos = await getActividad(null);
+      previa = eventos.find(e => e.tipo === 'oc' && e.nroOC === nroOC);
+    } catch (_) { /* sin lectura, mejor publicar que perder la novedad */ }
+
+    if (!previa) return logOCActivity(nroOC, proveedor, obra, total, folderId);
+    if (folderId && !previa.driveUrl) {
+      try {
+        await patchActividad(previa.key, {
+          driveUrl: `https://drive.google.com/drive/folders/${folderId}`
+        });
+      } catch (_) {}
+    }
+  };
+
+  // Corrige un evento ya publicado. Se usa para rellenar el link a Drive de una
+  // novedad que nació sin él: la tarjeta guarda la URL al crearse, así que una
+  // OC que se respalda después (subida registrada tarde, o resubida desde el
+  // panel) quedaba "sin link" para siempre aunque su PDF ya estuviera en Drive.
+  window.patchActividad = async function (key, fields) {
+    const resp = await fetch(_base() + '/actividad/' + key + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
   // Borra un evento de actividad (solo Administración). Afecta a todos.
   window.deleteActividad = async function (key) {
     const resp = await fetch(_base() + '/actividad/' + key + '.json', { method: 'DELETE' });

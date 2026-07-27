@@ -433,14 +433,20 @@ async function _procesarCola(items) {
       const srcFile = item.srcBuf
         ? new File([item.srcBuf], item.srcName || 'archivo', { type: item.srcType || 'application/octet-stream' })
         : null;
-      const { obrasFolderId, proveedoresFolderId } = await uploadToDrive(pdfBlob, item.pdfName,
+      // Idempotente: el intento anterior pudo llegar a Drive aunque el cliente
+      // lo viera fallar (corte de red al leer la respuesta). Reintentar a ciegas
+      // dejaba una segunda copia del PDF en la carpeta.
+      const { obrasFolderId, proveedoresFolderId } = await uploadOCIfMissing(pdfBlob, item.pdfName,
         { obra: item.obra, fecha: item.fecha, proveedor: item.proveedor, nroOC: item.nroOC },
         srcFile
       );
       await driveQueue.dequeue(item.histKey);
       if (obrasFolderId || proveedoresFolderId)
         await saveDriveIds(item.histKey, obrasFolderId, proveedoresFolderId, item.nroOC);
-      logOCActivity(item.nroOC, item.proveedor, item.obra, item.total, obrasFolderId || proveedoresFolderId);
+      // Once: la novedad puede existir ya (la creó la reconciliación de
+      // Novedades mientras la subida seguía en la cola); en ese caso sólo le
+      // falta el link.
+      logOCActivityOnce(item.nroOC, item.proveedor, item.obra, item.total, obrasFolderId || proveedoresFolderId);
       toast(`OC ${item.nroOC} subida a Drive.`, 'success');
     } catch (_) {
       // Sigue sin conexión o error — se mantiene en la cola

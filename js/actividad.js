@@ -322,6 +322,16 @@ async function cargarPaneles(code) {
   renderSinRespaldo();
   renderPendientes();
   await reconciliarNovedadesOC(hist);
+  await reconciliarLinksOC(hist);
+}
+
+// Autocorrección: tarjetas que quedaron "sin link" porque la OC se respaldó
+// después de que se publicó su novedad. El link sale del historial, que es
+// donde quedan registradas las carpetas de Drive.
+async function reconciliarLinksOC(hist) {
+  if (typeof completarLinksNovedades !== 'function') return;
+  const n = await completarLinksNovedades(hist, allEvents);
+  if (n) render();
 }
 
 // Autocorrección: cualquier OC con PDF emitido que no haya dejado su tarjeta
@@ -419,11 +429,15 @@ async function resubirTodas() {
   const btn = $('act-resubir');
   btn.disabled = true;
 
-  let ok = 0;
+  let ok = 0, yaEstaban = 0;
   const fallaron = [];
   for (const [i, oc] of list.entries()) {
     btn.innerHTML = `<span class="spinner"></span> Subiendo ${i + 1} de ${list.length}…`;
-    try { await resubirOC(oc); ok++; }
+    try {
+      const r = await resubirOC(oc);
+      ok++;
+      if (r && r.yaEstaba) yaEstaban++;
+    }
     catch (e) { fallaron.push(`${oc.nroOC} (${e.message})`); }
   }
 
@@ -432,6 +446,11 @@ async function resubirTodas() {
   btn.innerHTML = icSvg('folder') + ' Resubir a Drive';
   renderSinRespaldo();
 
+  // Recién ahora estas OC tienen carpeta: sus tarjetas pueden mostrar el link.
+  await reconciliarLinksOC(list);
+
   if (fallaron.length) toast(`${ok} subidas. Fallaron: ${fallaron.join(', ')}`, 'warning');
+  else if (yaEstaban === ok) toast(`Listo: ${ok === 1 ? 'ya estaba archivada en Drive' : `las ${ok} ya estaban archivadas en Drive`}; se registró el link.`, 'success');
+  else if (yaEstaban) toast(`Listo: ${ok - yaEstaban} ${ok - yaEstaban === 1 ? 'orden subida' : 'órdenes subidas'}; ${yaEstaban} ya ${yaEstaban === 1 ? 'estaba archivada' : 'estaban archivadas'}.`, 'success');
   else toast(`Listo: ${ok} ${ok === 1 ? 'orden subida' : 'órdenes subidas'} a Drive.`, 'success');
 }

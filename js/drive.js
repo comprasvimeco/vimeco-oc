@@ -7,6 +7,9 @@
     window.uploadToDrive       = noDrive;
     window.uploadSourceToDrive = noDrive;
     window.uploadPdfToDrive    = noDrive;
+    window.uploadPdfToFolders  = noDrive;
+    window.uploadOCIfMissing   = noDrive;
+    window.findOCUpload        = noDrive;
     window.deleteDriveFile     = async function () {};   // no-op sin Drive
     return;
   }
@@ -203,11 +206,16 @@
     return _proveedoresId;
   }
 
+  // Nombre de la subcarpeta de una OC, igual en OBRAS y en PROVEEDORES.
+  function _subName({ fecha, proveedor }) {
+    return `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
+  }
+
   // Crea (o reutiliza) las dos carpetas destino de una OC y devuelve sus IDs.
   //   COMPRAS/OBRAS/{Obra}/{YYYY-MM-DD | Proveedor}/
   //   COMPRAS/PROVEEDORES/{Proveedor}/{YYYY-MM-DD | Proveedor}/
   async function _ensureOCFolders(token, { obra, fecha, proveedor }) {
-    const subName = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
+    const subName = _subName({ fecha, proveedor });
     const [obrasRootId, proveedoresRootId] = await Promise.all([
       getObrasRootId(token),
       getProveedoresRootId(token)
@@ -226,14 +234,20 @@
   // Sube el PDF a ambas carpetas; deja un marcador de error si alguna falla.
   // Lanza solo si fallan las dos.
   async function _pushPdf(token, pdfBlob, pdfName, obrasFolderId, proveedoresFolderId, nroOC) {
-    const pdfResults = await Promise.allSettled([
-      uploadFile(token, pdfBlob, pdfName, 'application/pdf', obrasFolderId),
-      uploadFile(token, pdfBlob, pdfName, 'application/pdf', proveedoresFolderId)
-    ]);
+    // Un destino en null significa "esa copia ya está archivada": se saltea para
+    // no dejar un duplicado del PDF en la carpeta.
+    const destinos = [
+      { fid: obrasFolderId,       label: 'OBRAS' },
+      { fid: proveedoresFolderId, label: 'PROVEEDORES' }
+    ].filter(d => d.fid);
+    if (!destinos.length) throw new Error('Drive: sin carpeta destino para el PDF');
+
+    const pdfResults = await Promise.allSettled(
+      destinos.map(d => uploadFile(token, pdfBlob, pdfName, 'application/pdf', d.fid))
+    );
     for (const [i, res] of pdfResults.entries()) {
       if (res.status === 'rejected') {
-        const label = i === 0 ? 'OBRAS' : 'PROVEEDORES';
-        const fid   = i === 0 ? obrasFolderId : proveedoresFolderId;
+        const { label, fid } = destinos[i];
         await logDriveError(nroOC, new Error(`PDF ${label}: ${res.reason?.message}`));
         try {
           const marker = new Blob(
@@ -283,6 +297,90 @@
     }
 
     return { obrasFolderId, proveedoresFolderId };
+  };
+
+  // Busca una carpeta/archivo por nombre sin crear nada. Devuelve el id o null.
+  async function _findChild(token, name, parentId, soloCarpetas) {
+    if (!parentId || !name) return null;
+    const safe = String(name).replace(/[/\\]/g, '-').trim().substring(0, 120);
+    const q = `name=${JSON.stringify(safe)} and '${parentId}' in parents and trashed=false` +
+              (soloCarpetas ? " and mimeType='application/vnd.google-apps.folder'" : '');
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!r.ok) throw new Error(`Drive search (${r.status})`);
+    const { files } = await r.json();
+    return files && files.length ? files[0].id : null;
+  }
+
+  // ¿El PDF de esta OC ya está archivado? Una subida puede llegar a Drive aunque
+  // el cliente la vea fallar (se corta la red justo al leer la respuesta): la OC
+  // queda sin carpetas en el historial —figurando "sin respaldo"— pero el
+  // archivo existe. Mirar antes de resubir evita duplicar el PDF y permite
+  // registrar la carpeta que ya tenía. No crea nada: si no está, devuelve nulls.
+  window.findOCUpload = async function (meta, pdfName) {
+    const token   = await getAccessToken();
+    const subName = _subName(meta);
+    const [obrasRootId, proveedoresRootId] = await Promise.all([
+      getObrasRootId(token), getProveedoresRootId(token)
+    ]);
+    const [obraParentId, provParentId] = await Promise.all([
+      _findChild(token, meta.obra      || 'Sin obra',      obrasRootId,       true),
+      _findChild(token, meta.proveedor || 'Sin proveedor', proveedoresRootId, true)
+    ]);
+    const [obrasFolderId, proveedoresFolderId] = await Promise.all([
+      _findChild(token, subName, obraParentId, true),
+      _findChild(token, subName, provParentId, true)
+    ]);
+    const [pdfEnObras, pdfEnProveedores] = await Promise.all([
+      _findChild(token, pdfName, obrasFolderId,       false),
+      _findChild(token, pdfName, proveedoresFolderId, false)
+    ]);
+    return {
+      obrasFolderId, proveedoresFolderId,
+      pdfEnObras:       !!pdfEnObras,
+      pdfEnProveedores: !!pdfEnProveedores
+    };
+  };
+
+  // Sube el PDF a carpetas ya conocidas, salteando las que se pasen en null
+  // (esa copia ya está archivada). A diferencia de uploadPdfToDrive, nunca crea
+  // carpetas: se usa para completar una subida que quedó a medias.
+  window.uploadPdfToFolders = async function (pdfBlob, pdfName, { obrasFolderId, proveedoresFolderId, nroOC }) {
+    const token = await getAccessToken();
+    await _pushPdf(token, pdfBlob, pdfName, obrasFolderId, proveedoresFolderId, nroOC);
+  };
+
+  // Subida idempotente: sube sólo las copias que falten. La usan los caminos de
+  // reintento (cola offline, resubida desde Novedades), donde el PDF puede estar
+  // archivado desde el intento anterior aunque el cliente lo haya visto fallar.
+  // Devuelve además `yaEstaba` para poder informarlo sin mentir.
+  window.uploadOCIfMissing = async function (pdfBlob, pdfName, meta, sourceFile) {
+    let hallazgo = null;
+    try { hallazgo = await window.findOCUpload(meta, pdfName); } catch (_) {}
+
+    if (hallazgo && hallazgo.pdfEnObras && hallazgo.pdfEnProveedores) {
+      return {
+        obrasFolderId:       hallazgo.obrasFolderId,
+        proveedoresFolderId: hallazgo.proveedoresFolderId,
+        yaEstaba:            true
+      };
+    }
+    if (hallazgo && (hallazgo.pdfEnObras || hallazgo.pdfEnProveedores)) {
+      await window.uploadPdfToFolders(pdfBlob, pdfName, {
+        obrasFolderId:       hallazgo.pdfEnObras       ? null : hallazgo.obrasFolderId,
+        proveedoresFolderId: hallazgo.pdfEnProveedores ? null : hallazgo.proveedoresFolderId,
+        nroOC: meta.nroOC
+      });
+      return {
+        obrasFolderId:       hallazgo.obrasFolderId,
+        proveedoresFolderId: hallazgo.proveedoresFolderId,
+        yaEstaba:            false
+      };
+    }
+    const ids = await window.uploadToDrive(pdfBlob, pdfName, meta, sourceFile);
+    return { ...ids, yaEstaba: false };
   };
 
   // Al PEDIR autorización: crea las carpetas y sube solo el archivo fuente (si hay),
