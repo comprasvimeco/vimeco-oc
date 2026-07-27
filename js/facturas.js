@@ -1,9 +1,18 @@
-/* VIMECO S.A. — Adjuntar archivo a OC existente */
+/* VIMECO S.A. — Facturas: cargar la factura (u otro archivo) de una OC existente */
 
 let currentFile = null;
 let allOCs      = [];
-let pendingOC   = null;   // OC elegida para adjuntar manualmente (vista principal)
+let pendingOC   = null;   // OC elegida para cargar manualmente (vista principal)
 let viewerIsAdmin = false; // 0000 o usuario con permiso admin
+let tipoCarga   = 'factura';  // 'factura' | 'otro'
+
+// En la carpeta de una compra conviven la OC, el presupuesto, la factura y los
+// remitos: el prefijo es lo único que los distingue. "Otro archivo" va con su
+// nombre original, para no rotular de factura algo que no lo es.
+function archivoParaDrive(file) {
+  if (tipoCarga !== 'factura') return file;
+  return new File([file], nombreArchivoDrive('Factura', file.name), { type: file.type });
+}
 
 const $ = id => document.getElementById(id);
 
@@ -135,7 +144,7 @@ function renderMatchCards(matches) {
       <div class="hist-obra">${esc(oc.obra || '—')}</div>
       <div class="adj-oc-bottom">
         <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
-        <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Adjuntar aquí</button>
+        <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Cargar acá</button>
       </div>
     </div>`;
   }).join('');
@@ -152,7 +161,7 @@ function renderOCListItems(ocs) {
     <div class="hist-obra">${esc(oc.obra || '—')}</div>
     <div class="adj-oc-bottom">
       <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
-      <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Adjuntar aquí</button>
+      <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Cargar acá</button>
     </div>
   </div>`).join('');
 }
@@ -164,7 +173,7 @@ function renderManualListHTML(ocs) {
   <div id="adj-oc-list">${renderOCListItems(ocs)}</div>`;
 }
 
-// ---- Vista principal: lista de OC con adjuntar manual (elige archivo al tocar) ----
+// ---- Vista principal: lista de OC (se elige el archivo al tocar Cargar) ----
 
 function renderPrimaryListItems(ocs) {
   if (!ocs.length) return '<div class="hist-empty">No hay OC en el historial.</div>';
@@ -178,7 +187,7 @@ function renderPrimaryListItems(ocs) {
     ${viewerIsAdmin && oc.responsable?.nombre ? `<div class="hist-obra" style="color:var(--gray-500);font-size:.78rem;">por ${esc(oc.responsable.nombre)}</div>` : ''}
     <div class="adj-oc-bottom">
       <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
-      <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar</button>
+      <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Cargar</button>
     </div>
   </div>`).join('');
 }
@@ -208,17 +217,21 @@ function bindPickButtons() {
   });
 }
 
-// Registra un adjunto en el feed de Novedades (best-effort).
+// Registra la carga en el feed de Novedades (best-effort). Los eventos viejos
+// siguen siendo 'adjunto' (podían ser cualquier cosa); los nuevos distinguen la
+// factura, que es lo que la pantalla carga por defecto.
 function logAdjuntoActivity(oc, file, folderId) {
   if (typeof logActivity !== 'function') return;
   const fid = folderId || oc.drive_folder_obras_id || oc.drive_folder_proveedores_id || oc.drive_folder_id || '';
+  const esFactura = tipoCarga === 'factura';
   logActivity({
-    tipo:    'adjunto',
+    tipo:    esFactura ? 'factura' : 'adjunto',
+    nroOC:   oc.nroOC,
     usuario: {
       codigo: sessionStorage.getItem('responsable_code') || '',
       nombre: sessionStorage.getItem('responsable_name') || ''
     },
-    titulo:   `Adjunto en OC ${oc.nroOC} — ${oc.proveedor?.nombre || 'Sin proveedor'}`,
+    titulo:   `${esFactura ? 'Factura' : 'Adjunto'} en OC ${oc.nroOC} — ${oc.proveedor?.nombre || 'Sin proveedor'}`,
     detalle:  `${file.name} · ${oc.obra || 'Sin obra'}`,
     driveUrl: fid ? `https://drive.google.com/drive/folders/${fid}` : ''
   });
@@ -229,7 +242,8 @@ async function doAttachPick(file, oc) {
   const btn = document.querySelector(`.btn-attach-pick[data-nro="${oc.nroOC}"]`);
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Subiendo…'; }
   try {
-    const res = await attachToDriveOC(file, {
+    const subida = archivoParaDrive(file);
+    const res = await attachToDriveOC(subida, {
       drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
       drive_folder_proveedores_id: oc.drive_folder_proveedores_id || null,
       drive_folder_id:             oc.drive_folder_id             || null,
@@ -238,14 +252,14 @@ async function doAttachPick(file, oc) {
       proveedor: oc.proveedor?.nombre || '',
       nroOC:     oc.nroOC
     });
-    logAdjuntoActivity(oc, file, res?.folderId);
+    logAdjuntoActivity(oc, subida, res?.folderId);
     await clearShareFile();
-    toast(`Archivo adjuntado a OC ${oc.nroOC}`, 'success');
-    if (btn) { btn.innerHTML = `${icSvg('checkSm')} Adjuntado`; }
+    toast(`${tipoCarga === 'factura' ? 'Factura cargada' : 'Archivo cargado'} en OC ${oc.nroOC}`, 'success');
+    if (btn) { btn.innerHTML = `${icSvg('checkSm')} Cargado`; }
   } catch (e) {
     console.error('doAttachPick:', e);
     toast('Error al subir el archivo a Drive.', 'error');
-    if (btn) { btn.disabled = false; btn.innerHTML = 'Adjuntar'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Cargar'; }
   }
   pendingOC = null;
 }
@@ -306,7 +320,7 @@ function showAIResults(extracted, matches) {
 }
 
 function showManualMode() {
-  $('result-title').textContent = 'Elegir OC para adjuntar';
+  $('result-title').textContent = 'Elegir OC';
   $('result-body').innerHTML = renderManualListHTML(allOCs);
   bindButtons();
 }
@@ -317,7 +331,8 @@ async function doAttach(file, oc, btn) {
   btn.disabled  = true;
   btn.innerHTML = '<span class="spinner"></span> Subiendo…';
   try {
-    const res = await attachToDriveOC(file, {
+    const subida = archivoParaDrive(file);
+    const res = await attachToDriveOC(subida, {
       drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
       drive_folder_proveedores_id: oc.drive_folder_proveedores_id || null,
       drive_folder_id:             oc.drive_folder_id             || null,
@@ -326,16 +341,16 @@ async function doAttach(file, oc, btn) {
       proveedor: oc.proveedor?.nombre || '',
       nroOC:     oc.nroOC
     });
-    logAdjuntoActivity(oc, file, res?.folderId);
+    logAdjuntoActivity(oc, subida, res?.folderId);
     await clearShareFile();
     $('card-result').classList.add('hidden');
-    $('success-detail').textContent = `${file.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
+    $('success-detail').textContent = `${subida.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
     $('card-success').classList.remove('hidden');
   } catch (e) {
     toast('Error al subir el archivo a Drive.', 'error');
     console.error('doAttach:', e);
     btn.disabled    = false;
-    btn.textContent = 'Adjuntar aquí';
+    btn.textContent = 'Cargar acá';
   }
 }
 
@@ -376,6 +391,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (cached) allOCs = cached;
       renderPrimaryList($('adj-search-main').value);
     });
+
+  // Qué se está cargando (define el prefijo del archivo en Drive)
+  $('adj-tipo').addEventListener('click', ev => {
+    const btn = ev.target.closest('.cat-seg-btn');
+    if (!btn) return;
+    tipoCarga = btn.dataset.tipo;
+    $('adj-tipo').querySelectorAll('.cat-seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+  });
 
   // Buscador de la lista principal
   $('adj-search-main').addEventListener('input', e => {

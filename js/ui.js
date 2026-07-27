@@ -8,6 +8,24 @@ window.escHtml = function (str) {
 };
 
 /*
+ * Nombre con el que se archiva un adjunto en Drive. En la carpeta de una compra
+ * conviven la OC, el presupuesto, la factura y los remitos: el prefijo es lo
+ * único que los distingue de un "IMG_20260727.jpg".
+ *
+ *   nombreArchivoDrive('Factura', 'IMG_0042.jpg')        → 'Factura - IMG_0042.jpg'
+ *   nombreArchivoDrive('Remito', 'foto.jpg', '0001-12')  → 'Remito 0001-12 - foto.jpg'
+ *
+ * Idempotente: si el nombre ya viene prefijado (resubida de la cola offline) no
+ * lo prefija de nuevo.
+ */
+window.nombreArchivoDrive = function (prefijo, nombreOriginal, detalle) {
+  const limpio = s => String(s || '').replace(/[\\/:*?"<>|]/g, '-').trim();
+  const cabeza = detalle ? `${limpio(prefijo)} ${limpio(detalle)}` : limpio(prefijo);
+  const orig   = String(nombreOriginal || 'archivo').trim();
+  return orig.startsWith(cabeza + ' - ') ? orig : `${cabeza} - ${orig}`;
+};
+
+/*
  * Toast único para toda la app. Reemplaza las copias por página.
  * Requiere `js/icons.js` (icSvg) cargado antes, y un contenedor
  * `#toast-container` en la página.

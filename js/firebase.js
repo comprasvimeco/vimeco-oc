@@ -831,3 +831,48 @@
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 })();
+
+// ─── Remitos (control de entregas sobre las OC) ───────
+(function () {
+  const _base = () => FIREBASE_CONFIG.databaseURL;
+
+  // POST → Firebase genera la push-key. Devuelve la key del remito creado.
+  window.saveRemito = async function (remito) {
+    const resp = await fetch(_base() + '/remitos.json', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ...remito, timestamp: remito.timestamp || Date.now() })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return (await resp.json()).name;
+  };
+
+  // Devuelve TODOS los remitos, sin filtrar por usuario. El filtro de
+  // visibilidad (cada uno ve los suyos, el admin todos) es de la vista: lo que
+  // ya se entregó de una OC se calcula sobre todos sus remitos, los haya
+  // cargado quien los haya cargado. Filtrar acá daría cantidades pendientes
+  // distintas según quién mire.
+  window.getRemitos = async function () {
+    const resp = await fetch(_base() + '/remitos.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([key, r]) => ({ ...r, key }))
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  };
+
+  window.patchRemito = async function (key, fields) {
+    const resp = await fetch(_base() + '/remitos/' + key + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.deleteRemito = async function (key) {
+    const resp = await fetch(_base() + '/remitos/' + key + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+})();

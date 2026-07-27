@@ -9,6 +9,7 @@ const UNSEEN_DAYS = 7;
 
 let allEvents     = [];          // feed completo; el rango se aplica al mostrar
 let currentFilter = 'all';
+let searchQuery   = '';
 let seenKey       = 'vimeco_actividad_vistas';
 let rangeKey      = 'vimeco_actividad_rango';
 let seen          = new Set();   // claves de eventos marcados como vistos
@@ -40,7 +41,9 @@ function tipoMeta(tipo) {
   switch (tipo) {
     case 'oc':      return { label: 'OC',      icon: 'print',  cls: 'act-t-oc' };
     case 'adjunto': return { label: 'Adjunto', icon: 'clip',   cls: 'act-t-adjunto' };
+    case 'factura': return { label: 'Factura', icon: 'file',   cls: 'act-t-factura' };
     case 'caja':    return { label: 'Caja',    icon: 'dollar', cls: 'act-t-caja' };
+    case 'remito':  return { label: 'Remito',  icon: 'cart',   cls: 'act-t-remito' };
     default:        return { label: '—',       icon: 'check',  cls: '' };
   }
 }
@@ -119,12 +122,23 @@ function rangeLabel() {
   return `en los últimos ${range.preset} días`;
 }
 
+// El texto se busca sobre título y detalle, que es donde viven proveedor, obra
+// y monto, más el nroOC de los eventos que lo guardan aparte. Se combina con el
+// filtro de tipo y el rango, no los reemplaza.
+function coincideTexto(e, q) {
+  if (!q) return true;
+  return `${e.titulo || ''} ${e.detalle || ''} ${e.nroOC || ''} ${e.usuario?.nombre || ''}`
+    .toLowerCase().includes(q);
+}
+
 function getVisible() {
   const { from, to } = rangeBounds();
+  const q = (searchQuery || '').toLowerCase().trim();
   return allEvents.filter(e => {
     const ts = e.timestamp || 0;
     if (ts < from || ts > to) return false;
-    return currentFilter === 'all' || e.tipo === currentFilter;
+    if (currentFilter !== 'all' && e.tipo !== currentFilter) return false;
+    return coincideTexto(e, q);
   });
 }
 
@@ -143,7 +157,9 @@ function render() {
   updateBanner();
 
   if (!events.length) {
-    list.innerHTML = `<div class="hist-empty">No hay operaciones ${esc(rangeLabel())}.</div>`;
+    list.innerHTML = searchQuery.trim()
+      ? `<div class="hist-empty">No hay operaciones que coincidan con “${esc(searchQuery.trim())}” ${esc(rangeLabel())}.</div>`
+      : `<div class="hist-empty">No hay operaciones ${esc(rangeLabel())}.</div>`;
     return;
   }
 
@@ -283,6 +299,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     b.addEventListener('click', () => setFilter(b.dataset.filter)));
   document.querySelectorAll('.act-range').forEach(b =>
     b.addEventListener('click', () => setRange(b.dataset.range)));
+  $('act-search').addEventListener('input', e => {
+    searchQuery = e.target.value;
+    pager.reset('act');   // otra búsqueda → otra lista, se vuelve a la primera página
+    render();
+  });
   $('act-desde').addEventListener('change', onCustomDate);
   $('act-hasta').addEventListener('change', onCustomDate);
   syncRangeUI();
@@ -429,7 +450,7 @@ async function resubirTodas() {
   const btn = $('act-resubir');
   btn.disabled = true;
 
-  let ok = 0, yaEstaban = 0;
+  let ok = 0, yaEstaban = 0, conPresupuesto = 0;
   const fallaron = [];
   for (const [i, oc] of list.entries()) {
     btn.innerHTML = `<span class="spinner"></span> Subiendo ${i + 1} de ${list.length}…`;
@@ -437,6 +458,7 @@ async function resubirTodas() {
       const r = await resubirOC(oc);
       ok++;
       if (r && r.yaEstaba) yaEstaban++;
+      if (r && r.presupuestoRecuperado) conPresupuesto++;
     }
     catch (e) { fallaron.push(`${oc.nroOC} (${e.message})`); }
   }
@@ -453,4 +475,9 @@ async function resubirTodas() {
   else if (yaEstaban === ok) toast(`Listo: ${ok === 1 ? 'ya estaba archivada en Drive' : `las ${ok} ya estaban archivadas en Drive`}; se registró el link.`, 'success');
   else if (yaEstaban) toast(`Listo: ${ok - yaEstaban} ${ok - yaEstaban === 1 ? 'orden subida' : 'órdenes subidas'}; ${yaEstaban} ya ${yaEstaban === 1 ? 'estaba archivada' : 'estaban archivadas'}.`, 'success');
   else toast(`Listo: ${ok} ${ok === 1 ? 'orden subida' : 'órdenes subidas'} a Drive.`, 'success');
+
+  // El presupuesto sólo se puede rescatar de la cola de este navegador: cuando
+  // aparece conviene decirlo, porque es lo que antes se perdía en silencio.
+  if (conPresupuesto)
+    toast(`Se archivó también el presupuesto de ${conPresupuesto} ${conPresupuesto === 1 ? 'orden' : 'órdenes'}.`, 'success');
 }

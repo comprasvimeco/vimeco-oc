@@ -29,8 +29,10 @@ window.TUTORIALES = {
         texto: 'Si la OC necesita el visto bueno de un responsable, pedís la autorización desde la app. Le aparece en su pantalla de Autorizaciones y, cuando la firma, la Orden queda autorizada.' },
       { icono: 'folder', titulo: 'Generá y archivá',
         texto: 'Al generar, el PDF se sube a Drive automáticamente. No hace falta guardarlo ni ordenarlo a mano.' },
-      { icono: 'clip', titulo: 'Adjuntar e Historial',
-        texto: 'Sumá comprobantes a una OC existente desde Adjuntar, y volvé a ver o regenerar Órdenes anteriores desde Historial.' },
+      { icono: 'truck', titulo: 'Remitos: qué llegó y qué falta',
+        texto: 'Cuando llega el material, cargá el remito contra su Orden de Compra. Los ítems vienen precargados con lo que se pidió: si llegó todo, guardás; si fue parcial, corregís las cantidades. La OC te muestra cuánto falta entregar.' },
+      { icono: 'clip', titulo: 'Facturas e Historial',
+        texto: 'Cargá la factura del proveedor a una OC existente desde Facturas. Cada archivo se archiva en Drive con su nombre (Factura, Remito, Presupuesto), en la misma carpeta que la Orden. Desde Historial volvés a ver o regenerar Órdenes anteriores.' },
     ],
   },
 

@@ -488,10 +488,10 @@ function showShareChoiceModal(file) {
     toast('Archivo cargado. Usá "Extraer con IA" para procesar.', 'success');
   };
 
-  $('btn-share-adjuntar').onclick = () => {
+  $('btn-share-facturas').onclick = () => {
     $('modal-share-choice').classList.add('hidden');
-    // El archivo queda en cache como 'shared-file'; adjuntar.js lo leerá
-    window.location.href = 'adjuntar.html';
+    // El archivo queda en cache como 'shared-file'; facturas.js lo leerá
+    window.location.href = 'facturas.html';
   };
 
   $('btn-share-cancelar').onclick = () => {

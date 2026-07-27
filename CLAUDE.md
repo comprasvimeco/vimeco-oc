@@ -62,5 +62,5 @@ best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags
 ## Navegación
 
 - `menu.html` (raíz) → dos secciones: **Compras** (`compras.html`) y **Caja** (`caja.html`)
-- `compras.html` → submenú: Órdenes de Compra (`app.html`), Adjuntar (`adjuntar.html`), Historial (`historial.html`)
+- `compras.html` → submenú: Órdenes de Compra (`app.html`), Facturas (`facturas.html`), Historial (`historial.html`)
 - El logo/header de las páginas de Compras vuelve a `compras.html`; el de Caja vuelve a `menu.html`

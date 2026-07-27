@@ -90,6 +90,8 @@
     .act-t-oc      { background: #e6f0fb; color: #1a3a5c; }
     .act-t-adjunto { background: #e9f7ee; color: #1b6b3a; }
     .act-t-caja    { background: #fdeede; color: #8a4b00; }
+    .act-t-remito  { background: #f0ecfb; color: #4c3a8a; }
+    .act-t-factura { background: #fdf0f3; color: #8a2a45; }
     .act-body { flex: 1 1 auto; min-width: 0; }
     .act-title {
       font-weight: 600; font-size: .92rem; color: var(--gray-800);
@@ -142,10 +144,17 @@
       <div class="act-filters">
         <button class="act-chip act-filter active" data-filter="all">Todas</button>
         <button class="act-chip act-filter" data-filter="oc">Órdenes de Compra</button>
+        <button class="act-chip act-filter" data-filter="factura">Facturas</button>
         <button class="act-chip act-filter" data-filter="adjunto">Adjuntos</button>
+        <button class="act-chip act-filter" data-filter="remito">Remitos</button>
         <button class="act-chip act-filter" data-filter="caja">Caja</button>
       </div>
       <span class="hist-count" id="act-count"></span>
+    </div>
+
+    <div class="hist-toolbar">
+      <input type="search" id="act-search" class="hist-search"
+             placeholder="Buscar por proveedor, obra, N° OC…">
     </div>
 
     <div class="act-dates">
@@ -195,6 +204,7 @@
 <script src="js/logoBase64.js"></script>
 <script src="js/ocGenerator.js"></script>
 <script src="js/drive.js"></script>
+<script src="js/driveQueue.js"></script>
 <script src="js/driveBackup.js"></script>
 <script src="js/actividad.js"></script>
 </body>

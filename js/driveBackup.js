@@ -155,6 +155,28 @@ async function registrarCarpetasOC(oc, obrasFolderId, proveedoresFolderId) {
 // 0004-00000218, archivada el 24/07 y reclamada igual). En ese caso sólo se
 // registran las carpetas, sin dejar una segunda copia del PDF en la misma
 // carpeta. Devuelve { yaEstaba } para poder decirlo en pantalla.
+// El presupuesto (el archivo que se analizó con IA para armar la OC) sólo
+// existe en memoria mientras se crea la orden. Si la subida falló, la cola
+// offline lo guardó en IndexedDB: esa es la única copia que queda. Sin esto la
+// resubida archivaba el PDF y daba la OC por respaldada, dejándola para siempre
+// sin presupuesto y sin avisar.
+// Ojo: la cola vive en el navegador que creó la OC. Resubir desde otro
+// dispositivo no lo va a encontrar, y la app no puede saber si esa OC llegó a
+// tener presupuesto (el historial no lo registra).
+async function presupuestoEnCola(oc) {
+  if (typeof driveQueue === 'undefined') return null;
+  try {
+    const pend = await driveQueue.getAll();
+    const it   = pend.find(x => x.histKey === histKeyOf(oc));
+    if (!it || !it.srcBuf) return null;
+    return {
+      histKey: it.histKey,
+      file: new File([it.srcBuf], it.srcName || 'presupuesto',
+                     { type: it.srcType || 'application/octet-stream' })
+    };
+  } catch (_) { return null; }
+}
+
 async function resubirOC(oc) {
   const fname = `OC_${oc.nroOC}_${sanitize(oc.proveedor?.nombre || 'SinProveedor')}.pdf`;
   // La fecha de la OC, no la de hoy: la carpeta destino se llama
@@ -167,12 +189,20 @@ async function resubirOC(oc) {
 
   // El PDF se regenera siempre porque hay que tenerlo listo por si falta alguna
   // copia; uploadOCIfMissing decide qué subir (y no sube nada si ya está todo).
-  const blob = generateOCBlob(await ocDataDe(oc));
+  const blob   = generateOCBlob(await ocDataDe(oc));
+  const enCola = await presupuestoEnCola(oc);
   const { obrasFolderId, proveedoresFolderId, yaEstaba } =
-    await uploadOCIfMissing(blob, fname, meta, null);
+    await uploadOCIfMissing(blob, fname, meta, enCola?.file || null);
 
   await registrarCarpetasOC(oc, obrasFolderId, proveedoresFolderId);
-  return { yaEstaba };
+
+  // Ya quedó archivada (PDF + presupuesto): sacarla de la cola para que el
+  // reintento automático no suba una segunda copia de lo mismo.
+  if (enCola && typeof driveQueue !== 'undefined') {
+    try { await driveQueue.dequeue(enCola.histKey); } catch (_) {}
+  }
+
+  return { yaEstaba, presupuestoRecuperado: !!enCola };
 }
 
 // La tarjeta de una novedad guarda el link a la carpeta en el momento de

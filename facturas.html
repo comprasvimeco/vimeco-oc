@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIMECO S.A. — Adjuntar Archivo</title>
+  <title>VIMECO S.A. — Facturas</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" type="image/png" href="icono_app.png">
   <link rel="manifest" href="manifest.json">
@@ -19,7 +19,7 @@
     <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
       onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
     <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
-    <span class="header-title">Adjuntar Archivo</span>
+    <span class="header-title">Facturas</span>
   </div>
   <div class="header-user">
     <div class="user-badge">
@@ -87,13 +87,18 @@
       </div>
     </div>
 
-    <!-- Vista principal: lista de OC con adjuntar manual -->
+    <!-- Vista principal: lista de OC a las que cargarle un archivo -->
     <div class="card" id="card-list">
       <div class="card-header">
-        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Adjuntar a una OC</span>
+        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Cargar a una OC</span>
         <button class="btn btn-sm btn-outline" id="btn-toggle-ai"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Buscar con IA</button>
       </div>
       <div class="card-body">
+        <!-- Qué se está cargando: define el prefijo del archivo en Drive -->
+        <div class="cat-seg" id="adj-tipo" style="margin-bottom:.85rem;">
+          <button type="button" class="cat-seg-btn active" data-tipo="factura">Factura</button>
+          <button type="button" class="cat-seg-btn" data-tipo="otro">Otro archivo</button>
+        </div>
         <input type="search" id="adj-search-main" class="form-control" placeholder="Buscar por proveedor, obra o N° OC…" style="margin-bottom:.85rem;">
         <div id="adj-oc-list-main"><div class="hist-empty">Cargando OC…</div></div>
       </div>
@@ -111,6 +116,6 @@
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>
 <script src="js/gemini.js"></script>
-<script src="js/adjuntar.js"></script>
+<script src="js/facturas.js"></script>
 </body>
 </html>

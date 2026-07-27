@@ -149,6 +149,67 @@
     throw lastErr;
   }
 
+  // Sube un archivo o, si ya existe uno con ese nombre en la carpeta, reemplaza
+  // su contenido. Es lo que necesita cualquier planilla que se regenera (la de
+  // caja, las de entregas): con uploadFile a secas, cada sincronización dejaría
+  // una copia más en la carpeta.
+  // El nombre se sanitiza igual que en _findChild para que buscar y crear no
+  // apunten a nombres distintos (una obra con "/" en el nombre los separaría).
+  async function _upsertFile(token, blob, name, mimeType, folderId) {
+    _requireFolderId(folderId, `subida de "${name}"`);
+    const safe = String(name).replace(/[/\\]/g, '-').trim().substring(0, 120);
+
+    let existingId = null;
+    try { existingId = await _findChild(token, safe, folderId, false); } catch (_) {}
+    if (!existingId) return uploadFile(token, blob, safe, mimeType, folderId);
+
+    const boundary = 'vimeco_' + Date.now();
+    const meta     = JSON.stringify({ name: safe, mimeType });
+    const enc      = new TextEncoder();
+    const pre      = enc.encode(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+      `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
+    );
+    const post    = enc.encode(`\r\n--${boundary}--`);
+    const content = new Uint8Array(await blob.arrayBuffer());
+    const body    = new Uint8Array(pre.length + content.length + post.length);
+    body.set(pre, 0);
+    body.set(content, pre.length);
+    body.set(post, pre.length + content.length);
+
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await _sleep(600 * attempt);
+      try {
+        const resp = await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart&fields=id`,
+          { method: 'PATCH',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+            body }
+        );
+        if (resp.ok) return existingId;
+        lastErr = new Error(`Update "${safe}" (${resp.status})`);
+        if (resp.status < 500 && resp.status !== 429) break;
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+
+  // Versión pública: resuelve el token por su cuenta.
+  window.uploadOrUpdateFile = async function (blob, name, mimeType, folderId) {
+    const token = await getAccessToken();
+    return _upsertFile(token, blob, name, mimeType, folderId);
+  };
+
+  // Carpeta de una obra dentro de OBRAS (la crea si falta). Es el nivel de
+  // arriba de las subcarpetas "{fecha} | {proveedor}": ahí va la planilla de
+  // control de entregas de la obra.
+  window.getObraFolderId = async function (obra) {
+    const token = await getAccessToken();
+    const root  = await getObrasRootId(token);
+    return getOrCreateFolder(token, obra || 'Sin obra', root);
+  };
+
   // Borra un archivo de Drive por su ID. 404 (ya no existe) se trata como éxito.
   window.deleteDriveFile = async function (fileId) {
     if (!fileId) return;
@@ -266,9 +327,13 @@
   async function _pushSource(token, sourceFile, obrasFolderId, proveedoresFolderId, nroOC) {
     if (!sourceFile) return '';
     const mime = sourceFile.type || 'application/octet-stream';
+    // El archivo fuente es el presupuesto del proveedor: se archiva con el
+    // prefijo para distinguirlo de la OC, la factura y los remitos, que
+    // conviven en la misma carpeta.
+    const name = nombreArchivoDrive('Presupuesto', sourceFile.name);
     const results = await Promise.allSettled([
-      uploadFile(token, sourceFile, sourceFile.name, mime, obrasFolderId),
-      uploadFile(token, sourceFile, sourceFile.name, mime, proveedoresFolderId)
+      uploadFile(token, sourceFile, name, mime, obrasFolderId),
+      uploadFile(token, sourceFile, name, mime, proveedoresFolderId)
     ]);
     results.forEach((r, i) => {
       if (r.status === 'rejected')
@@ -352,6 +417,25 @@
     await _pushPdf(token, pdfBlob, pdfName, obrasFolderId, proveedoresFolderId, nroOC);
   };
 
+  // Archiva el presupuesto en las carpetas donde todavía no esté. Se usa cuando
+  // el PDF ya estaba subido: sin esto, una OC que se resube nunca recupera el
+  // presupuesto, porque _pushSource sólo corre en el camino de subida completa.
+  // Best-effort: el presupuesto no puede hacer fallar el respaldo de la OC.
+  async function _pushSourceIfMissing(obrasFid, provsFid, sourceFile, nroOC) {
+    if (!sourceFile) return;
+    const token = await getAccessToken();
+    const name  = nombreArchivoDrive('Presupuesto', sourceFile.name);
+    const mime  = sourceFile.type || 'application/octet-stream';
+    const subir = async fid => {
+      if (!fid) return;
+      const ya = await _findChild(token, name, fid, false);
+      if (!ya) await uploadFile(token, sourceFile, name, mime, fid);
+    };
+    const res = await Promise.allSettled([subir(obrasFid), subir(provsFid)]);
+    res.filter(r => r.status === 'rejected').forEach(r =>
+      logDriveError(nroOC, new Error(`Fuente: ${r.reason?.message}`)));
+  }
+
   // Subida idempotente: sube sólo las copias que falten. La usan los caminos de
   // reintento (cola offline, resubida desde Novedades), donde el PDF puede estar
   // archivado desde el intento anterior aunque el cliente lo haya visto fallar.
@@ -361,6 +445,8 @@
     try { hallazgo = await window.findOCUpload(meta, pdfName); } catch (_) {}
 
     if (hallazgo && hallazgo.pdfEnObras && hallazgo.pdfEnProveedores) {
+      // El PDF ya está archivado; lo único que puede faltar es el presupuesto.
+      await _pushSourceIfMissing(hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
       return {
         obrasFolderId:       hallazgo.obrasFolderId,
         proveedoresFolderId: hallazgo.proveedoresFolderId,
@@ -373,6 +459,7 @@
         proveedoresFolderId: hallazgo.pdfEnProveedores ? null : hallazgo.proveedoresFolderId,
         nroOC: meta.nroOC
       });
+      await _pushSourceIfMissing(hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
       return {
         obrasFolderId:       hallazgo.obrasFolderId,
         proveedoresFolderId: hallazgo.proveedoresFolderId,
@@ -453,35 +540,10 @@
 
     const mimeType = file.type || 'application/octet-stream';
 
-    // Para planilla: buscar si ya existe y hacer PATCH (actualizar) en vez de crear
-    if (tipo === 'planilla') {
-      const q = `name=${JSON.stringify(file.name)} and '${typeFolder}' in parents and trashed=false`;
-      const search = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (search.ok) {
-        const { files } = await search.json();
-        if (files?.length) {
-          // Actualizar contenido del archivo existente
-          const existingId = files[0].id;
-          const boundary   = 'vimeco_' + Date.now();
-          const meta       = JSON.stringify({ name: file.name, mimeType });
-          const enc        = new TextEncoder();
-          const pre        = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`);
-          const post       = enc.encode(`\r\n--${boundary}--`);
-          const content    = new Uint8Array(await file.arrayBuffer());
-          const body       = new Uint8Array(pre.length + content.length + post.length);
-          body.set(pre, 0); body.set(content, pre.length); body.set(post, pre.length + content.length);
-          const upd = await fetch(
-            `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart&fields=id`,
-            { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` }, body }
-          );
-          if (!upd.ok) throw new Error(`Update planilla (${upd.status})`);
-          return { fileId: (await upd.json()).id };
-        }
-      }
-    }
+    // La planilla del mes se regenera tras cada movimiento: pisa la que ya está
+    // en vez de dejar una copia nueva.
+    if (tipo === 'planilla')
+      return { fileId: await _upsertFile(token, file, file.name, mimeType, typeFolder) };
 
     // Crear nuevo archivo
     _requireFolderId(typeFolder, `caja de ${userName || userId}`);
@@ -712,16 +774,32 @@
     return { fileId, url, name };
   };
 
-  // Adjuntar un archivo a las carpetas Drive de una OC existente
-  window.attachToDriveOC = async function (file, { drive_folder_obras_id, drive_folder_proveedores_id, drive_folder_id, obra, fecha, proveedor, nroOC }) {
+  // Adjuntar un archivo a las carpetas Drive de una OC existente.
+  // `soloSiFalta` lo usan los reintentos: una subida puede llegar a Drive
+  // aunque el cliente la vea fallar (se corta la red al leer la respuesta), y
+  // reintentar a ciegas dejaba una segunda copia del archivo en la carpeta.
+  async function _attachToOC(file, meta, soloSiFalta) {
+    const { drive_folder_obras_id, drive_folder_proveedores_id, drive_folder_id,
+            obra, fecha, proveedor, nroOC } = meta;
     try {
       const token   = await getAccessToken();
       const mime    = file.type || 'application/octet-stream';
       const subName = `${fecha} | ${(proveedor || 'Sin proveedor').substring(0, 80)}`;
 
+      // Sube salvo que ya haya un archivo con ese nombre en la carpeta.
+      // _findChild sanitiza el nombre igual que uploadFile lo usa: los nombres
+      // vienen de un input de archivo, sin "/" ni más de 120 caracteres.
+      const subir = async fid => {
+        if (soloSiFalta) {
+          const ya = await _findChild(token, file.name, fid, false);
+          if (ya) return ya;
+        }
+        return uploadFile(token, file, file.name, mime, fid);
+      };
+
       // OC pre-reorganización: tiene solo drive_folder_id apuntando a COMPRAS/{obra}/...
       if (!drive_folder_obras_id && !drive_folder_proveedores_id && drive_folder_id) {
-        await uploadFile(token, file, file.name, mime, drive_folder_id);
+        await subir(drive_folder_id);
         return { folderId: drive_folder_id };
       }
 
@@ -744,14 +822,14 @@
         }
       }
 
-      await Promise.all([
-        uploadFile(token, file, file.name, mime, obrasFid),
-        uploadFile(token, file, file.name, mime, provsFid)
-      ]);
+      await Promise.all([subir(obrasFid), subir(provsFid)]);
       return { folderId: obrasFid || provsFid };
     } catch (err) {
       await logDriveError(nroOC, new Error(`Adjunto: ${err.message}`));
       throw err;
     }
-  };
+  }
+
+  window.attachToDriveOC          = (file, meta) => _attachToOC(file, meta, false);
+  window.attachToDriveOCIfMissing = (file, meta) => _attachToOC(file, meta, true);
 })();

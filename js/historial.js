@@ -30,6 +30,17 @@ function estadoBadge(oc) {
   return '';
 }
 
+// Estado de entrega, espejado en la OC por Remitos (`entrega.estado`). Las OC
+// sin remitos no muestran nada: sólo se avisa de lo que ya empezó a llegar.
+function entregaBadge(oc) {
+  const e = oc.entrega?.estado;
+  if (!e || e === 'sin') return '';
+  const base = 'display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;';
+  if (e === 'parcial')
+    return `<span style="${base}background:#fff4e0;color:#9a6a00;">Entrega parcial</span>`;
+  return `<span style="${base}background:#e3f5e8;color:#1e7d3a;">Entregada</span>`;
+}
+
 function renderCards(ocs) {
   const isAdmin = viewerIsAdmin;
   const list = $('hist-list');
@@ -54,6 +65,7 @@ function renderCards(ocs) {
     const total      = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
     const resp       = oc.responsable?.nombre || '';
     const badge      = estadoBadge(oc);
+    const entrega    = entregaBadge(oc);
     // Las OC pendientes todavía no tienen PDF definitivo → no se descarga.
     const showRegen  = canRegen && oc.estado !== 'pendiente';
 
@@ -64,7 +76,7 @@ function renderCards(ocs) {
       </div>
       <div class="hist-proveedor">${esc(provNombre)}</div>
       <div class="hist-obra">${esc(obra)}</div>
-      ${badge ? `<div style="margin-top:.35rem;">${badge}</div>` : ''}
+      ${badge || entrega ? `<div style="margin-top:.35rem;display:flex;gap:.35rem;flex-wrap:wrap;">${badge}${entrega}</div>` : ''}
       <div class="hist-card-bottom">
         <span class="hist-total">${total}</span>
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
@@ -230,7 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = name;
 
-  $('btn-adjuntar').addEventListener('click', () => { window.location.href = 'adjuntar.html'; });
+  $('btn-facturas').addEventListener('click', () => { window.location.href = 'facturas.html'; });
   $('btn-back').addEventListener('click',    () => { window.location.href = 'compras.html'; });
   $('hist-search').addEventListener('input',  applyFilters);
   $('hist-desde').addEventListener('change',  applyFilters);

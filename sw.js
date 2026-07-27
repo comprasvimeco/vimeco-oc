@@ -36,8 +36,11 @@ const STATIC_ASSETS = [
   BASE + '/historial.html',
   BASE + '/js/historial.js',
   BASE + '/js/driveQueue.js',
-  BASE + '/adjuntar.html',
-  BASE + '/js/adjuntar.js',
+  BASE + '/facturas.html',
+  BASE + '/js/facturas.js',
+  BASE + '/remitos.html',
+  BASE + '/js/remitos.js',
+  BASE + '/js/entregas.js',
   BASE + '/js/icons.js',
   BASE + '/js/ui.js',
   BASE + '/js/tutoriales.js',
@@ -85,7 +88,7 @@ self.addEventListener('fetch', event => {
 
   // Web Share Target: guarda el archivo en cache y redirige a app.html
   if (event.request.method === 'POST' &&
-      (url.pathname === BASE + '/app.html' || url.pathname === BASE + '/adjuntar.html')) {
+      (url.pathname === BASE + '/app.html' || url.pathname === BASE + '/facturas.html')) {
     event.respondWith((async () => {
       const formData = await event.request.formData();
       const file = formData.get('file');

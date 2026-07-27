@@ -1004,3 +1004,69 @@ body.scan-open { overflow: hidden; }
   background: #e8f0fb; color: var(--primary); border: 1px solid rgba(37,87,167,.18);
 }
 .obra-chip--none { background: var(--gray-100); color: var(--gray-500); border-color: var(--gray-200); font-weight: 400; }
+
+/* ===== REMITOS: control de entregas sobre las OC ===== */
+.rem-tabs { display: flex; gap: .4rem; margin-bottom: .85rem; }
+.rem-tab {
+  flex: 1; padding: .45rem .6rem; border: 1.5px solid var(--gray-300); background: var(--white);
+  border-radius: var(--radius); font-size: .85rem; font-weight: 600; color: var(--gray-600);
+  cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+}
+.rem-tab:hover  { border-color: var(--primary); color: var(--primary); }
+.rem-tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.rem-badge {
+  display: inline-block; padding: .1rem .5rem; border-radius: 999px;
+  font-size: .72rem; font-weight: 700;
+}
+.rem-badge--sin      { background: var(--gray-100); color: var(--gray-500); }
+.rem-badge--parcial  { background: #fff4e0; color: #9a6a00; }
+.rem-badge--completa { background: #e3f5e8; color: #1e7d3a; }
+
+.rem-prog-wrap { display: flex; align-items: center; gap: .5rem; margin: .45rem 0 .2rem; }
+.rem-prog { flex: 1; height: 6px; border-radius: 999px; background: var(--gray-200); overflow: hidden; }
+.rem-prog-fill { height: 100%; border-radius: 999px; transition: width .25s; }
+.rem-prog-fill--sin      { background: var(--gray-300); }
+.rem-prog-fill--parcial  { background: var(--warning); }
+.rem-prog-fill--completa { background: var(--success); }
+.rem-prog-pct { font-size: .72rem; font-weight: 700; color: var(--gray-500); min-width: 2.4rem; text-align: right; }
+
+.rem-obs { font-size: .8rem; color: var(--gray-500); font-style: italic; margin-top: .2rem; }
+
+/* Referencia de la OC arriba del formulario */
+.rem-oc-ref {
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius);
+  padding: .6rem .85rem; margin-bottom: 1.1rem;
+}
+.rem-oc-ref-nro  { font-size: .82rem; font-weight: 700; color: var(--primary); font-family: monospace; }
+.rem-oc-ref-prov { font-size: .92rem; font-weight: 600; color: var(--gray-900); }
+.rem-oc-ref-obra { font-size: .8rem; color: var(--gray-600); }
+
+.rem-section-lbl {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap;
+  font-size: .82rem; font-weight: 600; color: var(--gray-600);
+  margin-bottom: .5rem; text-transform: uppercase; letter-spacing: .04em;
+}
+.rem-quick { display: flex; gap: .35rem; }
+
+.rem-item {
+  border: 1px solid var(--gray-200); border-radius: var(--radius);
+  padding: .6rem .7rem; background: var(--white); margin-bottom: .5rem;
+}
+.rem-item:last-child { margin-bottom: 0; }
+.rem-item.is-completo { background: var(--gray-100); border-color: var(--gray-200); }
+.rem-item-desc { font-size: .88rem; font-weight: 600; color: var(--gray-900); margin-bottom: .4rem; }
+.rem-item-row  { display: flex; align-items: center; gap: .65rem; }
+.rem-item-meta {
+  flex: 1; display: flex; flex-wrap: wrap; gap: .1rem .65rem;
+  font-size: .74rem; color: var(--gray-500);
+}
+.rem-item-meta b { color: var(--gray-700); }
+.rem-item-pend b { color: var(--warning); }
+.rem-item.is-completo .rem-item-pend { color: var(--success); font-weight: 600; }
+.rem-item-input {
+  flex: 0 0 84px; padding: .45rem .5rem; font-size: 16px; text-align: right;
+  border: 1.5px solid var(--gray-300); border-radius: var(--radius);
+  background: var(--white); color: var(--gray-900);
+}
+.rem-item-input:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
