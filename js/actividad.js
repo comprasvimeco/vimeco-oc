@@ -472,7 +472,7 @@ async function resubirTodas() {
   const btn = $('act-resubir');
   btn.disabled = true;
 
-  let ok = 0, yaEstaban = 0, conPresupuesto = 0;
+  let ok = 0, yaEstaban = 0, conPresupuesto = 0, presupuestoPendiente = 0;
   const fallaron = [];
   for (const [i, oc] of list.entries()) {
     btn.innerHTML = `<span class="spinner"></span> Subiendo ${i + 1} de ${list.length}…`;
@@ -481,6 +481,7 @@ async function resubirTodas() {
       ok++;
       if (r && r.yaEstaba) yaEstaban++;
       if (r && r.presupuestoRecuperado) conPresupuesto++;
+      if (r && r.presupuestoPendiente)  presupuestoPendiente++;
     }
     catch (e) { fallaron.push(`${oc.nroOC} (${e.message})`); }
   }
@@ -502,4 +503,11 @@ async function resubirTodas() {
   // aparece conviene decirlo, porque es lo que antes se perdía en silencio.
   if (conPresupuesto)
     toast(`Se archivó también el presupuesto de ${conPresupuesto} ${conPresupuesto === 1 ? 'orden' : 'órdenes'}.`, 'success');
+
+  // Si no se pudo archivar, el archivo sigue en la cola de este navegador —no se
+  // borró—. Con la OC ya respaldada el panel deja de listarla, así que el
+  // reintento queda en manos de la cola: corre sola al abrir Órdenes de Compra.
+  if (presupuestoPendiente)
+    toast(`El presupuesto de ${presupuestoPendiente} ${presupuestoPendiente === 1 ? 'orden' : 'órdenes'} no se pudo archivar. ` +
+          'Sigue guardado en este dispositivo y se reintenta al abrir Órdenes de Compra.', 'warning');
 }

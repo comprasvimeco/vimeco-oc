@@ -192,18 +192,25 @@ async function resubirOC(oc) {
   // copia; uploadOCIfMissing decide qué subir (y no sube nada si ya está todo).
   const blob   = generateOCBlob(await ocDataDe(oc));
   const enCola = await presupuestoEnCola(oc);
-  const { obrasFolderId, proveedoresFolderId, yaEstaba } =
+  const { obrasFolderId, proveedoresFolderId, yaEstaba, presupuestoArchivado } =
     await uploadOCIfMissing(blob, fname, meta, enCola?.file || null);
 
   await registrarCarpetasOC(oc, obrasFolderId, proveedoresFolderId);
 
-  // Ya quedó archivada (PDF + presupuesto): sacarla de la cola para que el
-  // reintento automático no suba una segunda copia de lo mismo.
-  if (enCola && typeof driveQueue !== 'undefined') {
+  // Sólo se vacía la cola si quedó archivado TODO lo que había en ella. El
+  // presupuesto encolado es su única copia (vive sólo en este navegador): si la
+  // subida falló, borrarlo acá lo pierde para siempre. Queda para el reintento,
+  // que ahora es idempotente y no va a duplicar el PDF.
+  const presupuestoPendiente = !!enCola && !presupuestoArchivado;
+  if (enCola && !presupuestoPendiente && typeof driveQueue !== 'undefined') {
     try { await driveQueue.dequeue(enCola.histKey); } catch (_) {}
   }
 
-  return { yaEstaba, presupuestoRecuperado: !!enCola };
+  return {
+    yaEstaba,
+    presupuestoRecuperado: !!enCola && !presupuestoPendiente,
+    presupuestoPendiente
+  };
 }
 
 // La tarjeta de una novedad guarda el link a la carpeta en el momento de

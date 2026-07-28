@@ -616,7 +616,12 @@ async function retryRemitoQueue() {
     // Recién ahora las planillas pueden reflejar lo que estuvo encolado.
     for (const nro of subidas) {
       const oc = allOCs.find(o => o.nroOC === nro);
-      if (oc) await sincronizarPlanillas(oc);
+      if (!oc) continue;
+      // Y el resumen de entrega de la OC: es el que leen Historial y Reportes,
+      // que no bajan /remitos. Sin esto, un remito cargado sin señal dejaba la
+      // OC figurando sin entregas aunque el remito ya estuviera guardado.
+      actualizarEntregaOC(oc);
+      await sincronizarPlanillas(oc);
     }
   } catch (_) {}
 }

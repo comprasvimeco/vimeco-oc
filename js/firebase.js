@@ -583,6 +583,17 @@
     });
   };
 
+  // ¿Un admin borró a propósito la novedad de esta OC? La marca la deja
+  // tombstoneNovedadOC en el registro del historial.
+  async function _novedadOCBorrada(nroOC) {
+    try {
+      const resp = await fetch(
+        _base() + '/historial/' + String(nroOC).replace(/-/g, '') + '/novedad_borrada.json');
+      if (!resp.ok) return false;
+      return (await resp.json()) === true;
+    } catch (_) { return false; }
+  }
+
   // Igual que logOCActivity pero para los caminos de reintento (cola offline):
   // si la OC ya tiene su tarjeta —la pudo crear la reconciliación de Novedades
   // mientras la subida seguía pendiente— no publica otra, sólo le completa el
@@ -594,7 +605,12 @@
       previa = eventos.find(e => e.tipo === 'oc' && e.nroOC === nroOC);
     } catch (_) { /* sin lectura, mejor publicar que perder la novedad */ }
 
-    if (!previa) return logOCActivity(nroOC, proveedor, obra, total, folderId);
+    if (!previa) {
+      // Que no haya tarjeta también puede ser porque la borraron: publicarla
+      // ahora la haría volver, que es justo lo que la lápida evita.
+      if (await _novedadOCBorrada(nroOC)) return;
+      return logOCActivity(nroOC, proveedor, obra, total, folderId);
+    }
     if (folderId && !previa.driveUrl) {
       try {
         await patchActividad(previa.key, {

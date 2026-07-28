@@ -420,9 +420,11 @@
   // Archiva el presupuesto en las carpetas donde todavía no esté. Se usa cuando
   // el PDF ya estaba subido: sin esto, una OC que se resube nunca recupera el
   // presupuesto, porque _pushSource sólo corre en el camino de subida completa.
-  // Best-effort: el presupuesto no puede hacer fallar el respaldo de la OC.
+  // No hace fallar el respaldo de la OC, pero sí **devuelve si quedó archivado**:
+  // en una resubida el presupuesto puede venir de la cola offline, que es su
+  // única copia, y quien la vacía necesita saber que llegó a Drive.
   async function _pushSourceIfMissing(obrasFid, provsFid, sourceFile, nroOC) {
-    if (!sourceFile) return;
+    if (!sourceFile) return true;   // nada que archivar, nada que perder
     const token = await getAccessToken();
     const name  = nombreArchivoDrive('Presupuesto', sourceFile.name);
     const mime  = sourceFile.type || 'application/octet-stream';
@@ -434,23 +436,28 @@
     const res = await Promise.allSettled([subir(obrasFid), subir(provsFid)]);
     res.filter(r => r.status === 'rejected').forEach(r =>
       logDriveError(nroOC, new Error(`Fuente: ${r.reason?.message}`)));
+    return res.every(r => r.status === 'fulfilled');
   }
 
   // Subida idempotente: sube sólo las copias que falten. La usan los caminos de
   // reintento (cola offline, resubida desde Novedades), donde el PDF puede estar
   // archivado desde el intento anterior aunque el cliente lo haya visto fallar.
-  // Devuelve además `yaEstaba` para poder informarlo sin mentir.
+  // Devuelve `yaEstaba` para poder informarlo sin mentir, y
+  // `presupuestoArchivado` para que quien vacía la cola no borre la única copia
+  // del presupuesto sin que haya llegado a Drive.
   window.uploadOCIfMissing = async function (pdfBlob, pdfName, meta, sourceFile) {
     let hallazgo = null;
     try { hallazgo = await window.findOCUpload(meta, pdfName); } catch (_) {}
 
     if (hallazgo && hallazgo.pdfEnObras && hallazgo.pdfEnProveedores) {
       // El PDF ya está archivado; lo único que puede faltar es el presupuesto.
-      await _pushSourceIfMissing(hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
+      const presupuestoArchivado = await _pushSourceIfMissing(
+        hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
       return {
         obrasFolderId:       hallazgo.obrasFolderId,
         proveedoresFolderId: hallazgo.proveedoresFolderId,
-        yaEstaba:            true
+        yaEstaba:            true,
+        presupuestoArchivado
       };
     }
     if (hallazgo && (hallazgo.pdfEnObras || hallazgo.pdfEnProveedores)) {
@@ -459,15 +466,22 @@
         proveedoresFolderId: hallazgo.pdfEnProveedores ? null : hallazgo.proveedoresFolderId,
         nroOC: meta.nroOC
       });
-      await _pushSourceIfMissing(hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
+      const presupuestoArchivado = await _pushSourceIfMissing(
+        hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
       return {
         obrasFolderId:       hallazgo.obrasFolderId,
         proveedoresFolderId: hallazgo.proveedoresFolderId,
-        yaEstaba:            false
+        yaEstaba:            false,
+        presupuestoArchivado
       };
     }
-    const ids = await window.uploadToDrive(pdfBlob, pdfName, meta, sourceFile);
-    return { ...ids, yaEstaba: false };
+    // Nada archivado todavía: subida completa. El presupuesto se archiva aparte
+    // y esperando el resultado — uploadToDrive lo manda en background y ahí no
+    // hay forma de saber si llegó.
+    const ids = await window.uploadToDrive(pdfBlob, pdfName, meta, null);
+    const presupuestoArchivado = await _pushSourceIfMissing(
+      ids.obrasFolderId, ids.proveedoresFolderId, sourceFile, meta.nroOC);
+    return { ...ids, yaEstaba: false, presupuestoArchivado };
   };
 
   // Al PEDIR autorización: crea las carpetas y sube solo el archivo fuente (si hay),
