@@ -213,6 +213,11 @@ function render() {
   pager.footer('act', list, events, render);
 }
 
+// Novedades de OC borradas en esta sesión: la lápida vive en /historial, pero
+// la reconciliación trabaja con la copia del historial que bajó al abrir la
+// página, así que no vería una marca escrita después.
+const ocBorradasEnSesion = new Set();
+
 async function borrarNovedad(key) {
   const ev = allEvents.find(e => e.key === key);
   const ok = await showConfirm(
@@ -222,17 +227,37 @@ async function borrarNovedad(key) {
   if (!ok) return;
   try {
     await deleteActividad(key);
-    // Lápida: si es una novedad de OC, que la reconciliación no la reviva.
-    if (ev && ev.tipo === 'oc' && ev.nroOC && typeof tombstoneNovedadOC === 'function') {
-      await tombstoneNovedadOC(ev.nroOC);
-    }
-    allEvents = allEvents.filter(e => e.key !== key);
-    persistSeen();
-    render();
-    showToast('Novedad borrada.');
   } catch (_) {
     showToast('Error al borrar la novedad.', 'error');
+    return;
   }
+
+  allEvents = allEvents.filter(e => e.key !== key);
+  persistSeen();
+  render();
+
+  // Lápida: si es una novedad de OC, que la reconciliación no la reviva. Si no
+  // se puede escribir hay que decirlo: sin la marca la tarjeta vuelve sola en
+  // la próxima apertura de Novedades, y borrarla otra vez no cambia nada.
+  const nro = ev && ev.tipo === 'oc' ? (ev.nroOC || nroDeTitulo(ev.titulo)) : null;
+  if (nro) ocBorradasEnSesion.add(nro);   // la reconciliación puede estar corriendo
+  if (nro && typeof tombstoneNovedadOC === 'function') {
+    try {
+      await tombstoneNovedadOC(nro);
+    } catch (e) {
+      console.error('tombstoneNovedadOC:', e);
+      showToast(`Novedad borrada, pero la OC ${nro} puede volver a generarla.`, 'warning');
+      return;
+    }
+  }
+  showToast('Novedad borrada.');
+}
+
+// Las novedades previas al campo `nroOC` sólo lo tienen en el título
+// ("OC 0005-00000194 — Proveedor").
+function nroDeTitulo(titulo) {
+  const m = /^OC\s+(\S+)/.exec(titulo || '');
+  return m ? m[1] : null;
 }
 
 function setFilter(f) {
@@ -361,14 +386,11 @@ async function reconciliarLinksOC(hist) {
 // así el feed no depende de que cada aviso puntual haya llegado bien.
 async function reconciliarNovedadesOC(hist) {
   if (typeof ocsSinNovedad !== 'function' || typeof logOCActivity !== 'function') return;
-  let faltantes = ocsSinNovedad(hist, allEvents);
-  // No revivir las novedades que un admin borró a propósito (lápidas).
-  if (typeof getNovedadesOCBorradas === 'function') {
-    try {
-      const borradas = await getNovedadesOCBorradas();
-      faltantes = faltantes.filter(oc => !borradas.has(oc.nroOC));
-    } catch (_) {}
-  }
+  // Las que un admin borró a propósito quedan marcadas en su registro del
+  // historial (`novedad_borrada`) y ocsSinNovedad ya las descarta; las de esta
+  // misma sesión todavía no están en la copia del historial que se bajó.
+  const faltantes = ocsSinNovedad(hist, allEvents)
+    .filter(oc => !ocBorradasEnSesion.has(oc.nroOC));
   if (!faltantes.length) return;
 
   for (const oc of faltantes) {

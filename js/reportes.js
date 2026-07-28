@@ -733,6 +733,15 @@ function renderDuplicados(list) {
   }
 }
 
+// La OC deja de existir: su tarjeta en Novedades apuntaría a una orden que ya
+// no está (y el link de Drive a una carpeta sin dueño). Best-effort: el borrado
+// del historial, que es lo que importa, ya está hecho.
+async function limpiarNovedadesDe(oc) {
+  if (typeof deleteNovedadesDeOC !== 'function') return;
+  try { await deleteNovedadesDeOC(oc.nroOC); }
+  catch (e) { console.warn('limpiarNovedadesDe:', e); }
+}
+
 async function borrarDuplicado(key) {
   const oc = ocByKey(key);
   if (!oc) return;
@@ -744,6 +753,7 @@ async function borrarDuplicado(key) {
 
   try {
     await deleteHistorialEntry(key);
+    await limpiarNovedadesDe(oc);
     const i = ALL.indexOf(oc);     if (i >= 0) ALL.splice(i, 1);
     const j = ALL_RAW.indexOf(oc); if (j >= 0) ALL_RAW.splice(j, 1);
     toast('OC borrada.', 'success');
@@ -892,6 +902,7 @@ async function deleteOC() {
   const btn = $('foc-delete'); btn.disabled = true; btn.textContent = 'Borrando…';
   try {
     await deleteHistorialEntry(detailKey);
+    await limpiarNovedadesDe(oc);
     const i = ALL.indexOf(oc); if (i >= 0) ALL.splice(i, 1);
     const j = ALL_RAW.indexOf(oc); if (j >= 0) ALL_RAW.splice(j, 1);
     toast('OC borrada.', 'success');

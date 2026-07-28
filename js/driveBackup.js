@@ -80,6 +80,7 @@ function ocsSinNovedad(list, actEvents) {
   return list.filter(oc =>
     CON_PDF.has(oc.estado) &&
     !esObraPrueba(oc) &&
+    !oc.novedad_borrada &&           // un admin borró su novedad: no revivirla
     !conNovedad.has(oc.nroOC) &&
     !titulos.some(t => t.includes(oc.nroOC))
   );

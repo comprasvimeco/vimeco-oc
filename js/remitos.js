@@ -72,9 +72,13 @@ function entregasDeOC(oc) {
 // OC contra las que tiene sentido cargar un remito: las que realmente se
 // emitieron (una pendiente de autorización todavía no es una compra, y una
 // rechazada no va a llegar nunca) y que no son pruebas.
+// El super-admin (0000) sí ve las de prueba: es quien las crea (obra "X" del
+// desplegable) y las necesita para probar el circuito de entregas.
 function ocsElegibles() {
+  const verPruebas = viewerCode === '0000';
   return allOCs.filter(oc =>
-    !SIN_PDF.has(oc.estado) && !esObraPrueba(oc) && !esProveedorPrueba(oc));
+    !SIN_PDF.has(oc.estado) &&
+    (verPruebas || (!esObraPrueba(oc) && !esProveedorPrueba(oc))));
 }
 
 // ---- Render: lista de OC ----
@@ -339,6 +343,10 @@ function ocMetaDe(oc) {
 
 function logRemitoActivity(record, folderId) {
   if (typeof logActivity !== 'function') return;
+  // Los remitos de prueba (obra o proveedor "X") no van al feed: mismo criterio
+  // que el resto de la app. `record` tiene la misma forma que una OC (obra +
+  // proveedor.nombre), así que sirven las mismas funciones.
+  if (esObraPrueba(record) || esProveedorPrueba(record)) return;
   const n = (record.items || []).length;
   logActivity({
     tipo:    'remito',
@@ -427,6 +435,9 @@ async function guardarRemito() {
 
   if (!nro)   { mostrarError('Cargá el número de remito.'); return; }
   if (!fecha) { mostrarError('Cargá la fecha del remito.'); return; }
+  // La foto es el comprobante: sin ella el remito queda sin respaldo en Drive y
+  // no hay con qué verificar lo que se declaró recibido.
+  if (!modalFile) { mostrarError('Sacá o adjuntá la foto del remito.'); return; }
 
   // Una OC sin ítems cargados no tiene cantidades que pedir: se admite el
   // remito vacío (si no, el formulario no se puede guardar nunca).

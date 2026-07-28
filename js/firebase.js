@@ -626,19 +626,40 @@
   // "Lápida": marca una OC para que la reconciliación NO regenere su novedad
   // después de que un admin la borró a propósito. Sin esto, toda OC que siga en
   // /historial (típico de las de prueba con obra libre) revive su novedad al
-  // reabrir Novedades. Clave = nroOC (los guiones son válidos en Firebase).
+  // reabrir Novedades.
+  // La marca vive en el propio registro de /historial —contra el que ya se
+  // reconcilia— y no en un nodo aparte: las reglas de la base sólo habilitan los
+  // nodos existentes, así que el /actividad_oc_borradas de v157 respondía 401 y
+  // la lápida nunca llegaba a escribirse (silenciosamente: el PUT no miraba la
+  // respuesta). Por eso la novedad seguía volviendo en cada apertura.
   window.tombstoneNovedadOC = async function (nroOC) {
     if (!nroOC) return;
-    await fetch(_base() + '/actividad_oc_borradas/' + nroOC + '.json', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Date.now())
-    }).catch(() => {});
+    const url = _base() + '/historial/' + String(nroOC).replace(/-/g, '') + '.json';
+    // Si la OC ya no está en el historial no hay nada que pueda revivir: no se
+    // crea un registro fantasma sólo para dejar la marca.
+    const actual = await fetch(url);
+    if (!actual.ok || (await actual.json()) === null) return;
+    const resp = await fetch(url, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ novedad_borrada: true })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 
-  window.getNovedadesOCBorradas = async function () {
-    const resp = await fetch(_base() + '/actividad_oc_borradas.json');
-    if (!resp.ok) return new Set();
-    const data = await resp.json();
-    return new Set(Object.keys(data || {}));
+  // Borra del feed todas las novedades de una OC. Se usa al borrar la OC del
+  // historial: si no, su tarjeta queda huérfana en Novedades apuntando a una
+  // orden que ya no existe. Incluye las novedades viejas sin campo `nroOC`
+  // (sólo se pueden reconocer por el título).
+  window.deleteNovedadesDeOC = async function (nroOC) {
+    if (!nroOC) return 0;
+    const eventos = await getActividad(null);
+    const suyas = eventos.filter(e =>
+      e.tipo === 'oc' && (e.nroOC === nroOC || (e.titulo || '').includes(nroOC)));
+    for (const e of suyas) {
+      try { await deleteActividad(e.key); } catch (_) {}
+    }
+    return suyas.length;
   };
 
   // Devuelve los eventos de los últimos `dias` días, más recientes primero.
