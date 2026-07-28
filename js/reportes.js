@@ -160,18 +160,53 @@ function cuitDigits(oc) {
   return d.length >= 10 ? d : '';
 }
 
-let _provAlias = new Map();   // nombre normalizado → clave de CUIT
+let _provUnion = new Map();   // átomo → átomo padre (conjuntos de proveedor)
 let _provCanon = new Map();   // clave → { name, score }
 
-// Se reconstruye en cada render(): provKey() depende de _provAlias.
+// El CUIT solo no alcanza como identidad: se tipea a mano (o lo saca la IA de
+// un presupuesto) y un dígito de más parte al proveedor en dos. Pasó con
+// INDUTERM INGENIERIA S.R.L., que salía dos veces en el ranking —#6 y #7, una OC
+// cada una— y cuyas dos órdenes del mismo día por el mismo importe no se
+// detectaban como duplicadas porque el detector agrupa por proveedor.
+//
+// Así que la identidad se arma con las DOS señales, CUIT y nombre normalizado,
+// y es transitiva: dos OC son del mismo proveedor si comparten cualquiera de
+// las dos. Eso une "mismo nombre, CUIT mal tipeado" (el caso de arriba) y
+// "mismo CUIT, nombre escrito distinto" (el que ya resolvía el CUIT).
+//
+// El precio: dos proveedores realmente distintos que compartan nombre
+// normalizado quedan en un solo grupo aunque tengan CUIT distinto. Con nombres
+// de empresa completos es mucho menos probable que el error de tipeo inverso.
+function _provFind(atom, crear) {
+  if (!_provUnion.has(atom)) {
+    if (!crear) return atom;          // fuera del índice: vale por sí mismo
+    _provUnion.set(atom, atom);
+  }
+  let raiz = atom;
+  while (_provUnion.get(raiz) !== raiz) raiz = _provUnion.get(raiz);
+  // Compresión de camino: las próximas búsquedas son directas.
+  let k = atom;
+  while (_provUnion.get(k) !== raiz) { const sig = _provUnion.get(k); _provUnion.set(k, raiz); k = sig; }
+  return raiz;
+}
+
+// Átomos de una OC: su CUIT (si es válido) y su nombre normalizado.
+function _provAtoms(oc) {
+  const d = cuitDigits(oc);
+  const n = normProvName(oc.proveedor?.nombre);
+  return { cuit: d ? 'c' + d : null, nombre: n ? 'n' + n : null };
+}
+
+// Se reconstruye en cada render(): provKey() depende de estos índices.
 function buildProvIndex(list) {
-  // Alias: una OC sin CUIT válido se pega al grupo del mismo nombre que sí lo
-  // tiene, en vez de quedar como un proveedor aparte.
-  _provAlias = new Map();
+  _provUnion = new Map();
   list.forEach(oc => {
-    const d = cuitDigits(oc);
-    const n = normProvName(oc.proveedor?.nombre);
-    if (d && n) _provAlias.set(n, 'c' + d);
+    const { cuit, nombre } = _provAtoms(oc);
+    if (!cuit && !nombre) return;
+    const a = _provFind(cuit || nombre, true);
+    const b = _provFind(nombre || cuit, true);
+    // La raíz del CUIT gana cuando hay uno: es la clave más estable.
+    if (a !== b) _provUnion.set(b, a);
   });
 
   // Nombre a mostrar: gana el de la base maestra (el que trae codigoInterno);
@@ -186,11 +221,9 @@ function buildProvIndex(list) {
 }
 
 function provKey(oc) {
-  const d = cuitDigits(oc);
-  if (d) return 'c' + d;
-  const n = normProvName(oc.proveedor?.nombre);
-  if (!n) return '—';
-  return _provAlias.get(n) || ('n' + n);
+  const { cuit, nombre } = _provAtoms(oc);
+  if (!cuit && !nombre) return '—';
+  return _provFind(cuit || nombre, false);
 }
 
 function provLabel(oc) {
