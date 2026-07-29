@@ -58,7 +58,7 @@
 
   async function getOrCreateFolder(token, name, parentId) {
     _requireFolderId(parentId, `padre de "${name}"`);
-    const safe = (name || 'Sin nombre').replace(/[/\\]/g, '-').trim().substring(0, 120);
+    const safe = _safeName(name || 'Sin nombre');
     const q    = `name=${JSON.stringify(safe)} and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
     const s    = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
@@ -83,6 +83,14 @@
 
   function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+  // Nombre con el que un archivo o carpeta vive en Drive. Lo comparten quien
+  // sube y quien busca: si divergen, buscar no encuentra lo que se subió y todo
+  // lo que dependa de esa búsqueda (no duplicar, reemplazar la planilla) falla
+  // en silencio.
+  function _safeName(name) {
+    return String(name == null ? '' : name).replace(/[/\\]/g, '-').trim().substring(0, 120);
+  }
+
   // Reubica un archivo que Drive archivó fuera de su carpeta. Devuelve true si
   // quedó en su lugar.
   async function _moveToFolder(token, fileId, folderId, fromParents) {
@@ -95,8 +103,28 @@
     return r.ok;
   }
 
+  // ¿Una subida que el cliente vio fallar llegó igual a Drive? Busca en la
+  // carpeta un archivo con el mismo nombre Y el mismo tamaño creado desde que
+  // arrancó esta subida. Los tres filtros juntos hacen que sólo pueda encontrar
+  // lo que acabamos de mandar nosotros.
+  // Sin `desdeISO` la ventana temporal no se aplica: sirve para preguntar "¿este
+  // archivo exacto ya está en esta carpeta?" sin importar cuándo llegó.
+  async function _findUploaded(token, name, folderId, size, desdeISO) {
+    const q = `name=${JSON.stringify(name)} and '${folderId}' in parents and trashed=false` +
+              (desdeISO ? ` and createdTime > '${desdeISO}'` : '');
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,size)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!r.ok) return null;
+    const { files } = await r.json();
+    const hit = (files || []).find(f => String(f.size) === String(size));
+    return hit ? hit.id : null;
+  }
+
   async function uploadFile(token, blob, name, mimeType, folderId) {
     _requireFolderId(folderId, `subida de "${name}"`);
+    name = _safeName(name);
     const boundary = 'vimeco_' + Date.now();
     const meta     = JSON.stringify({ name, parents: [folderId], mimeType });
     const enc      = new TextEncoder();
@@ -115,9 +143,22 @@
     const url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,parents';
     // Reintentos con backoff: en móvil la subida falla a veces por cortes de red
     // transitorios ("Load failed") o respuestas 5xx/429. Reintentar las absorbe.
+    // Pero un fetch puede fallar DESPUÉS de que Drive creó el archivo (se corta
+    // la red al leer la respuesta): ahí reintentar a ciegas deja una segunda
+    // copia. Le pasó al presupuesto de la OC 0001-00000230, duplicado con 5
+    // minutos de diferencia —lo que tardaba cada intento en subir el archivo— y
+    // sin dejar ningún error registrado, porque el segundo intento salió bien.
+    // El margen de 2 minutos hacia atrás absorbe el desfase entre el reloj del
+    // dispositivo y el de Drive, que es quien pone createdTime.
+    const desdeISO = new Date(Date.now() - 120000).toISOString();
     let lastErr;
     for (let attempt = 0; attempt < 4; attempt++) {
-      if (attempt > 0) await _sleep(600 * attempt);   // 0, 600, 1200, 1800 ms
+      if (attempt > 0) {
+        await _sleep(600 * attempt);   // 600, 1200, 1800 ms
+        let yaSubido = null;
+        try { yaSubido = await _findUploaded(token, name, folderId, blob.size, desdeISO); } catch (_) {}
+        if (yaSubido) return yaSubido;
+      }
       try {
         const resp = await fetch(url, {
           method:  'POST',
@@ -157,7 +198,7 @@
   // apunten a nombres distintos (una obra con "/" en el nombre los separaría).
   async function _upsertFile(token, blob, name, mimeType, folderId) {
     _requireFolderId(folderId, `subida de "${name}"`);
-    const safe = String(name).replace(/[/\\]/g, '-').trim().substring(0, 120);
+    const safe = _safeName(name);
 
     let existingId = null;
     try { existingId = await _findChild(token, safe, folderId, false); } catch (_) {}
@@ -322,25 +363,58 @@
     if (pdfResults.every(r => r.status === 'rejected')) throw pdfResults[0].reason;
   }
 
-  // Sube el archivo fuente a ambas carpetas. Devuelve un link de vista a la
-  // primera copia subida con éxito (o '' si no hay archivo / falló todo).
-  async function _pushSource(token, sourceFile, obrasFolderId, proveedoresFolderId, nroOC) {
-    if (!sourceFile) return '';
-    const mime = sourceFile.type || 'application/octet-stream';
-    // El archivo fuente es el presupuesto del proveedor: se archiva con el
-    // prefijo para distinguirlo de la OC, la factura y los remitos, que
-    // conviven en la misma carpeta.
+  // Archiva el archivo fuente en las carpetas que se le pasen, salteando las que
+  // ya lo tienen. El archivo fuente es el presupuesto del proveedor: se archiva
+  // con el prefijo para distinguirlo de la OC, la factura y los remitos, que
+  // conviven en la misma carpeta.
+  //
+  // Tres caminos archivan el mismo presupuesto en la misma carpeta —emitir la
+  // OC, pedir autorización y reintentar desde la cola— y hasta ahora sólo el
+  // último miraba antes de subir. Mirar siempre también cubre el caso de dos OC
+  // del mismo proveedor el mismo día, que comparten carpeta.
+  //
+  // Nunca lanza: el respaldo de la OC no puede depender de esto. Devuelve
+  // `{ ok, link }`; `ok` en false significa que alguna copia no quedó archivada,
+  // y quien vacía la cola offline lo necesita para no borrar el único ejemplar
+  // que existe del presupuesto.
+  async function _archivarFuente(token, sourceFile, destinos, nroOC) {
     const name = nombreArchivoDrive('Presupuesto', sourceFile.name);
-    const results = await Promise.allSettled([
-      uploadFile(token, sourceFile, name, mime, obrasFolderId),
-      uploadFile(token, sourceFile, name, mime, proveedoresFolderId)
-    ]);
+    const mime = sourceFile.type || 'application/octet-stream';
+    const results = await Promise.allSettled(destinos.map(async ({ fid }) => {
+      // Se compara nombre Y tamaño: dos OC del mismo proveedor y día comparten
+      // carpeta, y sus presupuestos pueden llamarse igual sin serlo (dos fotos
+      // "IMG_0042.jpg"). Con el nombre solo, el segundo no se archivaría nunca.
+      // Si la búsqueda falla, subir igual: perder el presupuesto es peor que
+      // duplicarlo.
+      let ya = null;
+      try { ya = await _findUploaded(token, name, fid, sourceFile.size, null); } catch (_) {}
+      return ya || uploadFile(token, sourceFile, name, mime, fid);
+    }));
     results.forEach((r, i) => {
       if (r.status === 'rejected')
-        logDriveError(nroOC, new Error(`Fuente ${i === 0 ? 'OBRAS' : 'PROVEEDORES'}: ${r.reason?.message}`));
+        logDriveError(nroOC, new Error(`Fuente ${destinos[i].label}: ${r.reason?.message}`));
     });
     const ok = results.find(r => r.status === 'fulfilled' && r.value);
-    return ok ? `https://drive.google.com/file/d/${ok.value}/view` : '';
+    return {
+      ok:   results.every(r => r.status === 'fulfilled'),
+      link: ok ? `https://drive.google.com/file/d/${ok.value}/view` : ''
+    };
+  }
+
+  function _destinosFuente(obrasFid, proveedoresFid) {
+    return [
+      { fid: obrasFid,        label: 'OBRAS' },
+      { fid: proveedoresFid,  label: 'PROVEEDORES' }
+    ].filter(d => d.fid);
+  }
+
+  // Sube el archivo fuente a ambas carpetas. Devuelve un link de vista a la
+  // primera copia archivada (o '' si no hay archivo / falló todo).
+  async function _pushSource(token, sourceFile, obrasFolderId, proveedoresFolderId, nroOC) {
+    if (!sourceFile) return '';
+    const { link } = await _archivarFuente(
+      token, sourceFile, _destinosFuente(obrasFolderId, proveedoresFolderId), nroOC);
+    return link;
   }
 
   window.uploadToDrive = async function (pdfBlob, pdfName, meta, sourceFile) {
@@ -367,7 +441,7 @@
   // Busca una carpeta/archivo por nombre sin crear nada. Devuelve el id o null.
   async function _findChild(token, name, parentId, soloCarpetas) {
     if (!parentId || !name) return null;
-    const safe = String(name).replace(/[/\\]/g, '-').trim().substring(0, 120);
+    const safe = _safeName(name);
     const q = `name=${JSON.stringify(safe)} and '${parentId}' in parents and trashed=false` +
               (soloCarpetas ? " and mimeType='application/vnd.google-apps.folder'" : '');
     const r = await fetch(
@@ -420,23 +494,16 @@
   // Archiva el presupuesto en las carpetas donde todavía no esté. Se usa cuando
   // el PDF ya estaba subido: sin esto, una OC que se resube nunca recupera el
   // presupuesto, porque _pushSource sólo corre en el camino de subida completa.
-  // No hace fallar el respaldo de la OC, pero sí **devuelve si quedó archivado**:
+  // Comparte el fondo con _pushSource; se distingue en que resuelve el token por
+  // su cuenta y en que **devuelve si quedó archivado**:
   // en una resubida el presupuesto puede venir de la cola offline, que es su
   // única copia, y quien la vacía necesita saber que llegó a Drive.
   async function _pushSourceIfMissing(obrasFid, provsFid, sourceFile, nroOC) {
     if (!sourceFile) return true;   // nada que archivar, nada que perder
     const token = await getAccessToken();
-    const name  = nombreArchivoDrive('Presupuesto', sourceFile.name);
-    const mime  = sourceFile.type || 'application/octet-stream';
-    const subir = async fid => {
-      if (!fid) return;
-      const ya = await _findChild(token, name, fid, false);
-      if (!ya) await uploadFile(token, sourceFile, name, mime, fid);
-    };
-    const res = await Promise.allSettled([subir(obrasFid), subir(provsFid)]);
-    res.filter(r => r.status === 'rejected').forEach(r =>
-      logDriveError(nroOC, new Error(`Fuente: ${r.reason?.message}`)));
-    return res.every(r => r.status === 'fulfilled');
+    const { ok } = await _archivarFuente(
+      token, sourceFile, _destinosFuente(obrasFid, provsFid), nroOC);
+    return ok;
   }
 
   // Subida idempotente: sube sólo las copias que falten. La usan los caminos de
