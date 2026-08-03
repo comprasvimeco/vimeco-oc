@@ -83,6 +83,43 @@ function ocsElegibles() {
     (verPruebas || (!esObraPrueba(oc) && !esProveedorPrueba(oc))));
 }
 
+// ---- Búsqueda ----
+
+// Sin acentos ni mayúsculas: en obra se escribe "caneria" y el ítem dice
+// "Cañería". Se normaliza igual el texto buscado y el buscado adentro.
+function normTxt(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// Todo lo buscable de una OC en un solo texto: proveedor, obra, número y la
+// descripción de cada ítem. Así "hierro" encuentra la OC por su renglón aunque
+// el proveedor no se llame así.
+const hayCache = new WeakMap();
+function haystackOC(oc) {
+  let h = hayCache.get(oc);
+  if (h === undefined) {
+    h = normTxt([oc.proveedor?.nombre, oc.obra, oc.nroOC,
+                 ...(oc.items || []).map(it => it.desc)].join(' '));
+    hayCache.set(oc, h);
+  }
+  return h;
+}
+
+// Todos los términos tienen que aparecer, pero no juntos ni en orden: "cemento
+// norte" encuentra la OC de cemento de la obra Norte.
+function coincideOC(oc, terms) {
+  const hay = haystackOC(oc);
+  return terms.every(t => hay.includes(t));
+}
+
+// Renglones que explican la coincidencia, para mostrarlos en la tarjeta: si se
+// buscó un artículo, sin esto no se ve por qué apareció esa OC.
+function itemsCoincidentes(oc, terms) {
+  return (oc.items || [])
+    .filter(it => { const d = normTxt(it.desc); return terms.every(t => d.includes(t)); })
+    .map(it => it.desc);
+}
+
 // ---- Render: lista de OC ----
 
 function badgeEntrega(estado) {
@@ -91,27 +128,24 @@ function badgeEntrega(estado) {
 }
 
 function renderOCList() {
-  const q    = ($('rem-search').value || '').toLowerCase().trim();
-  const box  = $('rem-oc-list');
+  const terms = normTxt($('rem-search').value).trim().split(/\s+/).filter(Boolean);
+  const box   = $('rem-oc-list');
 
   let list = ocsElegibles().map(oc => ({ oc, e: entregasDeOC(oc) }));
   if (filtroOC === 'pendientes') list = list.filter(({ e }) => e.estado !== 'completa');
-  if (q) {
-    list = list.filter(({ oc }) =>
-      (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
-      (oc.obra || '').toLowerCase().includes(q) ||
-      (oc.nroOC || '').toLowerCase().includes(q));
-  }
+  if (terms.length) list = list.filter(({ oc }) => coincideOC(oc, terms));
 
   if (!list.length) {
     box.innerHTML = `<div class="hist-empty">${
-      filtroOC === 'pendientes' && !q
+      filtroOC === 'pendientes' && !terms.length
         ? 'No hay OC pendientes de entrega.'
         : 'No se encontraron OC.'}</div>`;
     return;
   }
 
-  box.innerHTML = pager.take('remoc', list).map(({ oc, e }) => `
+  box.innerHTML = pager.take('remoc', list).map(({ oc, e }) => {
+    const hits = terms.length ? itemsCoincidentes(oc, terms) : [];
+    return `
     <div class="adj-oc-card">
       <div class="adj-oc-top">
         <span class="hist-nro">${escHtml(oc.nroOC)}</span>
@@ -119,6 +153,9 @@ function renderOCList() {
       </div>
       <div class="hist-proveedor">${escHtml(oc.proveedor?.nombre || '—')}</div>
       <div class="hist-obra">${escHtml(oc.obra || '—')}</div>
+      ${hits.length ? `<div class="rem-hits">${
+        hits.slice(0, 3).map(d => `<span>${escHtml(d)}</span>`).join('')
+      }${hits.length > 3 ? `<span>y ${hits.length - 3} ítem(s) más</span>` : ''}</div>` : ''}
       <div class="rem-prog-wrap">
         <div class="rem-prog"><div class="rem-prog-fill rem-prog-fill--${e.estado}" style="width:${Math.min(100, e.pct)}%"></div></div>
         <span class="rem-prog-pct">${e.pct}%</span>
@@ -129,7 +166,8 @@ function renderOCList() {
           ${icSvg('plus')} Remito
         </button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   box.querySelectorAll('.btn-cargar-remito').forEach(btn => {
     btn.addEventListener('click', () => {

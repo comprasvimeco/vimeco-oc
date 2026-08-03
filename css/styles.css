@@ -1033,6 +1033,14 @@ body.scan-open { overflow: hidden; }
 
 .rem-obs { font-size: .8rem; color: var(--gray-500); font-style: italic; margin-top: .2rem; }
 
+/* Renglones de la OC que coinciden con lo buscado: explican por qué apareció */
+.rem-hits { display: flex; flex-direction: column; gap: .15rem; margin-top: .35rem; }
+.rem-hits span {
+  font-size: .78rem; color: var(--primary); background: var(--gray-100);
+  border-left: 2px solid var(--primary-light); border-radius: 0 4px 4px 0;
+  padding: .18rem .45rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* Referencia de la OC arriba del formulario */
 .rem-oc-ref {
   background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius);
