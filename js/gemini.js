@@ -380,6 +380,119 @@ async function extractFromTicket(file) {
   };
 }
 
+// ---- Remito: lectura contra los ítems de una OC ----
+
+// El remito se lee siempre CONTRA una OC ya cargada: en vez de pedir una lista
+// libre de ítems (que después habría que matchear a mano y con errores), se le
+// pasan los renglones de la OC numerados y sólo puede devolver cantidades
+// contra esos índices. Lo que figura en el papel y no está en la OC vuelve por
+// separado en "sin_match": es un aviso para el usuario, no algo para cargar.
+function remitoPrompt(ocItems) {
+  const lista = ocItems.length
+    ? ocItems.map((it, i) =>
+        `${i}. ${it.desc || '(sin descripción)'} | unidad: ${it.unidad || 'u'} | pendiente de entregar: ${it.pendiente}`
+      ).join('\n')
+    : '(la orden de compra no tiene ítems cargados)';
+
+  return `Analizás la foto de un REMITO de entrega de materiales de Argentina. Puede estar torcida, con sombras o escrita a mano.
+
+Estos son los renglones de la orden de compra contra la que se está recibiendo la mercadería:
+${lista}
+
+Tu tarea:
+1. Leer el número de remito y la fecha del documento.
+2. Para cada renglón del remito, decidir a qué número de la lista de arriba corresponde (por descripción y unidad; las palabras no van a coincidir exactamente) y cuánto se entregó.
+
+Devolvé ÚNICAMENTE un JSON válido, sin markdown ni texto adicional:
+
+{
+  "nro": "número de remito tal como figura (ej: 0001-00012345), o null",
+  "fecha": "fecha del remito en formato YYYY-MM-DD, o null",
+  "observaciones": "nota breve SOLO si el remito indica algo relevante sobre la entrega (bulto dañado, faltante, entrega parcial), sino null",
+  "items": [
+    { "idx": número_de_la_lista, "cantidad": número_decimal_entregado }
+  ],
+  "sin_match": ["descripción de los renglones del remito que no corresponden a ningún número de la lista"]
+}
+
+Reglas:
+- "idx" debe ser uno de los números de la lista de arriba. Nunca inventes índices.
+- Un renglón de la lista puede aparecer como máximo una vez en "items".
+- Si un renglón del remito no se corresponde con ninguno de la lista, va en "sin_match", NO en "items".
+- Si el remito no aclara la cantidad de un renglón que sí figura entregado, usá la cantidad pendiente de ese número.
+- Si no podés leer un dato, devolvé null (no inventes un número de remito ni una fecha).
+- FORMATO NUMÉRICO: en documentos argentinos el punto es separador de miles y la coma es decimal.
+  Ejemplos: "1.250,50" → 1250.5 · "12,5" → 12.5 · "1.000" → 1000`;
+}
+
+async function extractFromRemito(file, ocItems) {
+  const apiKey = typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : null;
+  if (!apiKey || apiKey === 'AQUI_VA_LA_KEY') throw new Error('No hay API Key configurada.');
+
+  const items = Array.isArray(ocItems) ? ocItems : [];
+
+  file = await compressImageIfNeeded(file);
+  const base64   = await fileToBase64(file);
+  const mimeType = normalizeMimeType(file.type, file.name);
+
+  const body = {
+    contents: [{ parts: [{ text: remitoPrompt(items) }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+    generationConfig: { temperature: 0.05, maxOutputTokens: 8192 }
+  };
+
+  let response;
+  try {
+    response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(60000)
+    });
+  } catch (err) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError')
+      throw new Error('Gemini tardó demasiado. Cargá el remito a mano.');
+    throw err;
+  }
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || `HTTP ${response.status}`);
+  }
+
+  const data    = await response.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let clean = rawText.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  const s = clean.indexOf('{'), e = clean.lastIndexOf('}');
+  if (s === -1 || e === -1) throw new Error('Respuesta inesperada de Gemini.');
+
+  let parsed;
+  try { parsed = JSON.parse(clean.slice(s, e + 1)); }
+  catch { throw new Error('La respuesta de Gemini no es JSON válido.'); }
+
+  // Un índice inventado escribiría una cantidad en el renglón equivocado, y un
+  // índice repetido pisaría el anterior: se descartan los dos casos.
+  const vistos = new Set();
+  const leidos = (parsed.items || []).reduce((acc, it) => {
+    const idx  = Number(it.idx);
+    const cant = parseFloatSafe(it.cantidad);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= items.length) return acc;
+    if (vistos.has(idx) || cant <= 0) return acc;
+    vistos.add(idx);
+    acc.push({ idx, cantidad: cant });
+    return acc;
+  }, []);
+
+  const fecha = trimOrNull(parsed.fecha);
+
+  return {
+    nro:           trimOrNull(parsed.nro),
+    fecha:         /^\d{4}-\d{2}-\d{2}$/.test(fecha || '') ? fecha : null,
+    observaciones: trimOrNull(parsed.observaciones),
+    items:         leidos,
+    sinMatch:      (parsed.sin_match || []).map(t => String(t || '').trim()).filter(Boolean)
+  };
+}
+
 // ---- Voice extraction ----
 
 const VOICE_PROMPT = `Sos un asistente especializado en registrar órdenes de compra para la empresa VIMECO S.A.

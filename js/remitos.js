@@ -17,7 +17,9 @@ let viewerName    = '';
 let viewerIsAdmin = false;
 let filtroOC      = 'pendientes';
 let modalOC       = null; // OC abierta en el modal de carga
-let modalFile     = null; // foto elegida para el remito en curso
+let modalFile     = null; // foto elegida para el remito en curso (la que se sube)
+let modalRawFile  = null; // la misma foto sin escanear, para volver a pasarla por el escáner
+let modalPrevUrl  = null; // objectURL del preview, a revocar al cambiarla
 
 // ---- Formato ----
 
@@ -233,8 +235,7 @@ function renderTodo() {
 // ---- Modal de carga ----
 
 function abrirModal(oc) {
-  modalOC   = oc;
-  modalFile = null;
+  modalOC = oc;
 
   const e = entregasDeOC(oc);
 
@@ -266,20 +267,154 @@ function abrirModal(oc) {
   $('rem-nro').value   = '';
   $('rem-fecha').value = hoyISO();
   $('rem-obs').value   = '';
-  $('rem-file').value  = '';
-  $('rem-camera').value = '';
-  $('rem-file-name').classList.add('hidden');
+  limpiarFoto();
   $('rem-error').classList.add('hidden');
   $('btn-rem-guardar').disabled = false;
 
+  // Sin foco en el N° de remito: ahora lo primero es la foto, y en el celular
+  // el teclado tapaba el formulario apenas se abría el modal.
   $('modal-remito').classList.remove('hidden');
-  $('rem-nro').focus();
 }
 
 function cerrarModal() {
   $('modal-remito').classList.add('hidden');
-  modalOC   = null;
-  modalFile = null;
+  limpiarFoto();
+  modalOC = null;
+}
+
+// ---- Foto del remito ----
+
+// La foto es el primer paso del formulario: es el comprobante que se archiva en
+// Drive y, con "Leer con IA", de ella salen el número, la fecha y las cantidades.
+function setFoto(file, conPreview) {
+  modalFile = file;
+  if (modalPrevUrl) { URL.revokeObjectURL(modalPrevUrl); modalPrevUrl = null; }
+
+  const nameEl = $('rem-file-name');
+  const prevEl = $('rem-preview');
+  if (conPreview && file.type.startsWith('image/')) {
+    modalPrevUrl = URL.createObjectURL(file);
+    $('rem-preview-img').src = modalPrevUrl;
+    prevEl.classList.remove('hidden');
+    nameEl.classList.add('hidden');
+  } else {
+    nameEl.innerHTML = `${icSvg('checkSm')} ${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB)`;
+    nameEl.classList.remove('hidden');
+    prevEl.classList.add('hidden');
+  }
+
+  $('btn-rem-rescan').style.display = modalRawFile ? '' : 'none';
+  $('btn-rem-ia').disabled = false;
+  ocultarIA();
+}
+
+function limpiarFoto() {
+  modalFile = modalRawFile = null;
+  if (modalPrevUrl) { URL.revokeObjectURL(modalPrevUrl); modalPrevUrl = null; }
+  $('rem-file').value   = '';
+  $('rem-camera').value = '';
+  $('rem-file-name').classList.add('hidden');
+  $('rem-preview').classList.add('hidden');
+  $('rem-preview-img').removeAttribute('src');
+  $('btn-rem-ia').disabled = true;
+  ocultarIA();
+}
+
+// Foto de cámara: pasa por el escáner (recorte de perspectiva + filtro) antes
+// de adjuntarse. Un remito enderezado se lee mucho mejor, en Drive y por la IA.
+async function escanear(file) {
+  if (!file || typeof openScanner !== 'function') { if (file) setFoto(file, true); return; }
+  modalRawFile = file;
+  try {
+    const scan = await openScanner(file);
+    if (scan) setFoto(scan, true);   // null = canceló: no cambia nada
+  } catch (_) {
+    // Escáner no disponible (p. ej. sin conexión la primera vez): va la original.
+    setFoto(file, true);
+    toast('Escáner no disponible; se adjuntó la foto original.', 'warning');
+  }
+}
+
+// Archivo elegido a mano: se adjunta tal cual (puede ser un PDF). Si es imagen
+// queda disponible para escanearla desde el preview.
+function adjuntarArchivo(file) {
+  if (!file) return;
+  modalRawFile = file.type.startsWith('image/') ? file : null;
+  setFoto(file, true);
+}
+
+// ---- Lectura con IA ----
+
+function setIA(tipo, icono, html) {
+  const box = $('rem-ia-status');
+  box.className = `extract-status ${tipo}`;
+  box.innerHTML = `${icono}<span>${html}</span>`;
+}
+
+function ocultarIA() {
+  const box = $('rem-ia-status');
+  box.className = 'extract-status hidden';
+  box.innerHTML = '';
+}
+
+// La IA lee el remito CONTRA los ítems de la OC abierta: no devuelve una lista
+// libre que después habría que matchear, sino cantidades atadas a cada renglón.
+async function leerConIA() {
+  if (!modalFile || !modalOC || typeof extractFromRemito !== 'function') return;
+
+  const e     = entregasDeOC(modalOC);
+  const items = (modalOC.items || []).map((it, i) => ({
+    desc:      it.desc   || '',
+    unidad:    it.unidad || '',
+    pendiente: e.pendiente[i]
+  }));
+
+  const btn = $('btn-rem-ia');
+  btn.disabled = true;
+  setIA('loading', '<span class="spinner"></span>', 'Leyendo el remito con IA…');
+
+  let r;
+  try {
+    r = await extractFromRemito(modalFile, items);
+  } catch (err) {
+    console.error('extractFromRemito:', err);
+    setIA('error', icSvg('alert'),
+      `${escHtml(err.message || 'No se pudo leer el remito.')} Cargalo a mano.`);
+    btn.disabled = false;
+    return;
+  }
+  btn.disabled = false;
+
+  if (r.nro)   $('rem-nro').value   = r.nro;
+  if (r.fecha) $('rem-fecha').value = r.fecha;
+  // Lo que ya escribió el usuario vale más que lo que dedujo la IA.
+  if (r.observaciones && !$('rem-obs').value.trim()) $('rem-obs').value = r.observaciones;
+
+  // Los inputs arrancan en "lo que falta": si sólo se completaran los renglones
+  // leídos, los que el remito no menciona quedarían declarados como recibidos.
+  // Por eso se vacían todos antes de volcar lo leído.
+  if (r.items.length) {
+    setCantidades('vaciar');
+    r.items.forEach(({ idx, cantidad }) => {
+      const inp = document.querySelector(`.rem-item-input[data-idx="${idx}"]`);
+      if (inp) inp.value = fmtInput(cantidad);
+    });
+  }
+
+  if (!r.nro && !r.items.length) {
+    setIA('error', icSvg('alert'),
+      'No se pudo leer el remito. Probá con otra foto o cargalo a mano.');
+    return;
+  }
+
+  const partes = [];
+  if (r.nro) partes.push(`N° ${escHtml(r.nro)}`);
+  if (r.items.length) partes.push(`${r.items.length} ítem${r.items.length !== 1 ? 's' : ''}`);
+  const aviso = r.sinMatch.length
+    ? `<br>Figura(n) en el remito pero no en la OC: ${escHtml(r.sinMatch.join(', '))}.`
+    : '';
+  setIA('success', icSvg('checkSm'),
+    `Leído: ${partes.join(' · ')}. Revisá los datos antes de guardar.${aviso}`);
 }
 
 // "Llegó todo" / "Vaciar": el input arranca en lo que falta, así guardar sin
@@ -682,15 +817,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('btn-rem-camera').style.display = '';
   $('btn-rem-archivo').addEventListener('click', () => $('rem-file').click());
   $('btn-rem-camera').addEventListener('click',  () => $('rem-camera').click());
-  const onFile = f => {
-    if (!f) return;
-    modalFile = f;
-    const el = $('rem-file-name');
-    el.innerHTML = `${icSvg('checkSm')} ${escHtml(f.name)} (${(f.size / 1024).toFixed(0)} KB)`;
-    el.classList.remove('hidden');
-  };
-  $('rem-file').addEventListener('change',   e => onFile(e.target.files[0]));
-  $('rem-camera').addEventListener('change', e => onFile(e.target.files[0]));
+  $('rem-file').addEventListener('change',   e => adjuntarArchivo(e.target.files[0]));
+  $('rem-camera').addEventListener('change', e => {
+    const f = e.target.files[0];
+    e.target.value = '';   // sacar dos veces la misma foto vuelve a disparar change
+    if (f) escanear(f);
+  });
+  $('btn-rem-rescan').addEventListener('click', () => { if (modalRawFile) escanear(modalRawFile); });
+  $('btn-rem-quitar').addEventListener('click', limpiarFoto);
+  $('btn-rem-ia').addEventListener('click', leerConIA);
 
   try {
     await cargarDatos();

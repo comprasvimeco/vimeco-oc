@@ -75,6 +75,46 @@
 
       <div class="rem-oc-ref" id="rem-oc-ref"></div>
 
+      <!-- Paso 1: la foto. Es el comprobante y, además, de ella sale el resto
+           del formulario cuando se usa "Leer con IA". -->
+      <div style="margin-bottom:1.2rem;">
+        <label class="rem-section-lbl">Foto del remito <span style="font-weight:400;text-transform:none;color:var(--danger);">(obligatoria)</span></label>
+        <input type="file" id="rem-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
+        <input type="file" id="rem-camera" accept="image/*" capture="environment" style="display:none">
+        <div class="import-buttons" style="margin-bottom:.5rem;">
+          <button type="button" class="btn import-btn" id="btn-rem-archivo">
+            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
+            <span class="import-btn-label">Subir archivo</span>
+          </button>
+          <button type="button" class="btn import-btn" id="btn-rem-camera" style="display:none">
+            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+            <span class="import-btn-label">Sacar foto</span>
+          </button>
+        </div>
+        <div id="rem-file-name" class="upload-filename hidden"></div>
+        <!-- Preview de la foto escaneada -->
+        <div id="rem-preview" class="scan-preview hidden">
+          <img id="rem-preview-img" alt="Remito">
+          <div class="scan-preview-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-rem-rescan">
+              <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              Escanear
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-rem-quitar">
+              <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Quitar
+            </button>
+          </div>
+        </div>
+        <div class="extract-bar">
+          <button type="button" class="btn btn-primary" id="btn-rem-ia" disabled>
+            <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Leer con IA
+          </button>
+        </div>
+        <div id="rem-ia-status" class="extract-status hidden" style="margin-top:.6rem;"></div>
+      </div>
+
       <div class="form-row">
         <div class="form-group">
           <label for="rem-nro">N° de remito *</label>
@@ -98,23 +138,6 @@
       <div class="form-group" style="margin-top:1.1rem;">
         <label for="rem-obs">Observaciones <span style="font-weight:400;text-transform:none;color:var(--gray-400);">(opcional)</span></label>
         <input type="text" id="rem-obs" class="form-control" placeholder="Ej: bulto dañado, faltó descarga…">
-      </div>
-
-      <div style="margin-bottom:.25rem;">
-        <label class="rem-section-lbl">Foto del remito <span style="font-weight:400;text-transform:none;color:var(--danger);">(obligatoria)</span></label>
-        <input type="file" id="rem-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
-        <input type="file" id="rem-camera" accept="image/*" capture="environment" style="display:none">
-        <div class="import-buttons" style="margin-bottom:.5rem;">
-          <button type="button" class="btn import-btn" id="btn-rem-archivo">
-            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
-            <span class="import-btn-label">Subir archivo</span>
-          </button>
-          <button type="button" class="btn import-btn" id="btn-rem-camera" style="display:none">
-            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-            <span class="import-btn-label">Sacar foto</span>
-          </button>
-        </div>
-        <div id="rem-file-name" class="upload-filename hidden"></div>
       </div>
 
       <div id="rem-error" class="alert alert-error hidden"></div>
@@ -145,6 +168,41 @@
   </div>
 </div>
 
+<!-- ===== EDITOR DE ESCANEO ===== -->
+<div id="scan-editor" class="scan-editor hidden">
+  <div class="scan-area">
+    <div class="scan-stage" id="scan-stage">
+      <canvas id="scan-canvas"></canvas>
+      <canvas id="scan-quad"></canvas>
+      <div class="scan-handle" data-corner="tl"></div>
+      <div class="scan-handle" data-corner="tr"></div>
+      <div class="scan-handle" data-corner="br"></div>
+      <div class="scan-handle" data-corner="bl"></div>
+    </div>
+  </div>
+  <div class="scan-loading hidden" id="scan-loading">
+    <div class="scan-spinner"></div>
+    <span id="scan-loading-text">Cargando escáner…</span>
+  </div>
+  <div class="scan-toolbar">
+    <div class="scan-filters">
+      <button type="button" class="scan-chip active" data-filter="color">Color</button>
+      <button type="button" class="scan-chip" data-filter="gray">Grises</button>
+      <button type="button" class="scan-chip" data-filter="bw">B&amp;N</button>
+    </div>
+    <div class="scan-actions">
+      <button type="button" class="scan-btn" id="scan-rotate" title="Rotar">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      </button>
+      <button type="button" class="scan-btn" id="scan-cancel">Cancelar</button>
+      <button type="button" class="scan-btn primary" id="scan-done">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Listo
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <script src="js/icons.js"></script>
@@ -155,6 +213,8 @@
 <script src="js/driveQueue.js"></script>
 <script src="js/driveBackup.js"></script>
 <script src="js/entregas.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/scanner.js"></script>
 <script src="js/remitos.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

@@ -30,7 +30,7 @@ window.TUTORIALES = {
       { icono: 'folder', titulo: 'Generá y archivá',
         texto: 'Al generar, el PDF se sube a Drive automáticamente. No hace falta guardarlo ni ordenarlo a mano.' },
       { icono: 'truck', titulo: 'Remitos: qué llegó y qué falta',
-        texto: 'Cuando llega el material, cargá el remito contra su Orden de Compra. Los ítems vienen precargados con lo que se pidió: si llegó todo, guardás; si fue parcial, corregís las cantidades. La OC te muestra cuánto falta entregar.' },
+        texto: 'Cuando llega el material, cargá el remito contra su Orden de Compra. Lo primero es la foto: la cámara abre el escáner y con "Leer con IA" se completan solos el número, la fecha y las cantidades recibidas. Revisás, corregís si hace falta y guardás. La OC te muestra cuánto falta entregar.' },
       { icono: 'clip', titulo: 'Facturas e Historial',
         texto: 'Cargá la factura del proveedor a una OC existente desde Facturas. Cada archivo se archiva en Drive con su nombre (Factura, Remito, Presupuesto), en la misma carpeta que la Orden. Desde Historial volvés a ver o regenerar Órdenes anteriores.' },
     ],
