@@ -5,6 +5,10 @@ let allOCs      = [];
 let pendingOC   = null;   // OC elegida para cargar manualmente (vista principal)
 let viewerIsAdmin = false; // 0000 o usuario con permiso admin
 let tipoCarga   = 'factura';  // 'factura' | 'otro'
+let rawFile     = null;   // imagen original (sin escanear), para volver a pasarla por el escáner
+let filePrevUrl = null;   // objectURL del preview actual
+
+const ES_MOBILE = 'ontouchstart' in window || window.innerWidth <= 768;
 
 // En la carpeta de una compra conviven la OC, el presupuesto, la factura y los
 // remitos: el prefijo es lo único que los distingue. "Otro archivo" va con su
@@ -41,15 +45,50 @@ function setFile(file) {
   $('file-ready-msg').innerHTML = `${icSvg('check')} ${esc(file.name)} &nbsp;(${(file.size / 1024).toFixed(0)} KB)`;
   $('file-info').classList.remove('hidden');
   $('step1-actions').classList.remove('hidden');
+  mostrarPreview(file);
+}
+
+// El preview (con su botón de escanear) solo tiene sentido con imágenes: un PDF
+// ya viene derecho y no pasa por el escáner.
+function mostrarPreview(file) {
+  if (filePrevUrl) { URL.revokeObjectURL(filePrevUrl); filePrevUrl = null; }
+  const box = $('file-preview');
+  if (!file.type.startsWith('image/') || typeof openScanner !== 'function') {
+    box.classList.add('hidden');
+    $('file-preview-img').removeAttribute('src');
+    return;
+  }
+  filePrevUrl = URL.createObjectURL(file);
+  $('file-preview-img').src = filePrevUrl;
+  box.classList.remove('hidden');
 }
 
 function resetZone() {
   currentFile = null;
+  rawFile     = null;
+  if (filePrevUrl) { URL.revokeObjectURL(filePrevUrl); filePrevUrl = null; }
   $('import-zone').classList.remove('hidden');
   $('file-info').classList.add('hidden');
+  $('file-preview').classList.add('hidden');
+  $('file-preview-img').removeAttribute('src');
   $('step1-actions').classList.add('hidden');
-  $('file-input').value    = '';
-  $('camera-input').value  = '';
+  $('file-input').value     = '';
+  $('camera-input').value   = '';
+  $('manual-camera').value  = '';
+}
+
+// Pasa una foto por el escáner (recorte de perspectiva + filtro). Una factura
+// enderezada se archiva mejor en Drive y la IA la lee mucho mejor.
+// Devuelve el archivo a usar, o null si el usuario canceló el escaneo.
+async function escanear(file) {
+  if (!file || typeof openScanner !== 'function') return file || null;
+  try {
+    return await openScanner(file);
+  } catch (_) {
+    // Escáner no disponible (p. ej. sin conexión la primera vez): va la original.
+    toast('Escáner no disponible; se usó la foto original.', 'warning');
+    return file;
+  }
 }
 
 async function checkShareFile() {
@@ -187,7 +226,10 @@ function renderPrimaryListItems(ocs) {
     ${viewerIsAdmin && oc.responsable?.nombre ? `<div class="hist-obra" style="color:var(--gray-500);font-size:.78rem;">por ${esc(oc.responsable.nombre)}</div>` : ''}
     <div class="adj-oc-bottom">
       <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
-      <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Cargar</button>
+      <span class="adj-oc-actions">
+        ${ES_MOBILE ? `<button class="btn btn-sm btn-secondary btn-icon btn-attach-cam" data-nro="${esc(oc.nroOC)}" title="Sacar foto" aria-label="Sacar foto"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></button>` : ''}
+        <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Cargar</button>
+      </span>
     </div>
   </div>`).join('');
 }
@@ -213,6 +255,16 @@ function bindPickButtons() {
       const mf = $('manual-file');
       mf.value = '';
       mf.click();
+    });
+  });
+
+  // Sacar foto: la factura pasa por el escáner y se sube apenas se toca "Listo".
+  document.querySelectorAll('.btn-attach-cam').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingOC = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
+      const ci = $('manual-camera');
+      ci.value = '';
+      ci.click();
     });
   });
 }
@@ -412,6 +464,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (f && pendingOC) doAttachPick(f, pendingOC);
   });
 
+  // Foto sacada desde una OC de la lista: escáner y, si no se cancela, sube
+  $('manual-camera').addEventListener('change', async e => {
+    const f  = e.target.files[0];
+    const oc = pendingOC;
+    e.target.value = '';   // sacar dos veces la misma foto vuelve a disparar change
+    if (!f || !oc) return;
+    const scan = await escanear(f);
+    if (scan) doAttachPick(scan, oc);
+    else pendingOC = null;   // canceló el escaneo: no se sube nada
+  });
+
   // Toggle del flujo IA (secundario)
   $('btn-toggle-ai').addEventListener('click', () => {
     $('card-file').classList.remove('hidden');
@@ -432,15 +495,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   const fileInput   = $('file-input');
   const cameraInput = $('camera-input');
 
-  if ('ontouchstart' in window || window.innerWidth <= 768) {
+  if (ES_MOBILE) {
     $('btn-camera').classList.remove('hidden');
   }
 
   $('btn-select-file').addEventListener('click', () => fileInput.click());
   $('btn-camera').addEventListener('click', () => cameraInput.click());
 
-  fileInput.addEventListener('change',   () => { if (fileInput.files[0])   setFile(fileInput.files[0]); });
-  cameraInput.addEventListener('change', () => { if (cameraInput.files[0]) setFile(cameraInput.files[0]); });
+  // Archivo elegido a mano: se usa tal cual (puede ser un PDF). Si es imagen,
+  // queda disponible para escanearla desde el preview.
+  function elegirArchivo(file) {
+    if (!file) return;
+    rawFile = file.type.startsWith('image/') ? file : null;
+    setFile(file);
+  }
+
+  fileInput.addEventListener('change', () => elegirArchivo(fileInput.files[0]));
+
+  // Foto de cámara: pasa por el escáner antes de quedar cargada
+  cameraInput.addEventListener('change', async () => {
+    const f = cameraInput.files[0];
+    cameraInput.value = '';
+    if (!f) return;
+    rawFile = f;
+    const scan = await escanear(f);
+    if (scan) setFile(scan);   // null = canceló: no cambia nada
+  });
+
+  $('btn-file-rescan').addEventListener('click', async () => {
+    const base = rawFile || currentFile;
+    if (!base) return;
+    const scan = await escanear(base);
+    if (scan) setFile(scan);
+  });
 
   // Drag & drop (desktop)
   const importZone = $('import-zone');
@@ -449,7 +536,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   importZone.addEventListener('drop', e => {
     e.preventDefault();
     importZone.classList.remove('drag-over');
-    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+    elegirArchivo(e.dataTransfer.files[0]);
   });
 
   $('btn-change-file').addEventListener('click', resetZone);
