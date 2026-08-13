@@ -110,6 +110,52 @@ const SEED_EQUIPOS = [
   ['VQ 218', 'Volqueta']
 ];
 
+// Patentes / dominios por código de equipo. Se usan en dos momentos:
+// al importar la lista inicial, y desde "Cargar patentes" para completar
+// el campo en los equipos que ya existen (sin tocar el resto de la ficha).
+const SEED_PATENTES = {
+  'AC 86':     'D 006622',
+  'C 172':     'VMH-951',
+  'C 23':      'F 010331',
+  'C 301':     'FVG466',
+  'C 316':     'NRX240',
+  'C 323':     'AA088DH',
+  'C 362':     'AF440LL',
+  'C 378':     'AH033UP',
+  'C 50':      'D 010753',
+  'C 76':      'D 002475',
+  'CB 306':    'FXQ815',
+  'CB 324':    'PHK729',
+  'MN 358':    'ELE 29',
+  'MTX 318':   'AA088DH',
+  'MTXT 331':  '101LHL342',
+  'P 296':     'FMN202',
+  'P 312':     'KZB380',
+  'P 313':     'LHL342',
+  'P 314':     'LVX297',
+  'P 317':     'NYQ004',
+  'P 319':     'NRL824',
+  'P 320':     'OYI625',
+  'P 322':     'AA383RS',
+  'P 350':     'AB513SR',
+  'P 352':     'AD352JR',
+  'P 366':     'AF440LH',
+  'P 374':     'AF802FA',
+  'PA 311':    'LGL360',
+  'PA 354':    'AD226EA',
+  'PA 360':    'AF241TT',
+  'PH 238':    'X 574327',
+  'PU 368':    'AF882SN',
+  'PU 370':    'AG200KI',
+  'REC 310':   'CSH61',
+  'REC 315':   'NRX240',
+  'RLV 364':   'ERK 37',
+  'S 390':     'AH538BF',
+  'S 57':      'D 001588',
+  'SC 58':     'D 001816',
+  'TXM 372':   'EVJ02'
+};
+
 
 
 function showConfirm(title, msg) {
@@ -140,7 +186,8 @@ function equipoKey(codigo) {
 let allEquipos = [];
 let obrasMap   = {};   // key de obra → nombre (para mostrar la ubicación)
 
-const PIN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+const PIN_SVG  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+const USER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
 
 function ubicChip(e) {
   if (!e.ubicacion) return '<span class="eq-ubic eq-ubic--none">Sin ubicación</span>';
@@ -163,8 +210,16 @@ function renderEquipos(list) {
   }
   container.innerHTML = list.map(e => `
     <div class="eq-row ${e.activo ? '' : 'eq-row--inactive'}" title="Abrir ficha">
-      <span class="eq-code">${esc(e.codigo)}</span>
-      <span class="eq-tipo">${esc(e.tipo || '')}</span>
+      <span class="eq-info">
+        <span class="eq-line">
+          <span class="eq-code">${esc(e.codigo)}</span>
+          ${e.patente ? `<span class="eq-pat">${esc(e.patente)}</span>` : ''}
+        </span>
+        <span class="eq-line">
+          <span class="eq-tipo">${esc(e.tipo || '')}</span>
+          ${e.responsable ? `<span class="eq-resp">${USER_SVG}${esc(e.responsable)}</span>` : ''}
+        </span>
+      </span>
       ${ubicChip(e)}
       ${e.activo ? '' : '<span class="u-badge u-badge-inactivo">Inactivo</span>'}
       <span class="eq-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
@@ -195,8 +250,10 @@ function applyFilter() {
   if (v === '__none')  list = list.filter(e => !e.ubicacion);
   else if (v)          list = list.filter(e => e.ubicacion === v);
   if (q) list = list.filter(e =>
-    (e.codigo || '').toLowerCase().includes(q) ||
-    (e.tipo   || '').toLowerCase().includes(q));
+    (e.codigo      || '').toLowerCase().includes(q) ||
+    (e.tipo        || '').toLowerCase().includes(q) ||
+    (e.patente     || '').toLowerCase().includes(q) ||
+    (e.responsable || '').toLowerCase().includes(q));
   renderEquipos(list);
 }
 
@@ -223,18 +280,23 @@ async function loadEquipos() {
 function openAddModal() {
   $('modal-equipo-title').textContent = 'Agregar equipo';
   $('modal-equipo-error').classList.add('hidden');
-  $('equipo-codigo').value = '';
-  $('equipo-tipo').value   = '';
-  $('equipo-codigo').disabled = false;
+  $('equipo-codigo').value      = '';
+  $('equipo-tipo').value        = '';
+  $('equipo-patente').value     = '';
+  $('equipo-responsable').value = '';
+  $('equipo-codigo').disabled   = false;
   $('modal-equipo').classList.remove('hidden');
   setTimeout(() => $('equipo-codigo').focus(), 50);
 }
 
-// Alta rápida (código + tipo). La foto y los repuestos se cargan luego en la ficha.
+// Alta rápida (código + tipo + patente + responsable).
+// La foto y los repuestos se cargan luego en la ficha.
 async function saveEquipoModal() {
-  const codigo = $('equipo-codigo').value.trim();
-  const tipo   = $('equipo-tipo').value.trim();
-  const errEl  = $('modal-equipo-error');
+  const codigo      = $('equipo-codigo').value.trim();
+  const tipo        = $('equipo-tipo').value.trim();
+  const patente     = $('equipo-patente').value.trim().toUpperCase();
+  const responsable = $('equipo-responsable').value.trim();
+  const errEl       = $('modal-equipo-error');
 
   if (!codigo) {
     errEl.textContent = 'El código es requerido.';
@@ -254,7 +316,7 @@ async function saveEquipoModal() {
   saveBtn.textContent = 'Guardando…';
 
   try {
-    await saveEquipo(key, { codigo, tipo, activo: true, creadoEn: Date.now() });
+    await saveEquipo(key, { codigo, tipo, patente, responsable, activo: true, creadoEn: Date.now() });
     $('modal-equipo').classList.add('hidden');
     showToast('Equipo creado.');
     openFicha(key);
@@ -280,7 +342,11 @@ async function seedEquipos() {
   try {
     const obj = {};
     SEED_EQUIPOS.forEach(([codigo, tipo]) => {
-      obj[equipoKey(codigo)] = { codigo, tipo, activo: true, creadoEn: Date.now() };
+      obj[equipoKey(codigo)] = {
+        codigo, tipo,
+        patente: SEED_PATENTES[codigo] || '',
+        activo: true, creadoEn: Date.now()
+      };
     });
     await bulkSaveEquipos(obj);
     showToast('Lista inicial importada.');
@@ -290,6 +356,46 @@ async function seedEquipos() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Importar lista inicial';
+  }
+}
+
+// Completa la patente en los equipos que ya existen, sin tocar el resto de la
+// ficha. Los códigos de la tabla que no estén cargados se informan al final.
+async function importarPatentes() {
+  const existentes = new Set(allEquipos.map(e => e.key));
+  const pares      = Object.entries(SEED_PATENTES);
+  const aplicar    = pares.filter(([codigo]) => existentes.has(equipoKey(codigo)));
+  const faltantes  = pares.filter(([codigo]) => !existentes.has(equipoKey(codigo)))
+                          .map(([codigo]) => codigo);
+
+  if (!aplicar.length) {
+    showToast('Ningún equipo de la tabla de patentes está cargado.', 'error');
+    return;
+  }
+
+  const ok = await showConfirm(
+    'Cargar patentes',
+    `Se completará la patente en ${aplicar.length} equipos. ` +
+    'Se sobrescribe la patente actual; el resto de la ficha no se toca.'
+  );
+  if (!ok) return;
+
+  const btn = $('btn-patentes');
+  btn.disabled = true;
+  btn.textContent = 'Cargando…';
+  try {
+    // Un PATCH por equipo: así solo se escribe el campo patente.
+    await Promise.all(aplicar.map(([codigo, patente]) =>
+      patchEquipo(equipoKey(codigo), { patente })));
+    showToast(faltantes.length
+      ? `${aplicar.length} patentes cargadas. Sin equipo: ${faltantes.join(', ')}.`
+      : `${aplicar.length} patentes cargadas.`);
+    await loadEquipos();
+  } catch (_) {
+    showToast('Error al cargar las patentes.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Cargar patentes';
   }
 }
 
@@ -310,12 +416,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
   $('btn-add-equipo').addEventListener('click', openAddModal);
   $('btn-seed').addEventListener('click', seedEquipos);
+  $('btn-patentes').addEventListener('click', importarPatentes);
   $('filtro-obra').addEventListener('change', applyFilter);
   $('buscar-equipo').addEventListener('input', applyFilter);
   $('modal-equipo-close').addEventListener('click',  () => $('modal-equipo').classList.add('hidden'));
   $('modal-equipo-cancel').addEventListener('click', () => $('modal-equipo').classList.add('hidden'));
   $('modal-equipo-save').addEventListener('click', saveEquipoModal);
-  $('equipo-tipo').addEventListener('keydown', e => { if (e.key === 'Enter') saveEquipoModal(); });
+  $('equipo-responsable').addEventListener('keydown', e => { if (e.key === 'Enter') saveEquipoModal(); });
 
   loadEquipos();
 });

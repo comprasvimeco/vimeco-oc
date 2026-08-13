@@ -222,8 +222,10 @@ async function loadFicha() {
     fotoActual = await getEquipoFoto(currentKey).catch(() => null);
     obras      = await getAllObras().catch(() => []);
 
-    $('eq-codigo').value = equipo.codigo || '';
-    $('eq-tipo').value   = equipo.tipo || '';
+    $('eq-codigo').value      = equipo.codigo || '';
+    $('eq-tipo').value        = equipo.tipo || '';
+    $('eq-patente').value     = equipo.patente || '';
+    $('eq-responsable').value = equipo.responsable || '';
     pintarEstado();
     pintarUbicacion();
 
@@ -242,12 +244,14 @@ async function loadFicha() {
 
 // ---- Guardar ----
 async function save() {
-  const codigo    = $('eq-codigo').value.trim();
-  const tipo      = $('eq-tipo').value.trim();
-  const activo    = equipo.activo !== false;
-  const ubicacion = $('eq-ubicacion').value || null;
-  const items     = collectItems();
-  const errEl     = $('eq-error');
+  const codigo      = $('eq-codigo').value.trim();
+  const tipo        = $('eq-tipo').value.trim();
+  const patente     = $('eq-patente').value.trim().toUpperCase();
+  const responsable = $('eq-responsable').value.trim();
+  const activo      = equipo.activo !== false;
+  const ubicacion   = $('eq-ubicacion').value || null;
+  const items       = collectItems();
+  const errEl       = $('eq-error');
   errEl.classList.add('hidden');
 
   if (!codigo) {
@@ -273,13 +277,13 @@ async function save() {
         return;
       }
       await saveEquipo(newKey, {
-        codigo, tipo, activo, ubicacion, items,
+        codigo, tipo, patente, responsable, activo, ubicacion, items,
         creadoEn: equipo.creadoEn || Date.now()
       });
       await deleteEquipo(currentKey);
       keyFinal = newKey;
     } else {
-      await patchEquipo(currentKey, { codigo, tipo, activo, ubicacion, items });
+      await patchEquipo(currentKey, { codigo, tipo, patente, responsable, activo, ubicacion, items });
     }
 
     // Foto
@@ -301,7 +305,7 @@ async function save() {
       return;
     }
     // Refrescar estado local
-    equipo = { key: keyFinal, codigo, tipo, activo, ubicacion, items, creadoEn: equipo.creadoEn };
+    equipo = { key: keyFinal, codigo, tipo, patente, responsable, activo, ubicacion, items, creadoEn: equipo.creadoEn };
     if (fotoNueva) fotoActual = fotoNueva;
     else if (fotoQuitar) fotoActual = null;
     fotoNueva = null; fotoQuitar = false;

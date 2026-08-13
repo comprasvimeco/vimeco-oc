@@ -19,8 +19,17 @@
     .eq-row:hover { border-color:var(--primary); box-shadow:0 2px 8px rgba(35,72,112,.10); }
     .eq-row:active { transform:scale(.995); }
     .eq-row--inactive { opacity:.55; }
+    .eq-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:.12rem; }
+    .eq-line { display:flex; align-items:center; gap:.5rem; min-width:0; }
     .eq-code { font-weight:700; color:var(--gray-800); font-size:.95rem; white-space:nowrap; flex-shrink:0; }
-    .eq-tipo { color:var(--gray-500); font-size:.88rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .eq-pat {
+      font-size:.7rem; font-weight:700; letter-spacing:.04em; color:var(--gray-600);
+      background:var(--gray-100); border:1px solid var(--gray-200); border-radius:5px;
+      padding:.06rem .32rem; white-space:nowrap; flex-shrink:0;
+    }
+    .eq-tipo { color:var(--gray-500); font-size:.88rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .eq-resp { flex-shrink:0; display:inline-flex; align-items:center; gap:.22rem; font-size:.76rem; color:var(--gray-500); white-space:nowrap; }
+    .eq-resp svg { width:12px; height:12px; flex-shrink:0; }
     .eq-ubic { flex-shrink:0; display:inline-flex; align-items:center; gap:.25rem; font-size:.76rem; font-weight:600;
       color:var(--primary); background:var(--gray-100); border-radius:999px; padding:.16rem .55rem;
       max-width:42%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -59,6 +68,7 @@
       <span style="font-weight:600;color:var(--gray-700);">Equipos del sistema</span>
       <div style="display:flex;gap:.5rem;">
         <button class="btn btn-secondary btn-sm hidden" id="btn-seed">Importar lista inicial</button>
+        <button class="btn btn-secondary btn-sm" id="btn-patentes">Cargar patentes</button>
         <button class="btn btn-primary btn-sm" id="btn-add-equipo">+ Agregar equipo</button>
       </div>
     </div>
@@ -90,9 +100,17 @@
         <label for="equipo-codigo">Código *</label>
         <input type="text" id="equipo-codigo" class="form-control" placeholder="Ej: C 172">
       </div>
-      <div class="form-group u-mb-0">
+      <div class="form-group">
         <label for="equipo-tipo">Tipo / Descripción</label>
         <input type="text" id="equipo-tipo" class="form-control" placeholder="Ej: Camion L111">
+      </div>
+      <div class="form-group">
+        <label for="equipo-patente">Patente / Dominio</label>
+        <input type="text" id="equipo-patente" class="form-control" placeholder="Ej: AF440LL" autocapitalize="characters" style="text-transform:uppercase">
+      </div>
+      <div class="form-group u-mb-0">
+        <label for="equipo-responsable">Responsable</label>
+        <input type="text" id="equipo-responsable" class="form-control" placeholder="Nombre y apellido">
       </div>
       <div id="modal-equipo-error" class="alert alert-error hidden"></div>
     </div>
