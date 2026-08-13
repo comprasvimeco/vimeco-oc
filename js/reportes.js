@@ -47,6 +47,20 @@ function esc(s) {
 function ocByKey(key) { return ALL.find(o => histKeyOf(o) === key); }
 
 let OBRAS_ALL = []; // nombres de obras (para el datalist de reasignación)
+let PATENTES  = {}; // código de equipo → patente (desde la ficha del equipo)
+
+// La OC guarda un snapshot del equipo (código, tipo, categoría). La patente se
+// toma de ahí si está, y si no de la ficha actual: así las OC viejas —cargadas
+// antes de que el equipo tuviera patente— también la muestran.
+function patenteDe(eq) {
+  return (eq && (eq.patente || PATENTES[eq.codigo])) || '';
+}
+
+function equipoLabel(eq) {
+  if (!eq || !eq.codigo) return '';
+  const pat = patenteDe(eq);
+  return eq.codigo + (pat ? ` (${pat})` : '') + (eq.tipo ? ' — ' + eq.tipo : '');
+}
 function distinctObras() {
   const s = new Set(OBRAS_ALL);
   ALL.forEach(o => { if (o.obra) s.add(o.obra); });
@@ -671,7 +685,7 @@ function render() {
   const conEquipo = list.filter(oc => oc.equipo?.codigo);
   renderBars('rep-equipos', groupAgg(conEquipo,
       oc => oc.equipo.codigo,
-      oc => `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}`),
+      oc => equipoLabel(oc.equipo)),
     { grandTotal: grand, drill: true, catChip: true, catSplit: true,
       emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
@@ -868,7 +882,7 @@ function openOCDetail(key) {
       ${fichaRow('CUIT', prov.cuit)}
       ${fichaRow('Cond. IVA', prov.condicionIVA)}
       ${fichaRow('Cond. pago', oc.condicionPago)}
-      ${fichaRow('Equipo', oc.equipo ? `${oc.equipo.codigo}${oc.equipo.tipo ? ' — ' + oc.equipo.tipo : ''}` : '')}
+      ${fichaRow('Equipo', equipoLabel(oc.equipo))}
       ${fichaRow('Categoría', oc.equipo?.categoria)}
       ${fichaRow('Responsable', oc.responsable?.nombre)}
       ${fichaRow('Moneda', cur)}
@@ -1108,6 +1122,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Nombres de obras para reasignación
   try { OBRAS_ALL = (await getAllObras()).map(o => o.nombre); } catch (_) {}
+
+  // Patentes por código de equipo (best-effort: sin esto el reporte sigue
+  // mostrando el equipo, sólo que sin la patente).
+  try {
+    PATENTES = {};
+    (await getAllEquipos()).forEach(e => { if (e.patente) PATENTES[e.codigo] = e.patente; });
+  } catch (_) {}
 
   renderDolarHoy();
   if (typeof getDolarSnapshot === 'function') getDolarSnapshot().then(renderDolarHoy).catch(() => {});

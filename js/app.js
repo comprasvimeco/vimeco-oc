@@ -666,7 +666,7 @@ async function setupEquipoCombo() {
     list.forEach(eq => {
       const div = document.createElement('div');
       div.className = 'combo-option';
-      div.innerHTML = `<span>${eq.codigo}</span><span class="combo-option-sub">${eq.tipo}</span>`;
+      div.innerHTML = `<span>${eq.codigo}</span><span class="combo-option-sub">${eq.tipo}${eq.patente ? ' · ' + eq.patente : ''}</span>`;
       div.addEventListener('mousedown', e => {
         // Equipo nuevo → se re-elige la categoría a propósito.
         e.preventDefault(); setEquipo(eq); setCategoria(null); dropdown.classList.add('hidden');
@@ -701,7 +701,9 @@ async function setupEquipoCombo() {
     selectedEquipo = null;
     const q = input.value.toLowerCase().trim();
     const filtered = q
-      ? equipos.filter(x => x.codigo.toLowerCase().includes(q) || (x.tipo || '').toLowerCase().includes(q))
+      ? equipos.filter(x => x.codigo.toLowerCase().includes(q) ||
+                            (x.tipo    || '').toLowerCase().includes(q) ||
+                            (x.patente || '').toLowerCase().includes(q))
       : equipos;
     buildOptions(filtered);
     dropdown.classList.toggle('hidden', !dropdown.children.length);
@@ -1740,7 +1742,7 @@ function buildOCData(numero, firma = null) {
       total:    roundCents((parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0))
     })),
     observaciones: $('observaciones').value.trim() || '',
-    equipo:      selectedEquipo ? { codigo: selectedEquipo.codigo, tipo: selectedEquipo.tipo, categoria: selectedCategoria || null } : null,
+    equipo:      selectedEquipo ? { codigo: selectedEquipo.codigo, tipo: selectedEquipo.tipo, patente: selectedEquipo.patente || '', categoria: selectedCategoria || null } : null,
     impuestos:   pdfTotals,
     totalLetras: numberToWords(total),
     _total:      total,

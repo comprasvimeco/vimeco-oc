@@ -411,7 +411,7 @@
     if (!data) return [];
     return Object.entries(data)
       .filter(([, e]) => e && e.codigo && e.activo)
-      .map(([key, e]) => ({ key, codigo: e.codigo, tipo: e.tipo || '' }))
+      .map(([key, e]) => ({ key, codigo: e.codigo, tipo: e.tipo || '', patente: e.patente || '' }))
       .sort(_sort);
   };
 
