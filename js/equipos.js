@@ -110,9 +110,9 @@ const SEED_EQUIPOS = [
   ['VQ 218', 'Volqueta']
 ];
 
-// Patentes / dominios por código de equipo. Se usan en dos momentos:
-// al importar la lista inicial, y desde "Cargar patentes" para completar
-// el campo en los equipos que ya existen (sin tocar el resto de la ficha).
+// Patentes / dominios por código de equipo, para la importación inicial.
+// Los equipos ya cargados tienen la patente en su ficha: esta tabla sólo
+// aplica si alguna vez se vuelve a sembrar la lista desde cero.
 const SEED_PATENTES = {
   'AC 86':     'D 006622',
   'C 172':     'VMH-951',
@@ -359,46 +359,6 @@ async function seedEquipos() {
   }
 }
 
-// Completa la patente en los equipos que ya existen, sin tocar el resto de la
-// ficha. Los códigos de la tabla que no estén cargados se informan al final.
-async function importarPatentes() {
-  const existentes = new Set(allEquipos.map(e => e.key));
-  const pares      = Object.entries(SEED_PATENTES);
-  const aplicar    = pares.filter(([codigo]) => existentes.has(equipoKey(codigo)));
-  const faltantes  = pares.filter(([codigo]) => !existentes.has(equipoKey(codigo)))
-                          .map(([codigo]) => codigo);
-
-  if (!aplicar.length) {
-    showToast('Ningún equipo de la tabla de patentes está cargado.', 'error');
-    return;
-  }
-
-  const ok = await showConfirm(
-    'Cargar patentes',
-    `Se completará la patente en ${aplicar.length} equipos. ` +
-    'Se sobrescribe la patente actual; el resto de la ficha no se toca.'
-  );
-  if (!ok) return;
-
-  const btn = $('btn-patentes');
-  btn.disabled = true;
-  btn.textContent = 'Cargando…';
-  try {
-    // Un PATCH por equipo: así solo se escribe el campo patente.
-    await Promise.all(aplicar.map(([codigo, patente]) =>
-      patchEquipo(equipoKey(codigo), { patente })));
-    showToast(faltantes.length
-      ? `${aplicar.length} patentes cargadas. Sin equipo: ${faltantes.join(', ')}.`
-      : `${aplicar.length} patentes cargadas.`);
-    await loadEquipos();
-  } catch (_) {
-    showToast('Error al cargar las patentes.', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Cargar patentes';
-  }
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch (_) { return null; } })();
   const code = _s?.codigo || sessionStorage.getItem('responsable_code');
@@ -416,7 +376,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
   $('btn-add-equipo').addEventListener('click', openAddModal);
   $('btn-seed').addEventListener('click', seedEquipos);
-  $('btn-patentes').addEventListener('click', importarPatentes);
   $('filtro-obra').addEventListener('change', applyFilter);
   $('buscar-equipo').addEventListener('input', applyFilter);
   $('modal-equipo-close').addEventListener('click',  () => $('modal-equipo').classList.add('hidden'));
