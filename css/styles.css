@@ -609,8 +609,21 @@ tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 .adj-oc-card:last-child { margin-bottom: 0; }
 .adj-oc-card:hover { box-shadow: var(--shadow); }
 .adj-oc-top { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.adj-oc-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: .15rem; }
+.adj-oc-bottom { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-top: .15rem; }
+.adj-oc-meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .adj-oc-actions { display: flex; align-items: center; gap: .4rem; }
+
+/* Sello de si la OC ya tiene su factura cargada */
+.adj-badge {
+  display: inline-flex; align-items: center; gap: .25rem;
+  padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 700;
+  white-space: nowrap;
+}
+.adj-badge .icon { width: 12px; height: 12px; }
+.adj-badge--sin   { background: var(--gray-100); color: var(--gray-500); }
+.adj-badge--con   { background: #e3f5e8; color: #1e7d3a; }
+/* Cargas previas a v166: hay archivos pero no se sabe si son la factura */
+.adj-badge--otros { background: #eff6ff; color: #1e40af; }
 .adj-match-score { font-size: .75rem; color: var(--primary); letter-spacing: .08em; margin-left: auto; margin-right: .25rem; }
 .adj-manual-fallback { margin-top: .85rem; text-align: center; border-top: 1px solid var(--gray-200); padding-top: .85rem; }
 .adj-step-actions { display: flex; flex-direction: column; gap: .5rem; margin-top: 1rem; }
@@ -1007,6 +1020,7 @@ body.scan-open { overflow: hidden; }
 .obra-chip--none { background: var(--gray-100); color: var(--gray-500); border-color: var(--gray-200); font-weight: 400; }
 
 /* ===== REMITOS: control de entregas sobre las OC ===== */
+/* .rem-tabs / .rem-tab también los usa el filtro de estado en Facturas */
 .rem-tabs { display: flex; gap: .4rem; margin-bottom: .85rem; }
 .rem-tab {
   flex: 1; padding: .45rem .6rem; border: 1.5px solid var(--gray-300); background: var(--white);

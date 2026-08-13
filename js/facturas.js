@@ -7,6 +7,7 @@ let viewerIsAdmin = false; // 0000 o usuario con permiso admin
 let tipoCarga   = 'factura';  // 'factura' | 'otro'
 let rawFile     = null;   // imagen original (sin escanear), para volver a pasarla por el escáner
 let filePrevUrl = null;   // objectURL del preview actual
+let filtroOC    = 'sin';  // 'sin' | 'con' | 'todas' — arranca en lo que falta cargar
 
 const ES_MOBILE = 'ontouchstart' in window || window.innerWidth <= 768;
 
@@ -35,6 +36,79 @@ function esc(str) {
 function displayToISODate(d) {
   const p = (d || '').split('/');
   return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : (d || '');
+}
+
+// ---- Estado de facturación de la OC ----
+
+// Qué se le cargó ya a esta OC, según `/historial/{key}/adjuntos`:
+//   'con'    → hay al menos un archivo cargado como factura
+//   'otros'  → hay archivos, pero ninguno rotulado factura. Son las cargas
+//              previas a v166, cuando la pantalla no distinguía qué se subía:
+//              no se puede afirmar ni que tiene ni que le falta.
+//   'sin'    → no hay ningún archivo registrado
+function estadoFactura(oc) {
+  const lista = Object.values(oc.adjuntos || {}).filter(Boolean);
+  const facts = lista.filter(a => a.tipo === 'factura');
+  if (facts.length) {
+    const ult = facts.reduce((a, b) => ((b.ts || 0) > (a.ts || 0) ? b : a));
+    return { estado: 'con', n: lista.length, ts: ult.ts, por: ult.por };
+  }
+  return { estado: lista.length ? 'otros' : 'sin', n: lista.length };
+}
+
+// dd/mm a mano: toLocaleDateString('es-AR') con 2-digit igual devuelve "10/8".
+function fmtFechaCorta(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function badgeFactura(f) {
+  if (f.estado === 'con') {
+    const tip = f.por ? `Factura cargada por ${f.por}` : 'Factura cargada';
+    return `<span class="adj-badge adj-badge--con" title="${esc(tip)}">${icSvg('checkSm')} Factura ${fmtFechaCorta(f.ts)}</span>`;
+  }
+  if (f.estado === 'otros') {
+    return `<span class="adj-badge adj-badge--otros" title="Archivos cargados antes de que la pantalla distinguiera la factura de otro archivo">${f.n} archivo${f.n > 1 ? 's' : ''}</span>`;
+  }
+  return '<span class="adj-badge adj-badge--sin">Sin factura</span>';
+}
+
+// Cargar una factura sobre una OC que ya la tiene suele ser el mismo archivo
+// subido dos veces. Cargar "otro archivo" es legítimo y no se pregunta nada.
+function confirmarDuplicado(oc) {
+  if (tipoCarga !== 'factura') return true;
+  const f = estadoFactura(oc);
+  if (f.estado !== 'con') return true;
+  const cuando = f.ts ? ' el ' + new Date(f.ts).toLocaleDateString('es-AR') : '';
+  const quien  = f.por ? ' por ' + f.por : '';
+  return confirm(`La OC ${oc.nroOC} ya tiene una factura cargada${cuando}${quien}.\n\n¿Cargar otra igual?`);
+}
+
+// Deja registrado el archivo en el historial para que la lista pueda mostrar el
+// estado sin consultar Drive. Best-effort: si falla, el archivo ya está subido.
+// Se refleja primero en memoria, así el sello cambia sin recargar la pantalla.
+async function registrarAdjunto(oc, file) {
+  const registro = {
+    tipo:   tipoCarga === 'factura' ? 'factura' : 'otro',
+    nombre: file.name,
+    ts:     Date.now(),
+    por:    sessionStorage.getItem('responsable_name') || ''
+  };
+  oc.adjuntos = oc.adjuntos || {};
+  oc.adjuntos['local_' + registro.ts] = registro;
+  try { await registrarAdjuntoOC(oc.nroOC, registro); }
+  catch (e) { console.warn('registrarAdjunto:', e); }
+}
+
+// Repinta el sello de una tarjeta ya renderizada, sin rearmar la lista entera
+// (rearmarla sacaría la tarjeta de la vista justo cuando el usuario mira si
+// funcionó).
+function refrescarBadge(oc) {
+  const badge = document
+    .querySelector(`[data-nro="${CSS.escape(oc.nroOC)}"]`)
+    ?.closest('.adj-oc-card')?.querySelector('.adj-badge');
+  if (badge) badge.outerHTML = badgeFactura(estadoFactura(oc));
 }
 
 // ---- Archivo ----
@@ -182,7 +256,10 @@ function renderMatchCards(matches) {
       <div class="hist-proveedor">${esc(oc.proveedor?.nombre || '—')}</div>
       <div class="hist-obra">${esc(oc.obra || '—')}</div>
       <div class="adj-oc-bottom">
-        <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
+        <span class="adj-oc-meta">
+          <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
+          ${badgeFactura(estadoFactura(oc))}
+        </span>
         <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Cargar acá</button>
       </div>
     </div>`;
@@ -199,7 +276,10 @@ function renderOCListItems(ocs) {
     <div class="hist-proveedor">${esc(oc.proveedor?.nombre || '—')}</div>
     <div class="hist-obra">${esc(oc.obra || '—')}</div>
     <div class="adj-oc-bottom">
-      <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
+      <span class="adj-oc-meta">
+        <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
+        ${badgeFactura(estadoFactura(oc))}
+      </span>
       <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Cargar acá</button>
     </div>
   </div>`).join('');
@@ -215,7 +295,13 @@ function renderManualListHTML(ocs) {
 // ---- Vista principal: lista de OC (se elige el archivo al tocar Cargar) ----
 
 function renderPrimaryListItems(ocs) {
-  if (!ocs.length) return '<div class="hist-empty">No hay OC en el historial.</div>';
+  if (!ocs.length) {
+    if ($('adj-search-main').value.trim()) return '<div class="hist-empty">No se encontraron OC.</div>';
+    return `<div class="hist-empty">${
+      filtroOC === 'sin' ? 'No queda ninguna OC sin factura.' :
+      filtroOC === 'con' ? 'Todavía no hay ninguna OC con factura cargada.' :
+                           'No hay OC en el historial.'}</div>`;
+  }
   return ocs.map(oc => `<div class="adj-oc-card">
     <div class="adj-oc-top">
       <span class="hist-nro">${esc(oc.nroOC)}</span>
@@ -225,7 +311,10 @@ function renderPrimaryListItems(ocs) {
     <div class="hist-obra">${esc(oc.obra || '—')}</div>
     ${viewerIsAdmin && oc.responsable?.nombre ? `<div class="hist-obra" style="color:var(--gray-500);font-size:.78rem;">por ${esc(oc.responsable.nombre)}</div>` : ''}
     <div class="adj-oc-bottom">
-      <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
+      <span class="adj-oc-meta">
+        <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
+        ${badgeFactura(estadoFactura(oc))}
+      </span>
       <span class="adj-oc-actions">
         ${ES_MOBILE ? `<button class="btn btn-sm btn-secondary btn-icon btn-attach-cam" data-nro="${esc(oc.nroOC)}" title="Sacar foto" aria-label="Sacar foto"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></button>` : ''}
         <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Cargar</button>
@@ -235,13 +324,18 @@ function renderPrimaryListItems(ocs) {
 }
 
 function renderPrimaryList(filter = '') {
-  const q    = filter.toLowerCase().trim();
-  const list = q
-    ? allOCs.filter(oc =>
-        (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
-        (oc.obra || '').toLowerCase().includes(q) ||
-        (oc.nroOC || '').toLowerCase().includes(q))
-    : allOCs;
+  const q = filter.toLowerCase().trim();
+  // 'otros' cae del lado de "sin": que haya un archivo viejo sin rotular no
+  // prueba que la factura esté cargada.
+  let list = filtroOC === 'todas'
+    ? allOCs
+    : allOCs.filter(oc => (estadoFactura(oc).estado === 'con') === (filtroOC === 'con'));
+  if (q) {
+    list = list.filter(oc =>
+      (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
+      (oc.obra || '').toLowerCase().includes(q) ||
+      (oc.nroOC || '').toLowerCase().includes(q));
+  }
   const box = $('adj-oc-list-main');
   box.innerHTML = renderPrimaryListItems(pager.take('adj', list));
   bindPickButtons();
@@ -251,7 +345,9 @@ function renderPrimaryList(filter = '') {
 function bindPickButtons() {
   document.querySelectorAll('.btn-attach-pick').forEach(btn => {
     btn.addEventListener('click', () => {
-      pendingOC = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
+      const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
+      if (!oc || !confirmarDuplicado(oc)) return;
+      pendingOC = oc;
       const mf = $('manual-file');
       mf.value = '';
       mf.click();
@@ -261,7 +357,9 @@ function bindPickButtons() {
   // Sacar foto: la factura pasa por el escáner y se sube apenas se toca "Listo".
   document.querySelectorAll('.btn-attach-cam').forEach(btn => {
     btn.addEventListener('click', () => {
-      pendingOC = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
+      const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
+      if (!oc || !confirmarDuplicado(oc)) return;
+      pendingOC = oc;
       const ci = $('manual-camera');
       ci.value = '';
       ci.click();
@@ -305,6 +403,8 @@ async function doAttachPick(file, oc) {
       nroOC:     oc.nroOC
     });
     logAdjuntoActivity(oc, subida, res?.folderId);
+    await registrarAdjunto(oc, subida);
+    refrescarBadge(oc);
     await clearShareFile();
     toast(`${tipoCarga === 'factura' ? 'Factura cargada' : 'Archivo cargado'} en OC ${oc.nroOC}`, 'success');
     if (btn) { btn.innerHTML = `${icSvg('checkSm')} Cargado`; }
@@ -319,9 +419,8 @@ async function doAttachPick(file, oc) {
 function bindButtons() {
   document.querySelectorAll('.btn-adj-attach').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const nro = btn.dataset.nro;
-      const oc  = allOCs.find(o => o.nroOC === nro);
-      if (oc) await doAttach(currentFile, oc, btn);
+      const oc = allOCs.find(o => o.nroOC === btn.dataset.nro);
+      if (oc && confirmarDuplicado(oc)) await doAttach(currentFile, oc, btn);
     });
   });
 
@@ -394,6 +493,7 @@ async function doAttach(file, oc, btn) {
       nroOC:     oc.nroOC
     });
     logAdjuntoActivity(oc, subida, res?.folderId);
+    await registrarAdjunto(oc, subida);
     await clearShareFile();
     $('card-result').classList.add('hidden');
     $('success-detail').textContent = `${subida.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
@@ -413,6 +513,7 @@ function resetToStart() {
   $('card-file').classList.remove('hidden');
   $('card-result').classList.add('hidden');
   $('card-success').classList.add('hidden');
+  renderPrimaryList($('adj-search-main').value);   // la OC recién cargada cambió de sello
 }
 
 // ---- Init ----
@@ -437,7 +538,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   viewerIsAdmin = isAdmin;
   getHistorial(code, isAdmin)
-    .then(ocs => { allOCs = ocs; renderPrimaryList($('adj-search-main').value); })
+    .then(async ocs => {
+      allOCs = ocs;
+      renderPrimaryList($('adj-search-main').value);
+      // Primera vez tras el deploy: reconstruir el estado de las OC viejas a
+      // partir del feed de Novedades. Después de eso ya viene en el historial.
+      const sembrado = await sembrarAdjuntosDesdeActividad(ocs);
+      if (sembrado) {
+        allOCs.forEach(oc => {
+          const reg = sembrado[String(oc.nroOC).replace(/-/g, '')];
+          if (reg) oc.adjuntos = { ...reg, ...(oc.adjuntos || {}) };
+        });
+        renderPrimaryList($('adj-search-main').value);
+      }
+    })
     .catch(() => {
       const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;
       if (cached) allOCs = cached;
@@ -450,6 +564,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!btn) return;
     tipoCarga = btn.dataset.tipo;
     $('adj-tipo').querySelectorAll('.cat-seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+  });
+
+  // Filtro por estado de factura
+  $('adj-filtro').addEventListener('click', ev => {
+    const btn = ev.target.closest('.rem-tab');
+    if (!btn) return;
+    filtroOC = btn.dataset.filtro;
+    $('adj-filtro').querySelectorAll('.rem-tab').forEach(b => b.classList.toggle('active', b === btn));
+    pager.reset('adj');
+    renderPrimaryList($('adj-search-main').value);
   });
 
   // Buscador de la lista principal

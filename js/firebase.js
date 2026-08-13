@@ -325,6 +325,77 @@
     const resp = await fetch(_base() + '/historial/' + key + '.json', { method: 'DELETE' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
+
+  // ─── Adjuntos de una OC ───────────────────────────
+  // `/historial/{key}/adjuntos` es la huella de qué archivos se le cargaron a la
+  // OC. Existe para poder mostrar "esta OC ya tiene factura" en la lista sin
+  // pedirle nada a Drive: el historial ya viene entero en getHistorial().
+  // registro = { tipo:'factura'|'otro'|'desconocido', nombre, ts, por }
+
+  window.registrarAdjuntoOC = async function (nroOC, registro) {
+    const key  = String(nroOC).replace(/-/g, '');
+    const resp = await fetch(_base() + '/historial/' + key + '/adjuntos.json', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(registro)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  // Estado inicial de `adjuntos` para las OC anteriores al nodo. Hasta ahora la
+  // única huella de una carga era el evento del feed de Novedades, que guarda el
+  // nroOC y nunca se poda. Los eventos viejos son 'adjunto' (podían ser factura
+  // o cualquier otra cosa): se siembran como 'desconocido' para no afirmar de
+  // más. Corre una sola vez —la marca queda en /drive_config— y escribe hoja por
+  // hoja, así nunca pisa lo que ya esté registrado.
+  // Devuelve el mapa { keyOC: { idRegistro: registro } } que sembró, o null.
+  window.sembrarAdjuntosDesdeActividad = async function (ocs) {
+    const base = _base();
+    try {
+      const flag = await (await fetch(base + '/drive_config/adjuntosSembrados.json')).json();
+      if (flag === true) return null;
+
+      const eventos = (await (await fetch(base + '/actividad.json')).json()) || {};
+
+      // Sólo OC que existen hoy: un evento puede sobrevivir a su OC borrada.
+      const vivas = new Set((ocs || []).map(oc => String(oc.nroOC).replace(/-/g, '')));
+      const mapa  = {};
+      const patch = {};
+
+      Object.values(eventos).forEach(e => {
+        if (!e || !e.nroOC || (e.tipo !== 'factura' && e.tipo !== 'adjunto')) return;
+        const key = String(e.nroOC).replace(/-/g, '');
+        if (!vivas.has(key)) return;
+        const ts  = e.timestamp || 0;
+        const id  = 'act_' + ts;   // determinista: sembrar dos veces no duplica
+        const reg = {
+          tipo:   e.tipo === 'factura' ? 'factura' : 'desconocido',
+          nombre: String(e.detalle || '').split(' · ')[0] || '',
+          ts,
+          por:    e.usuario?.nombre || ''
+        };
+        (mapa[key] = mapa[key] || {})[id] = reg;
+        patch[`${key}/adjuntos/${id}`]    = reg;
+      });
+
+      if (Object.keys(patch).length) {
+        const resp = await fetch(base + '/historial.json', {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(patch)
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      }
+
+      await fetch(base + '/drive_config/adjuntosSembrados.json', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: 'true'
+      });
+      return mapa;
+    } catch (e) {
+      console.warn('sembrarAdjuntosDesdeActividad:', e);
+      return null;   // best-effort: sin siembra, la lista muestra "sin datos"
+    }
+  };
 })();
 
 // ─── Gestión de Equipos ─────────────────────────────

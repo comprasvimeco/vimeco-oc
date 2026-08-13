@@ -110,6 +110,12 @@
           <button type="button" class="cat-seg-btn active" data-tipo="factura">Factura</button>
           <button type="button" class="cat-seg-btn" data-tipo="otro">Otro archivo</button>
         </div>
+        <!-- Arranca en "Sin factura": lo primero que se ve es lo que falta cargar -->
+        <div class="rem-tabs" id="adj-filtro">
+          <button type="button" class="rem-tab active" data-filtro="sin">Sin factura</button>
+          <button type="button" class="rem-tab" data-filtro="con">Con factura</button>
+          <button type="button" class="rem-tab" data-filtro="todas">Todas</button>
+        </div>
         <input type="search" id="adj-search-main" class="form-control" placeholder="Buscar por proveedor, obra o N° OC…" style="margin-bottom:.85rem;">
         <div id="adj-oc-list-main"><div class="hist-empty">Cargando OC…</div></div>
       </div>
