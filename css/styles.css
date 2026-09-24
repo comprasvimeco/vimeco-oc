@@ -1055,6 +1055,13 @@ body.scan-open { overflow: hidden; }
   border-left: 2px solid var(--primary-light); border-radius: 0 4px 4px 0;
   padding: .18rem .45rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Renglón con unidad y precio: la descripción se recorta, el precio no */
+.rem-hits .rem-hit { display: flex; gap: .75rem; align-items: baseline; }
+.rem-hits .rem-hit-desc, .rem-hits .rem-hit-precio {
+  background: none; border: 0; padding: 0; border-radius: 0; font-size: inherit;
+}
+.rem-hits .rem-hit-desc   { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rem-hits .rem-hit-precio { flex-shrink: 0; color: var(--gray-600); font-weight: 600; }
 
 /* Referencia de la OC arriba del formulario */
 .rem-oc-ref {

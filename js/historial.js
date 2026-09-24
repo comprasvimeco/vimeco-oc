@@ -78,7 +78,7 @@ function renderCards(ocs) {
       <div class="hist-proveedor">${esc(provNombre)}</div>
       <div class="hist-obra">${esc(obra)}</div>
       ${badge || entrega ? `<div style="margin-top:.35rem;display:flex;gap:.35rem;flex-wrap:wrap;">${badge}${entrega}</div>` : ''}
-      ${hitsHtml(itemsCoincidentes(oc, searchTerms), esc)}
+      ${hitsHtml(oc, itemsCoincidentes(oc, searchTerms), esc)}
       <div class="hist-card-bottom">
         <span class="hist-total">${total}</span>
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}

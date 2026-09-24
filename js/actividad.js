@@ -206,6 +206,7 @@ function render() {
     const borrar = isSuper
       ? `<button class="btn btn-sm btn-danger act-del" data-key="${esc(e.key)}">Borrar</button>`
       : '';
+    const ocEv    = ocDeEvento(e);
     const cardCls = !reciente ? 'act-card-old' : (vista ? 'act-card-seen' : 'act-card-unseen');
     html += `
       <div class="hist-card act-card ${cardCls}">
@@ -214,7 +215,7 @@ function render() {
           <div class="act-body">
             <div class="act-title">${esc(e.titulo)}</div>
             <div class="act-detalle">${esc(e.detalle)}</div>
-            ${hitsHtml(itemsCoincidentes(ocDeEvento(e), terms), esc)}
+            ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc)}
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
           </div>
           <div class="act-actions">${drive}${accion}${borrar}</div>

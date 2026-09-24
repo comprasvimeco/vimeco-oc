@@ -37,14 +37,28 @@ function coincideOC(oc, terms) {
 function itemsCoincidentes(oc, terms) {
   if (!oc || !terms.length) return [];
   return (oc.items || [])
-    .filter(it => { const d = normTxt(it.desc); return terms.every(t => d.includes(t)); })
-    .map(it => it.desc);
+    .filter(it => { const d = normTxt(it.desc); return terms.every(t => d.includes(t)); });
 }
 
-// HTML de los renglones coincidentes (clase .rem-hits). `escFn` escapa texto.
-function hitsHtml(hits, escFn) {
+// "m3 · $ 12.345,00": unidad y precio unitario del renglón, en la moneda de la
+// OC. Lo que falte (OC viejas, ítems sin unidad) simplemente no se muestra.
+function _precioItem(it, moneda) {
+  const partes = [];
+  if (it.unidad) partes.push(it.unidad);
+  const u = parseFloat(it.unitario);
+  if (u) partes.push((moneda === 'USD' ? 'US$ ' : '$ ') +
+    u.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  return partes.join(' · ');
+}
+
+// HTML de los renglones coincidentes de `oc` (clase .rem-hits). `escFn` escapa texto.
+function hitsHtml(oc, hits, escFn) {
   if (!hits.length) return '';
   return `<div class="rem-hits">${
-    hits.slice(0, 3).map(d => `<span>${escFn(d)}</span>`).join('')
+    hits.slice(0, 3).map(it => {
+      const precio = _precioItem(it, oc.moneda);
+      return `<span class="rem-hit"><span class="rem-hit-desc">${escFn(it.desc)}</span>${
+        precio ? `<span class="rem-hit-precio">${escFn(precio)}</span>` : ''}</span>`;
+    }).join('')
   }${hits.length > 3 ? `<span>y ${hits.length - 3} ítem(s) más</span>` : ''}</div>`;
 }
