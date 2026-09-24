@@ -18,8 +18,6 @@
 let ALL     = [];   // OC dentro del alcance del reporte
 let ALL_RAW = [];   // todo lo que devolvió /historial (para calcular el corte)
 let cutoffTs   = 0; // desde cuándo hay respaldo en Drive
-let excluidas  = 0; // OC previas al respaldo, fuera del reporte
-let dePrueba   = 0; // OC cargadas contra una obra de prueba
 
 // esObraPrueba, driveFolderId, driveUrlOf, driveCutoff, histKeyOf y ocDataDe
 // viven en driveBackup.js, compartidos con el panel de Novedades.
@@ -118,11 +116,6 @@ function amountIn(oc, cur) {
   const rate = rateFor(oc);
   if (!rate) return null;
   return cur === 'ARS' ? total * rate : total / rate;
-}
-
-function usedFallback(oc) {
-  const moneda = oc.moneda === 'USD' ? 'USD' : 'ARS';
-  return moneda !== state.moneda && !oc.cotizacion;
 }
 
 // ---- Filtro ----
@@ -716,41 +709,34 @@ function renderBars(containerId, rows, opts = {}) {
   }
 }
 
-// ---- Encabezado: hero + KPIs ----
+// ---- Encabezado: hero (período + total) ----
 function renderHero(list) {
-  let total = 0, count = 0, noConv = 0, fallback = 0;
-  const amounts = [];
+  let total = 0, count = 0;
   list.forEach(oc => {
     const amt = amountIn(oc, state.moneda);
-    if (amt == null) { noConv++; return; }
-    total += amt; count++; amounts.push(amt);
-    if (usedFallback(oc)) fallback++;
+    if (amt == null) return;
+    total += amt; count++;
   });
 
   $('kpi-total').textContent = fmtFull(total, state.moneda);
-  $('kpi-count').textContent = count;
-  $('kpi-avg').textContent   = fmtCompact(count ? total / count : 0, state.moneda);
-  $('kpi-med').textContent   = fmtCompact(median(amounts), state.moneda);
-  $('kpi-obras').textContent = new Set(list.map(o => o.obra).filter(Boolean)).size;
 
-  // Contexto del hero: período real de los datos + cotización aplicada.
+  // Rango elegido y flechas para moverse (sólo con un preset activo).
+  const r = rangoActual();
+  const lbl = labelRango(r);
+  $('hero-rango').textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
+  $('rep-per-nav').classList.toggle('rh-nav-off', !state.periodo);
+  $('per-next').disabled = !state.periodo || state.pOffset <= 0;
+
+  // Contexto: cantidad de OC, el tramo real de los datos cuando se mira todo
+  // el historial, y la cotización aplicada.
+  let per = '';
   const ts = list.map(o => o.timestamp || 0).filter(Boolean);
-  const per = ts.length
-    ? (monthLabel(monthKey(Math.min(...ts))) === monthLabel(monthKey(Math.max(...ts)))
-        ? monthLabel(monthKey(Math.min(...ts)))
-        : `${monthLabel(monthKey(Math.min(...ts)))} – ${monthLabel(monthKey(Math.max(...ts)))}`)
-    : 'sin datos';
+  if (!r.desde && !r.hasta && ts.length) {
+    const a = monthLabel(monthKey(Math.min(...ts))), b = monthLabel(monthKey(Math.max(...ts)));
+    per = ` · ${a === b ? a : `${a} – ${b}`}`;
+  }
   const cot = state.moneda === 'USD' ? ` · dólar ${state.rate}` : '';
-  $('hero-sub').textContent = `${count} OC · ${per}${cot}`;
-
-  const notes = [];
-  if (excluidas) notes.push(`${excluidas} OC anteriores al respaldo en Drive quedan fuera del reporte.`);
-  if (dePrueba)  notes.push(`${dePrueba} OC de prueba quedan fuera del reporte.`);
-  if (fallback)  notes.push(`${fallback} OC sin cotización propia — convertidas al dólar de hoy.`);
-  if (noConv)    notes.push(`${noConv} OC no se pudieron convertir (sin cotización disponible).`);
-  const noteEl = $('rep-note');
-  if (notes.length) { noteEl.innerHTML = notes.map(esc).join('<br>'); noteEl.classList.remove('hidden'); }
-  else noteEl.classList.add('hidden');
+  $('hero-sub').textContent = `${count} OC${per}${cot}`;
 
   return total;
 }
@@ -934,10 +920,6 @@ function renderResumen() {
   const d = resumenData();
 
   $('res-rango').textContent = labelRango(d.r);
-  const nav = $('rep-res-nav');
-  if (nav) nav.classList.toggle('rr-nav-off', !state.periodo);
-  const next = $('per-next');
-  if (next) next.disabled = !state.periodo || state.pOffset <= 0;
 
   const vT = variacion(d.total, d.prevSuma);
   const vC = variacion(d.list.length, d.prevCount);
@@ -1095,12 +1077,15 @@ function aplicarPeriodo() {
 }
 
 function setPeriodo(tipo) {
-  if (state.periodo === tipo) {   // volver a tocarlo lo apaga
+  if (tipo === 'todo') {          // sin preset ni fechas: todo el historial
     state.periodo = null; state.pOffset = 0;
+    state.desde = ''; state.hasta = '';
+    $('rep-desde').value = ''; $('rep-hasta').value = '';
     syncPeriodoUI();
     render();
     return;
   }
+  if (state.periodo === tipo && state.pOffset === 0) return;
   state.periodo = tipo; state.pOffset = 0;
   syncPeriodoUI();
   aplicarPeriodo();
@@ -1114,9 +1099,12 @@ function moverPeriodo(delta) {
   aplicarPeriodo();
 }
 
+// "Todo" queda marcado sólo sin preset ni fechas; con un rango puesto a mano
+// no se marca ninguno.
 function syncPeriodoUI() {
+  const activo = state.periodo || (!state.desde && !state.hasta ? 'todo' : null);
   [...$('seg-periodo').querySelectorAll('[data-per]')]
-    .forEach(b => b.classList.toggle('active', b.dataset.per === state.periodo));
+    .forEach(b => b.classList.toggle('active', b.dataset.per === activo));
 }
 
 function render() {
@@ -1569,21 +1557,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('rep-desde').addEventListener('change', () => { state.desde = $('rep-desde').value; soltarPreset(); render(); });
   $('rep-hasta').addEventListener('change', () => { state.hasta = $('rep-hasta').value; soltarPreset(); render(); });
   $('chk-no-emitidas').addEventListener('change', e => { state.incluirNoEmitidas = e.target.checked; render(); });
-  $('btn-clear-dates').addEventListener('click', () => {
-    state.desde = ''; state.hasta = '';
-    $('rep-desde').value = ''; $('rep-hasta').value = '';
-    soltarPreset();
-    render();
-  });
   $('btn-export').addEventListener('click', () => window.print());
 
-  // Resumen del período
+  // Período (en el hero): mueve todo el reporte, resumen incluido.
+  syncPeriodoUI();
   $('seg-periodo').addEventListener('click', e => {
     const btn = e.target.closest('[data-per]');
     if (btn) setPeriodo(btn.dataset.per);
   });
   $('per-prev').addEventListener('click', () => moverPeriodo(1));
   $('per-next').addEventListener('click', () => moverPeriodo(-1));
+
+  // Resumen del período
   $('btn-res-pdf').addEventListener('click', descargarResumenPDF);
 
   // Plegado y buscador de las cards (restaura lo que quedó plegado la vez pasada).
@@ -1619,9 +1604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ALL_RAW   = await getHistorial(code, true);
     cutoffTs  = driveCutoff(ALL_RAW);
     const conRespaldo = ALL_RAW.filter(oc => (oc.timestamp || 0) >= cutoffTs);
-    excluidas = ALL_RAW.length - conRespaldo.length;
     ALL       = conRespaldo.filter(oc => !esObraPrueba(oc) && !esProveedorPrueba(oc));
-    dePrueba  = conRespaldo.length - ALL.length;
     $('rep-loading').classList.add('hidden');
     $('rep-content').classList.remove('hidden');
     render();
