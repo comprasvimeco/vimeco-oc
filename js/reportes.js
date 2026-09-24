@@ -1136,7 +1136,7 @@ function tipoTag(oc) {
   if (oc.equipo?.codigo) {
     const cat = oc.equipo.categoria;
     return `<span class="cat-tag cat-tag--equipo" title="${esc(equipoLabel(oc.equipo))}">${icSvg('truck')}${
-      cat ? esc(cat === 'Mantenimiento' ? 'Mant.' : cat) : 'Equipo'}</span>`;
+      cat ? esc({ Mantenimiento: 'Mant.', Repuestos: 'Rep.' }[cat] || cat) : 'Equipo'}</span>`;
   }
   const c = catDeObra(oc);
   if (!c) return '';
