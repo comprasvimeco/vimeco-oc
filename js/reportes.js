@@ -1693,7 +1693,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Ficha de OC
   $('foc-close').addEventListener('click', closeOCDetail);
-  $('foc-cerrar').addEventListener('click', closeOCDetail);
   $('foc-pdf').addEventListener('click', verPDF);
   $('modal-oc').addEventListener('click', e => { if (e.target.id === 'modal-oc') closeOCDetail(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOCDetail(); });

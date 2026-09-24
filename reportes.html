@@ -406,7 +406,7 @@
     .foc-foot { justify-content: flex-end; flex-wrap: wrap; gap: .5rem; background: #fafbfd; }
     .foc-foot-r { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
     /* Botones de la ficha: pastillas con ícono, en los tonos pastel del reporte.
-       Drive en turquesa, PDF en rosa y Cerrar en el azul de la marca. */
+       Drive en turquesa y PDF en rosa. Se cierra con la cruz del encabezado. */
     .foc-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 999px;
       padding: .45rem 1rem; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; text-decoration: none;
       transition: filter .15s, transform .15s, box-shadow .15s; }
@@ -415,8 +415,6 @@
     .foc-btn:disabled { opacity: .45; cursor: default; }
     .foc-btn--drive { background: #dcf3ef; color: #16695f; }
     .foc-btn--pdf   { background: #fce8ee; color: #a23a57; }
-    .foc-btn--close { background: var(--grad-header); color: #fff; padding: .45rem 1.15rem;
-      box-shadow: 0 4px 12px -6px rgba(26,58,92,.6); }
     .foc-btn.hidden { display: none; }
     .foc-items-w { overflow-x: auto; margin-bottom: .9rem; }
     .foc-items-w .foc-items { margin-bottom: 0; }
@@ -674,7 +672,6 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Drive</a>
         <button class="foc-btn foc-btn--pdf" id="foc-pdf" title="Ver el PDF de la OC">
           <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>PDF</button>
-        <button class="foc-btn foc-btn--close" id="foc-cerrar">Cerrar</button>
       </div>
     </div>
   </div>
