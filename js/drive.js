@@ -11,6 +11,10 @@
     window.uploadOCIfMissing   = noDrive;
     window.findOCUpload        = noDrive;
     window.deleteDriveFile     = async function () {};   // no-op sin Drive
+    window.uploadEquipoArchivo  = noDrive;
+    window.renameDriveItem      = noDrive;
+    window.trashDriveFile       = noDrive;
+    window.listDriveFolderFiles = noDrive;
     return;
   }
 
@@ -941,4 +945,147 @@
 
   window.attachToDriveOC          = (file, meta) => _attachToOC(file, meta, false);
   window.attachToDriveOCIfMissing = (file, meta) => _attachToOC(file, meta, true);
+
+  // ─── EQUIPOS: documentación de cada equipo (títulos, manuales, etc.) ───
+  // Estructura: EQUIPOS → {Código - Descripción} → archivos. EQUIPOS es hermana
+  // de COMPRAS (nace afuera, no necesita la migración de CAJAS/PERSONAL). La
+  // carpeta de cada equipo se crea recién con su primer archivo.
+  async function getEquiposRootId(token) {
+    let id;
+    try {
+      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/equiposRootId.json');
+      if (r.ok) id = await r.json();
+    } catch (_) {}
+    if (id) return id;
+    const parent = (await getComprasParentId(token)) || DRIVE_CONFIG.folderId;
+    id = await getOrCreateFolder(token, 'EQUIPOS', parent);
+    fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/equiposRootId.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(id)
+    }).catch(() => {});
+    return id;
+  }
+
+  // ¿La carpeta existe y no está en la papelera? Si alguien la borró a mano en
+  // Drive, subir ahí fallaría: mejor crear otra.
+  async function _folderAlive(token, folderId) {
+    if (!folderId) return false;
+    try {
+      const r = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${folderId}?fields=trashed`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return r.ok && !(await r.json()).trashed;
+    } catch (_) { return false; }
+  }
+
+  // Subida resumable en tramos. Los manuales en PDF pesan decenas de MB: una
+  // multipart es para archivos chicos y una sola PUT gigante por datos móviles
+  // se pasaría del tope de _FETCH_TIMEOUT_UP. Cada tramo es un fetch aparte.
+  // (Los tramos tienen que ser múltiplos de 256 KB.)
+  const _CHUNK = 4 * 1024 * 1024;
+
+  async function _uploadResumable(token, file, name, mimeType, folderId, onProgress) {
+    _requireFolderId(folderId, `subida de "${name}"`);
+    const size = file.size;
+    if (!size) throw new Error('El archivo está vacío');
+    const init = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,parents',
+      {
+        method:  'POST',
+        headers: {
+          Authorization:             `Bearer ${token}`,
+          'Content-Type':            'application/json; charset=UTF-8',
+          'X-Upload-Content-Type':   mimeType,
+          'X-Upload-Content-Length': String(size)
+        },
+        body: JSON.stringify({ name: _safeName(name), parents: [folderId], mimeType })
+      }
+    );
+    if (!init.ok) throw new Error(`Upload init (${init.status})`);
+    const session = init.headers.get('Location');
+    if (!session) throw new Error('Upload: Drive no devolvió la sesión');
+
+    let info = null;
+    for (let start = 0; start < size; start += _CHUNK) {
+      const end = Math.min(start + _CHUNK, size);
+      const r = await fetch(session, {
+        method:  'PUT',
+        headers: { 'Content-Range': `bytes ${start}-${end - 1}/${size}` },
+        body:    file.slice(start, end)
+      });
+      // 308 = tramo recibido, falta el resto. 200/201 = archivo completo.
+      if (r.status === 308) { if (onProgress) onProgress(end / size); continue; }
+      if (!r.ok) throw new Error(`Upload (${r.status})`);
+      info = await r.json();
+      break;
+    }
+    if (!info || !info.id) throw new Error('Upload: Drive no confirmó el archivo');
+    if (info.parents && !info.parents.includes(folderId))
+      await _moveToFolder(token, info.id, folderId, info.parents);
+    return info.id;
+  }
+
+  // Sube un archivo a la carpeta del equipo (creándola si hace falta).
+  // Devuelve { fileId, folderId }: quien llama guarda el folderId si cambió.
+  window.uploadEquipoArchivo = async function (file, { folderId, folderName, nombre, onProgress }) {
+    const token = await getAccessToken();
+    let fid = folderId;
+    if (!(await _folderAlive(token, fid))) {
+      const root = await getEquiposRootId(token);
+      fid = await getOrCreateFolder(token, folderName || 'Sin nombre', root);
+    }
+    const mime   = file.type || 'application/octet-stream';
+    const fileId = await _uploadResumable(token, file, nombre || file.name, mime, fid, onProgress);
+    return { fileId, folderId: fid };
+  };
+
+  // Renombra un archivo o carpeta de Drive (best-effort en quien llama).
+  window.renameDriveItem = async function (id, name) {
+    if (!id) return;
+    const token = await getAccessToken();
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=id`, {
+      method:  'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name: _safeName(name) })
+    });
+    if (!r.ok) throw new Error(`Drive rename (${r.status})`);
+  };
+
+  // Manda un archivo a la papelera de Drive (recuperable 30 días), a diferencia
+  // de deleteDriveFile que lo borra para siempre.
+  window.trashDriveFile = async function (fileId) {
+    if (!fileId) return;
+    const token = await getAccessToken();
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id`, {
+      method:  'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ trashed: true })
+    });
+    if (!r.ok && r.status !== 404) throw new Error(`Drive trash (${r.status})`);
+  };
+
+  // Archivos (no carpetas) de una carpeta: para sumar al índice lo que se subió
+  // a mano directo en Drive.
+  window.listDriveFolderFiles = async function (folderId) {
+    if (!folderId) return [];
+    const token = await getAccessToken();
+    const q = `'${folderId}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`;
+    const out = [];
+    let pageToken = '';
+    do {
+      const r = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}` +
+        `&fields=nextPageToken,files(id,name,mimeType,size,createdTime)&pageSize=200` +
+        (pageToken ? `&pageToken=${pageToken}` : ''),
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!r.ok) throw new Error(`Drive list (${r.status})`);
+      const j = await r.json();
+      out.push(...(j.files || []));
+      pageToken = j.nextPageToken || '';
+    } while (pageToken);
+    return out;
+  };
 })();

@@ -565,6 +565,69 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     const resp = await fetch(_base() + '/equipos_fotos/' + key + '.json', { method: 'DELETE' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
+
+  // Documentación del equipo (archivos en Drive). Nodo aparte
+  // (/equipos_docs/{key}) por el mismo motivo que la foto, y porque
+  // saveEquipo/bulkSaveEquipos hacen PUT del equipo entero: guardado ahí, el
+  // folderId se perdería al renombrar o reimportar.
+  //   { folderId, archivos: { {id}: { texto, nombre, fileId, mime, size, subidoPor, fecha } } }
+  window.getEquipoDocs = async function (key) {
+    const resp = await fetch(_base() + '/equipos_docs/' + key + '.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = (await resp.json()) || {};
+    const archivos = Object.entries(d.archivos || {})
+      .map(([id, a]) => ({ id, ...a }))
+      .sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+    return { folderId: d.folderId || null, archivos };
+  };
+
+  window.setEquipoDocsFolder = async function (key, folderId) {
+    const resp = await fetch(_base() + '/equipos_docs/' + key + '/folderId.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(folderId)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.addEquipoArchivo = async function (key, data) {
+    const resp = await fetch(_base() + '/equipos_docs/' + key + '/archivos.json', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return (await resp.json()).name;
+  };
+
+  window.patchEquipoArchivo = async function (key, id, fields) {
+    const resp = await fetch(_base() + '/equipos_docs/' + key + '/archivos/' + id + '.json', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.deleteEquipoArchivo = async function (key, id) {
+    const resp = await fetch(_base() + '/equipos_docs/' + key + '/archivos/' + id + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  // Al cambiar el código del equipo cambia la clave: mudar el nodo entero.
+  window.moveEquipoDocs = async function (fromKey, toKey) {
+    const r = await fetch(_base() + '/equipos_docs/' + fromKey + '.json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    if (!data) return;
+    const w = await fetch(_base() + '/equipos_docs/' + toKey + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data)
+    });
+    if (!w.ok) throw new Error('HTTP ' + w.status);
+    await fetch(_base() + '/equipos_docs/' + fromKey + '.json', { method: 'DELETE' });
+  };
 })();
 
 // ─── Gestión de Usuarios ────────────────────────────

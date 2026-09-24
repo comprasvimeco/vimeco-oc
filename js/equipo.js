@@ -211,6 +211,270 @@ function collectItems() {
     .filter(Boolean);
 }
 
+// ---- Documentación (archivos en Drive) ----
+// Índice en Firebase (/equipos_docs/{key}); el archivo vive en Drive, en
+// EQUIPOS/{Código - Descripción}/. Subir o quitar un documento impacta al
+// instante: no pasa por "Guardar cambios".
+let docsFolderId = null;
+let docs         = [];     // [{ id, texto, nombre, fileId, mime, size, subidoPor, fecha }]
+let docEditando  = null;   // id del documento cuyo texto se edita (null = alta)
+let docArchivo   = null;   // File elegido en el modal de alta
+let userName     = '';
+
+function nombreCarpetaEquipo(codigo, tipo) {
+  return [codigo, tipo].map(s => String(s || '').trim()).filter(Boolean).join(' - ') || 'Sin nombre';
+}
+
+function extension(nombre) {
+  const m = /\.([a-z0-9]{1,6})$/i.exec(nombre || '');
+  return m ? m[1].toLowerCase() : '';
+}
+
+function sinExtension(nombre) {
+  return String(nombre || '').replace(/\.[a-z0-9]{1,6}$/i, '');
+}
+
+// Color y rótulo del cuadradito de la card según el tipo de archivo.
+function tipoDoc(mime, nombre) {
+  const ext = extension(nombre);
+  mime = mime || '';
+  if (mime === 'application/pdf' || ext === 'pdf') return { cls: 'pdf', label: 'PDF' };
+  if (mime.startsWith('image/')) return { cls: 'img', label: (ext || 'IMG').toUpperCase().slice(0, 4) };
+  if (/sheet|excel|csv/.test(mime) || /^(xlsx?|csv|ods)$/.test(ext))
+    return { cls: 'xls', label: (ext || 'XLS').toUpperCase() };
+  if (/word|document|text/.test(mime) || /^(docx?|odt|txt|rtf)$/.test(ext))
+    return { cls: 'doc', label: (ext || 'DOC').toUpperCase() };
+  return { cls: 'otro', label: (ext || 'ARCH').toUpperCase().slice(0, 4) };
+}
+
+function fmtPeso(bytes) {
+  const n = Number(bytes) || 0;
+  if (!n) return '';
+  if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + ' KB';
+  return (n / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB';
+}
+
+function fmtFecha(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+function docTileHTML(mime, nombre) {
+  const t = tipoDoc(mime, nombre);
+  return `<span class="doc-tile doc-tile--${t.cls}">${icSvg('file')}<span>${esc(t.label)}</span></span>`;
+}
+
+function docCardHTML(d) {
+  const meta = [fmtFecha(d.fecha), fmtPeso(d.size), d.subidoPor].filter(Boolean).join(' · ');
+  return `
+    <div class="doc-card" data-id="${esc(d.id)}">
+      <a class="doc-link" href="https://drive.google.com/file/d/${encodeURIComponent(d.fileId)}/view" target="_blank" rel="noopener" title="${esc(d.nombre)}">
+        ${docTileHTML(d.mime, d.nombre)}
+        <span class="doc-body">
+          <span class="doc-texto">${esc(d.texto || sinExtension(d.nombre))}</span>
+          <span class="doc-meta">${esc(meta)}</span>
+        </span>
+      </a>
+      <div class="doc-btns">
+        <button class="doc-btn" data-act="edit" title="Editar texto" aria-label="Editar texto">${icSvg('edit')}</button>
+        <button class="doc-btn doc-btn--del" data-act="del" title="Quitar" aria-label="Quitar">${icSvg('x')}</button>
+      </div>
+    </div>`;
+}
+
+function pintarDocs() {
+  $('eq-docs').innerHTML = docs.length
+    ? docs.map(docCardHTML).join('')
+    : '<div class="eq-docs-empty">Sin documentos adjuntos todavía.</div>';
+  const carpeta = $('btn-docs-carpeta');
+  if (docsFolderId) carpeta.href = 'https://drive.google.com/drive/folders/' + encodeURIComponent(docsFolderId);
+  carpeta.style.display           = docsFolderId ? '' : 'none';
+  $('btn-docs-sync').style.display = docsFolderId ? '' : 'none';
+}
+
+// Card provisoria con barra de progreso mientras sube.
+function cardSubiendo(texto, file) {
+  const el = document.createElement('div');
+  el.className = 'doc-card doc-card--subiendo';
+  el.innerHTML = `
+    <div class="doc-link">
+      ${docTileHTML(file.type, file.name)}
+      <span class="doc-body">
+        <span class="doc-texto">${esc(texto)}</span>
+        <span class="doc-meta">Subiendo… 0%</span>
+      </span>
+    </div>
+    <div class="doc-bar" style="width:0"></div>`;
+  const vacio = $('eq-docs').querySelector('.eq-docs-empty');
+  if (vacio) vacio.remove();
+  $('eq-docs').prepend(el);
+  return {
+    progreso(p) {
+      const pct = Math.round(p * 100);
+      el.querySelector('.doc-bar').style.width = pct + '%';
+      el.querySelector('.doc-meta').textContent = `Subiendo… ${pct}%`;
+    },
+    quitar() { el.remove(); }
+  };
+}
+
+function abrirModalDoc(doc) {
+  docEditando = doc ? doc.id : null;
+  docArchivo  = null;
+  $('modal-doc-title').textContent  = doc ? 'Editar texto' : 'Adjuntar documento';
+  $('modal-doc-yes').textContent    = doc ? 'Guardar' : 'Subir';
+  $('doc-file-group').style.display = doc ? 'none' : '';
+  $('doc-elegido').textContent      = '';
+  $('doc-texto').value = doc ? (doc.texto || sinExtension(doc.nombre)) : '';
+  $('modal-doc').classList.remove('hidden');
+  if (doc) $('doc-texto').focus();
+}
+
+function cerrarModalDoc() {
+  $('modal-doc').classList.add('hidden');
+  docEditando = null;
+  docArchivo  = null;
+}
+
+function onDocElegido(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!file.size) { showToast('El archivo está vacío.', 'error'); return; }
+  docArchivo = file;
+  $('doc-elegido').textContent = file.name + ' · ' + fmtPeso(file.size);
+  if (!$('doc-texto').value.trim()) $('doc-texto').value = sinExtension(file.name);
+  $('doc-texto').focus();
+}
+
+async function confirmarModalDoc() {
+  const texto = $('doc-texto').value.trim();
+  if (docEditando) {
+    const doc = docs.find(d => d.id === docEditando);
+    cerrarModalDoc();
+    if (doc && texto && texto !== doc.texto) await renombrarDoc(doc, texto);
+    return;
+  }
+  if (!docArchivo) { showToast('Elegí un archivo.', 'error'); return; }
+  const file = docArchivo;
+  cerrarModalDoc();
+  await subirDoc(file, texto || sinExtension(file.name));
+}
+
+// El archivo en Drive se llama como el texto de la card (+ extensión original),
+// así la carpeta queda prolija para quien la abra directo en Drive.
+function nombreEnDrive(texto, nombreOriginal) {
+  const ext = extension(nombreOriginal);
+  return texto + (ext ? '.' + ext : '');
+}
+
+async function subirDoc(file, texto) {
+  const nombre = nombreEnDrive(texto, file.name);
+  const card   = cardSubiendo(texto, file);
+  const btn    = $('btn-docs-add');
+  btn.disabled = true;
+  try {
+    const { fileId, folderId } = await uploadEquipoArchivo(file, {
+      folderId:   docsFolderId,
+      folderName: nombreCarpetaEquipo(equipo.codigo, equipo.tipo),
+      nombre,
+      onProgress: p => card.progreso(p)
+    });
+    if (folderId !== docsFolderId) {
+      await setEquipoDocsFolder(currentKey, folderId);
+      docsFolderId = folderId;
+    }
+    const data = {
+      texto, nombre, fileId,
+      mime: file.type || '', size: file.size,
+      subidoPor: userName, fecha: Date.now()
+    };
+    const id = await addEquipoArchivo(currentKey, data);
+    docs.unshift({ id, ...data });
+    showToast('Documento subido.');
+  } catch (err) {
+    showToast('No se pudo subir el documento: ' + ((err && err.message) || 'error'), 'error');
+  } finally {
+    card.quitar();
+    btn.disabled = false;
+    pintarDocs();
+  }
+}
+
+async function renombrarDoc(doc, texto) {
+  try {
+    await patchEquipoArchivo(currentKey, doc.id, { texto });
+    doc.texto = texto;
+    pintarDocs();
+  } catch (_) {
+    showToast('No se pudo guardar el texto.', 'error');
+    return;
+  }
+  // Best-effort: la card ya quedó bien aunque Drive no acompañe.
+  const nombre = nombreEnDrive(texto, doc.nombre);
+  renameDriveItem(doc.fileId, nombre)
+    .then(() => { doc.nombre = nombre; return patchEquipoArchivo(currentKey, doc.id, { nombre }); })
+    .catch(() => {});
+}
+
+async function quitarDoc(doc) {
+  const ok = await showConfirm(
+    'Quitar documento',
+    `¿Quitar "${doc.texto || doc.nombre}"? El archivo va a la papelera de Drive (se puede recuperar durante 30 días).`
+  );
+  if (!ok) return;
+  try {
+    await trashDriveFile(doc.fileId);
+    await deleteEquipoArchivo(currentKey, doc.id);
+    docs = docs.filter(d => d.id !== doc.id);
+    pintarDocs();
+    showToast('Documento quitado.');
+  } catch (_) {
+    showToast('No se pudo quitar el documento.', 'error');
+  }
+}
+
+// Suma al índice los archivos que se subieron a mano directo en la carpeta de Drive.
+async function traerDeDrive() {
+  const btn = $('btn-docs-sync');
+  btn.disabled = true;
+  btn.textContent = 'Buscando…';
+  try {
+    const enDrive   = await listDriveFolderFiles(docsFolderId);
+    const conocidos = new Set(docs.map(d => d.fileId));
+    const nuevos    = enDrive.filter(f => !conocidos.has(f.id));
+    for (const f of nuevos) {
+      const data = {
+        texto: sinExtension(f.name), nombre: f.name, fileId: f.id,
+        mime: f.mimeType || '', size: Number(f.size) || 0,
+        subidoPor: 'Drive', fecha: Date.parse(f.createdTime) || Date.now()
+      };
+      const id = await addEquipoArchivo(currentKey, data);
+      docs.push({ id, ...data });
+    }
+    docs.sort((a, b) => (b.fecha || 0) - (a.fecha || 0));
+    pintarDocs();
+    showToast(nuevos.length
+      ? `Se sumaron ${nuevos.length} archivo${nuevos.length === 1 ? '' : 's'} de Drive.`
+      : 'No hay archivos nuevos en la carpeta.');
+  } catch (_) {
+    showToast('No se pudo leer la carpeta de Drive.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Traer de Drive';
+  }
+}
+
+function onDocsClick(e) {
+  const btn = e.target.closest('.doc-btn');
+  if (!btn) return;
+  const doc = docs.find(d => d.id === btn.closest('.doc-card').dataset.id);
+  if (!doc) return;
+  if (btn.dataset.act === 'edit') abrirModalDoc(doc);
+  else quitarDoc(doc);
+}
+
 // ---- Carga ----
 async function loadFicha() {
   try {
@@ -221,6 +485,9 @@ async function loadFicha() {
     }
     fotoActual = await getEquipoFoto(currentKey).catch(() => null);
     obras      = await getAllObras().catch(() => []);
+    const d    = await getEquipoDocs(currentKey).catch(() => ({ folderId: null, archivos: [] }));
+    docsFolderId = d.folderId;
+    docs         = d.archivos;
 
     $('eq-codigo').value      = equipo.codigo || '';
     $('eq-tipo').value        = equipo.tipo || '';
@@ -233,6 +500,7 @@ async function loadFicha() {
     refreshItemsEmpty();
 
     pintarFoto(fotoActual);
+    pintarDocs();
 
     $('eq-loading').style.display = 'none';
     $('eq-ficha').style.display   = '';
@@ -281,6 +549,7 @@ async function save() {
         creadoEn: equipo.creadoEn || Date.now()
       });
       await deleteEquipo(currentKey);
+      await moveEquipoDocs(currentKey, newKey).catch(() => {});
       keyFinal = newKey;
     } else {
       await patchEquipo(currentKey, { codigo, tipo, patente, responsable, activo, ubicacion, items });
@@ -298,6 +567,10 @@ async function save() {
       await saveEquipoFoto(keyFinal, fotoActual);
       await deleteEquipoFoto(currentKey).catch(() => {});
     }
+
+    // La carpeta de Drive se llama "Código - Descripción": acompañar el cambio.
+    if (docsFolderId && nombreCarpetaEquipo(codigo, tipo) !== nombreCarpetaEquipo(equipo.codigo, equipo.tipo))
+      renameDriveItem(docsFolderId, nombreCarpetaEquipo(codigo, tipo)).catch(() => {});
 
     showToast('Ficha guardada.');
     if (keyFinal !== currentKey) {
@@ -337,6 +610,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentKey = new URLSearchParams(location.search).get('key');
   if (!currentKey) { window.location.href = 'equipos.html'; return; }
 
+  userName = name || '';
   $('hdr-name').textContent = name || '—';
   $('btn-back').addEventListener('click', () => { window.location.href = 'equipos.html'; });
   $('btn-foto').addEventListener('click', () => $('eq-file').click());
@@ -348,6 +622,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-toggle-activo').addEventListener('click', toggleActivo);
   $('btn-add-item').addEventListener('click', () => addItemRow().querySelector('input').focus());
   $('btn-save').addEventListener('click', save);
+
+  $('btn-docs-add').innerHTML     = icSvg('clip') + ' Adjuntar';
+  $('btn-docs-carpeta').innerHTML = icSvg('folder') + ' Carpeta';
+  $('btn-docs-add').addEventListener('click', () => abrirModalDoc(null));
+  $('btn-docs-sync').addEventListener('click', traerDeDrive);
+  $('btn-doc-elegir').addEventListener('click', () => $('doc-file').click());
+  $('doc-file').addEventListener('change', onDocElegido);
+  $('modal-doc-no').addEventListener('click', cerrarModalDoc);
+  $('modal-doc-yes').addEventListener('click', confirmarModalDoc);
+  $('doc-texto').addEventListener('keydown', e => { if (e.key === 'Enter') confirmarModalDoc(); });
+  $('eq-docs').addEventListener('click', onDocsClick);
 
   loadFicha();
 });
