@@ -29,12 +29,14 @@ const state = {
   hasta:  '',
   moneda: 'ARS',       // moneda de visualización
   rate:   'oficial',   // 'oficial' | 'blue' — qué cotización usar para convertir
-  incluirNoEmitidas: false,
   // Resumen del período: preset activo ('semana'|'quincena'|'mes'|null) y
   // cuántos períodos hacia atrás está parado. El preset ESCRIBE desde/hasta,
   // así que todo el panel se mueve con él; tocar las fechas a mano lo apaga.
   periodo:  null,
   pOffset:  0,
+  // Orden del listado del resumen (y del PDF, que sale en el mismo orden).
+  resOrden: 'fecha',
+  resDir:   1,          // 1 ascendente, -1 descendente
 };
 
 const expanded = new Set(); // claves de filas desplegadas (por sección+key)
@@ -119,15 +121,10 @@ function amountIn(oc, cur) {
 }
 
 // ---- Filtro ----
-function inEstado(oc) {
-  if (state.incluirNoEmitidas) return true;
-  const e = oc.estado || 'emitida';
-  return e !== 'pendiente' && e !== 'rechazada' && e !== 'cancelada';
-}
-
+// Sólo lo que se compró: pendientes, rechazadas y canceladas nunca entran.
 function getFiltered() {
   return ALL.filter(oc => {
-    if (!inEstado(oc)) return false;
+    if (!esFirme(oc)) return false;
     const ts = oc.timestamp || 0;
     if (state.desde && ts < new Date(state.desde + 'T00:00:00').getTime()) return false;
     if (state.hasta && ts > new Date(state.hasta + 'T23:59:59').getTime()) return false;
@@ -285,18 +282,61 @@ function weekLabel(k) {
   return 'Semana del ' + Number(p[2]) + ' de ' + (meses[Number(p[1]) - 1] || p[1]) + ' de ' + p[0];
 }
 
-const bucketShort = (k, unit) => unit === 'semana' ? weekShort(k) : monthShort(k);
-const bucketLabel = (k, unit) => unit === 'semana' ? weekLabel(k) : monthLabel(k);
+const DIAS_SEM = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+function dayShort(k) {
+  const p = k.split('-');
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return Number(p[2]) + ' ' + (meses[Number(p[1]) - 1] || p[1]);
+}
+function dayLabel(k) {
+  const d = new Date(k + 'T00:00:00');
+  const l = DIAS_SEM[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES_LG[d.getMonth()] + ' de ' + d.getFullYear();
+  return l.charAt(0).toUpperCase() + l.slice(1);
+}
 
-// Granularidad de la evolución. Agrupar por mes cuando todo el dato entra en
-// dos meses da una recta de dos puntos que no dice nada: ahí la semana informa.
+const bucketShort = (k, unit) => unit === 'dia' ? dayShort(k) : unit === 'semana' ? weekShort(k) : monthShort(k);
+const bucketLabel = (k, unit) => unit === 'dia' ? dayLabel(k) : unit === 'semana' ? weekLabel(k) : monthLabel(k);
+const bucketKey   = (ts, unit) => unit === 'dia' ? isoDe(new Date(ts)) : unit === 'semana' ? weekKey(ts) : monthKey(ts);
+
+// Todos los baldes (día, semana o mes) entre dos fechas, en orden.
+function bucketsEntre(ini, fin, unit) {
+  const keys = [];
+  const d = new Date(ini); d.setHours(0, 0, 0, 0);
+  if (unit === 'semana') d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  if (unit === 'mes')    d.setDate(1);
+  while (d <= fin) {
+    keys.push(bucketKey(d.getTime(), unit));
+    if (unit === 'dia')         d.setDate(d.getDate() + 1);
+    else if (unit === 'semana') d.setDate(d.getDate() + 7);
+    else                        d.setMonth(d.getMonth() + 1);
+  }
+  return keys;
+}
+
+// Granularidad de la evolución según el período elegido: semana y quincena
+// van por día, el mes por semana; "Todo" o fechas a mano, según el largo.
+// El eje cubre el rango entero (hasta hoy) con los baldes sin compras en
+// cero, así el gráfico no queda vacío aunque haya pocas OC. Si la unidad
+// elegida da un solo balde (primeros días del mes), baja a días.
 function timeSeries(list) {
-  const ts = list.map(o => o.timestamp || 0).filter(Boolean);
-  if (!ts.length) return { rows: [], unit: 'mes' };
-  const spanDias = (Math.max(...ts) - Math.min(...ts)) / 86400000;
-  const unit = spanDias <= 120 ? 'semana' : 'mes';
-  const kf = oc => unit === 'semana' ? weekKey(oc.timestamp) : monthKey(oc.timestamp);
-  const rows = groupAgg(list, kf, kf).sort((a, b) => a.key.localeCompare(b.key));
+  const r   = rangoActual();
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const ts  = list.map(o => o.timestamp || 0).filter(Boolean);
+
+  const ini = r.desde ? new Date(r.desde + 'T00:00:00') : (ts.length ? new Date(Math.min(...ts)) : null);
+  let   fin = r.hasta ? new Date(r.hasta + 'T00:00:00') : hoy;
+  if (fin > hoy) fin = hoy;
+  if (!ini || ini > fin) return { rows: [], unit: 'dia' };
+
+  const dias = Math.round((fin - ini) / 86400000) + 1;
+  let unit = state.periodo === 'semana' || state.periodo === 'quincena' ? 'dia'
+           : state.periodo === 'mes' ? 'semana'
+           : dias <= 31 ? 'dia' : dias <= 180 ? 'semana' : 'mes';
+  let keys = bucketsEntre(ini, fin, unit);
+  if (keys.length < 2 && unit !== 'dia') { unit = 'dia'; keys = bucketsEntre(ini, fin, unit); }
+
+  const byKey = new Map(groupAgg(list, oc => bucketKey(oc.timestamp, unit), () => '').map(g => [g.key, g]));
+  const rows = keys.map(k => byKey.get(k) || { key: k, label: '', total: 0, count: 0, ocs: [] });
   return { rows, unit };
 }
 
@@ -334,30 +374,15 @@ function catChip(cat) {
 //  Gráficos
 // ===================================================
 
-// Paleta categórica validada (contraste/daltonismo) para la barra de
-// participación. Ver scripts/validate_palette.js de la guía de dataviz:
-// peor par adyacente ΔE 24.2 bajo protanopia. Los tonos por debajo de 3:1
-// sobre blanco se compensan con la leyenda rotulada (relief rule).
-const SHARE_COLORS = ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7'];
-const SHARE_OTHER  = '#9ca3af';
-
-// ---- Rampa "heat" para los rankings (sequential = magnitud) ----
-// Un solo tono: el que más gastó va azul VIMECO intenso, y la intensidad cae
-// con el monto hasta apagarse en un gris-azulado. El ancho de la barra ya
-// codifica la magnitud; el color la refuerza (encoding redundante, a propósito).
-// Azul de marca de punta a punta (sin gris): frío = celeste claro saturado
-// (#a9c9ef) → caliente = azul marino (#16375a, primary-dark).
-const HEAT_COLD = [169, 201, 239];
-const HEAT_HOT  = [22, 55, 90];
-function _mix(a, b, t) { return [
-  Math.round(a[0] + (b[0] - a[0]) * t),
-  Math.round(a[1] + (b[1] - a[1]) * t),
-  Math.round(a[2] + (b[2] - a[2]) * t),
-]; }
-function _hex(rgb) { return '#' + rgb.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join(''); }
-// gamma < 1 estira el rango alto: sin esto sólo el #1 se vería intenso.
-function heatRgb(t) { return _mix(HEAT_COLD, HEAT_HOT, Math.pow(Math.max(0, Math.min(1, t)), 0.6)); }
-function heatColor(t) { return _hex(heatRgb(t)); }
+// Paleta categórica de la barra de participación, en la línea de la marca:
+// azul VIMECO, dorado, verde azulado, violeta y naranja. Validada con
+// scripts/validate_palette.js de la guía de dataviz: peor par adyacente
+// ΔE 14.8 bajo protanopia. El dorado y el naranja quedan debajo de 3:1 sobre
+// blanco; lo compensan la leyenda rotulada y el % escrito en el segmento.
+const SHARE_COLORS = ['#2557a7', '#d4a72c', '#169c8a', '#5b3f9e', '#e07b39'];
+const SHARE_OTHER  = '#a3adbb';
+// Sobre el dorado el texto va oscuro; sobre el resto, blanco.
+const SHARE_INK    = { '#d4a72c': '#3a2c05' };
 
 // ---- Barra de participación (part-to-whole, top 5 + Otras) ----
 function renderShare(containerId, rows, grand) {
@@ -378,11 +403,14 @@ function renderShare(containerId, rows, grand) {
   }
 
   const pct = t => (t / grand) * 100;
+  // El % va escrito dentro del segmento sólo si entra (≥ 7%); si no, lo dice
+  // la leyenda.
   el.innerHTML = `
     <div class="rep-share-track">
       ${segs.map(s => `
-        <div class="rep-share-seg" style="flex:${s.total};background:${s.color}"
-             title="${esc(s.label)} — ${esc(fmtFull(s.total, state.moneda))} (${pct(s.total).toFixed(1)}%)"></div>
+        <div class="rep-share-seg" style="flex:${s.total};background:${s.color};color:${SHARE_INK[s.color] || '#fff'}"
+             title="${esc(s.label)} — ${esc(fmtFull(s.total, state.moneda))} (${pct(s.total).toFixed(1)}%)">${
+          pct(s.total) >= 7 ? `<span>${Math.round(pct(s.total))}%</span>` : ''}</div>
       `).join('')}
     </div>
     <div class="rep-share-legend">
@@ -406,10 +434,11 @@ function renderLine(containerId, serie) {
   lineData = serie;
   const { rows, unit } = serie;
 
-  $('rep-linea-title').textContent = unit === 'semana' ? 'Evolución semanal' : 'Evolución mensual';
+  $('rep-linea-title').textContent = unit === 'dia' ? 'Evolución diaria'
+    : unit === 'semana' ? 'Evolución semanal' : 'Evolución mensual';
 
-  if (rows.length < 2) {
-    el.innerHTML = `<div class="rep-empty">${rows.length ? `Una sola ${unit} en el rango — no hay evolución para graficar.` : 'Sin movimientos en el rango seleccionado.'}</div>`;
+  if (!rows.length) {
+    el.innerHTML = '<div class="rep-empty">Sin movimientos en el rango seleccionado.</div>';
     return;
   }
 
@@ -447,7 +476,7 @@ function renderLine(containerId, serie) {
 
   el.innerHTML = `
     <svg class="rep-line-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img"
-         aria-label="Evolución mensual del gasto">
+         aria-label="Evolución del gasto">
       <defs>
         <linearGradient id="repAreaGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%"   stop-color="#2557a7" stop-opacity=".34"/>
@@ -580,7 +609,7 @@ function setupCards() {
     // Los controles del encabezado (buscador, "Unificar obras", flechas del
     // período) hacen lo suyo; el resto del header pliega.
     head.addEventListener('click', e => {
-      if (e.target.closest('input, button, a, .seg')) return;
+      if (e.target.closest('input, select, label, button, a, .seg')) return;
       toggleCard(card);
     });
     head.addEventListener('keydown', e => {
@@ -672,14 +701,9 @@ function renderBars(containerId, rows, opts = {}) {
         </button>`).join('')}</div>`;
     }
 
-    // Heat por magnitud: color e intensidad de la barra salen del monto relativo.
-    const t   = max ? r.total / max : 0;
-    const hc  = heatColor(t);
-    const hcL = _hex(_mix(heatRgb(t), [255, 255, 255], 0.34));
-
     return `
       <div class="rep-bar-row ${opts.drill ? 'rep-clickable' : ''} ${isOpen ? 'rep-open' : ''}" data-rowkey="${esc(rowKey)}">
-        <span class="rep-bar-rank">${r.rank}</span>
+        <span class="rep-bar-rank${r.rank <= 3 ? ` rep-rank-${r.rank}` : ''}">${r.rank}</span>
         <div class="rep-bar-body">
           <div class="rep-bar-head">
             ${opts.drill ? `<span class="rep-caret">${icSvg('chevR')}</span>` : ''}
@@ -687,9 +711,9 @@ function renderBars(containerId, rows, opts = {}) {
             <span class="rep-bar-val" title="${esc(fmtFull(r.total, state.moneda))}">${fmtCompact(r.total, state.moneda)}</span>
           </div>
           <div class="rep-bar-track">
-            <div class="rep-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${hcL},${hc})"></div>
+            <div class="rep-bar-fill" style="width:${pct}%"></div>
           </div>
-          <div class="rep-bar-sub">${r.count} OC · ${share}%</div>
+          <div class="rep-bar-sub"><span>${r.count} OC</span><span class="rep-bar-pct">${share || !r.total ? share : '<1'}% del total</span></div>
           ${drillHtml}
         </div>
       </div>`;
@@ -749,11 +773,8 @@ function renderHero(list) {
 // mismo que se ve en pantalla y lo que sale en el PDF —los dos leen de
 // resumenData()—, así que no pueden discrepar.
 //
-// Dos diferencias a propósito con el resto del panel:
-//   · nunca incluye pendientes ni rechazadas, aunque el checkbox de arriba las
-//     prenda: es lo que se compró, no lo que se pidió;
-//   · el importe de cada fila va en la moneda original de la OC. Sólo los
-//     totales se convierten a la moneda elegida arriba.
+// A diferencia del resto del panel, el importe de cada fila va en la moneda
+// original de la OC. Sólo los totales se convierten a la moneda elegida arriba.
 
 const DIAS_FACTURA = 15;    // sin factura pasados estos días = a reclamar
 
@@ -897,8 +918,9 @@ function resumenData() {
     else                    { fact.mSin += amt; }          // incluye las 'sin rotular'
     if (f.estado === 'otros') fact.otros++;
     if (vencida)            { fact.venc++; fact.mVenc += amt; }
-    return { oc, f, vencida };
+    return { oc, f, vencida, amt };
   });
+  ordenarFilas(filas);
 
   // El índice de proveedores es global (lo usan los rankings y el detector de
   // duplicados): se arma sobre esta lista para agrupar bien acá y se restaura
@@ -914,6 +936,37 @@ function resumenData() {
 
   return { r, prevR, unidad, list, filas, total, noConv, prevSuma,
            prevCount: prevR ? prev.length : null, fact, topObras, topProv };
+}
+
+// Orden del listado. El importe se compara convertido a la moneda de
+// visualización (hay OC en ARS y en USD); los textos, sin distinguir
+// mayúsculas ni tildes. Empates: por fecha.
+const ORDEN_TXT = {
+  obra:        oc => oc.obra || '',
+  responsable: oc => oc.responsable?.nombre || '',
+  proveedor:   oc => oc.proveedor?.nombre || '',
+};
+function ordenarFilas(filas) {
+  const campo = state.resOrden, dir = state.resDir;
+  const porFecha = (a, b) => (a.oc.timestamp || 0) - (b.oc.timestamp || 0);
+  filas.sort((a, b) => {
+    let c = 0;
+    if (campo === 'importe') c = a.amt - b.amt;
+    else if (ORDEN_TXT[campo]) {
+      const va = ORDEN_TXT[campo](a.oc), vb = ORDEN_TXT[campo](b.oc);
+      if (!va !== !vb) return va ? -1 : 1;   // los vacíos siempre al final
+      c = va.localeCompare(vb, 'es', { sensitivity: 'base' });
+    }
+    return c * dir || porFecha(a, b) * (campo === 'fecha' ? dir : 1);
+  });
+}
+// El importe arranca de mayor a menor; el resto, ascendente. Tocar la misma
+// columna invierte el sentido.
+function setOrdenResumen(campo, desdeColumna) {
+  if (desdeColumna && state.resOrden === campo) state.resDir = -state.resDir;
+  else { state.resOrden = campo; state.resDir = campo === 'importe' ? -1 : 1; }
+  $('res-orden').value = campo;
+  renderResumen();
 }
 
 function renderResumen() {
@@ -966,12 +1019,18 @@ function renderResumen() {
   $('res-tops').innerHTML = mini('Obras del período', d.topObras)
                           + mini('Proveedores del período', d.topProv);
 
+  const th = (campo, txt, cls = '') => {
+    const on = state.resOrden === campo;
+    return `<th class="${cls}${on ? ' rr-sorted' : ''}" data-sort="${campo}" title="Ordenar por ${txt.toLowerCase()}">${txt}${
+      on ? `<span class="rr-arr">${state.resDir > 0 ? '▲' : '▼'}</span>` : ''}</th>`;
+  };
+
   $('res-list').innerHTML = d.filas.length ? `
     <table class="rr-tbl">
       <thead><tr>
-        <th>Fecha</th><th>N° OC</th><th>Proveedor</th><th>Obra</th>
-        <th class="rr-c-eq">Equipo</th><th class="rr-c-resp">Responsable</th>
-        <th class="rr-n">Importe</th><th>Factura</th>
+        ${th('fecha', 'Fecha')}<th>N° OC</th>${th('proveedor', 'Proveedor')}${th('obra', 'Obra')}
+        <th class="rr-c-eq">Equipo</th>${th('responsable', 'Responsable', 'rr-c-resp')}
+        ${th('importe', 'Importe', 'rr-n')}<th>Factura</th>
       </tr></thead>
       <tbody>
         ${d.filas.map(({ oc, f, vencida }) => `
@@ -989,6 +1048,8 @@ function renderResumen() {
     </table>`
     : '<div class="rep-empty">No hay órdenes de compra emitidas en este período.</div>';
 
+  $('res-list').querySelectorAll('th[data-sort]').forEach(h =>
+    h.addEventListener('click', () => setOrdenResumen(h.dataset.sort, true)));
   $('res-list').querySelectorAll('.rr-row').forEach(tr => {
     tr.addEventListener('click', () => openOCDetail(tr.dataset.k));
     tr.addEventListener('keydown', e => { if (e.key === 'Enter') openOCDetail(tr.dataset.k); });
@@ -1556,7 +1617,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const soltarPreset = () => { state.periodo = null; state.pOffset = 0; syncPeriodoUI(); };
   $('rep-desde').addEventListener('change', () => { state.desde = $('rep-desde').value; soltarPreset(); render(); });
   $('rep-hasta').addEventListener('change', () => { state.hasta = $('rep-hasta').value; soltarPreset(); render(); });
-  $('chk-no-emitidas').addEventListener('change', e => { state.incluirNoEmitidas = e.target.checked; render(); });
   $('btn-export').addEventListener('click', () => window.print());
 
   // Período (en el hero): mueve todo el reporte, resumen incluido.
@@ -1570,6 +1630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Resumen del período
   $('btn-res-pdf').addEventListener('click', descargarResumenPDF);
+  $('res-orden').addEventListener('change', e => setOrdenResumen(e.target.value, false));
 
   // Plegado y buscador de las cards (restaura lo que quedó plegado la vez pasada).
   setupCards();

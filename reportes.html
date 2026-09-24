@@ -74,8 +74,6 @@
     .rep-ctrl { display: flex; flex-direction: column; gap: .3rem; }
     .rep-ctrl > label { font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
     .rep-ctrl input[type=date] { padding: .38rem .5rem; border: 1px solid var(--gray-300); border-radius: var(--radius); font: inherit; font-size: .82rem; color: var(--gray-700); background: var(--white); }
-    .rep-check { flex-direction: row; align-items: center; gap: .45rem; padding-bottom: .45rem; }
-    .rep-check label { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--gray-600); font-size: .82rem; cursor: pointer; }
     .rep-sep { align-self: stretch; width: 1px; background: var(--gray-200); }
     .rep-spacer { flex: 1 1 auto; }
 
@@ -140,16 +138,21 @@
     .rep-q:focus { outline: 2px solid var(--primary-light); outline-offset: -1px; }
 
     /* ---- Participación por obra (part-to-whole) ---- */
-    .rep-share-track { display: flex; gap: 2px; height: 32px; border-radius: 8px; overflow: hidden; margin-bottom: 1rem;
-      box-shadow: inset 0 1px 2px rgba(17,24,39,.12); }
-    .rep-share-seg { min-width: 3px; transition: filter .15s; }
-    .rep-share-seg:hover { filter: brightness(1.12); }
-    .rep-share-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .45rem .9rem; }
-    .rep-share-item { display: flex; align-items: center; gap: .45rem; font-size: .82rem; min-width: 0; }
-    .rep-share-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; box-shadow: 0 1px 2px rgba(17,24,39,.2); }
-    .rep-share-lbl { color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+    .rep-share-track { display: flex; gap: 2px; height: 38px; border-radius: 10px; overflow: hidden; margin-bottom: 1.1rem;
+      background: var(--white); box-shadow: 0 4px 14px -6px rgba(26,58,92,.35); }
+    .rep-share-seg { min-width: 3px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+      font-size: .74rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .01em;
+      transition: filter .15s; }
+    .rep-share-seg span { white-space: nowrap; padding: 0 .3rem; }
+    .rep-share-seg:hover { filter: brightness(1.1) saturate(1.05); }
+    .rep-share-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: .5rem; }
+    .rep-share-item { display: flex; align-items: center; gap: .55rem; font-size: .82rem; min-width: 0;
+      background: #f5f8fc; border: 1px solid var(--gray-100); border-radius: var(--radius); padding: .45rem .65rem; }
+    .rep-share-dot { width: 12px; height: 12px; border-radius: 4px; flex: 0 0 auto; }
+    .rep-share-lbl { color: var(--gray-700); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
     .rep-share-pct { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
-    .rep-share-val { color: var(--gray-500); font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rep-share-val { color: var(--gray-500); font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+      min-width: 3.6rem; text-align: right; }
 
     /* ---- Evolución mensual ---- */
     .rep-line { position: relative; }
@@ -171,7 +174,7 @@
     .rep-tip strong { font-weight: 700; }
     .rep-tip-sub { color: rgba(255,255,255,.65); font-size: .7rem; }
 
-    /* ---- Barras (ranking "heat": color e intensidad por magnitud) ---- */
+    /* ---- Barras de ranking ---- */
     /* Grid [rango | cuerpo]: la pastilla de rango y el cuerpo quedan alineados
        en todas las filas, sin importar el largo de la etiqueta. */
     .rep-bar-row { display: grid; grid-template-columns: auto 1fr; gap: .7rem;
@@ -180,12 +183,17 @@
     .rep-clickable { cursor: pointer; transition: background .12s; }
     .rep-clickable:hover { background: #f2f6fb; }
     .rep-open { background: #f2f6fb; }
-    /* Rango: círculo con borde (sin relleno), número centrado. Estilo único
-       para todas las filas; el degradé queda sólo en la barra. */
-    .rep-bar-rank { width: 24px; height: 24px; border-radius: 50%; display: inline-flex;
-      align-items: center; justify-content: center; font-size: .76rem; font-weight: 700;
+    /* Rango: círculo con el número. El podio se destaca como el hero: el #1 en
+       dorado, #2 y #3 en el degradé azul; el resto, sólo contorno. */
+    .rep-bar-rank { width: 26px; height: 26px; border-radius: 50%; display: inline-flex;
+      align-items: center; justify-content: center; font-size: .74rem; font-weight: 800;
       line-height: 1; font-variant-numeric: tabular-nums; flex: 0 0 auto; margin-top: 1px;
-      color: var(--primary); border: 1.5px solid var(--primary-light); background: transparent; }
+      color: var(--gray-500); border: 1.5px solid var(--gray-300); background: var(--white); }
+    .rep-bar-rank.rep-rank-1 { color: #3a2c05; border: none; background: var(--grad-gold, linear-gradient(120deg,#c8a852,#e6c878));
+      box-shadow: 0 3px 8px -3px rgba(200,168,82,.7); }
+    .rep-bar-rank.rep-rank-2,
+    .rep-bar-rank.rep-rank-3 { color: #fff; border: none; background: var(--grad-header);
+      box-shadow: 0 3px 8px -3px rgba(26,58,92,.55); }
     .rep-bar-body { min-width: 0; }
     .rep-bar-head { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .4rem; }
     .rep-caret { color: var(--primary-light); display: inline-flex; flex: 0 0 auto;
@@ -194,14 +202,19 @@
     .rep-open .rep-caret { transform: rotate(90deg); }
     .rep-bar-label { flex: 1; font-size: .9rem; color: var(--gray-800); font-weight: 700;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.01em; }
-    .rep-bar-val { font-size: .98rem; font-weight: 800; color: var(--primary); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .rep-bar-track { background: var(--gray-100); border-radius: 999px; height: 11px; overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(17,24,39,.06); }
+    .rep-bar-val { font-size: 1rem; font-weight: 800; color: var(--primary-dark); white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+    .rep-bar-track { background: #edf1f7; border-radius: 999px; height: 9px; overflow: hidden; }
+    /* Un solo color para toda la serie: el degradé del header. El ancho ya
+       dice cuánto; teñir por monto repetía el dato. */
     .rep-bar-fill { height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, var(--primary-light), var(--primary-dark));
+      box-shadow: 0 2px 6px -2px rgba(37,87,167,.45);
       animation: repGrow .55s var(--ease-spring, cubic-bezier(.22,1,.36,1)) both; transform-origin: left; }
     @keyframes repGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
     @media (prefers-reduced-motion: reduce) { .rep-bar-fill { animation: none; } }
-    .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .3rem; font-variant-numeric: tabular-nums; }
+    .rep-bar-sub { display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+      font-size: .72rem; color: var(--gray-500); margin-top: .35rem; font-variant-numeric: tabular-nums; }
+    .rep-bar-pct { font-weight: 700; color: var(--primary-light); background: #eaf1fb; border-radius: 999px; padding: .05rem .5rem; }
 
     /* ---- Drill-down: cada OC abre su ficha ---- */
     .rep-drill { margin: .7rem 0 .2rem; border-left: 2px solid var(--gray-200); padding-left: .7rem; }
@@ -288,14 +301,23 @@
     .rr-tbl .rr-n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--gray-800); }
     .rr-nro { font-family: 'Courier New', monospace; font-weight: 700; color: var(--primary); }
     .rr-row { cursor: pointer; transition: background .12s; }
-    .rr-row:hover, .rr-row:focus-visible { background: #eef3fa; outline: none; }
+    /* Filas alternadas para seguir la línea a lo ancho de la tabla. */
+    .rr-row:nth-child(even) { background: #f5f8fc; }
+    .rr-row:hover, .rr-row:focus-visible { background: #e6eef9; outline: none; }
+    /* Encabezados que ordenan: el activo lleva la flecha de dirección. */
+    .rr-tbl th[data-sort] { cursor: pointer; user-select: none; transition: color .12s; }
+    .rr-tbl th[data-sort]:hover { color: var(--primary); }
+    .rr-tbl th.rr-sorted { color: var(--primary); }
+    .rr-arr { display: inline-block; margin-left: .25rem; font-size: .7rem; }
+    .rr-sort-l { font-size: .7rem; color: var(--gray-500); font-weight: 600; white-space: nowrap; }
+    .rr-sort { padding: .3rem .5rem; font: inherit; font-size: .78rem; color: var(--gray-700); background: var(--white);
+      border: 1px solid var(--gray-300); border-radius: var(--radius); cursor: pointer; }
     .rr-f { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; white-space: nowrap; }
     .rr-f--con   { background: #e3f5e8; color: #1e7d3a; }
     .rr-f--sin   { background: #fde6e6; color: #b02a2a; }
     .rr-f--otros { background: #fff4e0; color: #9a6a00; }
 
-    .rr-foot { display: flex; justify-content: space-between; align-items: center; gap: .7rem;
-      flex-wrap: wrap; margin-top: 1rem; }
+    .rr-foot { margin-top: .9rem; }
     .rr-foot-n { font-size: .74rem; color: var(--gray-500); }
 
     @media (max-width: 900px) {
@@ -432,10 +454,6 @@
           <button data-val="blue">Blue</button>
         </div>
       </div>
-      <div class="rep-ctrl rep-check">
-        <input type="checkbox" id="chk-no-emitidas">
-        <label for="chk-no-emitidas">Incluir pendientes / rechazadas</label>
-      </div>
       <div class="rep-spacer"></div>
       <div class="rep-ctrl">
         <button class="btn btn-primary btn-sm" id="btn-export" title="Imprimir o guardar como PDF">Exportar</button>
@@ -467,6 +485,17 @@
               <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>Resumen del período</span>
               <span class="rr-range" id="res-rango">—</span>
             </div>
+            <span class="rep-ch-r">
+              <label class="rr-sort-l" for="res-orden">Ordenar por</label>
+              <select class="rr-sort" id="res-orden">
+                <option value="fecha">Fecha</option>
+                <option value="importe">Importe</option>
+                <option value="obra">Obra</option>
+                <option value="responsable">Responsable</option>
+                <option value="proveedor">Proveedor</option>
+              </select>
+              <button class="btn btn-primary btn-sm" id="btn-res-pdf">Descargar PDF</button>
+            </span>
           </div>
           <div class="card-body">
             <div class="rr-stats" id="res-stats"></div>
@@ -474,7 +503,6 @@
             <div class="rr-list" id="res-list"></div>
             <div class="rr-foot">
               <span class="rr-foot-n">Sólo OC emitidas y autorizadas. Los importes de cada fila van en la moneda original de la OC.</span>
-              <button class="btn btn-primary btn-sm" id="btn-res-pdf">Descargar PDF</button>
             </div>
           </div>
         </div>
