@@ -83,44 +83,8 @@ function ocsElegibles() {
     (verPruebas || (!esObraPrueba(oc) && !esProveedorPrueba(oc))));
 }
 
-// ---- Búsqueda ----
-
-// Sin acentos ni mayúsculas: en obra se escribe "caneria" y el ítem dice
-// "Cañería". Se normaliza igual el texto buscado y el buscado adentro.
-function normTxt(s) {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-// Todo lo buscable de una OC en un solo texto: proveedor, obra, número y la
-// descripción de cada ítem. Así "hierro" encuentra la OC por su renglón aunque
-// el proveedor no se llame así.
-const hayCache = new WeakMap();
-function haystackOC(oc) {
-  let h = hayCache.get(oc);
-  if (h === undefined) {
-    h = normTxt([oc.proveedor?.nombre, oc.obra, oc.nroOC,
-                 ...(oc.items || []).map(it => it.desc)].join(' '));
-    hayCache.set(oc, h);
-  }
-  return h;
-}
-
-// Todos los términos tienen que aparecer, pero no juntos ni en orden: "cemento
-// norte" encuentra la OC de cemento de la obra Norte.
-function coincideOC(oc, terms) {
-  const hay = haystackOC(oc);
-  return terms.every(t => hay.includes(t));
-}
-
-// Renglones que explican la coincidencia, para mostrarlos en la tarjeta: si se
-// buscó un artículo, sin esto no se ve por qué apareció esa OC.
-function itemsCoincidentes(oc, terms) {
-  return (oc.items || [])
-    .filter(it => { const d = normTxt(it.desc); return terms.every(t => d.includes(t)); })
-    .map(it => it.desc);
-}
-
 // ---- Render: lista de OC ----
+// La búsqueda (normTxt, coincideOC, itemsCoincidentes…) vive en buscarOC.js.
 
 function badgeEntrega(estado) {
   const txt = { sin: 'Sin entregas', parcial: 'Entrega parcial', completa: 'Entregada' };
@@ -128,7 +92,7 @@ function badgeEntrega(estado) {
 }
 
 function renderOCList() {
-  const terms = normTxt($('rem-search').value).trim().split(/\s+/).filter(Boolean);
+  const terms = terminosBusqueda($('rem-search').value);
   const box   = $('rem-oc-list');
 
   let list = ocsElegibles().map(oc => ({ oc, e: entregasDeOC(oc) }));
@@ -153,9 +117,7 @@ function renderOCList() {
       </div>
       <div class="hist-proveedor">${escHtml(oc.proveedor?.nombre || '—')}</div>
       <div class="hist-obra">${escHtml(oc.obra || '—')}</div>
-      ${hits.length ? `<div class="rem-hits">${
-        hits.slice(0, 3).map(d => `<span>${escHtml(d)}</span>`).join('')
-      }${hits.length > 3 ? `<span>y ${hits.length - 3} ítem(s) más</span>` : ''}</div>` : ''}
+      ${hitsHtml(hits, escHtml)}
       <div class="rem-prog-wrap">
         <div class="rem-prog"><div class="rem-prog-fill rem-prog-fill--${e.estado}" style="width:${Math.min(100, e.pct)}%"></div></div>
         <span class="rem-prog-pct">${e.pct}%</span>

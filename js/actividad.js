@@ -122,23 +122,42 @@ function rangeLabel() {
   return `en los últimos ${range.preset} días`;
 }
 
+// OC del historial por número, para buscar novedades por los ítems comprados:
+// el evento no guarda los ítems, la OC sí. Se llena cuando cargan los paneles;
+// hasta entonces la búsqueda sólo mira el texto del evento.
+let ocPorNro = new Map();
+
+function ocDeEvento(e) {
+  const nro = e.nroOC || (e.tipo === 'oc' ? nroDeTitulo(e.titulo) : null);
+  return nro ? ocPorNro.get(nro) : null;
+}
+
 // El texto se busca sobre título y detalle, que es donde viven proveedor, obra
-// y monto, más el nroOC de los eventos que lo guardan aparte. Se combina con el
-// filtro de tipo y el rango, no los reemplaza.
-function coincideTexto(e, q) {
-  if (!q) return true;
-  return `${e.titulo || ''} ${e.detalle || ''} ${e.nroOC || ''} ${e.usuario?.nombre || ''}`
-    .toLowerCase().includes(q);
+// y monto, más el nroOC de los eventos que lo guardan aparte y —si el evento es
+// de una OC (la OC, su factura o su remito)— la descripción de sus ítems. Cada
+// término puede salir de cualquiera de las dos partes. Se combina con el filtro
+// de tipo y el rango, no los reemplaza.
+const _hayCacheEv = new WeakMap();
+function coincideTexto(e, terms) {
+  if (!terms.length) return true;
+  let hay = _hayCacheEv.get(e);
+  if (hay === undefined) {
+    hay = normTxt(`${e.titulo || ''} ${e.detalle || ''} ${e.nroOC || ''} ${e.usuario?.nombre || ''}`);
+    _hayCacheEv.set(e, hay);
+  }
+  const oc = ocDeEvento(e);
+  const hayOC = oc ? haystackOC(oc) : '';
+  return terms.every(t => hay.includes(t) || hayOC.includes(t));
 }
 
 function getVisible() {
   const { from, to } = rangeBounds();
-  const q = (searchQuery || '').toLowerCase().trim();
+  const terms = terminosBusqueda(searchQuery);
   return allEvents.filter(e => {
     const ts = e.timestamp || 0;
     if (ts < from || ts > to) return false;
     if (currentFilter !== 'all' && e.tipo !== currentFilter) return false;
-    return coincideTexto(e, q);
+    return coincideTexto(e, terms);
   });
 }
 
@@ -163,6 +182,7 @@ function render() {
     return;
   }
 
+  const terms = terminosBusqueda(searchQuery);
   let html    = '';
   let lastDay = null;
   // `act-count` sigue contando todo el rango; acá se pinta sólo la página.
@@ -194,6 +214,7 @@ function render() {
           <div class="act-body">
             <div class="act-title">${esc(e.titulo)}</div>
             <div class="act-detalle">${esc(e.detalle)}</div>
+            ${hitsHtml(itemsCoincidentes(ocDeEvento(e), terms), esc)}
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
           </div>
           <div class="act-actions">${drive}${accion}${borrar}</div>
@@ -363,6 +384,8 @@ async function cargarPaneles(code) {
   try { hist = await getHistorial(code, true); }
   catch (e) { console.warn('paneles:', e); return; }
   miCodigo       = code;
+  ocPorNro       = new Map(hist.map(oc => [oc.nroOC, oc]));
+  if (searchQuery.trim()) render();   // ahora la búsqueda alcanza también los ítems
   sinRespaldoOCs = ocsSinRespaldo(hist);
   pendientesOCs  = ocsPendientes(hist);
   renderSinRespaldo();

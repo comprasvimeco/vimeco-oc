@@ -2,6 +2,7 @@
 
 let allOCs = [];
 let viewerIsAdmin = false;   // 0000 o usuario con permiso admin
+let searchTerms = [];        // búsqueda vigente, para marcar los ítems que coinciden
 
 const $ = id => document.getElementById(id);
 
@@ -77,6 +78,7 @@ function renderCards(ocs) {
       <div class="hist-proveedor">${esc(provNombre)}</div>
       <div class="hist-obra">${esc(obra)}</div>
       ${badge || entrega ? `<div style="margin-top:.35rem;display:flex;gap:.35rem;flex-wrap:wrap;">${badge}${entrega}</div>` : ''}
+      ${hitsHtml(itemsCoincidentes(oc, searchTerms), esc)}
       <div class="hist-card-bottom">
         <span class="hist-total">${total}</span>
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
@@ -118,19 +120,14 @@ function sanitizeStr(str) {
 function applyFilters() {
   // Filtro nuevo → la lista es otra, se vuelve a la primera página.
   pager.reset('hist');
-  const q     = ($('hist-search').value || '').toLowerCase().trim();
+  searchTerms = terminosBusqueda($('hist-search').value);
   const desde = $('hist-desde').value; // YYYY-MM-DD
   const hasta = $('hist-hasta').value;
 
   let result = allOCs;
 
-  if (q) {
-    result = result.filter(oc =>
-      (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
-      (oc.obra || '').toLowerCase().includes(q) ||
-      (oc.nroOC || '').toLowerCase().includes(q)
-    );
-  }
+  // Como en Remitos: también por la descripción de los ítems comprados.
+  if (searchTerms.length) result = result.filter(oc => coincideOC(oc, searchTerms));
 
   if (desde || hasta) {
     const desdeTs = desde ? new Date(desde + 'T00:00:00').getTime() : 0;
