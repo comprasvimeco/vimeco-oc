@@ -344,10 +344,16 @@
        clase (no nth-child) porque una OC con ítems encontrados ocupa dos filas. */
     .rr-row.rr-alt { background: #f5f8fc; }
     .rr-row:hover, .rr-row:focus-visible { background: #e6eefb; outline: none; }
-    /* Renglones que explican la coincidencia de la búsqueda, pegados a su OC. */
+    /* Renglones que explican la coincidencia de la búsqueda, pegados a su OC y
+       alineados a las columnas: descripción bajo Proveedor, precio bajo Importe. */
     .rr-row.rr-row-main.rr-has-hits td { border-bottom: none; }
-    .rr-row-hits td { padding-top: 0; white-space: normal; }
-    .rr-row-hits .rem-hits { margin: 0 0 .1rem 7%; max-width: 560px; }
+    .rr-row-hit td { padding-top: 0; padding-bottom: .3rem; border-bottom: none; font-size: .74rem; }
+    .rr-row-main + .rr-row-hit td { padding-top: .05rem; }
+    .rr-row-hit + .rr-row-main td { border-top: 1px solid var(--gray-100); }
+    .rr-hit-desc span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: #2c4fa8; font-weight: 600; border-left: 2px solid #b9cbee; padding-left: .5rem; }
+    .rr-tbl td.rr-hit-precio { font-weight: 600; color: var(--gray-600); font-size: .72rem; }
+    .rr-hit-more { color: var(--gray-500); font-style: italic; }
 
     .rr-search { display: flex; align-items: center; gap: .7rem; margin-bottom: .6rem; }
     .rr-search .hist-search { max-width: 420px; font-size: .84rem; padding: .45rem .75rem; }
@@ -371,6 +377,33 @@
     @media (max-width: 900px) {
       .rr-tops { grid-template-columns: 1fr; }
       .rr-c-resp { display: none; }
+    }
+    /* Celular: cada OC del resumen es una tarjetita en vez de una fila que se
+       desliza de costado. Proveedor e importe arriba, obra y tipo al medio, y
+       fecha · N° · responsable abajo. El orden se elige con "Ordenar por". */
+    @media (max-width: 640px) {
+      .rr-tbl { min-width: 0; display: block; }
+      .rr-tbl thead { display: none; }
+      .rr-tbl tbody { display: block; }
+      .rr-tbl tr.rr-row-main { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto;
+        grid-template-areas: "prov prov prov imp" "obra obra obra tipo" "fecha nro resp resp";
+        column-gap: .5rem; row-gap: .1rem; padding: .6rem .7rem; border-top: 1px solid var(--gray-100); }
+      .rr-tbl tr.rr-row-main td { width: auto !important; padding: 0; border: none !important; min-width: 0; }
+      .rr-tbl tr.rr-row-main td:nth-child(1) { grid-area: fecha; font-size: .7rem; color: var(--gray-500); }
+      .rr-tbl tr.rr-row-main td:nth-child(2) { grid-area: nro; font-size: .7rem; }
+      .rr-tbl tr.rr-row-main td:nth-child(3) { grid-area: prov; font-weight: 700; color: var(--gray-800); font-size: .85rem; }
+      .rr-tbl tr.rr-row-main td:nth-child(4) { grid-area: obra; font-size: .76rem; color: var(--gray-600); }
+      .rr-tbl tr.rr-row-main td:nth-child(5) { grid-area: resp; display: block; font-size: .7rem; color: var(--gray-500); text-align: right; }
+      .rr-tbl tr.rr-row-main td:nth-child(6) { grid-area: imp; font-size: .88rem; align-self: center; }
+      .rr-tbl tr.rr-row-main td:nth-child(7) { grid-area: tipo; justify-self: end; padding: 0; }
+      .rr-tbl tr.rr-row-main.rr-has-hits { padding-bottom: .25rem; }
+      /* Ítems encontrados: descripción y precio en una línea, dentro de la tarjeta. */
+      .rr-tbl tr.rr-row-hit { display: flex; align-items: baseline; gap: .6rem; padding: .1rem .7rem .3rem; }
+      .rr-tbl tr.rr-row-hit td { padding: 0; width: auto !important; }
+      .rr-tbl tr.rr-row-hit td.rr-hit-pad { display: none; }
+      .rr-tbl tr.rr-row-hit td.rr-hit-desc { flex: 1; min-width: 0; }
+      .rr-tbl tr.rr-row-hit td.rr-hit-precio { flex: 0 0 auto; }
+      .rr-row-hit + .rr-row-main td { border-top: none !important; }
     }
 
     /* ---- Ficha de la OC ---- */

@@ -1150,6 +1150,29 @@ function tipoTexto(oc) {
   return c ? OBRA_CATS[c].label : '—';
 }
 
+// Renglones de la OC que explican la coincidencia del buscador, como filas
+// propias alineadas a la tabla: la descripción bajo Proveedor/Obra y la unidad
+// con el precio unitario terminando bajo Importe (usa también el ancho de
+// Responsable para no cortarse). Hasta 3, y "y N más".
+const HITS_MAX = 3;
+function hitRows(oc, hits, alt) {
+  if (!hits.length) return '';
+  const k = esc(histKeyOf(oc));
+  const filas = hits.slice(0, HITS_MAX).map(it => `
+          <tr class="rr-row rr-row-hit${alt}" data-k="${k}">
+            <td class="rr-hit-pad" colspan="2"></td>
+            <td class="rr-hit-desc" colspan="2" title="${esc(it.desc)}"><span>${esc(it.desc)}</span></td>
+            <td class="rr-n rr-hit-precio" colspan="2">${esc(_precioItem(it, oc.moneda))}</td>
+            <td class="rr-hit-pad"></td>
+          </tr>`);
+  if (hits.length > HITS_MAX) filas.push(`
+          <tr class="rr-row rr-row-hit${alt}" data-k="${k}">
+            <td class="rr-hit-pad" colspan="2"></td>
+            <td class="rr-hit-more" colspan="5">y ${hits.length - HITS_MAX} ítem${hits.length - HITS_MAX !== 1 ? 's' : ''} más</td>
+          </tr>`);
+  return filas.join('');
+}
+
 function filasVisibles(d) {
   const terms = terminosBusqueda(state.resQ);
   return { terms, filas: terms.length ? d.filas.filter(({ oc }) => coincideOC(oc, terms)) : d.filas };
@@ -1234,10 +1257,7 @@ function renderResumen() {
             <td class="rr-c-resp">${esc(oc.responsable?.nombre || '—')}</td>
             <td class="rr-n">${fmtFull(oc.total, oc.moneda === 'USD' ? 'USD' : 'ARS')}</td>
             <td class="rr-c-eq">${tipoTag(oc)}</td>
-          </tr>${hits.length ? `
-          <tr class="rr-row rr-row-hits${alt}" data-k="${esc(histKeyOf(oc))}">
-            <td colspan="7">${hitsHtml(oc, hits, esc)}</td>
-          </tr>` : ''}`;
+          </tr>${hitRows(oc, hits, alt)}`;
         }).join('')}
       </tbody>
     </table>`;
