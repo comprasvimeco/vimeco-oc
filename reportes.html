@@ -147,9 +147,9 @@
     .rep-share-seg:last-child  { border-radius: 6px 10px 10px 6px; }
     .rep-share-seg:only-child  { border-radius: 10px; }
     .rep-share-seg:hover { filter: brightness(1.06); transform: translateY(-1px); }
-    .rep-share-pill { white-space: nowrap; background: rgba(255,255,255,.9); color: var(--h-ink);
-      font-size: .7rem; font-weight: 800; font-variant-numeric: tabular-nums;
-      border-radius: 999px; padding: .1rem .5rem; }
+    /* El % va escrito directo sobre el color, en blanco con una sombra mínima para que se lea. */
+    .rep-share-pill { white-space: nowrap; color: #fff; font-size: .74rem; font-weight: 800; font-variant-numeric: tabular-nums;
+      letter-spacing: .01em; text-shadow: 0 1px 2px rgba(15,30,50,.28); }
     .rep-share-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .15rem 1.4rem; }
     .rep-share-item { display: flex; align-items: center; gap: .55rem; font-size: .83rem; min-width: 0;
       padding: .4rem 0; border-bottom: 1px solid var(--gray-100); }
@@ -159,6 +159,19 @@
     .rep-share-val { color: var(--gray-500); font-size: .76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .rep-share-pct { background: var(--h-bg); color: var(--h-ink); font-weight: 700; font-size: .74rem;
       font-variant-numeric: tabular-nums; border-radius: 999px; padding: .08rem .5rem; min-width: 3.3rem; text-align: center; }
+    /* "Otras N obras": se despliega para ver cuáles son. */
+    .rep-share-otras { width: 100%; background: none; border: none; border-bottom: 1px solid var(--gray-100);
+      font: inherit; font-size: .83rem; text-align: left; cursor: pointer; border-radius: 0; }
+    .rep-share-otras:hover .rep-share-lbl { color: var(--primary); }
+    .rep-share-otras .rep-share-lbl { text-decoration: underline dotted var(--gray-400); text-underline-offset: 3px; }
+    .rep-share-chev { display: inline-flex; color: var(--gray-400); transition: transform .18s; }
+    .rep-share-chev .icon { width: 13px; height: 13px; }
+    .rep-share-otras.open .rep-share-chev { transform: rotate(90deg); }
+    .rep-share-rest { margin-top: .6rem; background: #f8fafd; border: 1px solid var(--gray-100); border-left: 3px solid #b8c0cc;
+      border-radius: 10px; padding: .25rem .8rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 1.4rem; }
+    .rep-share-rest-i { display: flex; align-items: center; gap: .55rem; font-size: .8rem; padding: .35rem 0; min-width: 0;
+      border-bottom: 1px solid #edf1f6; }
+    .rep-share-rest-p { font-size: .72rem; font-weight: 700; color: #4b5563; font-variant-numeric: tabular-nums; min-width: 2.8rem; text-align: right; }
 
     /* ---- Evolución mensual ---- */
     .rep-line { position: relative; }
@@ -215,32 +228,29 @@
       border-radius: 999px; padding: .08rem .5rem; min-width: 2.9rem; text-align: center; }
 
     /* ---- Drill-down: cada OC abre su ficha ---- */
-    .rep-drill { margin: .7rem 0 .2rem; border-left: 2px solid var(--gray-200); padding-left: .7rem; }
-    .rep-oc { display: grid; grid-template-columns: 1fr auto auto; gap: .1rem .6rem; align-items: center;
-      padding: .5rem .35rem; border-bottom: 1px dashed var(--gray-200); width: 100%;
-      background: none; border-top: none; border-left: none; border-right: none;
-      font: inherit; text-align: left; cursor: pointer; border-radius: var(--radius); transition: background .12s; }
-    .rep-oc:hover { background: #eef3fa; }
-    .rep-oc:last-child { border-bottom: none; }
-    .rep-oc-main { display: flex; flex-direction: column; min-width: 0; }
-    .rep-oc-nro { font-family: 'Courier New', monospace; font-size: .74rem; color: var(--gray-500); font-weight: 700; }
-    .rep-oc-prov { font-size: .82rem; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rep-oc-meta { grid-column: 1 / -1; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-    .rep-oc-fecha { font-size: .72rem; color: var(--gray-400); }
-    .rep-oc-total { grid-row: 1; grid-column: 2; font-size: .86rem; font-weight: 800; color: var(--primary); white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
-    .rep-oc-go { grid-row: 1; grid-column: 3; display: inline-flex; color: var(--gray-400); }
-    .rep-oc-go .icon { width: 15px; height: 15px; }
-    .rep-oc:hover .rep-oc-go { color: var(--primary); }
-    .rep-oc-drv { display: inline-flex; color: #1e7d3a; }
-    .rep-oc-drv .icon { width: 13px; height: 13px; }
-    .rep-oc-flag { background: #fff5f5; border-bottom-color: #f5c6c6; }
-    .rep-oc-flag .rep-oc-total { color: #c02626; }
+    /* Panel claro con el acento del tono de la fila; una línea por OC. */
+    .rep-drill { margin: .65rem 0 .15rem; }
+    .rep-ocs { background: #f8fafd; border: 1px solid var(--gray-100); border-left: 3px solid var(--h-mark, var(--gray-300));
+      border-radius: 10px; overflow: hidden; }
+    .rep-oc { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .5rem .75rem;
+      background: none; border: none; font: inherit; text-align: left; cursor: pointer; transition: background .12s; }
+    .rep-oc + .rep-oc { border-top: 1px solid #edf1f6; }
+    .rep-oc:hover { background: var(--h-bg, #eef3fa); }
+    .rep-oc-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .rep-oc-t { font-size: .82rem; font-weight: 600; color: var(--gray-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rep-oc-s { font-size: .7rem; color: var(--gray-500); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rep-oc-total { font-size: .84rem; font-weight: 700; color: var(--gray-800); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .rep-oc-go { display: inline-flex; color: var(--gray-300); }
+    .rep-oc-go .icon { width: 14px; height: 14px; }
+    .rep-oc:hover .rep-oc-go { color: var(--h-ink, var(--primary)); }
+    .rep-oc-more { display: block; margin: .45rem auto 0; background: var(--h-bg, #e8eefc); color: var(--h-ink, var(--primary));
+      border: none; border-radius: 999px; padding: .25rem .9rem; font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; }
+    .rep-oc-more:hover { filter: brightness(.97); }
     .rep-chip { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; }
     .rep-catsum { display: flex; flex-wrap: wrap; gap: .5rem .9rem; padding: .1rem .1rem .55rem; }
     .rep-catsum-i { display: inline-flex; align-items: center; gap: .35rem; font-size: .82rem; color: var(--gray-600); }
     .rep-catsum-i b { color: var(--gray-800); font-weight: 700; }
-    .rep-flag { display: inline-flex; align-items: center; gap: .2rem; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; background: #fde6e6; color: #b02a2a; }
-    .rep-flag .icon { width: 11px; height: 11px; }
+
 
     .rep-empty { color: var(--gray-500); font-size: .85rem; padding: .5rem 0; }
     .rep-loading { text-align: center; color: var(--gray-500); padding: 3.5rem 1rem; }
@@ -394,11 +404,8 @@
     .foc-conv { margin-top: .9rem; background: #fff4e0; color: #8a5d00;
       border-radius: var(--radius); padding: .5rem .75rem; font-size: .78rem; }
 
-    .foc-foot { justify-content: space-between; flex-wrap: wrap; gap: .5rem; background: #fafbfd; }
+    .foc-foot { justify-content: flex-end; flex-wrap: wrap; gap: .5rem; background: #fafbfd; }
     .foc-foot-r { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-    /* Borrar en pastilla roja suave: presente, pero sin gritar. */
-    .foc-del { background: #fde6e6; color: #b02a2a; border: none; font-weight: 700; }
-    .foc-del:hover { background: #fbd3d3; }
     .foc-items-w { overflow-x: auto; margin-bottom: .9rem; }
     .foc-items-w .foc-items { margin-bottom: 0; }
     @media (max-width: 520px) {
@@ -653,7 +660,6 @@
     </div>
     <div class="modal-body" id="foc-body"></div>
     <div class="modal-footer foc-foot">
-      <button class="btn btn-sm foc-del" id="foc-delete">Borrar OC</button>
       <div class="foc-foot-r">
         <span class="foc-nodrive hidden" id="foc-nodrive">Respaldo en Drive pendiente</span>
         <a class="btn btn-outline btn-sm hidden" id="foc-drive" target="_blank" rel="noopener">Abrir en Drive</a>

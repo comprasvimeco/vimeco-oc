@@ -42,6 +42,8 @@ const state = {
 };
 
 const expanded = new Set(); // claves de filas desplegadas (por sección+key)
+const drillAll = new Set(); // desplegadas que muestran todas sus OC, no sólo las primeras
+const DRILL_MAX = 8;
 
 // ?? y no ||: con `||` un 0 legítimo (p. ej. la cantidad de un ítem) se
 // renderizaría como celda vacía.
@@ -241,22 +243,6 @@ function provLabel(oc) {
   return _provCanon.get(provKey(oc))?.name || oc.proveedor?.nombre || 'Sin proveedor';
 }
 
-function median(nums) {
-  if (!nums.length) return 0;
-  const s = [...nums].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
-// Marca una OC como "posible error" si su monto supera 10× la mediana de la
-// obra/equipo (con al menos 3 OC en el grupo). Detecta los cargados ×1000.
-function flagOutliers(row) {
-  if (row.count < 3) return;
-  const med = median(row.ocs.map(x => x.amt));
-  if (med <= 0) return;
-  row.ocs.forEach(x => { x.flag = x.amt > med * 10; });
-}
-
 function monthKey(ts) {
   const d = new Date(ts || 0);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -383,24 +369,27 @@ function catChip(cat) {
 //   bg   → fondo de la burbuja (rango, %)
 //   ink  → texto sobre la burbuja
 // Los mark están validados con scripts/validate_palette.js de la guía de
-// dataviz (peor par vecino ΔE 8.6 bajo protanopia). Quedan debajo de 3:1 sobre
-// blanco; lo compensan la leyenda rotulada y el % escrito en cada segmento.
+// dataviz (peor par vecino ΔE 12.3 bajo deuteranopia). Quedan debajo de 3:1
+// sobre blanco; lo compensan la leyenda rotulada y el % escrito en cada segmento.
 const HUES = {
-  azul:    { mark: '#6f9fe6', bg: '#e6eefb', ink: '#1f4f96' },
-  ambar:   { mark: '#dea43c', bg: '#fff4e0', ink: '#8a5d00' },
-  verde:   { mark: '#56b98a', bg: '#e3f5ec', ink: '#1b6e48' },
-  violeta: { mark: '#a58be3', bg: '#efe9fb', ink: '#5b3f9e' },
-  coral:   { mark: '#ec8a76', bg: '#fde9e4', ink: '#a8402b' },
-  gris:    { mark: '#b8c0cc', bg: '#eef0f3', ink: '#4b5563' },
+  azul:     { mark: '#4f7fe0', bg: '#e8eefc', ink: '#2c4fa8' },
+  ambar:    { mark: '#e39d38', bg: '#fdf0dc', ink: '#8a5a0b' },
+  turquesa: { mark: '#2aa89a', bg: '#dcf3ef', ink: '#16695f' },
+  lavanda:  { mark: '#9a84ea', bg: '#efebfd', ink: '#5a45a8' },
+  rosa:     { mark: '#e0708c', bg: '#fce8ee', ink: '#a23a57' },
+  gris:     { mark: '#b8c0cc', bg: '#eef0f3', ink: '#4b5563' },
 };
 // Orden fijo de la participación (el color sigue a la obra, no al puesto).
-const SHARE_HUES = [HUES.azul, HUES.ambar, HUES.verde, HUES.violeta, HUES.coral];
+// Turquesa y rosa no van pegados: bajo deuteranopia se confunden.
+const SHARE_HUES = [HUES.azul, HUES.ambar, HUES.turquesa, HUES.lavanda, HUES.rosa];
 const hueVars = h => `--h-mark:${h.mark};--h-bg:${h.bg};--h-ink:${h.ink}`;
 const pctTxt  = v => v.toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
 
 // Color de cada obra en la participación, para que "Gasto por Obra" la pinte
 // igual. Lo arma renderShare, que corre antes.
 let obraHue = new Map();
+// "Otras N obras" desplegado (se recuerda mientras se navega el reporte).
+let shareOtrasOpen = false;
 
 // ---- Barra de participación (part-to-whole, top 5 + Otras) ----
 function renderShare(containerId, rows, grand) {
@@ -433,15 +422,34 @@ function renderShare(containerId, rows, grand) {
       `).join('')}
     </div>
     <div class="rep-share-legend">
-      ${segs.map(s => `
-        <div class="rep-share-item" style="${hueVars(s.hue)}">
+      ${segs.map((s, i) => {
+        const otras = resto.length && i === segs.length - 1;
+        return `
+        <${otras ? 'button type="button"' : 'div'} class="rep-share-item${otras ? ' rep-share-otras' : ''}${otras && shareOtrasOpen ? ' open' : ''}"
+             style="${hueVars(s.hue)}"${otras ? ` aria-expanded="${shareOtrasOpen}" title="Ver las obras agrupadas"` : ''}>
           <span class="rep-share-dot"></span>
           <span class="rep-share-lbl" title="${esc(s.label)}">${esc(s.label)}</span>
+          ${otras ? `<span class="rep-share-chev">${icSvg('chevR')}</span>` : ''}
           <span class="rep-share-val">${esc(fmtCompact(s.total, state.moneda))}</span>
           <span class="rep-share-pct">${pctTxt(pct(s.total))}</span>
-        </div>
-      `).join('')}
-    </div>`;
+        </${otras ? 'button' : 'div'}>`;
+      }).join('')}
+    </div>
+    ${resto.length && shareOtrasOpen ? `
+    <div class="rep-share-rest">
+      ${resto.map(r => `
+        <div class="rep-share-rest-i">
+          <span class="rep-share-lbl" title="${esc(r.label)}">${esc(r.label)}</span>
+          <span class="rep-share-val">${esc(fmtCompact(r.total, state.moneda))}</span>
+          <span class="rep-share-rest-p">${pctTxt(pct(r.total))}</span>
+        </div>`).join('')}
+    </div>` : ''}`;
+
+  const btn = el.querySelector('.rep-share-otras');
+  if (btn) btn.addEventListener('click', () => {
+    shareOtrasOpen = !shareOtrasOpen;
+    renderShare(containerId, rows, grand);
+  });
 }
 
 // ---- Evolución mensual (área + línea, una sola serie) ----
@@ -686,8 +694,9 @@ function renderBars(containerId, rows, opts = {}) {
 
     let drillHtml = '';
     if (opts.drill && isOpen) {
-      flagOutliers(r);
-      const ocs = [...r.ocs].sort((a, b) => b.amt - a.amt);
+      const ocs   = [...r.ocs].sort((a, b) => b.amt - a.amt);
+      const todas = drillAll.has(rowKey);
+      const vis   = todas ? ocs : ocs.slice(0, DRILL_MAX);
       // Resumen Repuestos vs Mantenimiento del equipo (split por categoría).
       let sumHtml = '';
       if (opts.catSplit) {
@@ -701,23 +710,20 @@ function renderBars(containerId, rows, opts = {}) {
           .map(([c, v]) => `<span class="rep-catsum-i">${catChip(c) || esc(c)}<b>${esc(fmtFull(v, state.moneda))}</b></span>`)
           .join('')}</div>`;
       }
-      drillHtml = `<div class="rep-drill">${sumHtml}${ocs.map(({ oc, amt, flag }) => `
-        <button class="rep-oc ${flag ? 'rep-oc-flag' : ''}" data-ockey="${esc(histKeyOf(oc))}"
-                title="Ver la ficha completa de la OC ${esc(oc.nroOC)}">
-          <div class="rep-oc-main">
-            <span class="rep-oc-nro">${esc(oc.nroOC)}</span>
-            <span class="rep-oc-prov">${esc(oc.proveedor?.nombre || '—')}</span>
-          </div>
-          <div class="rep-oc-meta">
-            <span class="rep-oc-fecha">${esc(oc.fecha || '')}</span>
-            ${opts.catChip ? catChip(oc.equipo?.categoria) : ''}
-            ${estadoChip(oc)}
-            ${flag ? `<span class="rep-flag">${icSvg('alert')} revisar</span>` : ''}
-            ${driveFolderId(oc) ? `<span class="rep-oc-drv" title="Respaldada en Drive">${icSvg('folder')}</span>` : ''}
-          </div>
+      // Una línea por OC: el dato que no repite la fila (el proveedor, o la
+      // obra si ya se está mirando un proveedor) y, chico debajo, N° y fecha.
+      const titulo = opts.drillTitulo || (oc => oc.proveedor?.nombre || '—');
+      drillHtml = `<div class="rep-drill">${sumHtml}<div class="rep-ocs">${vis.map(({ oc, amt }) => `
+        <button class="rep-oc" data-ockey="${esc(histKeyOf(oc))}" title="Ver la ficha de la OC ${esc(oc.nroOC)}">
+          <span class="rep-oc-main">
+            <span class="rep-oc-t">${esc(titulo(oc))}</span>
+            <span class="rep-oc-s">${esc(oc.nroOC)} · ${esc(oc.fecha || '')}${
+              opts.catChip && oc.equipo?.categoria ? ` · ${esc(oc.equipo.categoria)}` : ''}</span>
+          </span>
           <span class="rep-oc-total">${fmtFull(amt, state.moneda)}</span>
           <span class="rep-oc-go">${icSvg('chevR')}</span>
-        </button>`).join('')}</div>`;
+        </button>`).join('')}</div>${ocs.length > DRILL_MAX ? `
+        <button class="rep-oc-more" data-more="${esc(rowKey)}">${todas ? 'Mostrar menos' : `Ver las ${ocs.length - DRILL_MAX} restantes`}</button>` : ''}</div>`;
     }
 
     const hue = opts.hueFor ? opts.hueFor(r) : (opts.hue || HUES.azul);
@@ -746,6 +752,14 @@ function renderBars(containerId, rows, opts = {}) {
     el.addEventListener('click', e => {
       const ocBtn = e.target.closest('[data-ockey]');
       if (ocBtn) { e.stopPropagation(); openOCDetail(ocBtn.dataset.ockey); return; }
+      const more = e.target.closest('[data-more]');
+      if (more) {
+        const k = more.dataset.more;
+        if (drillAll.has(k)) drillAll.delete(k); else drillAll.add(k);
+        render();
+        return;
+      }
+      if (e.target.closest('.rep-drill')) return;   // clics en el panel no pliegan la fila
       const row = e.target.closest('.rep-bar-row');
       if (!row) return;
       const k = row.dataset.rowkey;
@@ -1235,7 +1249,7 @@ function render() {
   renderBars('rep-equipos', groupAgg(conEquipo,
       oc => oc.equipo.codigo,
       oc => equipoLabel(oc.equipo)),
-    { grandTotal: grand, drill: true, catChip: true, catSplit: true, hue: HUES.verde,
+    { grandTotal: grand, drill: true, catChip: true, catSplit: true, hue: HUES.turquesa,
       emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   // Repuestos vs Mantenimiento: sólo las OC con equipo llevan categoría. Las
@@ -1244,11 +1258,12 @@ function render() {
       oc => oc.equipo.categoria || 'Sin categoría',
       oc => oc.equipo.categoria || 'Sin categoría'),
     { grandTotal: grand, drill: true, catChip: true,
-      hueFor: r => r.key === 'Repuestos' ? HUES.azul : r.key === 'Mantenimiento' ? HUES.violeta : HUES.gris,
+      hueFor: r => r.key === 'Repuestos' ? HUES.azul : r.key === 'Mantenimiento' ? HUES.lavanda : HUES.gris,
       emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   renderBars('rep-proveedores', groupAgg(list, provKey, provLabel),
-    { grandTotal: grand, limit: 10, drill: true, hue: HUES.azul, emptyMsg: 'Sin proveedores en el rango.' });
+    { grandTotal: grand, limit: 10, drill: true, hue: HUES.azul,
+      drillTitulo: oc => oc.obra || 'Sin obra', emptyMsg: 'Sin proveedores en el rango.' });
 
   renderBars('rep-responsables', groupAgg(list,
       oc => oc.responsable?.codigo || '—',
@@ -1505,29 +1520,6 @@ async function verPDF() {
   }
 }
 
-async function deleteOC() {
-  const oc = ocByKey(detailKey);
-  if (!oc) return;
-  const ok = await showConfirm('Borrar OC',
-    `¿Borrar la OC ${oc.nroOC} (${fmtFull(oc.total, oc.moneda || 'ARS')}) del historial? No se puede deshacer. El archivo en Drive no se toca.`);
-  if (!ok) return;
-
-  const btn = $('foc-delete'); btn.disabled = true; btn.textContent = 'Borrando…';
-  try {
-    await deleteHistorialEntry(detailKey);
-    await limpiarNovedadesDe(oc);
-    const i = ALL.indexOf(oc); if (i >= 0) ALL.splice(i, 1);
-    const j = ALL_RAW.indexOf(oc); if (j >= 0) ALL_RAW.splice(j, 1);
-    toast('OC borrada.', 'success');
-    closeOCDetail();
-    render();
-  } catch (e) {
-    toast('No se pudo borrar. ' + e.message, 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Borrar OC';
-  }
-}
-
 function showConfirm(title, msg) {
   return new Promise(resolve => {
     $('mcf-title').textContent = title;
@@ -1691,7 +1683,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('foc-close').addEventListener('click', closeOCDetail);
   $('foc-cerrar').addEventListener('click', closeOCDetail);
   $('foc-pdf').addEventListener('click', verPDF);
-  $('foc-delete').addEventListener('click', deleteOC);
   $('modal-oc').addEventListener('click', e => { if (e.target.id === 'modal-oc') closeOCDetail(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOCDetail(); });
 
