@@ -46,8 +46,9 @@ function driveCutoff(list) {
 
 // Una OC pendiente de autorización todavía no tiene PDF, y una rechazada nunca
 // lo va a tener: no se les puede reclamar respaldo ni resubirlas (hacerlo
-// emitiría el PDF de una orden sin autorizar).
-const SIN_PDF = new Set(['pendiente', 'rechazada']);
+// emitiría el PDF de una orden sin autorizar). Lo mismo una cancelada por quien
+// pidió la autorización.
+const SIN_PDF = new Set(['pendiente', 'rechazada', 'cancelada']);
 
 // OC que deberían tener respaldo y no lo tienen: emitidas, posteriores al corte,
 // sin carpeta registrada y sin contar las obras de prueba. Más recientes primero.

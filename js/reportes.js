@@ -129,7 +129,7 @@ function usedFallback(oc) {
 function inEstado(oc) {
   if (state.incluirNoEmitidas) return true;
   const e = oc.estado || 'emitida';
-  return e !== 'pendiente' && e !== 'rechazada';
+  return e !== 'pendiente' && e !== 'rechazada' && e !== 'cancelada';
 }
 
 function getFiltered() {
@@ -320,6 +320,7 @@ function estadoChip(oc) {
     autorizada: ['Autorizada', '#e3f5e8', '#1e7d3a'],
     pendiente:  ['Pendiente',  '#fff4e0', '#9a6a00'],
     rechazada:  ['Rechazada',  '#fde6e6', '#b02a2a'],
+    cancelada:  ['Cancelada',  '#eceef1', '#5b6573'],
   };
   const [txt, bg, fg] = map[e] || map.emitida;
   return `<span class="rep-chip" style="background:${bg};color:${fg}">${txt}</span>`;
@@ -848,7 +849,7 @@ function rangoAnterior(r) {
 
 function esFirme(oc) {
   const e = oc.estado || 'emitida';
-  return e !== 'pendiente' && e !== 'rechazada';
+  return e !== 'pendiente' && e !== 'rechazada' && e !== 'cancelada';
 }
 
 function ocsDeRango(r) {
@@ -1368,7 +1369,7 @@ function openOCDetail(key) {
     $('foc-nodrive').classList.remove('hidden');
   }
 
-  $('foc-pdf').disabled = oc.estado === 'pendiente';
+  $('foc-pdf').disabled = oc.estado === 'pendiente' || oc.estado === 'cancelada';
   $('modal-oc').classList.remove('hidden');
 }
 

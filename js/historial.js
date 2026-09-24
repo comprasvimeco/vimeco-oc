@@ -28,6 +28,9 @@ function estadoBadge(oc) {
     const motivo = oc.autorizacion?.motivoRechazo;
     return `<span style="${base}background:#fde6e6;color:#b02a2a;" title="${esc(motivo || '')}">Rechazada</span>`;
   }
+  if (e === 'cancelada') {
+    return `<span style="${base}background:#eceef1;color:#5b6573;">Cancelada</span>`;
+  }
   return '';
 }
 
@@ -67,8 +70,9 @@ function renderCards(ocs) {
     const resp       = oc.responsable?.nombre || '';
     const badge      = estadoBadge(oc);
     const entrega    = entregaBadge(oc);
-    // Las OC pendientes todavía no tienen PDF definitivo → no se descarga.
-    const showRegen  = canRegen && oc.estado !== 'pendiente';
+    // Las OC pendientes todavía no tienen PDF definitivo, y las canceladas no lo
+    // van a tener → no se descarga.
+    const showRegen  = canRegen && oc.estado !== 'pendiente' && oc.estado !== 'cancelada';
 
     card.innerHTML = `
       <div class="hist-card-top">

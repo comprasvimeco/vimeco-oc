@@ -112,6 +112,7 @@ const SEEN_KEY = () => 'vimeco_solicitudes_vistas_' + myCode;
 function estadoPedido(oc) {
   if (oc.estado === 'autorizada') return ['aprob',  'Aprobada'];
   if (oc.estado === 'rechazada')  return ['rech',   'Rechazada'];
+  if (oc.estado === 'cancelada')  return ['canc',   'Cancelada'];
   return ['espera', 'En espera'];
 }
 
@@ -156,7 +157,13 @@ function renderPedidos() {
       extra = `<div class="aut-motivo">Motivo: ${esc(a.motivoRechazo)}</div>`;
     } else if (oc.estado === 'autorizada' && a.firmante) {
       extra = `<div class="aut-meta">Firmó: ${esc(a.firmante)}</div>`;
+    } else if (oc.estado === 'cancelada' && a.canceladoEn) {
+      extra = `<div class="aut-meta">Cancelaste el pedido el ${esc(new Date(a.canceladoEn).toLocaleDateString('es-AR'))}</div>`;
     }
+    const acciones = oc.estado === 'pendiente'
+      ? `<div class="aut-actions">
+           <button class="btn btn-sm btn-outline btn-cancelar-pedido">Cancelar pedido</button>
+         </div>` : '';
     const card = document.createElement('div');
     card.className = 'hist-card';
     card.innerHTML = `
@@ -170,9 +177,58 @@ function renderPedidos() {
         <span class="aut-total">${total}</span>
         <span class="aut-meta">A: ${esc(quien)}</span>
       </div>
-      ${extra}`;
+      ${extra}
+      ${acciones}`;
+    const btnCanc = card.querySelector('.btn-cancelar-pedido');
+    if (btnCanc) btnCanc.addEventListener('click', () => cancelarPedido(oc, btnCanc));
     list.appendChild(card);
   });
+}
+
+// El solicitante se arrepiente antes de que la firmen: la OC queda 'cancelada'
+// (el número ya se consumió, no se reutiliza) y sale de la bandeja del
+// autorizador. Se relee el estado del servidor por si justo la resolvieron.
+async function cancelarPedido(oc, btn) {
+  const quien = oc.autorizacion?.solicitadoA?.nombre || 'El autorizador';
+  if (!confirm(`¿Cancelar el pedido de autorización de la OC ${oc.nroOC}?\n\n` +
+               `${quien} ya no la va a ver para firmar y el número de OC queda anulado.`)) return;
+  const histKey = oc.nroOC.replace(/-/g, '');
+  btn.disabled = true;
+  try {
+    const actual = await getHistorialEstado(histKey);
+    if (actual !== 'pendiente') {
+      toast(actual === 'autorizada' ? `La OC ${oc.nroOC} ya fue autorizada.`
+          : actual === 'rechazada'  ? `La OC ${oc.nroOC} ya fue rechazada.`
+          : `La OC ${oc.nroOC} ya no está pendiente.`, 'warning');
+      if (actual) oc.estado = actual;
+      renderPedidos();
+      return;
+    }
+    const nuevaAut = { ...(oc.autorizacion || {}), canceladoEn: Date.now() };
+    await patchHistorialEntry(histKey, { estado: 'cancelada', autorizacion: nuevaAut });
+    oc.estado = 'cancelada';
+    oc.autorizacion = nuevaAut;
+    renderPedidos();
+    toast(`Pedido de la OC ${oc.nroOC} cancelado.`, 'info');
+  } catch (e) {
+    toast('No se pudo cancelar el pedido. Revisá tu conexión.', 'error');
+    console.error('cancelarPedido:', e);
+    btn.disabled = false;
+  }
+}
+
+// Antes de firmar o rechazar: si el solicitante canceló el pedido (o ya lo
+// resolvió otro), no pisarlo. Si no se puede leer, se sigue como antes.
+async function siguePendiente(oc) {
+  let actual;
+  try { actual = await getHistorialEstado(oc.nroOC.replace(/-/g, '')); } catch (_) { return true; }
+  if (actual === 'pendiente') return true;
+  toast(actual === 'cancelada' ? `El solicitante canceló el pedido de la OC ${oc.nroOC}.`
+                               : `La OC ${oc.nroOC} ya no está pendiente.`, 'warning');
+  quitarDeLista(oc);
+  cerrarRechazo();
+  cerrarPreview();
+  return false;
 }
 
 // ---- "Autorizadas": OC que YA resolví (firmé o rechacé) ----
@@ -313,6 +369,7 @@ async function firmarOC(oc) {
   // El botón se repone pase lo que pase: si algo revienta después de arrancar,
   // dejarlo con el spinner puesto simula un trabajo que ya no existe.
   try {
+    if (!(await siguePendiente(oc))) return;
     const ocData = ocDataFromRecord(oc);
     ocData._firma    = myFirma;   // firma del autorizador
     ocData._firmante = myName;    // nombre del autorizador bajo la firma
@@ -394,6 +451,7 @@ function abrirRechazo() {
 function cerrarRechazo() { $('modal-rechazo').classList.add('hidden'); }
 
 async function rechazarOC(oc, motivo) {
+  if (!(await siguePendiente(oc))) return;
   const nuevaAut = {
     ...(oc.autorizacion || {}),
     resueltoEn:    Date.now(),

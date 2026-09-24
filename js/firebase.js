@@ -377,6 +377,14 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
 
+  // Estado actual de una OC leído del servidor (no del caché). Lo usan firmar,
+  // rechazar y cancelar un pedido para no pisar lo que resolvió el otro lado.
+  window.getHistorialEstado = async function (key) {
+    const resp = await _fetchConTope(_base() + '/historial/' + key + '/estado.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.json();
+  };
+
   // Borra un registro del historial (corrección de datos, solo admin).
   window.deleteHistorialEntry = async function (key) {
     const resp = await fetch(_base() + '/historial/' + key + '.json', { method: 'DELETE' });
