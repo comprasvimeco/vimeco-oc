@@ -37,6 +37,8 @@ const state = {
   // Orden del listado del resumen (y del PDF, que sale en el mismo orden).
   resOrden: 'fecha',
   resDir:   1,          // 1 ascendente, -1 descendente
+  // Buscador del listado del resumen (el mismo motor que Novedades).
+  resQ:     '',
 };
 
 const expanded = new Set(); // claves de filas desplegadas (por sección+key)
@@ -374,15 +376,31 @@ function catChip(cat) {
 //  Gráficos
 // ===================================================
 
-// Paleta categórica de la barra de participación, en la línea de la marca:
-// azul VIMECO, dorado, verde azulado, violeta y naranja. Validada con
-// scripts/validate_palette.js de la guía de dataviz: peor par adyacente
-// ΔE 14.8 bajo protanopia. El dorado y el naranja quedan debajo de 3:1 sobre
-// blanco; lo compensan la leyenda rotulada y el % escrito en el segmento.
-const SHARE_COLORS = ['#2557a7', '#d4a72c', '#169c8a', '#5b3f9e', '#e07b39'];
-const SHARE_OTHER  = '#a3adbb';
-// Sobre el dorado el texto va oscuro; sobre el resto, blanco.
-const SHARE_INK    = { '#d4a72c': '#3a2c05' };
+// ---- Paleta "burbuja" ----
+// Misma estética que las pastillas Sí/No de factura del resumen: fondo pastel
+// con el texto en el mismo tono, oscuro. Cada tono trae tres pasos:
+//   mark → relleno de barras y segmentos
+//   bg   → fondo de la burbuja (rango, %)
+//   ink  → texto sobre la burbuja
+// Los mark están validados con scripts/validate_palette.js de la guía de
+// dataviz (peor par vecino ΔE 8.6 bajo protanopia). Quedan debajo de 3:1 sobre
+// blanco; lo compensan la leyenda rotulada y el % escrito en cada segmento.
+const HUES = {
+  azul:    { mark: '#6f9fe6', bg: '#e6eefb', ink: '#1f4f96' },
+  ambar:   { mark: '#dea43c', bg: '#fff4e0', ink: '#8a5d00' },
+  verde:   { mark: '#56b98a', bg: '#e3f5ec', ink: '#1b6e48' },
+  violeta: { mark: '#a58be3', bg: '#efe9fb', ink: '#5b3f9e' },
+  coral:   { mark: '#ec8a76', bg: '#fde9e4', ink: '#a8402b' },
+  gris:    { mark: '#b8c0cc', bg: '#eef0f3', ink: '#4b5563' },
+};
+// Orden fijo de la participación (el color sigue a la obra, no al puesto).
+const SHARE_HUES = [HUES.azul, HUES.ambar, HUES.verde, HUES.violeta, HUES.coral];
+const hueVars = h => `--h-mark:${h.mark};--h-bg:${h.bg};--h-ink:${h.ink}`;
+const pctTxt  = v => v.toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
+
+// Color de cada obra en la participación, para que "Gasto por Obra" la pinte
+// igual. Lo arma renderShare, que corre antes.
+let obraHue = new Map();
 
 // ---- Barra de participación (part-to-whole, top 5 + Otras) ----
 function renderShare(containerId, rows, grand) {
@@ -393,33 +411,34 @@ function renderShare(containerId, rows, grand) {
   }
   const top   = rows.slice(0, 5);
   const resto = rows.slice(5);
-  const segs  = top.map((r, i) => ({ label: r.label, total: r.total, color: SHARE_COLORS[i] }));
+  obraHue = new Map(top.map((r, i) => [r.key, SHARE_HUES[i]]));
+  const segs  = top.map((r, i) => ({ label: r.label, total: r.total, hue: SHARE_HUES[i] }));
   if (resto.length) {
     segs.push({
       label: `Otras ${resto.length} obra${resto.length !== 1 ? 's' : ''}`,
       total: resto.reduce((a, r) => a + r.total, 0),
-      color: SHARE_OTHER
+      hue: HUES.gris
     });
   }
 
   const pct = t => (t / grand) * 100;
-  // El % va escrito dentro del segmento sólo si entra (≥ 7%); si no, lo dice
-  // la leyenda.
+  // El % va en una burbuja dentro del segmento sólo si entra (≥ 8%); si no,
+  // lo dice la leyenda.
   el.innerHTML = `
     <div class="rep-share-track">
       ${segs.map(s => `
-        <div class="rep-share-seg" style="flex:${s.total};background:${s.color};color:${SHARE_INK[s.color] || '#fff'}"
-             title="${esc(s.label)} — ${esc(fmtFull(s.total, state.moneda))} (${pct(s.total).toFixed(1)}%)">${
-          pct(s.total) >= 7 ? `<span>${Math.round(pct(s.total))}%</span>` : ''}</div>
+        <div class="rep-share-seg" style="flex:${s.total};${hueVars(s.hue)}"
+             title="${esc(s.label)} — ${esc(fmtFull(s.total, state.moneda))} (${pctTxt(pct(s.total))})">${
+          pct(s.total) >= 8 ? `<span class="rep-share-pill">${Math.round(pct(s.total))}%</span>` : ''}</div>
       `).join('')}
     </div>
     <div class="rep-share-legend">
       ${segs.map(s => `
-        <div class="rep-share-item">
-          <span class="rep-share-dot" style="background:${s.color}"></span>
-          <span class="rep-share-lbl">${esc(s.label)}</span>
-          <span class="rep-share-pct">${pct(s.total).toFixed(1)}%</span>
+        <div class="rep-share-item" style="${hueVars(s.hue)}">
+          <span class="rep-share-dot"></span>
+          <span class="rep-share-lbl" title="${esc(s.label)}">${esc(s.label)}</span>
           <span class="rep-share-val">${esc(fmtCompact(s.total, state.moneda))}</span>
+          <span class="rep-share-pct">${pctTxt(pct(s.total))}</span>
         </div>
       `).join('')}
     </div>`;
@@ -701,19 +720,22 @@ function renderBars(containerId, rows, opts = {}) {
         </button>`).join('')}</div>`;
     }
 
+    const hue = opts.hueFor ? opts.hueFor(r) : (opts.hue || HUES.azul);
+
     return `
-      <div class="rep-bar-row ${opts.drill ? 'rep-clickable' : ''} ${isOpen ? 'rep-open' : ''}" data-rowkey="${esc(rowKey)}">
-        <span class="rep-bar-rank${r.rank <= 3 ? ` rep-rank-${r.rank}` : ''}">${r.rank}</span>
+      <div class="rep-bar-row ${opts.drill ? 'rep-clickable' : ''} ${isOpen ? 'rep-open' : ''}" data-rowkey="${esc(rowKey)}" style="${hueVars(hue)}">
+        <span class="rep-bar-rank">${r.rank}</span>
         <div class="rep-bar-body">
           <div class="rep-bar-head">
             ${opts.drill ? `<span class="rep-caret">${icSvg('chevR')}</span>` : ''}
             <span class="rep-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
             <span class="rep-bar-val" title="${esc(fmtFull(r.total, state.moneda))}">${fmtCompact(r.total, state.moneda)}</span>
+            <span class="rep-bar-pct" title="Del total gastado">${share || !r.total ? share : '<1'}%</span>
           </div>
           <div class="rep-bar-track">
             <div class="rep-bar-fill" style="width:${pct}%"></div>
           </div>
-          <div class="rep-bar-sub"><span>${r.count} OC</span><span class="rep-bar-pct">${share || !r.total ? share : '<1'}% del total</span></div>
+          <div class="rep-bar-sub">${r.count} OC</div>
           ${drillHtml}
         </div>
       </div>`;
@@ -1025,7 +1047,17 @@ function renderResumen() {
       on ? `<span class="rr-arr">${state.resDir > 0 ? '▲' : '▼'}</span>` : ''}</th>`;
   };
 
-  $('res-list').innerHTML = d.filas.length ? `
+  // El buscador filtra sólo el listado: los totales y los tops de arriba (y
+  // el PDF) siguen describiendo el período entero.
+  const terms = terminosBusqueda(state.resQ);
+  const filas = terms.length ? d.filas.filter(({ oc }) => coincideOC(oc, terms)) : d.filas;
+  $('res-q-n').textContent = terms.length ? `${filas.length} de ${d.filas.length} OC` : '';
+
+  $('res-list').innerHTML = !d.filas.length
+    ? '<div class="rep-empty">No hay órdenes de compra emitidas en este período.</div>'
+    : !filas.length
+    ? `<div class="rep-empty">Ninguna OC del período coincide con «${esc(state.resQ.trim())}».</div>`
+    : `
     <table class="rr-tbl">
       <thead><tr>
         ${th('fecha', 'Fecha')}<th>N° OC</th>${th('proveedor', 'Proveedor')}${th('obra', 'Obra')}
@@ -1033,8 +1065,11 @@ function renderResumen() {
         ${th('importe', 'Importe', 'rr-n')}<th>Factura</th>
       </tr></thead>
       <tbody>
-        ${d.filas.map(({ oc, f, vencida }) => `
-          <tr class="rr-row" data-k="${esc(histKeyOf(oc))}" tabindex="0">
+        ${filas.map(({ oc, f, vencida }, i) => {
+          const hits = itemsCoincidentes(oc, terms);
+          const alt  = i % 2 ? ' rr-alt' : '';
+          return `
+          <tr class="rr-row rr-row-main${alt}${hits.length ? ' rr-has-hits' : ''}" data-k="${esc(histKeyOf(oc))}" tabindex="0">
             <td>${dm(oc.timestamp)}</td>
             <td class="rr-nro">${esc(oc.nroOC)}</td>
             <td title="${esc(oc.proveedor?.nombre || '')}">${esc(oc.proveedor?.nombre || '—')}</td>
@@ -1043,10 +1078,13 @@ function renderResumen() {
             <td class="rr-c-resp">${esc(oc.responsable?.nombre || '—')}</td>
             <td class="rr-n">${fmtFull(oc.total, oc.moneda === 'USD' ? 'USD' : 'ARS')}</td>
             <td><span class="rr-f rr-f--${f.estado}">${textoFactura(f, vencida)}</span></td>
-          </tr>`).join('')}
+          </tr>${hits.length ? `
+          <tr class="rr-row rr-row-hits${alt}" data-k="${esc(histKeyOf(oc))}">
+            <td colspan="8">${hitsHtml(oc, hits, esc)}</td>
+          </tr>` : ''}`;
+        }).join('')}
       </tbody>
-    </table>`
-    : '<div class="rep-empty">No hay órdenes de compra emitidas en este período.</div>';
+    </table>`;
 
   $('res-list').querySelectorAll('th[data-sort]').forEach(h =>
     h.addEventListener('click', () => setOrdenResumen(h.dataset.sort, true)));
@@ -1187,7 +1225,8 @@ function render() {
   renderLine('rep-linea', timeSeries(list));
 
   renderBars('rep-obras', obras,
-    { grandTotal: grand, drill: true, emptyMsg: 'No hay OC con obra en el rango.' });
+    { grandTotal: grand, drill: true, hueFor: r => obraHue.get(r.key) || HUES.gris,
+      emptyMsg: 'No hay OC con obra en el rango.' });
 
   // El equipo es opcional: las OC sin equipo no son un equipo llamado "Sin
   // equipo", simplemente no pertenecen a esta vista. Los % siguen midiéndose
@@ -1196,7 +1235,7 @@ function render() {
   renderBars('rep-equipos', groupAgg(conEquipo,
       oc => oc.equipo.codigo,
       oc => equipoLabel(oc.equipo)),
-    { grandTotal: grand, drill: true, catChip: true, catSplit: true,
+    { grandTotal: grand, drill: true, catChip: true, catSplit: true, hue: HUES.verde,
       emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   // Repuestos vs Mantenimiento: sólo las OC con equipo llevan categoría. Las
@@ -1205,15 +1244,16 @@ function render() {
       oc => oc.equipo.categoria || 'Sin categoría',
       oc => oc.equipo.categoria || 'Sin categoría'),
     { grandTotal: grand, drill: true, catChip: true,
+      hueFor: r => r.key === 'Repuestos' ? HUES.azul : r.key === 'Mantenimiento' ? HUES.violeta : HUES.gris,
       emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   renderBars('rep-proveedores', groupAgg(list, provKey, provLabel),
-    { grandTotal: grand, limit: 10, drill: true, emptyMsg: 'Sin proveedores en el rango.' });
+    { grandTotal: grand, limit: 10, drill: true, hue: HUES.azul, emptyMsg: 'Sin proveedores en el rango.' });
 
   renderBars('rep-responsables', groupAgg(list,
       oc => oc.responsable?.codigo || '—',
       oc => oc.responsable?.nombre || '—'),
-    { grandTotal: grand, drill: true, emptyMsg: 'Sin responsables en el rango.' });
+    { grandTotal: grand, drill: true, hue: HUES.ambar, emptyMsg: 'Sin responsables en el rango.' });
 
   // Al final: resumenData() rearma el índice de proveedores para su propia
   // lista y lo deja como lo espera el resto del panel.
@@ -1342,26 +1382,31 @@ function openOCDetail(key) {
   const cur  = oc.moneda === 'USD' ? 'USD' : 'ARS';
   const prov = oc.proveedor || {};
 
-  $('foc-title').textContent = 'OC ' + oc.nroOC;
-  $('foc-estado').innerHTML  = estadoChip(oc);
+  // Factura: misma pastilla que en el listado del resumen.
+  const f = estadoFacturaOC(oc);
+  const vencida = f.estado !== 'con' && (oc.timestamp || 0) < Date.now() - DIAS_FACTURA * 86400000;
+  $('foc-title').textContent = oc.nroOC;
+  $('foc-total').textContent = fmtDec(oc.total, cur);
+  $('foc-estado').innerHTML  = estadoChip(oc)
+    + `<span class="rep-chip rr-f rr-f--${f.estado}">Factura: ${esc(textoFactura(f, vencida))}</span>`;
 
   const items = oc.items || [];
   const itemsHtml = items.length ? `
-    <table class="foc-items">
+    <div class="foc-items-w"><table class="foc-items">
       <thead><tr>
         <th>Descripción</th><th class="foc-n">Cant.</th><th>Un.</th>
-        <th class="foc-n">Unitario</th><th class="foc-n">Total</th>
+        <th class="foc-n foc-c-unit">Unitario</th><th class="foc-n">Total</th>
       </tr></thead>
       <tbody>
         ${items.map(it => `<tr>
           <td>${esc(it.desc)}</td>
           <td class="foc-n">${esc(it.cant)}</td>
-          <td>${esc(it.unidad)}</td>
-          <td class="foc-n">${esc(fmtDec(it.unitario, cur))}</td>
+          <td>${it.unidad ? `<span class="foc-un">${esc(it.unidad)}</span>` : ''}</td>
+          <td class="foc-n foc-c-unit">${esc(fmtDec(it.unitario, cur))}</td>
           <td class="foc-n">${esc(fmtDec(it.total, cur))}</td>
         </tr>`).join('')}
       </tbody>
-    </table>` : '<div class="rep-empty">Esta OC no guardó el detalle de ítems.</div>';
+    </table></div>` : '<div class="rep-empty">Esta OC no guardó el detalle de ítems.</div>';
 
   // `impuestos` ya es el desglose cerrado que imprime el PDF: Gravado, cada
   // impuesto, Subtotal/Descuento y la fila TOTAL. No se le suma `impuestosExtra`
@@ -1388,20 +1433,26 @@ function openOCDetail(key) {
         (dólar ${esc(state.rate)}${oc.cotizacion ? ' de la fecha de la OC' : ' de hoy — la OC no guardó cotización'}).</div>`
     : '';
 
+  const tags = [prov.cuit && `CUIT ${prov.cuit}`, prov.condicionIVA].filter(Boolean);
   $('foc-body').innerHTML = `
+    <div class="foc-prov">
+      <span class="foc-prov-ic">${icSvg('truck')}</span>
+      <div style="min-width:0">
+        <div class="foc-prov-n">${esc(prov.nombre || 'Proveedor sin nombre')}</div>
+        ${tags.length ? `<div class="foc-prov-s">${tags.map(t => `<span class="foc-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      </div>
+    </div>
     <div class="foc-grid">
       ${fichaRow('Fecha', oc.fecha)}
       ${fichaRow('Obra', oc.obra)}
-      ${fichaRow('Rubro', oc.rubro?.nombre)}
-      ${fichaRow('Proveedor', prov.nombre)}
-      ${fichaRow('CUIT', prov.cuit)}
-      ${fichaRow('Cond. IVA', prov.condicionIVA)}
+      ${fichaRow('Responsable', oc.responsable?.nombre)}
       ${fichaRow('Cond. pago', oc.condicionPago)}
+      ${fichaRow('Moneda', cur)}
+      ${fichaRow('Rubro', oc.rubro?.nombre)}
       ${fichaRow('Equipo', equipoLabel(oc.equipo))}
       ${fichaRow('Categoría', oc.equipo?.categoria)}
-      ${fichaRow('Responsable', oc.responsable?.nombre)}
-      ${fichaRow('Moneda', cur)}
     </div>
+    <div class="foc-sec">Ítems${items.length ? ` <span class="foc-cnt">${items.length}</span>` : ''}</div>
     ${itemsHtml}
     ${totalesHtml}
     ${convHtml}`;
@@ -1631,6 +1682,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Resumen del período
   $('btn-res-pdf').addEventListener('click', descargarResumenPDF);
   $('res-orden').addEventListener('change', e => setOrdenResumen(e.target.value, false));
+  $('res-q').addEventListener('input', e => { state.resQ = e.target.value; renderResumen(); });
 
   // Plegado y buscador de las cards (restaura lo que quedó plegado la vez pasada).
   setupCards();
