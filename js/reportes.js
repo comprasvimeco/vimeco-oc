@@ -18,12 +18,13 @@
 let ALL     = [];   // OC dentro del alcance del reporte
 let ALL_RAW = [];   // todo lo que devolvió /historial (para calcular el corte)
 let cutoffTs   = 0; // desde cuándo hay respaldo en Drive
-// Categoría de cada obra (Arquitectura / Vial), por nombre normalizado: las OC
+// Categoría de cada obra (Arquitectura / Vial / Oficina), por nombre normalizado: las OC
 // guardan el nombre de la obra, no su clave. Se carga de /obras al entrar.
 let obraCat = new Map();
 const OBRA_CATS = {
   arquitectura: { label: 'Arquitectura', corto: 'Arq.', icon: 'building' },
   vial:         { label: 'Vial',         corto: 'Vial', icon: 'road' },
+  oficina:      { label: 'Oficina',      corto: 'Ofic.', icon: 'briefcase' },
 };
 const normObra = s => String(s || '').trim().toLowerCase();
 const catDeObra = oc => obraCat.get(normObra(oc.obra)) || null;
@@ -1129,7 +1130,8 @@ function remDetalle(rem) {
 // documento sale con lo mismo que se ve.
 // Etiqueta de la última columna. Si la OC fue para un equipo, el camión con
 // la categoría (Repuestos / Mantenimiento; cuál equipo lo dicen el tooltip y
-// la ficha). Si no, la línea de la obra: casita (Arquitectura) o ruta (Vial).
+// la ficha). Si no, la línea de la obra: casita (Arquitectura), ruta (Vial)
+// o maletín (Oficina).
 function tipoTag(oc) {
   if (oc.equipo?.codigo) {
     const cat = oc.equipo.categoria;

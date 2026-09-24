@@ -23,11 +23,13 @@ function esc(s) {
 
 let allObras = [];
 
-// Categoría de la obra: las dos líneas de trabajo de la empresa. Reportes
-// la muestra como etiqueta (casita / ruta) en el listado de OC.
+// Categoría de la obra: las dos líneas de trabajo de la empresa más la
+// oficina. Reportes la muestra como etiqueta (casita / ruta / maletín) en el
+// listado de OC.
 const CATEGORIAS = {
   arquitectura: { label: 'Arquitectura', icon: 'building' },
   vial:         { label: 'Vial',         icon: 'road' },
+  oficina:      { label: 'Oficina',      icon: 'briefcase' },
 };
 function categoriaTag(cat) {
   const c = CATEGORIAS[cat];
