@@ -53,6 +53,16 @@
     .rh-nav.rh-nav-off .rh-arrow { display: none; }
     .rh-nav.rh-nav-off .rh-range { min-width: 0; text-align: right; }
 
+    /* Filtro por obra / equipo: pastillas "vidrio" con la cruz para quitarlo. */
+    .rh-filtros { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+    .rh-filtro { display: inline-flex; align-items: center; gap: .45rem; max-width: 100%;
+      background: #fff; color: var(--primary); border: none; border-radius: 999px;
+      padding: .3rem .55rem .3rem .75rem; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 2px 8px -2px rgba(0,0,0,.25); }
+    .rh-filtro-k { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); }
+    .rh-filtro .icon { width: 13px; height: 13px; color: var(--gray-500); flex: 0 0 auto; }
+    .rh-filtro:hover .icon { color: #b02a2a; }
+
     .rep-hero-lbl {
       font-size: .7rem; text-transform: uppercase; letter-spacing: .1em;
       font-weight: 700; color: rgba(255,255,255,.72);
@@ -146,6 +156,8 @@
     .rep-share-seg:last-child  { border-radius: 6px 10px 10px 6px; }
     .rep-share-seg:only-child  { border-radius: 10px; }
     .rep-share-seg:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .rep-share-seg[data-obra], .rep-share-pick { cursor: pointer; }
+    .rep-share-pick:hover .rep-share-lbl { color: var(--primary); }
     /* El % va escrito directo sobre el color, en blanco con una sombra mínima para que se lea. */
     .rep-share-pill { white-space: nowrap; color: #fff; font-size: .74rem; font-weight: 800; font-variant-numeric: tabular-nums;
       letter-spacing: .01em; text-shadow: 0 1px 2px rgba(15,30,50,.28); }
@@ -180,6 +192,16 @@
     .rep-line-svg .rep-line { fill: none; stroke: #2557a7; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
     .rep-dot { fill: #2557a7; stroke: var(--white); stroke-width: 2; }
     .rep-dot-last { fill: var(--accent, #c8a852); }
+    .rep-line-svg .rep-line-prev { fill: none; stroke: #9aa5b4; stroke-width: 1.6; stroke-dasharray: 5 4;
+      stroke-linejoin: round; stroke-linecap: round; }
+    .rep-dot-prev { fill: #fff; stroke: #9aa5b4; stroke-width: 2; }
+    .rep-line-leg { display: flex; gap: 1.1rem; justify-content: flex-end; font-size: .74rem; color: var(--gray-600);
+      font-weight: 600; margin-bottom: .3rem; }
+    .rep-leg-i { display: inline-flex; align-items: center; gap: .4rem; }
+    .rep-leg-cur  { width: 18px; height: 3px; border-radius: 2px; background: #2557a7; }
+    .rep-leg-prev { width: 18px; height: 0; border-top: 2px dashed #9aa5b4; }
+    .rep-tip-prev { color: rgba(255,255,255,.72); font-size: .7rem; margin-top: .15rem;
+      padding-top: .2rem; border-top: 1px solid rgba(255,255,255,.18); }
     .rep-dot-on { r: 5.5; }
     .rep-cross { stroke: var(--gray-300); stroke-width: 1; }
     .rep-tip {
@@ -214,6 +236,13 @@
     .rep-open .rep-caret { transform: rotate(90deg); }
     .rep-bar-label { flex: 1; font-size: .9rem; color: var(--gray-800); font-weight: 700;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.01em; }
+    /* Embudo: filtra todo el reporte por esa obra / equipo. */
+    .rep-filt { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%; border: none; padding: 0; cursor: pointer;
+      background: transparent; color: var(--gray-300); transition: background .12s, color .12s; }
+    .rep-filt .icon { width: 13px; height: 13px; }
+    .rep-filt:hover { background: var(--h-bg, #e8eefc); color: var(--h-ink, var(--primary)); }
+    .rep-filt.on { background: var(--h-bg, #e8eefc); color: var(--h-ink, var(--primary)); }
     .rep-bar-val { font-size: .95rem; font-weight: 800; color: var(--gray-800); white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
     .rep-bar-track { background: #f1f3f7; border-radius: 999px; height: 8px; overflow: hidden; }
     /* Un tono por serie (o por obra, igual que en la participación). */
@@ -274,6 +303,8 @@
     .rr-stat--no   { border-left-color: #b02a2a; }
     .rr-stat--no .rr-v { color: #b02a2a; }
     .rr-stat--warn { border-left-color: #9a6a00; background: #fff8ec; }
+    .rr-stat--rem  { border-left-color: #2aa89a; }
+    .rr-stat--rem .rr-v { color: #16695f; }
     .rr-stat--warn .rr-v { color: #9a6a00; }
 
     .rr-tops { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-bottom: 1.1rem; }
@@ -298,13 +329,14 @@
     .rr-tbl td { padding: .45rem .5rem; border-bottom: 1px solid var(--gray-100); color: var(--gray-700);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .rr-tbl th:nth-child(1), .rr-tbl td:nth-child(1) { width: 7%; }
-    .rr-tbl th:nth-child(2), .rr-tbl td:nth-child(2) { width: 11%; }
-    .rr-tbl th:nth-child(3), .rr-tbl td:nth-child(3) { width: 22%; }
-    .rr-tbl th:nth-child(4), .rr-tbl td:nth-child(4) { width: 18%; }
-    .rr-tbl th:nth-child(5), .rr-tbl td:nth-child(5) { width: 10%; }
-    .rr-tbl th:nth-child(6), .rr-tbl td:nth-child(6) { width: 12%; }
-    .rr-tbl th:nth-child(7), .rr-tbl td:nth-child(7) { width: 11%; }
-    .rr-tbl th:nth-child(8), .rr-tbl td:nth-child(8) { width: 9%; }
+    .rr-tbl th:nth-child(2), .rr-tbl td:nth-child(2) { width: 13%; }
+    .rr-tbl th:nth-child(3), .rr-tbl td:nth-child(3) { width: 26%; }
+    .rr-tbl th:nth-child(4), .rr-tbl td:nth-child(4) { width: 21%; }
+    .rr-tbl th:nth-child(5), .rr-tbl td:nth-child(5) { width: 13%; }
+    .rr-tbl th:nth-child(6), .rr-tbl td:nth-child(6) { width: 11%; }
+    .rr-tbl th:nth-child(7), .rr-tbl td:nth-child(7) { width: 9%; }
+    /* Tipo: etiqueta chica (.cat-tag, en styles.css) con el equipo o la línea de la obra. */
+    .rr-tbl th.rr-c-eq, .rr-tbl td.rr-c-eq { padding-left: .9rem; }
     .rr-tbl .rr-n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--gray-800); }
     .rr-nro { font-family: 'Courier New', monospace; font-weight: 700; color: var(--primary); }
     .rr-row { cursor: pointer; transition: background .12s; }
@@ -338,7 +370,7 @@
 
     @media (max-width: 900px) {
       .rr-tops { grid-template-columns: 1fr; }
-      .rr-c-eq, .rr-c-resp { display: none; }
+      .rr-c-resp { display: none; }
     }
 
     /* ---- Ficha de la OC ---- */
@@ -357,6 +389,9 @@
     .foc-total { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .foc-chips { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .3rem; }
     .foc-chips .rep-chip { font-size: .68rem; padding: .12rem .55rem; }
+    .rem-chip--completa { background: #e3f5e8; color: #1e7d3a; }
+    .rem-chip--parcial  { background: #fff4e0; color: #9a6a00; }
+    .rem-chip--sin      { background: #eef0f3; color: #4b5563; }
     .foc-x { position: absolute; top: .75rem; right: .75rem; width: 30px; height: 30px; border-radius: 50%;
       display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
       border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.1); color: #fff; transition: background .15s; }
@@ -506,6 +541,7 @@
           <button class="rh-arrow" id="per-next" title="Período siguiente" aria-label="Período siguiente"><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
         </div>
       </div>
+      <div class="rh-filtros hidden" id="rep-filtros"></div>
       <div class="rep-hero-lbl">Total gastado</div>
       <div class="rep-hero-val" id="kpi-total">—</div>
       <div class="rh-foot">

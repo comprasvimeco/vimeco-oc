@@ -18,6 +18,15 @@
 let ALL     = [];   // OC dentro del alcance del reporte
 let ALL_RAW = [];   // todo lo que devolvió /historial (para calcular el corte)
 let cutoffTs   = 0; // desde cuándo hay respaldo en Drive
+// Categoría de cada obra (Arquitectura / Vial), por nombre normalizado: las OC
+// guardan el nombre de la obra, no su clave. Se carga de /obras al entrar.
+let obraCat = new Map();
+const OBRA_CATS = {
+  arquitectura: { label: 'Arquitectura', corto: 'Arq.', icon: 'building' },
+  vial:         { label: 'Vial',         corto: 'Vial', icon: 'road' },
+};
+const normObra = s => String(s || '').trim().toLowerCase();
+const catDeObra = oc => obraCat.get(normObra(oc.obra)) || null;
 
 // esObraPrueba, driveFolderId, driveUrlOf, driveCutoff, histKeyOf y ocDataDe
 // viven en driveBackup.js, compartidos con el panel de Novedades.
@@ -39,6 +48,11 @@ const state = {
   resDir:   1,          // 1 ascendente, -1 descendente
   // Buscador del listado del resumen (el mismo motor que Novedades).
   resQ:     '',
+  // Filtro de todo el reporte por una obra o un equipo: { key, label } o null.
+  // Se elige tocando la obra en Participación o el embudo de una fila de
+  // Gasto por Obra / Gasto por Equipo; se quita desde la pastilla del hero.
+  filtroObra:   null,
+  filtroEquipo: null,
 };
 
 const expanded = new Set(); // claves de filas desplegadas (por sección+key)
@@ -125,10 +139,27 @@ function amountIn(oc, cur) {
 }
 
 // ---- Filtro ----
-// Sólo lo que se compró: pendientes, rechazadas y canceladas nunca entran.
+// Sólo lo que se compró (pendientes, rechazadas y canceladas nunca entran) y,
+// si hay, sólo la obra o el equipo elegidos. Lo usan el panel y el resumen,
+// también para el período anterior con que se comparan.
+function pasaFiltros(oc) {
+  if (!esFirme(oc)) return false;
+  if (state.filtroObra   && (oc.obra || '—') !== state.filtroObra.key) return false;
+  if (state.filtroEquipo && oc.equipo?.codigo !== state.filtroEquipo.key) return false;
+  return true;
+}
+
+function setFiltro(tipo, key, label) {
+  const campo = tipo === 'equipo' ? 'filtroEquipo' : 'filtroObra';
+  state[campo] = state[campo]?.key === key ? null : { key, label };
+  expanded.clear();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function getFiltered() {
   return ALL.filter(oc => {
-    if (!esFirme(oc)) return false;
+    if (!pasaFiltros(oc)) return false;
     const ts = oc.timestamp || 0;
     if (state.desde && ts < new Date(state.desde + 'T00:00:00').getTime()) return false;
     if (state.hasta && ts > new Date(state.hasta + 'T23:59:59').getTime()) return false;
@@ -312,8 +343,8 @@ function timeSeries(list) {
   const ts  = list.map(o => o.timestamp || 0).filter(Boolean);
 
   const ini = r.desde ? new Date(r.desde + 'T00:00:00') : (ts.length ? new Date(Math.min(...ts)) : null);
-  let   fin = r.hasta ? new Date(r.hasta + 'T00:00:00') : hoy;
-  if (fin > hoy) fin = hoy;
+  const finRango = r.hasta ? new Date(r.hasta + 'T00:00:00') : hoy;
+  const fin = finRango > hoy ? hoy : finRango;
   if (!ini || ini > fin) return { rows: [], unit: 'dia' };
 
   const dias = Math.round((fin - ini) / 86400000) + 1;
@@ -323,9 +354,25 @@ function timeSeries(list) {
   let keys = bucketsEntre(ini, fin, unit);
   if (keys.length < 2 && unit !== 'dia') { unit = 'dia'; keys = bucketsEntre(ini, fin, unit); }
 
+  const cero  = k => ({ key: k, label: '', total: 0, count: 0, ocs: [] });
   const byKey = new Map(groupAgg(list, oc => bucketKey(oc.timestamp, unit), () => '').map(g => [g.key, g]));
-  const rows = keys.map(k => byKey.get(k) || { key: k, label: '', total: 0, count: 0, ocs: [] });
-  return { rows, unit };
+  const rows  = keys.map(k => byKey.get(k) || cero(k));
+
+  // Eje del período completo: en el período en curso la línea llega hasta hoy
+  // y el resto queda libre para ver hacia dónde iba el anterior.
+  const keysFull = bucketsEntre(ini, finRango, unit);
+
+  // Período anterior (mismo largo, misma unidad), alineado por posición:
+  // día 1 contra día 1, semana 1 contra semana 1. Con "Todo" no hay.
+  let prev = null;
+  const pr = rangoAnterior(r);
+  if (pr && pr.desde && pr.hasta) {
+    const pKeys = bucketsEntre(new Date(pr.desde + 'T00:00:00'), new Date(pr.hasta + 'T00:00:00'), unit);
+    const pBy   = new Map(groupAgg(ocsDeRango(pr), oc => bucketKey(oc.timestamp, unit), () => '').map(g => [g.key, g]));
+    prev = pKeys.map(k => pBy.get(k) || cero(k));
+  }
+  const n = Math.max(keysFull.length, rows.length, prev ? prev.length : 0);
+  return { rows, unit, prev, keysFull, n };
 }
 
 function monthShort(k) {
@@ -390,6 +437,7 @@ const pctTxt  = v => v.toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '
 let obraHue = new Map();
 // "Otras N obras" desplegado (se recuerda mientras se navega el reporte).
 let shareOtrasOpen = false;
+let _share = null;   // último dibujo, para redibujar al desplegar "Otras"
 
 // ---- Barra de participación (part-to-whole, top 5 + Otras) ----
 function renderShare(containerId, rows, grand) {
@@ -401,7 +449,7 @@ function renderShare(containerId, rows, grand) {
   const top   = rows.slice(0, 5);
   const resto = rows.slice(5);
   obraHue = new Map(top.map((r, i) => [r.key, SHARE_HUES[i]]));
-  const segs  = top.map((r, i) => ({ label: r.label, total: r.total, hue: SHARE_HUES[i] }));
+  const segs  = top.map((r, i) => ({ key: r.key, label: r.label, total: r.total, hue: SHARE_HUES[i] }));
   if (resto.length) {
     segs.push({
       label: `Otras ${resto.length} obra${resto.length !== 1 ? 's' : ''}`,
@@ -416,7 +464,7 @@ function renderShare(containerId, rows, grand) {
   el.innerHTML = `
     <div class="rep-share-track">
       ${segs.map(s => `
-        <div class="rep-share-seg" style="flex:${s.total};${hueVars(s.hue)}"
+        <div class="rep-share-seg" style="flex:${s.total};${hueVars(s.hue)}"${s.key != null ? ` data-obra="${esc(s.key)}" data-label="${esc(s.label)}"` : ''}
              title="${esc(s.label)} — ${esc(fmtFull(s.total, state.moneda))} (${pctTxt(pct(s.total))})">${
           pct(s.total) >= 8 ? `<span class="rep-share-pill">${Math.round(pct(s.total))}%</span>` : ''}</div>
       `).join('')}
@@ -425,8 +473,9 @@ function renderShare(containerId, rows, grand) {
       ${segs.map((s, i) => {
         const otras = resto.length && i === segs.length - 1;
         return `
-        <${otras ? 'button type="button"' : 'div'} class="rep-share-item${otras ? ' rep-share-otras' : ''}${otras && shareOtrasOpen ? ' open' : ''}"
-             style="${hueVars(s.hue)}"${otras ? ` aria-expanded="${shareOtrasOpen}" title="Ver las obras agrupadas"` : ''}>
+        <${otras ? 'button type="button"' : 'div'} class="rep-share-item${otras ? ' rep-share-otras' : ' rep-share-pick'}${otras && shareOtrasOpen ? ' open' : ''}"
+             style="${hueVars(s.hue)}"${otras ? ` aria-expanded="${shareOtrasOpen}" title="Ver las obras agrupadas"`
+               : ` data-obra="${esc(s.key)}" data-label="${esc(s.label)}" title="Ver sólo esta obra en todo el reporte"`}>
           <span class="rep-share-dot"></span>
           <span class="rep-share-lbl" title="${esc(s.label)}">${esc(s.label)}</span>
           ${otras ? `<span class="rep-share-chev">${icSvg('chevR')}</span>` : ''}
@@ -438,28 +487,41 @@ function renderShare(containerId, rows, grand) {
     ${resto.length && shareOtrasOpen ? `
     <div class="rep-share-rest">
       ${resto.map(r => `
-        <div class="rep-share-rest-i">
+        <div class="rep-share-rest-i rep-share-pick" data-obra="${esc(r.key)}" data-label="${esc(r.label)}" title="Ver sólo esta obra en todo el reporte">
           <span class="rep-share-lbl" title="${esc(r.label)}">${esc(r.label)}</span>
           <span class="rep-share-val">${esc(fmtCompact(r.total, state.moneda))}</span>
           <span class="rep-share-rest-p">${pctTxt(pct(r.total))}</span>
         </div>`).join('')}
     </div>` : ''}`;
 
-  const btn = el.querySelector('.rep-share-otras');
-  if (btn) btn.addEventListener('click', () => {
-    shareOtrasOpen = !shareOtrasOpen;
-    renderShare(containerId, rows, grand);
-  });
+  _share = { containerId, rows, grand };
+  if (!el._wired) {
+    el._wired = true;
+    el.addEventListener('click', e => {
+      if (e.target.closest('.rep-share-otras')) {
+        shareOtrasOpen = !shareOtrasOpen;
+        renderShare(_share.containerId, _share.rows, _share.grand);
+        return;
+      }
+      const o = e.target.closest('[data-obra]');
+      if (o) setFiltro('obra', o.dataset.obra, o.dataset.label);
+    });
+  }
 }
 
-// ---- Evolución mensual (área + línea, una sola serie) ----
+// ---- Evolución (área + línea) contra el período anterior (línea punteada) ----
 // Se dibuja al ancho real del contenedor para que los trazos no se deformen.
 let lineData = { rows: [], unit: 'mes' };
+
+const PREV_LBL = { semana: 'Semana anterior', quincena: 'Quincena anterior', mes: 'Mes anterior' };
 
 function renderLine(containerId, serie) {
   const el = $(containerId);
   lineData = serie;
   const { rows, unit } = serie;
+  const prev = serie.prev && serie.prev.length ? serie.prev : null;
+  const n    = Math.max(serie.n || 0, rows.length);
+  const ejeK = serie.keysFull && serie.keysFull.length ? serie.keysFull : rows.map(r => r.key);
 
   $('rep-linea-title').textContent = unit === 'dia' ? 'Evolución diaria'
     : unit === 'semana' ? 'Evolución semanal' : 'Evolución mensual';
@@ -475,14 +537,16 @@ function renderLine(containerId, serie) {
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
 
-  const max  = Math.max(...rows.map(r => r.total));
+  const max  = Math.max(...rows.map(r => r.total), ...(prev || []).map(r => r.total));
   const top  = niceMax(max);
-  const x = i => pad.l + (rows.length === 1 ? iw / 2 : (i / (rows.length - 1)) * iw);
+  const x = i => pad.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
   const y = v => pad.t + ih - (top ? (v / top) * ih : 0);
+  const path = ps => ps.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
 
   const pts  = rows.map((r, i) => [x(i), y(r.total)]);
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const line = path(pts);
   const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${(pad.t + ih).toFixed(1)} L${pts[0][0].toFixed(1)},${(pad.t + ih).toFixed(1)} Z`;
+  const prevLine = prev && prev.length > 1 ? path(prev.slice(0, n).map((r, i) => [x(i), y(r.total)])) : '';
 
   // Ejes: hairlines sólidos, un tono por encima de la superficie.
   const ticks = [0, .25, .5, .75, 1].map(f => top * f);
@@ -491,19 +555,25 @@ function renderLine(containerId, serie) {
     <text class="rep-axis" x="${pad.l - 8}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end">${esc(fmtCompact(v, state.moneda))}</text>
   `).join('');
 
-  // Etiquetas de mes: se ralean si no entran.
-  const step = Math.ceil(rows.length / Math.max(2, Math.floor(iw / 54)));
-  const xlab = rows.map((r, i) =>
-    (i % step === 0 || i === rows.length - 1)
-      ? `<text class="rep-axis" x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${esc(bucketShort(r.key, unit))}</text>`
+  // Etiquetas del eje (del período completo): se ralean si no entran.
+  const nLab = Math.min(n, ejeK.length);
+  const step = Math.ceil(nLab / Math.max(2, Math.floor(iw / 54)));
+  const xlab = ejeK.slice(0, nLab).map((k, i) =>
+    (i % step === 0 || i === nLab - 1)
+      ? `<text class="rep-axis" x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${esc(bucketShort(k, unit))}</text>`
       : '').join('');
 
   // Sólo se rotula el último punto: el resto lo cuenta el eje y el hover.
   const last = rows.length - 1;
+  const prevTxt = PREV_LBL[state.periodo] || 'Período anterior';
 
   el.innerHTML = `
+    ${prev ? `<div class="rep-line-leg">
+      <span class="rep-leg-i"><span class="rep-leg-cur"></span>Este período</span>
+      <span class="rep-leg-i"><span class="rep-leg-prev"></span>${esc(prevTxt)}</span>
+    </div>` : ''}
     <svg class="rep-line-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img"
-         aria-label="Evolución del gasto">
+         aria-label="Evolución del gasto${prev ? ' comparada con el período anterior' : ''}">
       <defs>
         <linearGradient id="repAreaGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%"   stop-color="#2557a7" stop-opacity=".34"/>
@@ -513,15 +583,17 @@ function renderLine(containerId, serie) {
       </defs>
       ${grid}
       ${xlab}
+      ${prevLine ? `<path class="rep-line-prev" d="${prevLine}"/>` : ''}
       <path class="rep-area" d="${area}" fill="url(#repAreaGrad)"/>
       <path class="rep-line" d="${line}"/>
       ${pts.map((p, i) => `<circle class="rep-dot ${i === last ? 'rep-dot-last' : ''}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === last ? 4.5 : 3}" data-i="${i}"/>`).join('')}
+      <circle class="rep-dot-prev hidden" id="rep-dot-prev" r="3.5"/>
       <line class="rep-cross hidden" id="rep-cross" y1="${pad.t}" y2="${pad.t + ih}"/>
       <rect id="rep-hit" x="${pad.l}" y="${pad.t}" width="${iw}" height="${ih}" fill="transparent"/>
     </svg>
     <div class="rep-tip hidden" id="rep-tip"></div>`;
 
-  wireLineHover(el, rows, x, y, unit);
+  wireLineHover(el, { rows, prev, n, ejeK, unit, prevTxt }, x, y);
 }
 
 // Techo "redondo" para el eje (1 / 2 / 5 × potencia de 10).
@@ -533,10 +605,12 @@ function niceMax(v) {
   return step * exp;
 }
 
-function wireLineHover(el, rows, x, y, unit) {
+function wireLineHover(el, d, x, y) {
+  const { rows, prev, n, ejeK, unit, prevTxt } = d;
   const svg   = el.querySelector('.rep-line-svg');
   const hit   = el.querySelector('#rep-hit');
   const cross = el.querySelector('#rep-cross');
+  const dotP  = el.querySelector('#rep-dot-prev');
   const tip   = el.querySelector('#rep-tip');
   if (!hit) return;
 
@@ -544,37 +618,45 @@ function wireLineHover(el, rows, x, y, unit) {
     const box = svg.getBoundingClientRect();
     const px  = (clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
     let best = 0, bd = Infinity;
-    rows.forEach((_, i) => { const d = Math.abs(x(i) - px); if (d < bd) { bd = d; best = i; } });
+    for (let i = 0; i < n; i++) { const dd = Math.abs(x(i) - px); if (dd < bd) { bd = dd; best = i; } }
     return best;
   };
 
   const show = clientX => {
     const i = nearest(clientX);
-    const r = rows[i];
+    const r = rows[i];                 // puede no haber: período en curso, más allá de hoy
+    const p = prev ? prev[i] : null;
     cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i));
     cross.classList.remove('hidden');
-    svg.querySelectorAll('.rep-dot').forEach(d =>
-      d.classList.toggle('rep-dot-on', Number(d.dataset.i) === i));
+    svg.querySelectorAll('.rep-dot').forEach(dt =>
+      dt.classList.toggle('rep-dot-on', Number(dt.dataset.i) === i));
+    if (p) { dotP.setAttribute('cx', x(i)); dotP.setAttribute('cy', y(p.total)); dotP.classList.remove('hidden'); }
+    else dotP.classList.add('hidden');
 
-    tip.innerHTML = `<strong>${esc(bucketLabel(r.key, unit))}</strong>
-      <span>${esc(fmtFull(r.total, state.moneda))}</span>
-      <span class="rep-tip-sub">${r.count} OC</span>`;
+    const k = r ? r.key : ejeK[i];
+    tip.innerHTML = `<strong>${esc(k ? bucketLabel(k, unit) : '')}</strong>
+      ${r ? `<span>${esc(fmtFull(r.total, state.moneda))}</span><span class="rep-tip-sub">${r.count} OC</span>`
+           : '<span class="rep-tip-sub">Todavía no llegó</span>'}
+      ${p ? `<span class="rep-tip-prev">${esc(prevTxt)} · ${esc(bucketShort(p.key, unit))}: ${esc(fmtFull(p.total, state.moneda))}</span>` : ''}`;
     tip.classList.remove('hidden');
 
     // Posición relativa al contenedor, sin desbordarlo.
     const box = svg.getBoundingClientRect();
+    const off = svg.getBoundingClientRect().top - el.getBoundingClientRect().top;
     const scale = box.width / svg.viewBox.baseVal.width;
     let left = x(i) * scale;
     const tw = tip.offsetWidth;
     left = Math.min(Math.max(left - tw / 2, 4), box.width - tw - 4);
     tip.style.left = left + 'px';
-    tip.style.top  = Math.max(y(r.total) * scale - tip.offsetHeight - 12, 4) + 'px';
+    const alto = Math.max(r ? r.total : 0, p ? p.total : 0);
+    tip.style.top  = Math.max(off + y(alto) * scale - tip.offsetHeight - 12, 4) + 'px';
   };
 
   const hide = () => {
     cross.classList.add('hidden');
+    dotP.classList.add('hidden');
     tip.classList.add('hidden');
-    svg.querySelectorAll('.rep-dot').forEach(d => d.classList.remove('rep-dot-on'));
+    svg.querySelectorAll('.rep-dot').forEach(dt => dt.classList.remove('rep-dot-on'));
   };
 
   hit.addEventListener('mousemove', e => show(e.clientX));
@@ -654,6 +736,11 @@ function setupCards() {
 }
 
 // ---- Render de barras (con drill-down opcional) ----
+function filtroActivo(tipo, key) {
+  const f = tipo === 'equipo' ? state.filtroEquipo : state.filtroObra;
+  return !!f && f.key === key;
+}
+
 function renderBars(containerId, rows, opts = {}) {
   const el = $(containerId);
   _bars[containerId] = { rows, opts };   // para poder refiltrar al tipear
@@ -734,7 +821,9 @@ function renderBars(containerId, rows, opts = {}) {
         <div class="rep-bar-body">
           <div class="rep-bar-head">
             ${opts.drill ? `<span class="rep-caret">${icSvg('chevR')}</span>` : ''}
-            <span class="rep-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>
+            <span class="rep-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>${opts.filtro ? `
+            <button class="rep-filt${filtroActivo(opts.filtro, r.key) ? ' on' : ''}" data-filt="${esc(r.key)}" data-label="${esc(r.label)}"
+                    title="${filtroActivo(opts.filtro, r.key) ? 'Quitar el filtro' : `Ver sólo ${opts.filtro === 'equipo' ? 'este equipo' : 'esta obra'} en todo el reporte`}"><svg class="icon" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>` : ''}
             <span class="rep-bar-val" title="${esc(fmtFull(r.total, state.moneda))}">${fmtCompact(r.total, state.moneda)}</span>
             <span class="rep-bar-pct" title="Del total gastado">${share || !r.total ? share : '<1'}%</span>
           </div>
@@ -752,6 +841,8 @@ function renderBars(containerId, rows, opts = {}) {
     el.addEventListener('click', e => {
       const ocBtn = e.target.closest('[data-ockey]');
       if (ocBtn) { e.stopPropagation(); openOCDetail(ocBtn.dataset.ockey); return; }
+      const filt = e.target.closest('[data-filt]');
+      if (filt) { e.stopPropagation(); setFiltro(_bars[containerId].opts.filtro, filt.dataset.filt, filt.dataset.label); return; }
       const more = e.target.closest('[data-more]');
       if (more) {
         const k = more.dataset.more;
@@ -785,6 +876,18 @@ function renderHero(list) {
   const lbl = labelRango(r);
   $('hero-rango').textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
   $('rep-per-nav').classList.toggle('rh-nav-off', !state.periodo);
+
+  const chips = [
+    state.filtroObra   && { tipo: 'obra',   txt: 'Obra',   f: state.filtroObra },
+    state.filtroEquipo && { tipo: 'equipo', txt: 'Equipo', f: state.filtroEquipo },
+  ].filter(Boolean);
+  const fEl = $('rep-filtros');
+  fEl.classList.toggle('hidden', !chips.length);
+  fEl.innerHTML = chips.map(c => `
+    <button class="rh-filtro" data-quitar="${c.tipo}" title="Quitar el filtro">
+      <span class="rh-filtro-k">${c.txt}</span>${esc(c.f.label)}
+      <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`).join('');
   $('per-next').disabled = !state.periodo || state.pOffset <= 0;
 
   // Contexto: cantidad de OC, el tramo real de los datos cuando se mira todo
@@ -898,7 +1001,7 @@ function esFirme(oc) {
 function ocsDeRango(r) {
   return ALL
     .filter(oc => {
-      if (!esFirme(oc)) return false;
+      if (!pasaFiltros(oc)) return false;
       const ts = oc.timestamp || 0;
       if (r.desde && ts < new Date(r.desde + 'T00:00:00').getTime()) return false;
       if (r.hasta && ts > new Date(r.hasta + 'T23:59:59').getTime()) return false;
@@ -956,6 +1059,15 @@ function resumenData() {
     if (vencida)            { fact.venc++; fact.mVenc += amt; }
     return { oc, f, vencida, amt };
   });
+
+  // Remitos: el estado de entrega que Remitos deja espejado en la OC.
+  const rem = { con: 0, completas: 0, parciales: 0, monto: 0 };
+  list.forEach(oc => {
+    const e = oc.entrega?.estado;
+    if (e !== 'parcial' && e !== 'completa') return;
+    rem.con++; rem.monto += amountIn(oc, state.moneda) || 0;
+    if (e === 'completa') rem.completas++; else rem.parciales++;
+  });
   ordenarFilas(filas);
 
   // El índice de proveedores es global (lo usan los rankings y el detector de
@@ -971,7 +1083,7 @@ function resumenData() {
                : state.periodo === 'mes' ? 'mes' : 'período';
 
   return { r, prevR, unidad, list, filas, total, noConv, prevSuma,
-           prevCount: prevR ? prev.length : null, fact, topObras, topProv };
+           prevCount: prevR ? prev.length : null, fact, rem, topObras, topProv };
 }
 
 // Orden del listado. El importe se compara convertido a la moneda de
@@ -1005,6 +1117,42 @@ function setOrdenResumen(campo, desdeColumna) {
   renderResumen();
 }
 
+function remDetalle(rem) {
+  if (!rem.con) return 'ninguna con entregas';
+  const p = [];
+  if (rem.completas) p.push(`${rem.completas} completa${rem.completas !== 1 ? 's' : ''}`);
+  if (rem.parciales) p.push(`${rem.parciales} parcial${rem.parciales !== 1 ? 'es' : ''}`);
+  return p.join(' · ');
+}
+
+// Filas del listado después del buscador. La usan la tabla y el PDF, así el
+// documento sale con lo mismo que se ve.
+// Etiqueta de la última columna. Si la OC fue para un equipo, el camión con
+// la categoría (Repuestos / Mantenimiento; cuál equipo lo dicen el tooltip y
+// la ficha). Si no, la línea de la obra: casita (Arquitectura) o ruta (Vial).
+function tipoTag(oc) {
+  if (oc.equipo?.codigo) {
+    const cat = oc.equipo.categoria;
+    return `<span class="cat-tag cat-tag--equipo" title="${esc(equipoLabel(oc.equipo))}">${icSvg('truck')}${
+      cat ? esc(cat === 'Mantenimiento' ? 'Mant.' : cat) : 'Equipo'}</span>`;
+  }
+  const c = catDeObra(oc);
+  if (!c) return '';
+  return `<span class="cat-tag cat-tag--${c}" title="${esc(oc.obra)} · Obra ${OBRA_CATS[c].label.toLowerCase()}">${
+    icSvg(OBRA_CATS[c].icon)}${OBRA_CATS[c].corto}</span>`;
+}
+// Lo mismo en texto, para el PDF.
+function tipoTexto(oc) {
+  if (oc.equipo?.codigo) return equipoLabel(oc.equipo);
+  const c = catDeObra(oc);
+  return c ? OBRA_CATS[c].label : '—';
+}
+
+function filasVisibles(d) {
+  const terms = terminosBusqueda(state.resQ);
+  return { terms, filas: terms.length ? d.filas.filter(({ oc }) => coincideOC(oc, terms)) : d.filas };
+}
+
 function renderResumen() {
   const d = resumenData();
 
@@ -1029,15 +1177,10 @@ function renderResumen() {
       <span class="rr-v">${d.fact.con}</span>
       <span class="rr-d">${fmtCompact(d.fact.mCon, state.moneda)}</span>
     </div>
-    <div class="rr-stat rr-stat--no">
-      <span class="rr-k">Sin factura</span>
-      <span class="rr-v">${d.list.length - d.fact.con}</span>
-      <span class="rr-d">${fmtCompact(d.fact.mSin, state.moneda)}${d.fact.otros ? ` · ${d.fact.otros} sin rotular` : ''}</span>
-    </div>
-    <div class="rr-stat ${d.fact.venc ? 'rr-stat--warn' : ''}">
-      <span class="rr-k">Sin factura +${DIAS_FACTURA} días</span>
-      <span class="rr-v">${d.fact.venc}</span>
-      <span class="rr-d">${d.fact.venc ? fmtCompact(d.fact.mVenc, state.moneda) + ' a reclamar' : 'nada pendiente'}</span>
+    <div class="rr-stat rr-stat--rem">
+      <span class="rr-k">Con remito</span>
+      <span class="rr-v">${d.rem.con}</span>
+      <span class="rr-d">${remDetalle(d.rem)}</span>
     </div>`;
 
   const mini = (titulo, rows) => `
@@ -1061,10 +1204,9 @@ function renderResumen() {
       on ? `<span class="rr-arr">${state.resDir > 0 ? '▲' : '▼'}</span>` : ''}</th>`;
   };
 
-  // El buscador filtra sólo el listado: los totales y los tops de arriba (y
-  // el PDF) siguen describiendo el período entero.
-  const terms = terminosBusqueda(state.resQ);
-  const filas = terms.length ? d.filas.filter(({ oc }) => coincideOC(oc, terms)) : d.filas;
+  // El buscador filtra el listado (y el PDF); los totales y los tops de arriba
+  // siguen describiendo el período entero.
+  const { terms, filas } = filasVisibles(d);
   $('res-q-n').textContent = terms.length ? `${filas.length} de ${d.filas.length} OC` : '';
 
   $('res-list').innerHTML = !d.filas.length
@@ -1075,11 +1217,10 @@ function renderResumen() {
     <table class="rr-tbl">
       <thead><tr>
         ${th('fecha', 'Fecha')}<th>N° OC</th>${th('proveedor', 'Proveedor')}${th('obra', 'Obra')}
-        <th class="rr-c-eq">Equipo</th>${th('responsable', 'Responsable', 'rr-c-resp')}
-        ${th('importe', 'Importe', 'rr-n')}<th>Factura</th>
+        ${th('responsable', 'Responsable', 'rr-c-resp')}${th('importe', 'Importe', 'rr-n')}<th class="rr-c-eq">Tipo</th>
       </tr></thead>
       <tbody>
-        ${filas.map(({ oc, f, vencida }, i) => {
+        ${filas.map(({ oc }, i) => {
           const hits = itemsCoincidentes(oc, terms);
           const alt  = i % 2 ? ' rr-alt' : '';
           return `
@@ -1088,13 +1229,12 @@ function renderResumen() {
             <td class="rr-nro">${esc(oc.nroOC)}</td>
             <td title="${esc(oc.proveedor?.nombre || '')}">${esc(oc.proveedor?.nombre || '—')}</td>
             <td title="${esc(oc.obra || '')}">${esc(oc.obra || 'Sin obra')}</td>
-            <td class="rr-c-eq" title="${esc(equipoLabel(oc.equipo))}">${esc(equipoLabel(oc.equipo) || '—')}</td>
             <td class="rr-c-resp">${esc(oc.responsable?.nombre || '—')}</td>
             <td class="rr-n">${fmtFull(oc.total, oc.moneda === 'USD' ? 'USD' : 'ARS')}</td>
-            <td><span class="rr-f rr-f--${f.estado}">${textoFactura(f, vencida)}</span></td>
+            <td class="rr-c-eq">${tipoTag(oc)}</td>
           </tr>${hits.length ? `
           <tr class="rr-row rr-row-hits${alt}" data-k="${esc(histKeyOf(oc))}">
-            <td colspan="8">${hitsHtml(oc, hits, esc)}</td>
+            <td colspan="7">${hitsHtml(oc, hits, esc)}</td>
           </tr>` : ''}`;
         }).join('')}
       </tbody>
@@ -1120,7 +1260,11 @@ function descargarResumenPDF() {
   const btn = $('btn-res-pdf');
   btn.disabled = true;
   try {
+    const { filas } = filasVisibles(d);
     const notas = ['Sólo OC emitidas y autorizadas.'];
+    if (state.filtroObra)   notas.push(`Filtrado por obra: ${state.filtroObra.label}.`);
+    if (state.filtroEquipo) notas.push(`Filtrado por equipo: ${state.filtroEquipo.label}.`);
+    if (state.resQ.trim())  notas.push(`Listado filtrado por «${state.resQ.trim()}»: ${filas.length} de ${d.filas.length} OC. Los totales son del período completo.`);
     if (state.moneda === 'USD' || d.list.some(oc => oc.moneda === 'USD')) {
       notas.push(`Totales en ${state.moneda} — dólar ${state.rate} de la fecha de cada OC; el importe de cada fila va en su moneda original.`);
     }
@@ -1141,26 +1285,20 @@ function descargarResumenPDF() {
           sub: fmtVar(variacion(d.list.length, d.prevCount), d.unidad) },
         { lbl: 'Con factura', val: String(d.fact.con),
           sub: fmtCompact(d.fact.mCon, state.moneda), color: [30, 125, 58] },
-        { lbl: 'Sin factura', val: String(d.list.length - d.fact.con),
-          sub: fmtCompact(d.fact.mSin, state.moneda), color: [176, 42, 42] },
-        { lbl: `Sin factura +${DIAS_FACTURA} días`, val: String(d.fact.venc),
-          sub: d.fact.venc ? fmtCompact(d.fact.mVenc, state.moneda) + ' a reclamar' : 'nada pendiente',
-          color: d.fact.venc ? [154, 106, 0] : null }
+        { lbl: 'Con remito', val: String(d.rem.con), sub: remDetalle(d.rem), color: [22, 105, 95] }
       ],
       topObras: d.topObras.map(r => ({ label: r.label, val: fmtCompact(r.total, state.moneda),
         pct: (d.total ? Math.round((r.total / d.total) * 100) : 0) + '%' })),
       topProv: d.topProv.map(r => ({ label: r.label, val: fmtCompact(r.total, state.moneda),
         pct: (d.total ? Math.round((r.total / d.total) * 100) : 0) + '%' })),
-      ocs: d.filas.map(({ oc, f, vencida }) => ({
+      ocs: filas.map(({ oc }) => ({
         fecha:       dm(oc.timestamp),
         nroOC:       oc.nroOC,
         proveedor:   oc.proveedor?.nombre || '—',
         obra:        oc.obra || 'Sin obra',
-        equipo:      equipoLabel(oc.equipo) || '—',
+        equipo:      tipoTexto(oc),
         responsable: oc.responsable?.nombre || '—',
-        importe:     fmtFull(oc.total, oc.moneda === 'USD' ? 'USD' : 'ARS'),
-        factura:     textoFactura(f, vencida),
-        facturaEstado: f.estado
+        importe:     fmtFull(oc.total, oc.moneda === 'USD' ? 'USD' : 'ARS')
       }))
     };
 
@@ -1239,7 +1377,7 @@ function render() {
   renderLine('rep-linea', timeSeries(list));
 
   renderBars('rep-obras', obras,
-    { grandTotal: grand, drill: true, hueFor: r => obraHue.get(r.key) || HUES.gris,
+    { grandTotal: grand, drill: true, filtro: 'obra', hueFor: r => obraHue.get(r.key) || HUES.gris,
       emptyMsg: 'No hay OC con obra en el rango.' });
 
   // El equipo es opcional: las OC sin equipo no son un equipo llamado "Sin
@@ -1249,7 +1387,7 @@ function render() {
   renderBars('rep-equipos', groupAgg(conEquipo,
       oc => oc.equipo.codigo,
       oc => equipoLabel(oc.equipo)),
-    { grandTotal: grand, drill: true, catChip: true, catSplit: true, hue: HUES.turquesa,
+    { grandTotal: grand, drill: true, catChip: true, catSplit: true, filtro: 'equipo', hue: HUES.turquesa,
       emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   // Repuestos vs Mantenimiento: sólo las OC con equipo llevan categoría. Las
@@ -1415,8 +1553,11 @@ function openOCDetail(key) {
   const vencida = f.estado !== 'con' && (oc.timestamp || 0) < Date.now() - DIAS_FACTURA * 86400000;
   $('foc-title').textContent = oc.nroOC;
   $('foc-total').textContent = fmtDec(oc.total, cur);
+  const ent = oc.entrega?.estado || 'sin';
+  const REM_TXT = { sin: 'No', parcial: 'Parcial', completa: 'Sí' };
   $('foc-estado').innerHTML  = estadoChip(oc)
-    + `<span class="rep-chip rr-f rr-f--${f.estado}">Factura: ${esc(textoFactura(f, vencida))}</span>`;
+    + `<span class="rep-chip rr-f rr-f--${f.estado}">Factura: ${esc(textoFactura(f, vencida))}</span>`
+    + `<span class="rep-chip rem-chip rem-chip--${ent}">Remito: ${REM_TXT[ent] || 'No'}</span>`;
 
   const items = oc.items || [];
   const itemsHtml = items.length ? `
@@ -1674,6 +1815,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('rep-desde').addEventListener('change', () => { state.desde = $('rep-desde').value; soltarPreset(); render(); });
   $('rep-hasta').addEventListener('change', () => { state.hasta = $('rep-hasta').value; soltarPreset(); render(); });
 
+  // Pastillas de filtro por obra / equipo (en el hero): tocar la cruz lo quita.
+  $('rep-filtros').addEventListener('click', e => {
+    const b = e.target.closest('[data-quitar]');
+    if (!b) return;
+    state[b.dataset.quitar === 'equipo' ? 'filtroEquipo' : 'filtroObra'] = null;
+    render();
+  });
+
   // Período (en el hero): mueve todo el reporte, resumen incluido.
   syncPeriodoUI();
   $('seg-periodo').addEventListener('click', e => {
@@ -1716,7 +1865,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof getDolarSnapshot === 'function') getDolarSnapshot().then(renderDolarHoy).catch(() => {});
 
   try {
+    // Las categorías de obra no bloquean el reporte: si /obras falla, las OC
+    // salen sin la etiqueta de Arquitectura / Vial.
+    const obrasP = getAllObras().catch(() => []);
     ALL_RAW   = await getHistorial(code, true);
+    obraCat   = new Map((await obrasP).filter(o => OBRA_CATS[o.categoria]).map(o => [normObra(o.nombre), o.categoria]));
     cutoffTs  = driveCutoff(ALL_RAW);
     const conRespaldo = ALL_RAW.filter(oc => (oc.timestamp || 0) >= cutoffTs);
     ALL       = conRespaldo.filter(oc => !esObraPrueba(oc) && !esProveedorPrueba(oc));

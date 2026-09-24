@@ -549,6 +549,13 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .u-badge-inactivo { background: #fee2e2; color: #991b1b; }
 .u-badge-pwd-ok   { background: #dbeafe; color: #1e40af; }
 .u-badge-pwd-none { background: #fef9c3; color: #854d0e; }
+/* Categoría de obra (Gestión de Obras y Reportes): casita = Arquitectura, ruta = Vial. */
+.cat-tag { display: inline-flex; align-items: center; gap: .3rem; padding: .08rem .5rem .08rem .4rem;
+  border-radius: 999px; font-size: .68rem; font-weight: 700; white-space: nowrap; }
+.cat-tag .icon { width: 12px; height: 12px; }
+.cat-tag--arquitectura { background: #fdf0dc; color: #8a5a0b; }
+.cat-tag--vial         { background: #e8eefc; color: #2c4fa8; }
+.cat-tag--equipo       { background: #dcf3ef; color: #16695f; }
 @media (max-width: 600px) {
   .user-card { flex-direction: column; align-items: flex-start; }
   .user-card-actions { width: 100%; justify-content: flex-start; }

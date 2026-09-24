@@ -3,8 +3,8 @@
    resumenPDF.js
 
    Documento A4 apaisado con el resumen de compras de un rango de fechas:
-   franja de totales, top obras / top proveedores y el listado completo de
-   las OC emitidas en el período con su estado de factura.
+   franja de totales, top obras / top proveedores y el listado de las OC
+   emitidas en el período (el mismo que se ve en pantalla, buscador incluido).
 
    No sabe nada de monedas ni de conversiones: recibe todo ya formateado
    desde reportes.js (ver el contrato en generateResumenBlob).
@@ -22,13 +22,6 @@ const RC = (typeof C !== 'undefined') ? C : {
 };
 const RV = (typeof VIMECO !== 'undefined') ? VIMECO : { cuit: '30-50424533-7' };
 
-// Semáforo de la columna Factura.
-const F_COL = {
-  con:   [30, 125, 58],    // verde
-  sin:   [176, 42, 42],    // rojo
-  otros: [154, 106, 0]     // ámbar (archivos sin rotular)
-};
-
 // ─── Geometría A4 apaisado ───────────────────────────
 const RP = {
   w: 297, h: 210,
@@ -38,9 +31,9 @@ const RP = {
 };
 
 // Anchos de la tabla del listado, en mm (suman 277).
-const T_COLS = [18, 26, 58, 46, 26, 30, 34, 39];
-const T_HEAD = ['Fecha', 'N° OC', 'Proveedor', 'Obra', 'Equipo', 'Responsable', 'Importe', 'Factura'];
-const T_ALIGN = ['left', 'left', 'left', 'left', 'left', 'left', 'right', 'left'];
+const T_COLS = [18, 28, 70, 58, 40, 33, 30];
+const T_HEAD = ['Fecha', 'N° OC', 'Proveedor', 'Obra', 'Responsable', 'Importe', 'Equipo / tipo'];
+const T_ALIGN = ['left', 'left', 'left', 'left', 'left', 'right', 'left'];
 const ROW_H = 5.6;
 
 // ─── API ─────────────────────────────────────────────
@@ -53,8 +46,7 @@ const ROW_H = 5.6;
       kpis:       [{ lbl, val, sub }],            // hasta 5
       topObras:   [{ label, val, pct }],
       topProv:    [{ label, val, pct }],
-      ocs:        [{ fecha, nroOC, proveedor, obra, equipo, responsable,
-                     importe, factura, facturaEstado }],
+      ocs:        [{ fecha, nroOC, proveedor, obra, equipo, responsable, importe }],
       totalStr:   '$ 8.400.000',
       generado:   '01/09/2026 14:32'
     }  */
@@ -243,12 +235,10 @@ function drawTabla(doc, data, y) {
       doc.rect(RP.ml, y, RP.cw, ROW_H, 'F');
     }
 
-    const vals = [oc.fecha, oc.nroOC, oc.proveedor, oc.obra, oc.equipo,
-                  oc.responsable, oc.importe, oc.factura];
+    const vals = [oc.fecha, oc.nroOC, oc.proveedor, oc.obra,
+                  oc.responsable, oc.importe, oc.equipo];
     vals.forEach((v, c) => {
-      // La columna Factura lleva el color del estado; el resto va en negro.
-      if (c === 7) { doc.setTextColor(...(F_COL[oc.facturaEstado] || RC.negro)); doc.setFont('helvetica', 'bold'); }
-      else if (c === 6) { doc.setTextColor(...RC.negro); doc.setFont('helvetica', 'bold'); }
+      if (c === 5) { doc.setTextColor(...RC.negro); doc.setFont('helvetica', 'bold'); }
       else if (c === 1) { doc.setTextColor(...RC.azulMed); doc.setFont('helvetica', 'bold'); }
       else { doc.setTextColor(...RC.negro); doc.setFont('helvetica', 'normal'); }
       doc.setFontSize(7.5);

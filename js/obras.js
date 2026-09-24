@@ -22,6 +22,17 @@ function esc(s) {
 }
 
 let allObras = [];
+
+// Categoría de la obra: las dos líneas de trabajo de la empresa. Reportes
+// la muestra como etiqueta (casita / ruta) en el listado de OC.
+const CATEGORIAS = {
+  arquitectura: { label: 'Arquitectura', icon: 'building' },
+  vial:         { label: 'Vial',         icon: 'road' },
+};
+function categoriaTag(cat) {
+  const c = CATEGORIAS[cat];
+  return c ? `<span class="cat-tag cat-tag--${cat}">${icSvg(c.icon)}${c.label}</span>` : '';
+}
 let allJefes = [];  // usuarios con rol jefeObra
 
 // ---- Rubros de la obra en edición ----
@@ -167,6 +178,7 @@ function renderObras(list) {
     <div class="user-card ${o.activa ? '' : 'user-card--inactive'}">
       <div class="user-card-info">
         <span class="user-card-name">${esc(o.nombre)}</span>
+        ${categoriaTag(o.categoria)}
         ${o.lugar_entrega ? `<span style="font-size:.8rem;color:var(--gray-500);">${esc(o.lugar_entrega)}</span>` : ''}
         <span class="u-badge ${o.activa ? 'u-badge-activo' : 'u-badge-inactivo'}">${o.activa ? 'Activa' : 'Inactiva'}</span>
         ${rubrosBadge}
@@ -205,6 +217,7 @@ function openAddModal() {
   $('modal-obra-error').classList.add('hidden');
   $('obra-nombre').value   = '';
   $('obra-lugar').value    = '';
+  $('obra-categoria').value = '';
   $('obra-jornada').value  = '8';
   $('obra-comida').value   = '';
   $('rubro-nuevo').value   = '';
@@ -223,6 +236,7 @@ window.editObra = function (key) {
   $('modal-obra-error').classList.add('hidden');
   $('obra-nombre').value  = obra.nombre || '';
   $('obra-lugar').value   = obra.lugar_entrega || '';
+  $('obra-categoria').value = CATEGORIAS[obra.categoria] ? obra.categoria : '';
   const c = obra.constantes || {};
   $('obra-jornada').value = (c.jornadaHoras ?? 8);
   $('obra-comida').value  = (c.valorComida ?? '');
@@ -238,6 +252,7 @@ window.editObra = function (key) {
 async function saveObraModal() {
   const nombre = $('obra-nombre').value.trim();
   const lugar  = $('obra-lugar').value.trim();
+  const categoria = $('obra-categoria').value || null;
   const errEl  = $('modal-obra-error');
 
   if (!nombre) {
@@ -261,14 +276,14 @@ async function saveObraModal() {
   try {
     if (editingKey) {
       await patchObra(editingKey, {
-        nombre, lugar_entrega: lugar, constantes, jefes,
+        nombre, lugar_entrega: lugar, categoria, constantes, jefes,
         rubros, rubrosCerrados: cerrados
       });
     } else {
       const key = nombre.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').substring(0, 40)
         + '_' + Date.now();
       await saveObra(key, {
-        nombre, lugar_entrega: lugar, activa: true, creadaEn: Date.now(), constantes, jefes,
+        nombre, lugar_entrega: lugar, categoria, activa: true, creadaEn: Date.now(), constantes, jefes,
         rubros, rubrosCerrados: cerrados
       });
     }
