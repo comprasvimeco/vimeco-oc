@@ -1111,6 +1111,23 @@ function ordenarFilas(filas) {
 }
 // El importe arranca de mayor a menor; el resto, ascendente. Tocar la misma
 // columna invierte el sentido.
+// Botón al lado de "Ordenar por": flecha arriba = ascendente. El texto de
+// ayuda dice qué queda primero según el campo.
+const DIR_TXT = {
+  fecha:   ['Más antiguas primero', 'Más nuevas primero'],
+  importe: ['Menor importe primero', 'Mayor importe primero'],
+};
+function syncDirBtn() {
+  const b = $('res-dir');
+  if (!b) return;
+  const asc = state.resDir > 0;
+  const [a, d] = DIR_TXT[state.resOrden] || ['De la A a la Z', 'De la Z a la A'];
+  b.classList.toggle('desc', !asc);
+  b.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+  b.title = `${asc ? a : d} · tocá para invertir`;
+  b.setAttribute('aria-label', `Invertir el orden (ahora: ${(asc ? a : d).toLowerCase()})`);
+}
+
 function setOrdenResumen(campo, desdeColumna) {
   if (desdeColumna && state.resOrden === campo) state.resDir = -state.resDir;
   else { state.resOrden = campo; state.resDir = campo === 'importe' ? -1 : 1; }
@@ -1182,6 +1199,7 @@ function renderResumen() {
   const d = resumenData();
 
   $('res-rango').textContent = labelRango(d.r);
+  syncDirBtn();
 
   const vT = variacion(d.total, d.prevSuma);
   const vC = variacion(d.list.length, d.prevCount);
@@ -1857,6 +1875,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Resumen del período
   $('btn-res-pdf').addEventListener('click', descargarResumenPDF);
   $('res-orden').addEventListener('change', e => setOrdenResumen(e.target.value, false));
+  $('res-dir').addEventListener('click', () => { state.resDir = -state.resDir; renderResumen(); });
   $('res-q').addEventListener('input', e => { state.resQ = e.target.value; renderResumen(); });
 
   // Plegado y buscador de las cards (restaura lo que quedó plegado la vez pasada).

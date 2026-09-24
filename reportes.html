@@ -366,6 +366,13 @@
     .rr-sort-l { font-size: .7rem; color: var(--gray-500); font-weight: 600; white-space: nowrap; }
     .rr-sort { padding: .3rem .5rem; font: inherit; font-size: .78rem; color: var(--gray-700); background: var(--white);
       border: 1px solid var(--gray-300); border-radius: var(--radius); cursor: pointer; }
+    /* Invierte el sentido del orden (en el celular no hay encabezados que tocar). */
+    .rr-dir { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: 0 0 auto;
+      border: 1px solid var(--gray-300); border-radius: var(--radius); background: var(--white); color: var(--primary);
+      cursor: pointer; padding: 0; transition: background .12s; }
+    .rr-dir:hover { background: #e8eefc; }
+    .rr-dir .icon { width: 15px; height: 15px; transition: transform .18s; }
+    .rr-dir.desc .icon { transform: rotate(180deg); }
     .rr-f { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; white-space: nowrap; }
     .rr-f--con   { background: #e3f5e8; color: #1e7d3a; }
     .rr-f--sin   { background: #fde6e6; color: #b02a2a; }
@@ -643,6 +650,7 @@
                 <option value="responsable">Responsable</option>
                 <option value="proveedor">Proveedor</option>
               </select>
+              <button type="button" class="rr-dir" id="res-dir"></button>
               <button class="btn btn-primary btn-sm" id="btn-res-pdf">Descargar PDF</button>
             </span>
           </div>
