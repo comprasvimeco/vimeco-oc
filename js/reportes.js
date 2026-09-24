@@ -1385,6 +1385,19 @@ async function borrarDuplicado(key) {
 
 let detailKey = null;
 
+// Iniciales del proveedor para la burbuja de la ficha: primeras letras de las
+// dos primeras palabras, sin la forma societaria ni conectores. Con una sola
+// palabra, sus dos primeras letras ("DGB SRL" → DG).
+const FORMAS_SOC = /(^|\s)(s\.?\s?r\.?\s?l|s\.?\s?a\.?\s?(s|c\.?i\.?f?\.?i?\.?a?)?|s\.?\s?h)\.?(?=\s|$|-)/gi;
+const CONECTORES = new Set(['y', 'e', 'de', 'del', 'la', 'los', 'las', 'el', 'cia', 'hijos', 'hnos']);
+function iniciales(nombre) {
+  const pal = String(nombre || '').replace(FORMAS_SOC, ' ')
+    .split(/[^\p{L}\p{N}]+/u).filter(p => p && !CONECTORES.has(p.toLowerCase()));
+  if (!pal.length) return '?';
+  const ini = pal.length === 1 ? pal[0].slice(0, 2) : pal[0][0] + pal[1][0];
+  return ini.toUpperCase();
+}
+
 function fichaRow(lbl, val) {
   if (!val) return '';
   return `<div class="foc-f"><span class="foc-k">${esc(lbl)}</span><span class="foc-v">${esc(val)}</span></div>`;
@@ -1451,7 +1464,7 @@ function openOCDetail(key) {
   const tags = [prov.cuit && `CUIT ${prov.cuit}`, prov.condicionIVA].filter(Boolean);
   $('foc-body').innerHTML = `
     <div class="foc-prov">
-      <span class="foc-prov-ic">${icSvg('truck')}</span>
+      <span class="foc-prov-ic" aria-hidden="true">${esc(iniciales(prov.nombre))}</span>
       <div style="min-width:0">
         <div class="foc-prov-n">${esc(prov.nombre || 'Proveedor sin nombre')}</div>
         ${tags.length ? `<div class="foc-prov-s">${tags.map(t => `<span class="foc-tag">${esc(t)}</span>`).join('')}</div>` : ''}
@@ -1508,7 +1521,7 @@ async function verPDF() {
       const a = document.createElement('a');
       a.href = url;
       // sanitize() viene de ocGenerator.js: mismo nombre de archivo que al emitirla.
-      a.download = `OC_${oc.nroOC}_${sanitize(prov.nombre || 'SinProveedor')}.pdf`;
+      a.download = `OC_${oc.nroOC}_${sanitize(oc.proveedor?.nombre || 'SinProveedor')}.pdf`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
     setTimeout(() => URL.revokeObjectURL(url), 60000);
@@ -1660,7 +1673,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const soltarPreset = () => { state.periodo = null; state.pOffset = 0; syncPeriodoUI(); };
   $('rep-desde').addEventListener('change', () => { state.desde = $('rep-desde').value; soltarPreset(); render(); });
   $('rep-hasta').addEventListener('change', () => { state.hasta = $('rep-hasta').value; soltarPreset(); render(); });
-  $('btn-export').addEventListener('click', () => window.print());
 
   // Período (en el hero): mueve todo el reporte, resumen incluido.
   syncPeriodoUI();
