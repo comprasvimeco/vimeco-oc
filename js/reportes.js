@@ -1585,6 +1585,13 @@ function renderDuplicados(list) {
 // Queda en el historial (compartido), así nadie más la vuelve a ver marcada.
 async function marcarNoDuplicadas(btn) {
   const keys = btn.dataset.okkeys.split(',');
+  const nros = keys.map(k => ocByKey(k)?.nroOC || k).join(', ');
+  const ok = await showConfirm('No son duplicadas',
+    `¿Marcar las OC ${nros} como compras distintas? El grupo sale de la lista para todos ` +
+    `y no se puede deshacer desde acá. Vuelve a aparecer sólo si se le suma una OC nueva.`,
+    { si: 'Confirmar', peligro: false });
+  if (!ok) return;
+
   const marca = { ts: Date.now(), por: sessionStorage.getItem('responsable_name') || '' };
   btn.disabled = true;
   try {
@@ -1800,10 +1807,14 @@ async function verPDF() {
   }
 }
 
-function showConfirm(title, msg) {
+// Por defecto confirma un borrado (botón rojo "Borrar"); `si` y `peligro`
+// lo adaptan a otras acciones.
+function showConfirm(title, msg, { si = 'Borrar', peligro = true } = {}) {
   return new Promise(resolve => {
     $('mcf-title').textContent = title;
     $('mcf-msg').textContent   = msg;
+    $('mcf-yes').textContent   = si;
+    $('mcf-yes').className     = 'btn ' + (peligro ? 'btn-danger' : 'btn-primary');
     const modal = $('modal-confirm');
     modal.classList.remove('hidden');
     const done = v => { modal.classList.add('hidden'); resolve(v); };
