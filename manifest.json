@@ -21,7 +21,7 @@
       "files": [
         {
           "name": "file",
-          "accept": ["application/pdf", "image/jpeg", "image/png", "image/webp"]
+          "accept": ["application/pdf", ".pdf", "image/*", ".jpg", ".jpeg", ".png", ".webp", "application/octet-stream", "*/*"]
         }
       ]
     }

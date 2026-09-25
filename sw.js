@@ -107,8 +107,13 @@ self.addEventListener('fetch', event => {
       }
       const cache = await caches.open('share-target');
       if (file) {
+        // Algunas apps declaran el PDF con un tipo genérico: el tipo real se
+        // saca de los primeros bytes (y el nombre se completa con su extensión).
+        const { type, ext } = await tipoReal(file);
+        let name = file.name || 'compartido';
+        if (ext && !/\.[a-z0-9]{2,4}$/i.test(name)) name += ext;
         await cache.put('shared-file', new Response(file, {
-          headers: { 'X-File-Name': file.name || '', 'Content-Type': file.type || '' }
+          headers: { 'X-File-Name': name, 'Content-Type': type }
         }));
       } else {
         // Diagnóstico: qué llegó en el envío, para mostrarlo en la página.
@@ -187,3 +192,15 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
+// Tipo real de un archivo por su firma (magic bytes). Si no se reconoce, se
+// deja el tipo declarado.
+async function tipoReal(file) {
+  const b = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const txt = String.fromCharCode(...b);
+  if (txt.startsWith('%PDF'))                               return { type: 'application/pdf', ext: '.pdf' };
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF)       return { type: 'image/jpeg', ext: '.jpg' };
+  if (b[0] === 0x89 && txt.slice(1, 4) === 'PNG')            return { type: 'image/png', ext: '.png' };
+  if (txt.startsWith('RIFF') && txt.slice(8, 12) === 'WEBP') return { type: 'image/webp', ext: '.webp' };
+  return { type: file.type || 'application/octet-stream', ext: '' };
+}
