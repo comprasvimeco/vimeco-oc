@@ -94,6 +94,11 @@ let manualOCNumber   = null; // número de OC ingresado manualmente
 // ---- DOM shortcut ----
 const $ = id => document.getElementById(id);
 
+// Errores no atrapados: se muestran en pantalla para poder diagnosticar en el
+// celular, donde no hay consola.
+window.addEventListener('error', e => { try { toast('Error: ' + e.message, 'error'); } catch (_) {} });
+window.addEventListener('unhandledrejection', e => { try { toast('Error: ' + (e.reason && e.reason.message || e.reason), 'error'); } catch (_) {} });
+
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
   // Al compartir un archivo, Android abre la app en frío (sessionStorage vacío):
@@ -104,6 +109,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!code || !name) { window.location.href = 'index.html'; return; }
   sessionStorage.setItem('responsable_code', code);
   sessionStorage.setItem('responsable_name', name);
+
+  // Archivo compartido desde otra app: se revisa antes que nada, para que ningún
+  // otro paso del arranque pueda impedir que aparezca el cartel.
+  checkSharedFile();
 
   $('hdr-name').textContent = name;
   $('date-display').textContent = formatDateDisplay(new Date());
@@ -188,7 +197,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadLogo();
   loadProveedoresCache();
-  checkSharedFile();
   retryDriveQueue().catch(() => {});
   window.addEventListener('online', () => retryDriveQueue().catch(() => {}));
 
@@ -462,11 +470,26 @@ async function _procesarCola(items) {
 
 // ---- Web Share Target: recibe archivo compartido desde otra app ----
 async function checkSharedFile() {
-  if (!('caches' in window)) return;
+  // El SW redirige con ?compartido=1: si el archivo no aparece, se avisa en vez
+  // de abrir el formulario como si nada.
+  const params     = new URLSearchParams(location.search);
+  const compartido = params.has('compartido');
+  if (compartido) history.replaceState(null, '', location.pathname);
+  if (!('caches' in window)) {
+    if (compartido) toast('Este navegador no permite recibir archivos compartidos.', 'error');
+    return;
+  }
   try {
     const cache = await caches.open('share-target');
-    const match = await cache.match('shared-file');
-    if (!match) return;
+    let match = await cache.match('shared-file');
+    for (let i = 0; !match && compartido && i < 10; i++) {
+      await new Promise(res => setTimeout(res, 300));
+      match = await cache.match('shared-file');
+    }
+    if (!match) {
+      if (compartido) toast('No llegó el archivo compartido. Probá compartirlo de nuevo.', 'error');
+      return;
+    }
     // No borrar todavía: el modal decide qué hacer con él
     const blob     = await match.blob();
     const origName = match.headers.get('X-File-Name') || '';
@@ -476,6 +499,7 @@ async function checkSharedFile() {
     showShareChoiceModal(file);
   } catch (e) {
     console.warn('checkSharedFile:', e);
+    toast('No se pudo abrir el archivo compartido: ' + (e && e.message || e), 'error');
   }
 }
 

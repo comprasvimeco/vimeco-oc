@@ -100,7 +100,7 @@ self.addEventListener('fetch', event => {
           headers: { 'X-File-Name': file.name || '', 'Content-Type': file.type || '' }
         }));
       }
-      return Response.redirect(BASE + '/app.html', 303);
+      return Response.redirect(BASE + '/app.html?compartido=1', 303);
     })());
     return;
   }
