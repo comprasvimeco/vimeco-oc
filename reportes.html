@@ -110,8 +110,10 @@
       gap: .1rem; background: none; border: none; padding: .2rem; cursor: pointer; text-align: left; border-radius: 6px; }
     .rep-dup-ver:hover { background: #eef3fa; }
     .rep-dup-nro { font-family: 'Courier New', monospace; font-size: .76rem; font-weight: 700; color: var(--primary); }
-    .rep-dup-dif { font-family: inherit; font-size: .68rem; font-weight: 700; color: #8a5a00; background: #fff4e0;
-      border-radius: 999px; padding: .02rem .4rem; margin-left: .25rem; }
+    /* Monto de cada OC a la derecha y, debajo, cuánto difiere de la primera del grupo. */
+    .rep-dup-monto { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .05rem; }
+    .rep-dup-tot { font-size: .84rem; font-weight: 800; color: var(--gray-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rep-dup-dif { font-size: .7rem; color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .rep-dup-sub { font-size: .72rem; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
     .rep-dup-del { flex-shrink: 0; }
     @media print { #rep-dup-card { break-inside: avoid; } .rep-dup-del { display: none !important; } }

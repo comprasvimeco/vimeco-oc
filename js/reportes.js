@@ -1509,6 +1509,13 @@ function horaDe(ts) {
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
+// Leyenda bajo el monto de cada OC de un grupo de duplicados.
+function etiquetaDup(oc, head) {
+  if (oc === head) return 'primera';
+  const d = difDup(oc, head);
+  return d ? d + ' vs. la primera' : 'mismo monto';
+}
+
 // Diferencia de una OC contra la primera del grupo, o '' si es idéntica.
 function difDup(oc, head) {
   const base = montoDe(head);
@@ -1536,15 +1543,19 @@ function renderDuplicados(list) {
       <div class="rep-dup-g">
         <div class="rep-dup-head">
           <span class="rep-dup-prov">${esc(provLabel(head))}</span>
-          <span class="rep-dup-meta">${esc(head.responsable?.nombre || '—')} · ${esc(dmy(head.timestamp))} · ${esc(fmtFull(head.total, head.moneda || 'ARS'))} · ×${g.length}</span>
+          <span class="rep-dup-meta">${esc(head.responsable?.nombre || '—')} · ${esc(dmy(head.timestamp))} · ×${g.length}</span>
         </div>
         ${g.map(oc => `
           <div class="rep-dup-oc">
             <button class="rep-dup-ver" data-ockey="${esc(histKeyOf(oc))}"
                     title="Ver la ficha completa de la OC ${esc(oc.nroOC)}">
-              <span class="rep-dup-nro">${esc(oc.nroOC)}${difDup(oc, head) ? ` <span class="rep-dup-dif" title="${esc(fmtFull(oc.total, oc.moneda || 'ARS'))}">${esc(difDup(oc, head))}</span>` : ''}</span>
+              <span class="rep-dup-nro">${esc(oc.nroOC)}</span>
               <span class="rep-dup-sub">${esc(horaDe(oc.timestamp))} · ${esc(oc.obra || 'Sin obra')}</span>
             </button>
+            <span class="rep-dup-monto">
+              <span class="rep-dup-tot">${esc(fmtFull(oc.total, oc.moneda || 'ARS'))}</span>
+              <span class="rep-dup-dif">${esc(etiquetaDup(oc, head))}</span>
+            </span>
             <button class="btn btn-sm btn-danger rep-dup-del" data-delkey="${esc(histKeyOf(oc))}"
                     title="Borrar la OC ${esc(oc.nroOC)} del historial">Borrar</button>
           </div>`).join('')}
