@@ -2372,11 +2372,11 @@ function openPreview(blob, oc) {
   $('preview-body').scrollTop = 0;
 
   // La comparación con OC anteriores necesita el historial: llega después y se
-  // suma a los avisos, si la vista previa sigue abierta.
+  // agrega debajo de los avisos, si la vista previa sigue abierta.
   const token = blobUrl;
   checkOCHistorial(oc).then(res => {
     if (modal.dataset.blobUrl !== token || !res) return;
-    $('preview-warn').innerHTML = previewWarningsHtml([...checkOCLocal(oc), ...res.avisos], res.info);
+    $('preview-warn').innerHTML = previewWarningsHtml(checkOCLocal(oc), res.info) + comparacionHtml(res.cambios);
   }).catch(() => {});
 }
 
@@ -2424,14 +2424,13 @@ async function checkOCHistorial(oc) {
     (cuit.length >= 11
       ? String(h.proveedor?.cuit || '').replace(/\D/g, '') === cuit
       : nom && normalizeProvName(h.proveedor?.nombre) === nom));
-  if (!mismas.length) return { avisos: [], info: 'Primera OC a este proveedor.' };
+  if (!mismas.length) return { cambios: [], info: 'Primera OC a este proveedor.' };
 
   const moneda = oc.moneda;
-  const fmt = (n, cur) => (cur === 'USD' ? 'US$\u00a0' : '$\u00a0') + fmtMoneyDisplay(n);
   const ult = mismas[0]; // getHistorial viene ordenado del más nuevo al más viejo
-  const info = `Última OC a este proveedor: ${ult.nroOC} del ${ult.fecha} por ${fmt(ult.total, ult.moneda)}.`;
+  const info = `Última OC a este proveedor: ${ult.fecha}, por ${fmtMonto(ult.total, ult.moneda)}.`;
 
-  const avisos = [];
+  const cambios = [];
   oc.items.forEach(it => {
     const d  = normDesc(it.desc);
     const pu = parseFloat(it.unitario) || 0;
@@ -2443,13 +2442,46 @@ async function checkOCHistorial(oc) {
       if (!pp) continue;
       const dif = (pu - pp) / pp;
       if (Math.abs(dif) >= 0.10) {
-        const pct = (dif > 0 ? '+' : '') + (dif * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
-        avisos.push(`"${it.desc}": ${fmt(pu, moneda)} (${pct}). En la OC ${h.nroOC} del ${h.fecha} estaba a ${fmt(pp, moneda)}.`);
+        cambios.push({ desc: it.desc, antes: pp, ahora: pu, dif, moneda, fecha: h.fecha });
       }
       break; // sólo contra la compra más reciente de ese ítem
     }
   });
-  return { avisos, info };
+  return { cambios, info };
+}
+
+const fmtMonto = (n, cur) => (cur === 'USD' ? 'US$ ' : '$ ') + fmtMoneyDisplay(n);
+
+// Desplegable con una tarjeta por ítem cuyo precio cambió respecto de la
+// última compra. Sube = rojo, baja = verde.
+function comparacionHtml(cambios) {
+  if (!cambios || !cambios.length) return '';
+  const suben = cambios.filter(c => c.dif > 0).length;
+  const bajan = cambios.length - suben;
+  const pct = d => (d > 0 ? '+' : '') + (d * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
+  const cards = cambios.map(c => {
+    const cls = c.dif > 0 ? 'up' : 'down';
+    const delta = (c.dif > 0 ? '+' : '−') + fmtMonto(Math.abs(c.ahora - c.antes), c.moneda);
+    return `<div class="foc-cmp-card">
+      <div class="foc-cmp-desc">${esc(c.desc)}</div>
+      <div class="foc-cmp-row">
+        <span class="foc-cmp-tag"><small>Antes</small>${esc(fmtMonto(c.antes, c.moneda))}</span>
+        ${icSvg('arrowRight', 'foc-cmp-arr')}
+        <span class="foc-cmp-tag foc-cmp-now"><small>Ahora</small>${esc(fmtMonto(c.ahora, c.moneda))}</span>
+        <span class="foc-cmp-dif ${cls}">${esc(pct(c.dif))}<small>${esc(delta)}</small></span>
+      </div>
+      <div class="foc-cmp-ref">Última compra: ${esc(c.fecha)}</div>
+    </div>`;
+  }).join('');
+  return `<details class="foc-cmp">
+    <summary>
+      ${icSvg('trend')}<span class="foc-cmp-t">Comparación de precios</span>
+      ${suben ? `<span class="foc-cmp-chip up">${suben} ${suben === 1 ? 'sube' : 'suben'}</span>` : ''}
+      ${bajan ? `<span class="foc-cmp-chip down">${bajan} ${bajan === 1 ? 'baja' : 'bajan'}</span>` : ''}
+      ${icSvg('chevron', 'foc-cmp-chev')}
+    </summary>
+    <div class="foc-cmp-list">${cards}</div>
+  </details>`;
 }
 
 function previewWarningsHtml(avisos, info) {

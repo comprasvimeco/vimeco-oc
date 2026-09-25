@@ -1282,6 +1282,33 @@ body.scan-open { overflow: hidden; }
 .foc-info { font-size: .76rem; color: var(--gray-600); background: #f5f8fc; border: 1px solid var(--gray-100);
   border-radius: var(--radius-lg); padding: .3rem .8rem; margin-bottom: .75rem; }
 
+/* Comparación de precios contra la última compra (desplegable). */
+.foc-cmp { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); background: #fff; margin-bottom: .75rem; overflow: hidden; }
+.foc-cmp summary { display: flex; align-items: center; gap: .45rem; padding: .6rem .85rem; cursor: pointer; list-style: none;
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 800; color: var(--primary); user-select: none; }
+.foc-cmp summary::-webkit-details-marker { display: none; }
+.foc-cmp summary .icon { width: 15px; height: 15px; flex-shrink: 0; }
+.foc-cmp-t { margin-right: auto; }
+.foc-cmp-chip { font-size: .66rem; letter-spacing: .02em; text-transform: none; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; }
+.foc-cmp-chip.up, .foc-cmp-dif.up { background: #fdecec; color: #b42318; }
+.foc-cmp-chip.down, .foc-cmp-dif.down { background: #e7f6ec; color: #1a7f3c; }
+.foc-cmp summary .foc-cmp-chev { color: var(--gray-400); transition: transform .2s; }
+.foc-cmp[open] summary .foc-cmp-chev { transform: rotate(180deg); }
+.foc-cmp[open] summary { border-bottom: 1px solid var(--gray-100); }
+.foc-cmp-list { display: flex; flex-direction: column; gap: .5rem; padding: .6rem; background: #f7f9fc; }
+.foc-cmp-card { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: .6rem .75rem; }
+.foc-cmp-desc { font-size: .84rem; font-weight: 700; color: var(--gray-900); margin-bottom: .45rem; overflow-wrap: anywhere; }
+.foc-cmp-row { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.foc-cmp-tag { display: inline-flex; flex-direction: column; font-size: .82rem; font-weight: 700; color: var(--gray-700);
+  background: var(--gray-100); border-radius: 8px; padding: .25rem .55rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.foc-cmp-tag small, .foc-cmp-dif small { font-size: .6rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; opacity: .75; }
+.foc-cmp-now { background: #eaf1fa; color: var(--primary); }
+.foc-cmp-arr { width: 14px; height: 14px; color: var(--gray-400); flex-shrink: 0; }
+.foc-cmp-dif { display: inline-flex; flex-direction: column; align-items: flex-end; margin-left: auto; font-size: .86rem; font-weight: 800;
+  border-radius: 8px; padding: .25rem .55rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.foc-cmp-dif small { text-transform: none; letter-spacing: 0; }
+.foc-cmp-ref { font-size: .7rem; color: var(--gray-500); margin-top: .4rem; }
+
 /* Encabezados de tabla claros, como la tabla de ítems de la ficha. */
 .oc-section .items-table th, .oc-section .imp-table th { background: #f4f7fb; color: var(--gray-500); font-size: .64rem;
   font-weight: 700; letter-spacing: .06em; border-bottom: 1px solid var(--gray-200); }
