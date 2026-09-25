@@ -488,14 +488,11 @@ async function checkSharedFile() {
     }
     if (!match) {
       if (compartido) {
-        // El SW deja anotado qué recibió cuando no vino ningún archivo.
-        let recibido = null;
-        const info = await cache.match('shared-info');
-        if (info) { try { recibido = await info.json(); } catch (_) {} await cache.delete('shared-info'); }
-        toast(recibido && recibido.length
-          ? 'No llegó un archivo. Se recibió: ' + recibido.join(', ')
-          : 'No llegó el archivo compartido (el envío vino vacío). Si compartís desde Drive, usá "Enviar una copia".',
-          'error');
+        // Chrome 153 en Android entrega el envío sin el archivo (regresión de
+        // Chrome, GoogleChromeLabs/squoosh#1503). Mismo cartel, pero cada opción
+        // pide elegir el archivo a mano.
+        await cache.delete('shared-info');
+        showShareChoiceModal(null);
       }
       return;
     }
@@ -516,18 +513,45 @@ async function deleteSharedFile() {
   try { const c = await caches.open('share-target'); await c.delete('shared-file'); } catch (_) {}
 }
 
+// Selector de archivos (debe abrirse desde un toque del usuario).
+function elegirArchivo() {
+  return new Promise(resolve => {
+    const inp = document.createElement('input');
+    inp.type   = 'file';
+    inp.accept = '.jpg,.jpeg,.png,.pdf,.webp';
+    inp.onchange = () => resolve(inp.files[0] || null);
+    inp.click();
+  });
+}
+
+// file = null: el archivo compartido no llegó y cada opción lo pide a mano.
 function showShareChoiceModal(file) {
-  $('share-choice-filename').textContent = file.name;
+  $('share-choice-filename').textContent = file
+    ? file.name
+    : 'Chrome no entregó el archivo compartido (falla de Chrome 153). Elegí qué hacer y seleccionalo de Descargas.';
+  // El nombre de archivo corta en cualquier letra; el mensaje, por palabras.
+  $('share-choice-filename').parentElement.style.wordBreak = file ? 'break-all' : 'normal';
   $('modal-share-choice').classList.remove('hidden');
 
-  $('btn-share-generar').onclick = () => {
+  $('btn-share-generar').onclick = async () => {
+    const f = file || await elegirArchivo();
+    if (!f) return;
     $('modal-share-choice').classList.add('hidden');
     deleteSharedFile();
-    handleFileSelected(file);
+    handleFileSelected(f);
     toast('Archivo cargado. Usá "Extraer con IA" para procesar.', 'success');
   };
 
-  $('btn-share-facturas').onclick = () => {
+  $('btn-share-facturas').onclick = async () => {
+    if (!file) {
+      const f = await elegirArchivo();
+      if (!f) return;
+      // facturas.js lo toma de la misma caché que un archivo compartido.
+      const c = await caches.open('share-target');
+      await c.put('shared-file', new Response(f, {
+        headers: { 'X-File-Name': f.name, 'Content-Type': f.type || '' }
+      }));
+    }
     $('modal-share-choice').classList.add('hidden');
     // El archivo queda en cache como 'shared-file'; facturas.js lo leerá
     window.location.href = 'facturas.html';
