@@ -1,5 +1,5 @@
 // Versión reemplazada automáticamente por build.js en cada push (GitHub Actions)
-const CACHE_NAME = 'vimeco-oc-v1790365580689';
+const CACHE_NAME = 'vimeco-oc-v1790366480433';
 
 const BASE = '/vimeco-oc';
 
