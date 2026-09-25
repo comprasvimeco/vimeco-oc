@@ -1456,30 +1456,65 @@ function render() {
 // ===================================================
 //  OC duplicadas
 // ===================================================
-// Mismo proveedor + misma fecha + mismo monto = la misma compra emitida dos
-// veces (doble clic, o "parecía que falló y la hice de nuevo"). La huella es que
-// los números suelen salir consecutivos: 0004-00000157 y 158, con 10 ítems
-// idénticos cada una.
+// La misma persona emite al mismo proveedor, dentro de una hora, una OC por un
+// monto parecido (±25%): es la misma compra hecha dos veces (doble clic, "parecía
+// que falló y la hice de nuevo", o rehecha corrigiendo un precio). La huella es
+// que los números suelen salir consecutivos: 0004-00000157 y 158.
 //
-// A propósito NO se usa una ventana de días: mismo proveedor y monto en fechas
-// distintas puede ser una compra recurrente real (nafta, lubricantes del taller)
-// y marcarla como duplicado sería gritar en falso.
+// Hasta v201 bastaba mismo proveedor + mismo día + mismo monto exacto, sin mirar
+// quién ni a qué hora: marcaba en falso dos obras que le compraban lo mismo al
+// mismo corralón en el día, y se le escapaba la OC rehecha con un ajuste.
+//
+// La obra NO se exige: rehacerla por haber elegido mal la obra también es un
+// duplicado (la obra se ve en cada renglón). Las OC sin hora no se comparan.
 //
 // El monto se compara en su moneda original, no en la de visualización: el toggle
 // ARS/USD no puede cambiar qué es un duplicado.
+const DUP_VENTANA_MS = 60 * 60 * 1000;
+const DUP_TOLERANCIA = 0.25;
+
+function montoDe(oc) { return parseFloat(oc.total) || 0; }
+
 function grupoDuplicados(list) {
   const map = new Map();
   list.forEach(oc => {
-    const monto = Math.round((parseFloat(oc.total) || 0) * 100);
-    if (!monto) return;                       // una OC en $0 no es un duplicado
-    const k = [provKey(oc), oc.fecha || '', oc.moneda || 'ARS', monto].join('|');
+    if (!montoDe(oc) || !oc.timestamp) return;   // una OC en $0 no es un duplicado
+    const k = [provKey(oc), oc.responsable?.codigo || '—', oc.moneda || 'ARS'].join('|');
     if (!map.has(k)) map.set(k, []);
     map.get(k).push(oc);
   });
-  return [...map.values()]
+
+  // Dentro de cada proveedor+persona+moneda, en orden de emisión, cada OC se
+  // suma al grupo cuya última OC cae dentro de la ventana y de la tolerancia.
+  // Se busca entre todos los grupos (no sólo el último) para que otra compra
+  // distinta emitida en el medio no corte el duplicado.
+  const grupos = [];
+  const pareja = (a, b) => b.timestamp - a.timestamp <= DUP_VENTANA_MS &&
+    Math.abs(montoDe(b) - montoDe(a)) <= DUP_TOLERANCIA * Math.max(montoDe(a), montoDe(b));
+  map.forEach(ocs => {
+    const abiertos = [];
+    ocs.sort((a, b) => a.timestamp - b.timestamp).forEach(oc => {
+      const g = abiertos.find(g => pareja(g[g.length - 1], oc));
+      if (g) g.push(oc); else abiertos.push([oc]);
+    });
+    grupos.push(...abiertos);
+  });
+  return grupos
     .filter(g => g.length > 1)
-    .map(g => [...g].sort((a, b) => String(a.nroOC).localeCompare(String(b.nroOC))))
-    .sort((a, b) => (parseFloat(b[0].total) || 0) - (parseFloat(a[0].total) || 0));
+    .sort((a, b) => montoDe(b[0]) - montoDe(a[0]));
+}
+
+function horaDe(ts) {
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+// Diferencia de una OC contra la primera del grupo, o '' si es idéntica.
+function difDup(oc, head) {
+  const base = montoDe(head);
+  const pct = base ? (montoDe(oc) - base) / base * 100 : 0;
+  if (Math.abs(pct) < 0.05) return '';
+  return (pct > 0 ? '+' : '−') + Math.abs(pct).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
 }
 
 function renderDuplicados(list) {
@@ -1489,9 +1524,9 @@ function renderDuplicados(list) {
   if (!grupos.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
 
-  // Lo que se ahorra si cada grupo queda con una sola OC.
+  // Lo que se ahorra si cada grupo queda con una sola OC (la primera).
   const enJuego = grupos.reduce((s, g) =>
-    s + (amountIn(g[0], state.moneda) || 0) * (g.length - 1), 0);
+    s + g.slice(1).reduce((t, oc) => t + (amountIn(oc, state.moneda) || 0), 0), 0);
   $('rep-dup-count').textContent =
     `${grupos.length} grupo${grupos.length > 1 ? 's' : ''} · ${fmtCompact(enJuego, state.moneda)} contados de más`;
 
@@ -1501,14 +1536,14 @@ function renderDuplicados(list) {
       <div class="rep-dup-g">
         <div class="rep-dup-head">
           <span class="rep-dup-prov">${esc(provLabel(head))}</span>
-          <span class="rep-dup-meta">${esc(head.fecha || '')} · ${esc(fmtFull(head.total, head.moneda || 'ARS'))} · ×${g.length}</span>
+          <span class="rep-dup-meta">${esc(head.responsable?.nombre || '—')} · ${esc(dmy(head.timestamp))} · ${esc(fmtFull(head.total, head.moneda || 'ARS'))} · ×${g.length}</span>
         </div>
         ${g.map(oc => `
           <div class="rep-dup-oc">
             <button class="rep-dup-ver" data-ockey="${esc(histKeyOf(oc))}"
                     title="Ver la ficha completa de la OC ${esc(oc.nroOC)}">
-              <span class="rep-dup-nro">${esc(oc.nroOC)}</span>
-              <span class="rep-dup-sub">${esc(oc.obra || 'Sin obra')} · ${esc(oc.responsable?.nombre || '—')}</span>
+              <span class="rep-dup-nro">${esc(oc.nroOC)}${difDup(oc, head) ? ` <span class="rep-dup-dif" title="${esc(fmtFull(oc.total, oc.moneda || 'ARS'))}">${esc(difDup(oc, head))}</span>` : ''}</span>
+              <span class="rep-dup-sub">${esc(horaDe(oc.timestamp))} · ${esc(oc.obra || 'Sin obra')}</span>
             </button>
             <button class="btn btn-sm btn-danger rep-dup-del" data-delkey="${esc(histKeyOf(oc))}"
                     title="Borrar la OC ${esc(oc.nroOC)} del historial">Borrar</button>
@@ -1536,14 +1571,15 @@ async function limpiarNovedadesDe(oc) {
   catch (e) { console.warn('limpiarNovedadesDe:', e); }
 }
 
-async function borrarDuplicado(key) {
+// Pide confirmación y borra la OC del historial. Devuelve true si se borró.
+async function borrarOC(key, titulo) {
   const oc = ocByKey(key);
-  if (!oc) return;
-  const ok = await showConfirm('Borrar OC duplicada',
+  if (!oc) return false;
+  const ok = await showConfirm(titulo,
     `¿Borrar la OC ${oc.nroOC} (${fmtFull(oc.total, oc.moneda || 'ARS')}) del historial? ` +
     `No se puede deshacer. El PDF en Drive no se toca: si esta OC ya se le mandó al proveedor, ` +
     `borrarla acá no la da de baja.`);
-  if (!ok) return;
+  if (!ok) return false;
 
   try {
     await deleteHistorialEntry(key);
@@ -1552,10 +1588,14 @@ async function borrarDuplicado(key) {
     const j = ALL_RAW.indexOf(oc); if (j >= 0) ALL_RAW.splice(j, 1);
     toast('OC borrada.', 'success');
     render();
+    return true;
   } catch (e) {
     toast('No se pudo borrar. ' + e.message, 'error');
+    return false;
   }
 }
+
+function borrarDuplicado(key) { return borrarOC(key, 'Borrar OC duplicada'); }
 
 // ===================================================
 //  Ficha de la OC
@@ -1680,6 +1720,16 @@ function openOCDetail(key) {
 
   $('foc-pdf').disabled = oc.estado === 'pendiente' || oc.estado === 'cancelada';
   $('modal-oc').classList.remove('hidden');
+}
+
+async function eliminarDesdeFicha() {
+  const btn = $('foc-delete');
+  btn.disabled = true;
+  try {
+    if (await borrarOC(detailKey, 'Eliminar OC')) closeOCDetail();
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function closeOCDetail() {
@@ -1884,6 +1934,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Ficha de OC
   $('foc-close').addEventListener('click', closeOCDetail);
   $('foc-pdf').addEventListener('click', verPDF);
+  $('foc-delete').addEventListener('click', eliminarDesdeFicha);
   $('modal-oc').addEventListener('click', e => { if (e.target.id === 'modal-oc') closeOCDetail(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOCDetail(); });
 

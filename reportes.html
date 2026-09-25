@@ -110,6 +110,8 @@
       gap: .1rem; background: none; border: none; padding: .2rem; cursor: pointer; text-align: left; border-radius: 6px; }
     .rep-dup-ver:hover { background: #eef3fa; }
     .rep-dup-nro { font-family: 'Courier New', monospace; font-size: .76rem; font-weight: 700; color: var(--primary); }
+    .rep-dup-dif { font-family: inherit; font-size: .68rem; font-weight: 700; color: #8a5a00; background: #fff4e0;
+      border-radius: 999px; padding: .02rem .4rem; margin-left: .25rem; }
     .rep-dup-sub { font-size: .72rem; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
     .rep-dup-del { flex-shrink: 0; }
     @media print { #rep-dup-card { break-inside: avoid; } .rep-dup-del { display: none !important; } }
@@ -478,10 +480,11 @@
     .foc-conv { margin-top: .9rem; background: #fff4e0; color: #8a5d00;
       border-radius: var(--radius); padding: .5rem .75rem; font-size: .78rem; }
 
-    .foc-foot { justify-content: flex-end; flex-wrap: wrap; gap: .5rem; background: #fafbfd; }
+    .foc-foot { justify-content: space-between; flex-wrap: wrap; gap: .5rem; background: #fafbfd; }
     .foc-foot-r { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
     /* Botones de la ficha: pastillas con ícono, en los tonos pastel del reporte.
-       Drive en turquesa y PDF en rosa. Se cierra con la cruz del encabezado. */
+       Drive en turquesa y PDF en rosa. Se cierra con la cruz del encabezado.
+       Eliminar va aparte, a la izquierda, en rojo suave: presente, pero sin gritar. */
     .foc-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 999px;
       padding: .45rem 1rem; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; text-decoration: none;
       transition: filter .15s, transform .15s, box-shadow .15s; }
@@ -490,6 +493,7 @@
     .foc-btn:disabled { opacity: .45; cursor: default; }
     .foc-btn--drive { background: #dcf3ef; color: #16695f; }
     .foc-btn--pdf   { background: #fce8ee; color: #a23a57; }
+    .foc-btn--del   { background: #fde6e6; color: #b02a2a; }
     .foc-btn.hidden { display: none; }
     .foc-items-w { overflow-x: auto; margin-bottom: .9rem; }
     .foc-items-w .foc-items { margin-bottom: 0; }
@@ -743,6 +747,8 @@
     </div>
     <div class="modal-body" id="foc-body"></div>
     <div class="modal-footer foc-foot">
+      <button class="foc-btn foc-btn--del" id="foc-delete" title="Eliminar la OC del historial">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Eliminar</button>
       <div class="foc-foot-r">
         <span class="foc-nodrive hidden" id="foc-nodrive">Respaldo en Drive pendiente</span>
         <a class="foc-btn foc-btn--drive hidden" id="foc-drive" target="_blank" rel="noopener" title="Abrir la carpeta de la OC en Drive">
