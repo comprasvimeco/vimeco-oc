@@ -257,8 +257,6 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
   transition: all .15s;
 }
 .import-btn:hover { border-color: var(--primary-light); background: #eff6ff; }
-.import-btn.recording { border-color: var(--danger); background: #fef2f2; animation: pulse .9s ease-in-out infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .65; } }
 .import-btn-icon  { display: flex; align-items: center; justify-content: center; line-height: 1; }
 .import-btn-icon .icon { width: 1.5rem; height: 1.5rem; }
 .import-btn-label { font-size: .86rem; font-weight: 600; }

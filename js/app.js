@@ -601,6 +601,46 @@ function setObraValue(nombre) {
   return !!obra;
 }
 
+// ---- Obra recordada ----
+// Cada OC nueva arranca con la obra de la última OC del usuario. Se guarda en
+// el dispositivo al generar; en uno nuevo (o sin nada guardado) sale del historial.
+const obraRecordadaKey = () => `vimeco_ultima_obra_${sessionStorage.getItem('responsable_code') || ''}`;
+
+function recordarObra(nombre) {
+  try { if (nombre) localStorage.setItem(obraRecordadaKey(), nombre); } catch (_) {}
+}
+
+async function obraRecordada() {
+  try {
+    const local = localStorage.getItem(obraRecordadaKey());
+    if (local) return local;
+  } catch (_) {}
+  const code = sessionStorage.getItem('responsable_code') || '';
+  const ult = (await historialParaComparar()).find(h => h.responsable?.codigo === code && h.obra);
+  return ult ? ult.obra : null;
+}
+
+// Carga la obra recordada sólo si el campo está vacío: nunca pisa una elección.
+// Si ya no está en el padrón (cerrada o renombrada), el campo queda vacío.
+async function aplicarObraRecordada() {
+  let nombre;
+  try { nombre = await obraRecordada(); } catch (_) { return; }
+  if (!nombre || $('obra').value.trim()) return;
+  const obra = buscarObra(nombre);
+  if (obra) aplicarObra(obra);
+}
+
+// Carga la obra y, si tiene lugar de entrega, lo propone (sin pisar uno escrito a mano).
+function aplicarObra(obra) {
+  $('obra').value = obra.nombre;
+  syncRubroCombo();
+  const lugarInput = $('lugar-entrega');
+  if (obra.lugar_entrega && (!lugarInput.value.trim() || lugarInput.dataset.autoFilled === '1')) {
+    lugarInput.value = obra.lugar_entrega;
+    lugarInput.dataset.autoFilled = '1';
+  }
+}
+
 async function setupObraCombo() {
   const input    = $('obra');
   const arrow    = $('obra-arrow');
@@ -619,14 +659,8 @@ async function setupObraCombo() {
   }
 
   function selectObra(obra) {
-    input.value = obra.nombre;
     dropdown.classList.add('hidden');
-    syncRubroCombo();
-    const lugarInput = $('lugar-entrega');
-    if (obra.lugar_entrega && (!lugarInput.value.trim() || lugarInput.dataset.autoFilled === '1')) {
-      lugarInput.value = obra.lugar_entrega;
-      lugarInput.dataset.autoFilled = '1';
-    }
+    aplicarObra(obra);
   }
 
   function buildOptions() {
@@ -669,6 +703,8 @@ async function setupObraCombo() {
   document.addEventListener('click', e => {
     if (!e.target.closest('.combo-wrap')) dropdown.classList.add('hidden');
   });
+
+  aplicarObraRecordada();
 }
 
 // ---- Rubro de la obra ----
@@ -1309,7 +1345,6 @@ function setupImportButtons() {
   const cameraInput = $('camera-input');
   const btnUpload   = $('btn-upload-file');
   const btnCamera   = $('btn-camera');
-  const btnVoice    = $('btn-voice');
 
   if ('ontouchstart' in window || window.innerWidth <= 768) {
     btnCamera.style.display = '';
@@ -1317,7 +1352,6 @@ function setupImportButtons() {
 
   btnUpload.addEventListener('click', () => fileInput.click());
   btnCamera.addEventListener('click', () => cameraInput.click());
-  btnVoice.addEventListener('click',  () => window.toggleVoiceRecording(btnVoice));
 
   fileInput.addEventListener('change',   () => { if (fileInput.files[0])   handleFileSelected(fileInput.files[0]); });
   cameraInput.addEventListener('change', () => { if (cameraInput.files[0]) handleFileSelected(cameraInput.files[0]); });
@@ -1455,17 +1489,6 @@ async function handleExtract() {
     $('btn-extract').disabled = false;
   }
 }
-
-// ---- Voice callbacks (called from voice.js) ----
-window.onVoiceRecorded = function(result) {
-  applyExtractionResult(result);
-  const itemsMsg = result.items?.length ? ` con ${result.items.length} ítem(s)` : '';
-  toast(`Voz procesada exitosamente${itemsMsg}.`, 'success');
-};
-
-window.showVoiceError = function(msg) {
-  toast(`Error de voz: ${msg}`, 'error');
-};
 
 function fillIfEmpty(id, value) {
   const el = $(id);
@@ -2099,6 +2122,7 @@ async function handleGenerate() {
 
   // Guardar en historial; una vez guardado, subir a Drive y salvar folder_id
   const histKey   = numero.replace(/-/g, '');
+  recordarObra(ocData.proveedor.ubicacion);
   const histSaved = saveOCToHistory(ocData, ocData._total, { estado: 'emitida' })
     .then(() => { updateProveedoresCache(); return true; })
     .catch(e => { console.warn('saveOCToHistory:', e); return false; });
@@ -2214,6 +2238,7 @@ async function solicitarAutorizacion(autorizador) {
   };
 
   const histKey = numero.replace(/-/g, '');
+  recordarObra(ocData.proveedor.ubicacion);
   try {
     await saveOCToHistory(ocData, ocData._total, {
       estado:       'pendiente',
@@ -2603,6 +2628,7 @@ function resetFormKeepProvider() {
   clearExtractStatus();
   $('btn-same-provider').classList.add('hidden');
   toast('Nueva OC — proveedor conservado.', 'info');
+  aplicarObraRecordada();
   $('obra').focus();
 }
 
@@ -2640,6 +2666,7 @@ function resetForm() {
   clearExtractStatus();
   $('btn-same-provider').classList.add('hidden');
   toast('Formulario limpiado.', 'info');
+  aplicarObraRecordada();
 }
 
 // ---- Toast ----

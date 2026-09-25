@@ -31,9 +31,6 @@ const CADENA_DOC = [G_LITE_35, G_LITE_31, G_FLASH_36, G_FLASH_25];
 // Arranca por el modelo grande y deja los lite como red para cuando se agote.
 const CADENA_REMITO = [G_FLASH_36, G_LITE_35, G_LITE_31, G_FLASH_25];
 
-// Audio: sólo los modelos con los que ya se probó el dictado.
-const CADENA_AUDIO = [G_FLASH_25, G_FLASH_36];
-
 const GEMINI_AGOTADOS_KEY = 'vimeco_gemini_agotados';
 const modelosSinNombre    = new Set();   // 404: nombre que esta API todavía no sirve
 
@@ -544,96 +541,5 @@ async function extractFromRemito(file, ocItems) {
     observaciones: trimOrNull(parsed.observaciones),
     items:         leidos,
     sinMatch:      (parsed.sin_match || []).map(t => String(t || '').trim()).filter(Boolean)
-  };
-}
-
-// ---- Voice extraction ----
-
-const VOICE_PROMPT = `Sos un asistente especializado en registrar órdenes de compra para la empresa VIMECO S.A.
-
-El usuario va a dictar por voz los datos de una orden de compra. Puede mencionar proveedor, ítems, cantidades, precios, condiciones, obra, etc.
-
-Extraé toda la información y devolvé ÚNICAMENTE un JSON válido, sin bloques de código markdown, sin texto adicional.
-
-Estructura JSON requerida:
-{
-  "proveedor": "nombre del proveedor o null",
-  "cuit_proveedor": "CUIT en formato XX-XXXXXXXX-X o null",
-  "domicilio_proveedor": "domicilio o null",
-  "telefonos_proveedor": "teléfonos o null",
-  "condicion_iva_proveedor": "condición IVA o null",
-  "ref_presupuesto": "número de presupuesto o null",
-  "condicion_pago": "condición de pago o null",
-  "ubicacion": "nombre de la obra o proyecto o null",
-  "plazo_entrega": "plazo de entrega o null",
-  "lugar_entrega": "lugar de entrega o null",
-  "items": [
-    {
-      "desc": "descripción del ítem",
-      "unidad": "unidad de medida (m², m³, kg, u, gl, etc.)",
-      "cant": número_decimal,
-      "unitario": número_decimal
-    }
-  ]
-}
-
-Reglas:
-- Los números son siempre numbers, no strings
-- Si un campo no fue mencionado, usá null
-- Si no hay ítems claros, devolvé items como []`;
-
-async function extractFromAudio(base64, mimeType) {
-  const { data } = await callGemini(CADENA_AUDIO, {
-    contents: [{
-      parts: [
-        { text: VOICE_PROMPT },
-        { inline_data: { mime_type: mimeType, data: base64 } }
-      ]
-    }],
-    generationConfig: { temperature: 0.05, maxOutputTokens: 2048 }
-  }, {
-    timeout:    60000,
-    msgTimeout: 'Gemini tardó demasiado con el audio. Intentá de nuevo.',
-    msgVacio:   'Gemini no pudo procesar el audio. Intentá de nuevo.'
-  });
-
-  return parseVoiceResponse(textoGemini(data));
-}
-
-function parseVoiceResponse(text) {
-  let clean = text.trim();
-  clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-
-  const start = clean.indexOf('{');
-  const end   = clean.lastIndexOf('}');
-  if (start === -1 || end === -1) throw new Error('No se encontró JSON en la respuesta de voz.');
-
-  let parsed;
-  try {
-    parsed = JSON.parse(clean.slice(start, end + 1));
-  } catch {
-    throw new Error('La respuesta de voz no es JSON válido.');
-  }
-
-  return {
-    proveedor:               trimOrNull(parsed.proveedor),
-    cuit_proveedor:          trimOrNull(parsed.cuit_proveedor),
-    domicilio_proveedor:     trimOrNull(parsed.domicilio_proveedor),
-    telefonos_proveedor:     trimOrNull(parsed.telefonos_proveedor),
-    condicion_iva_proveedor: trimOrNull(parsed.condicion_iva_proveedor),
-    ref_presupuesto:         trimOrNull(parsed.ref_presupuesto),
-    condicion_pago:          trimOrNull(parsed.condicion_pago),
-    ubicacion:               trimOrNull(parsed.ubicacion),
-    plazo_entrega:           trimOrNull(parsed.plazo_entrega),
-    lugar_entrega:           trimOrNull(parsed.lugar_entrega),
-    items: (parsed.items || []).map(it => ({
-      descripcion:     String(it.desc || it.descripcion || '').trim(),
-      unidad:          String(it.unidad || 'u').trim(),
-      cantidad:        parseFloatSafe(it.cant  ?? it.cantidad),
-      precio_unitario: parseFloatSafe(it.unitario ?? it.precio_unitario)
-    })),
-    descuento: null,
-    noGravado: null,
-    impuestos: []
   };
 }
