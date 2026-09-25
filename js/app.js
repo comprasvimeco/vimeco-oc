@@ -94,11 +94,6 @@ let manualOCNumber   = null; // número de OC ingresado manualmente
 // ---- DOM shortcut ----
 const $ = id => document.getElementById(id);
 
-// Errores no atrapados: se muestran en pantalla para poder diagnosticar en el
-// celular, donde no hay consola.
-window.addEventListener('error', e => { try { toast('Error: ' + e.message, 'error'); } catch (_) {} });
-window.addEventListener('unhandledrejection', e => { try { toast('Error: ' + (e.reason && e.reason.message || e.reason), 'error'); } catch (_) {} });
-
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
   // Al compartir un archivo, Android abre la app en frío (sessionStorage vacío):
