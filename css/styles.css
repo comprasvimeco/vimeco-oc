@@ -1289,3 +1289,7 @@ body.scan-open { overflow: hidden; }
   /* Cerrada, la sección muestra su resumen: los botones del encabezado sobran. */
   .oc-section.collapsed > .card-header > .btn { display: none; }
 }
+
+/* Aviso en el cartel de archivo compartido cuando Chrome no entrega el archivo. */
+.share-aviso { background: #fde6e6; color: #b02a2a; border: 1px solid #f5c2c2; border-radius: var(--radius-lg);
+  padding: .65rem .8rem; margin-bottom: .9rem; font-size: .84rem; font-weight: 600; line-height: 1.4; }

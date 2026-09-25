@@ -526,11 +526,9 @@ function elegirArchivo() {
 
 // file = null: el archivo compartido no llegó y cada opción lo pide a mano.
 function showShareChoiceModal(file) {
-  $('share-choice-filename').textContent = file
-    ? file.name
-    : 'Chrome no entregó el archivo compartido (falla de Chrome 153). Elegí qué hacer y seleccionalo de Descargas.';
-  // El nombre de archivo corta en cualquier letra; el mensaje, por palabras.
-  $('share-choice-filename').parentElement.style.wordBreak = file ? 'break-all' : 'normal';
+  $('share-choice-filename').textContent = file ? file.name : '';
+  $('share-choice-file').classList.toggle('hidden', !file);
+  $('share-choice-aviso').classList.toggle('hidden', !!file);
   $('modal-share-choice').classList.remove('hidden');
 
   $('btn-share-generar').onclick = async () => {
