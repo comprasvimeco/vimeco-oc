@@ -96,8 +96,11 @@ const $ = id => document.getElementById(id);
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
-  const code = sessionStorage.getItem('responsable_code') || localStorage.getItem('responsable_code');
-  const name = sessionStorage.getItem('responsable_name') || localStorage.getItem('responsable_name');
+  // Al compartir un archivo, Android abre la app en frío (sessionStorage vacío):
+  // se toma la sesión recordada del dispositivo, como en el resto de las páginas.
+  const sess = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')) || {}; } catch (_) { return {}; } })();
+  const code = sessionStorage.getItem('responsable_code') || sess.codigo || localStorage.getItem('responsable_code');
+  const name = sessionStorage.getItem('responsable_name') || sess.nombre || localStorage.getItem('responsable_name');
   if (!code || !name) { window.location.href = 'index.html'; return; }
   sessionStorage.setItem('responsable_code', code);
   sessionStorage.setItem('responsable_name', name);
