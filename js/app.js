@@ -487,7 +487,16 @@ async function checkSharedFile() {
       match = await cache.match('shared-file');
     }
     if (!match) {
-      if (compartido) toast('No llegó el archivo compartido. Probá compartirlo de nuevo.', 'error');
+      if (compartido) {
+        // El SW deja anotado qué recibió cuando no vino ningún archivo.
+        let recibido = null;
+        const info = await cache.match('shared-info');
+        if (info) { try { recibido = await info.json(); } catch (_) {} await cache.delete('shared-info'); }
+        toast(recibido && recibido.length
+          ? 'No llegó un archivo. Se recibió: ' + recibido.join(', ')
+          : 'No llegó el archivo compartido (el envío vino vacío). Si compartís desde Drive, usá "Enviar una copia".',
+          'error');
+      }
       return;
     }
     // No borrar todavía: el modal decide qué hacer con él

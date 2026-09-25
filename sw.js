@@ -93,12 +93,23 @@ self.addEventListener('fetch', event => {
       (url.pathname === BASE + '/app.html' || url.pathname === BASE + '/facturas.html')) {
     event.respondWith((async () => {
       const formData = await event.request.formData();
-      const file = formData.get('file');
+      // Se toma el primer archivo con contenido, venga en el campo que venga:
+      // algunas apps no respetan el nombre 'file' del manifest.
+      let file = null;
+      const recibido = [];
+      for (const [k, v] of formData.entries()) {
+        if (typeof v === 'string') { recibido.push(k + ' (texto)'); continue; }
+        recibido.push(k + ' (' + (v.type || 'sin tipo') + ', ' + v.size + ' bytes)');
+        if (!file && v.size > 0) file = v;
+      }
+      const cache = await caches.open('share-target');
       if (file) {
-        const cache = await caches.open('share-target');
         await cache.put('shared-file', new Response(file, {
           headers: { 'X-File-Name': file.name || '', 'Content-Type': file.type || '' }
         }));
+      } else {
+        // Diagnóstico: qué llegó en el envío, para mostrarlo en la página.
+        await cache.put('shared-info', new Response(JSON.stringify(recibido)));
       }
       return Response.redirect(BASE + '/app.html?compartido=1', 303);
     })());
