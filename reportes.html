@@ -97,6 +97,8 @@
     #rep-dup-card { border: 1px solid #f0dca8; }
     #rep-dup-card .card-header { background: #fff8ec; border-bottom: 1px solid #f0dca8; }
     #rep-dup-card .card-title { color: #8a5a00; }
+    #rep-dup-card .rep-chev { color: #b8860b; }
+    #rep-dup-card.collapsed > .card-header { border-bottom: none; }
     .rep-dup-count { font-size: .74rem; font-weight: 700; color: #8a5a00; }
     .rep-dup-g { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .5rem .6rem; margin-bottom: .6rem; }
     .rep-dup-g:last-child { margin-bottom: 0; }
@@ -116,7 +118,8 @@
     .rep-dup-dif { font-size: .7rem; color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .rep-dup-sub { font-size: .72rem; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
     .rep-dup-del { flex-shrink: 0; }
-    @media print { #rep-dup-card { break-inside: avoid; } .rep-dup-del { display: none !important; } }
+    .rep-dup-foot { display: flex; justify-content: flex-end; padding-top: .45rem; border-top: 1px solid var(--gray-100); }
+    @media print { #rep-dup-card { break-inside: avoid; } .rep-dup-del, .rep-dup-foot { display: none !important; } }
 
     /* ---- Secciones ---- */
     /* Las tarjetas grandes (hero de análisis) van a ancho completo, apiladas.
@@ -675,9 +678,9 @@
           </div>
         </div>
 
-        <div class="card rep-card rep-full hidden" id="rep-dup-card">
-          <div class="card-header">
-            <span class="card-title">OC duplicadas</span>
+        <div class="card rep-card rep-full hidden" id="rep-dup-card" data-card="rep-dup">
+          <div class="card-header" tabindex="0" aria-expanded="true">
+            <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span>OC duplicadas</span>
             <span class="rep-dup-count" id="rep-dup-count"></span>
           </div>
           <div class="card-body" id="rep-dup"></div>

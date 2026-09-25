@@ -1526,7 +1526,9 @@ function difDup(oc, head) {
 
 function renderDuplicados(list) {
   const card   = $('rep-dup-card');
-  const grupos = grupoDuplicados(list);
+  // Un grupo que alguien ya revisó ("No son duplicadas") no se vuelve a mostrar,
+  // salvo que se le sume una OC nueva sin revisar: por eso se mira OC por OC.
+  const grupos = grupoDuplicados(list).filter(g => !g.every(oc => oc.noDuplicada));
 
   if (!grupos.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
@@ -1559,6 +1561,10 @@ function renderDuplicados(list) {
             <button class="btn btn-sm btn-danger rep-dup-del" data-delkey="${esc(histKeyOf(oc))}"
                     title="Borrar la OC ${esc(oc.nroOC)} del historial">Borrar</button>
           </div>`).join('')}
+        <div class="rep-dup-foot">
+          <button class="btn btn-sm btn-outline rep-dup-ok" data-okkeys="${esc(g.map(histKeyOf).join(','))}"
+                  title="Son compras distintas: sacar este grupo de la lista">No son duplicadas</button>
+        </div>
       </div>`;
   }).join('');
 
@@ -1567,9 +1573,28 @@ function renderDuplicados(list) {
     $('rep-dup').addEventListener('click', e => {
       const del = e.target.closest('[data-delkey]');
       if (del) { borrarDuplicado(del.dataset.delkey); return; }
+      const okBtn = e.target.closest('[data-okkeys]');
+      if (okBtn) { marcarNoDuplicadas(okBtn); return; }
       const ver = e.target.closest('[data-ockey]');
       if (ver) openOCDetail(ver.dataset.ockey);
     });
+  }
+}
+
+// Marca cada OC del grupo como revisada: son compras distintas, no un duplicado.
+// Queda en el historial (compartido), así nadie más la vuelve a ver marcada.
+async function marcarNoDuplicadas(btn) {
+  const keys = btn.dataset.okkeys.split(',');
+  const marca = { ts: Date.now(), por: sessionStorage.getItem('responsable_name') || '' };
+  btn.disabled = true;
+  try {
+    await Promise.all(keys.map(k => patchHistorialEntry(k, { noDuplicada: marca })));
+    keys.forEach(k => { const oc = ocByKey(k); if (oc) oc.noDuplicada = marca; });
+    toast('Listo: no se marcan más como duplicadas.', 'success');
+    render();
+  } catch (e) {
+    toast('No se pudo guardar. ' + e.message, 'error');
+    btn.disabled = false;
   }
 }
 
