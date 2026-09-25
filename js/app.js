@@ -2475,7 +2475,7 @@ function comparacionHtml(cambios) {
   }).join('');
   return `<details class="foc-cmp">
     <summary>
-      ${icSvg('trend')}<span class="foc-cmp-t">Comparación de precios</span>
+      ${icSvg('trend')}<span class="foc-cmp-t">Comparación<span class="foc-cmp-t2"> de precios</span></span>
       ${suben ? `<span class="foc-cmp-chip up">${suben} ${suben === 1 ? 'sube' : 'suben'}</span>` : ''}
       ${bajan ? `<span class="foc-cmp-chip down">${bajan} ${bajan === 1 ? 'baja' : 'bajan'}</span>` : ''}
       ${icSvg('chevron', 'foc-cmp-chev')}

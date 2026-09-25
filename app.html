@@ -340,10 +340,10 @@
 
   <!-- Generate bar -->
   <div class="generate-bar">
-    <button class="btn btn-secondary" id="btn-clear-form">Limpiar formulario</button>
-    <button class="btn btn-outline btn-sm hidden" id="btn-same-provider"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Mismo proveedor</button>
-    <button class="btn btn-outline" id="btn-preview"><svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Vista previa</button>
-    <button class="btn btn-success btn-generate" id="btn-generate">
+    <button class="foc-btn foc-btn--clear" id="btn-clear-form"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Limpiar formulario</button>
+    <button class="foc-btn foc-btn--edit hidden" id="btn-same-provider"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Mismo proveedor</button>
+    <button class="foc-btn foc-btn--edit" id="btn-preview"><svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Vista previa</button>
+    <button class="foc-btn foc-btn--gen btn-generate" id="btn-generate">
       <svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       Generar PDF — Orden de Compra
     </button>
@@ -382,8 +382,8 @@
       <a class="foc-btn foc-btn--pdf" id="preview-pdf" target="_blank" rel="noopener" title="Abrir el PDF tal como va a salir">
         <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Ver PDF</a>
       <div class="foc-foot-r">
-        <button class="btn btn-secondary" id="modal-preview-close2">Seguir editando</button>
-        <button class="btn btn-success" id="modal-preview-generate"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Generar</button>
+        <button class="foc-btn foc-btn--edit" id="modal-preview-close2" title="Volver al formulario"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Editar</button>
+        <button class="foc-btn foc-btn--gen" id="modal-preview-generate"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Generar</button>
       </div>
     </div>
   </div>

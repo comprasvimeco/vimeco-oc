@@ -289,7 +289,7 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 
   /* Generate bar — stacked, Generar first (top), Limpiar last */
   .generate-bar { flex-direction: column; gap: .5rem; margin-bottom: 2rem; }
-  .generate-bar .btn { width: 100%; }
+  .generate-bar .btn, .generate-bar .foc-btn { width: 100%; }
   .generate-bar .btn-generate { order: -1; }
   .generate-bar #btn-preview { order: 0; }
   .generate-bar #btn-same-provider { order: 1; }
@@ -1200,7 +1200,21 @@ body.scan-open { overflow: hidden; }
 .foc-chip { display: inline-block; padding: .12rem .55rem; border-radius: 999px; font-size: .68rem; font-weight: 700;
   background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.28); }
 .foc-letras { margin-top: .55rem; text-align: right; font-size: .76rem; color: var(--gray-500); font-style: italic; }
-#modal-preview .foc-foot .btn { padding-top: .45rem; padding-bottom: .45rem; }
+/* Pie de la vista previa: Ver PDF, Editar y Generar como pastillas, siempre en una línea. */
+#modal-preview .foc-foot, #modal-preview .foc-foot-r { flex-wrap: nowrap; }
+#modal-preview .foc-foot .foc-btn { white-space: nowrap; }
+.foc-btn--edit { background: #e8eef7; color: var(--primary); }
+.foc-btn--gen  { background: #dff3e5; color: #1a7f3c; }
+.foc-btn--clear { background: var(--gray-100); color: var(--gray-600); }
+/* Barra de generar del formulario: las mismas pastillas, Generar un poco más grande. */
+.generate-bar .foc-btn { justify-content: center; }
+.generate-bar .foc-btn.btn-generate { font-size: .9rem; padding: .6rem 1.4rem; }
+.generate-bar .foc-btn.btn-generate .icon { width: 17px; height: 17px; }
+@media (max-width: 400px) {
+  #modal-preview .foc-foot { gap: .35rem; padding-left: .75rem; padding-right: .75rem; }
+  #modal-preview .foc-foot-r { gap: .35rem; }
+  #modal-preview .foc-foot .foc-btn { padding: .45rem .75rem; }
+}
 
 /* Acordeón de la OC: al abrir una sección, su título queda visible debajo del header fijo. */
 .oc-section { scroll-margin-top: calc(60px + .75rem); }
@@ -1288,8 +1302,9 @@ body.scan-open { overflow: hidden; }
   font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 800; color: var(--primary); user-select: none; }
 .foc-cmp summary::-webkit-details-marker { display: none; }
 .foc-cmp summary .icon { width: 15px; height: 15px; flex-shrink: 0; }
-.foc-cmp-t { margin-right: auto; }
-.foc-cmp-chip { font-size: .66rem; letter-spacing: .02em; text-transform: none; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; }
+.foc-cmp-t { margin-right: auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 480px) { .foc-cmp-t2 { display: none; } }
+.foc-cmp-chip { flex-shrink: 0; white-space: nowrap; font-size: .66rem; letter-spacing: .02em; text-transform: none; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; }
 .foc-cmp-chip.up, .foc-cmp-dif.up { background: #fdecec; color: #b42318; }
 .foc-cmp-chip.down, .foc-cmp-dif.down { background: #e7f6ec; color: #1a7f3c; }
 .foc-cmp summary .foc-cmp-chev { color: var(--gray-400); transition: transform .2s; }
