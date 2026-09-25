@@ -1345,10 +1345,9 @@ function handleFileSelected(file) {
   if (!ok) { toast('Formato no soportado. Usá JPG, PNG, PDF o WEBP.', 'error'); return; }
   selectedFile = file;
   const nameEl = $('upload-filename');
-  nameEl.textContent = `${file.name} (${formatBytes(file.size)})`;
+  $('upload-filename-txt').textContent = `${file.name} (${formatBytes(file.size)})`;
   nameEl.classList.remove('hidden');
   $('btn-extract').disabled = false;
-  $('btn-clear-file').classList.remove('hidden');
   clearExtractStatus();
 }
 
@@ -1358,7 +1357,6 @@ function clearFile() {
   $('camera-input').value = '';
   $('upload-filename').classList.add('hidden');
   $('btn-extract').disabled = true;
-  $('btn-clear-file').classList.add('hidden');
   clearExtractStatus();
 }
 

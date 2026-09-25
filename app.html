@@ -69,7 +69,6 @@
         <span class="step-badge">1</span>
         Importar Documento con IA <span class="step-optional">(opcional)</span>
       </span>
-      <button class="btn btn-sm btn-secondary hidden" id="btn-clear-file"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Quitar</button>
     </div>
     <div class="card-body" id="drop-zone">
       <input type="file" id="file-input"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
@@ -88,7 +87,10 @@
           <span class="import-btn-label">Dictar datos</span>
         </button>
       </div>
-      <div class="upload-filename hidden" id="upload-filename"></div>
+      <div class="upload-filename hidden" id="upload-filename">
+        <span class="upload-filename-txt" id="upload-filename-txt"></span>
+        <button class="foc-btn foc-btn--clear upload-file-x" id="btn-clear-file" title="Quitar el archivo"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Quitar</button>
+      </div>
       <div class="extract-bar">
         <button class="btn btn-primary" id="btn-extract" disabled>
           <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>

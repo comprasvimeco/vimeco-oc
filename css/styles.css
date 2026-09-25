@@ -140,7 +140,10 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .upload-icon { font-size: 2.5rem; margin-bottom: .5rem; opacity: .6; }
 .upload-text { font-size: .88rem; color: var(--gray-500); }
 .upload-text strong { color: var(--primary); }
-.upload-filename { font-size: .85rem; font-weight: 600; color: var(--success); margin-top: .5rem; }
+.upload-filename { display: flex; align-items: center; gap: .6rem; font-size: .85rem; font-weight: 600; color: var(--success); margin-top: .5rem; }
+.upload-filename-txt { min-width: 0; overflow-wrap: anywhere; }
+.upload-filename .upload-file-x { flex-shrink: 0; margin-left: auto; padding: .3rem .75rem; font-size: .76rem; }
+.upload-filename .upload-file-x .icon { width: 13px; height: 13px; }
 .upload-formats { font-size: .75rem; color: var(--gray-400); margin-top: .3rem; }
 #file-input { display: none; }
 
