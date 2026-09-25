@@ -113,7 +113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('date-display').textContent = formatDateDisplay(new Date());
   refreshOCNumberDisplay();
 
-  $('btn-new-oc').addEventListener('click', resetForm);
   $('btn-clear-form').addEventListener('click', resetForm);
   $('btn-add-row').addEventListener('click', addEmptyRow);
   $('btn-generate').addEventListener('click', handleGenerate);

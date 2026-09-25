@@ -1224,12 +1224,12 @@ body.scan-open { overflow: hidden; }
 /* Hero: degradé con halo dorado, número de OC y total en vivo como titular. */
 .oc-hero { position: relative; overflow: hidden; display: block;
   background: var(--grad-header); color: #fff; border-radius: var(--radius-lg);
-  padding: 1rem 1.35rem 1.15rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-glow); }
+  padding: .75rem 1.15rem .85rem; margin-bottom: 1rem; box-shadow: var(--shadow-glow); }
 .oc-hero::after { content: ''; position: absolute; right: -80px; top: -110px; width: 340px; height: 340px; border-radius: 50%;
   background: radial-gradient(circle, rgba(200,168,82,.30) 0%, transparent 68%); pointer-events: none; }
 .oc-hero > * { position: relative; z-index: 1; }
 .oc-hero-top { display: flex; justify-content: space-between; align-items: center; gap: .6rem 1rem; flex-wrap: wrap;
-  padding-bottom: .8rem; margin-bottom: .9rem; border-bottom: 1px solid rgba(255,255,255,.14); }
+  padding-bottom: .55rem; margin-bottom: .6rem; border-bottom: 1px solid rgba(255,255,255,.14); }
 .oc-hero .oc-number-display { background: none; border: none; padding: 0; gap: .5rem; }
 .oc-hero .oc-number-label { display: inline; font-size: .66rem; font-weight: 700; letter-spacing: .1em; color: rgba(255,255,255,.72); }
 .oc-hero .oc-number-value { color: #fff; font-size: 1.15rem; font-weight: 800; }
@@ -1237,11 +1237,8 @@ body.scan-open { overflow: hidden; }
 .oc-hero .oc-number-input { background: #fff; }
 .oc-hero .btn-icon.btn-xs { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.26); color: #fff; box-shadow: none; }
 .oc-hero-date { font-size: .8rem; color: rgba(255,255,255,.72); font-variant-numeric: tabular-nums; }
-.oc-hero-new { border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px;
-  padding: .32rem .9rem; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; transition: background .15s; }
-.oc-hero-new:hover { background: rgba(255,255,255,.2); }
 .oc-hero-lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: rgba(255,255,255,.72); }
-.oc-hero-val { font-size: clamp(1.9rem, 6vw, 2.8rem); font-weight: 800; line-height: 1.05; margin: .25rem 0 .35rem;
+.oc-hero-val { font-size: clamp(1.5rem, 5vw, 2.2rem); font-weight: 800; line-height: 1.05; margin: .15rem 0 .2rem;
   letter-spacing: -.02em; font-variant-numeric: tabular-nums; word-break: break-word; }
 .oc-hero-sub { font-size: .82rem; color: rgba(255,255,255,.78); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
