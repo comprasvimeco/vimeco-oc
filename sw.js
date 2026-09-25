@@ -92,6 +92,9 @@ self.addEventListener('fetch', event => {
   if (event.request.method === 'POST' &&
       (url.pathname === BASE + '/app.html' || url.pathname === BASE + '/facturas.html')) {
     event.respondWith((async () => {
+      // Tamaño y tipo del cuerpo, para el diagnóstico si no llega ningún archivo.
+      const ct  = event.request.headers.get('content-type') || 'sin content-type';
+      const len = (await event.request.clone().arrayBuffer()).byteLength;
       const formData = await event.request.formData();
       // Se toma el primer archivo con contenido, venga en el campo que venga:
       // algunas apps no respetan el nombre 'file' del manifest.
@@ -109,6 +112,7 @@ self.addEventListener('fetch', event => {
         }));
       } else {
         // Diagnóstico: qué llegó en el envío, para mostrarlo en la página.
+        recibido.push('cuerpo de ' + len + ' bytes, ' + ct.split(';')[0]);
         await cache.put('shared-info', new Response(JSON.stringify(recibido)));
       }
       return Response.redirect(BASE + '/app.html?compartido=1', 303);
