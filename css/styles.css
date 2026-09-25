@@ -1108,3 +1108,184 @@ body.scan-open { overflow: hidden; }
   background: var(--white); color: var(--gray-900);
 }
 .rem-item-input:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
+
+/* ===== Ficha de la OC (reportes + vista previa de la OC) ===== */
+/* Encabezado como el hero del panel (degradé azul) y el cuerpo con la
+   estética de burbujas pastel del resto del reporte. */
+.foc-modal { max-width: 640px; overflow: hidden; }
+.foc-head { position: relative; display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem;
+  background: var(--grad-header); color: #fff; padding: 1.1rem 3.2rem 1.1rem 1.35rem; flex-shrink: 0; overflow: hidden; }
+.foc-head::after { content: ''; position: absolute; right: -60px; top: -90px; width: 240px; height: 240px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,168,82,.28) 0%, transparent 68%); pointer-events: none; }
+.foc-head > * { position: relative; z-index: 1; }
+.foc-head-l { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.foc-head-r { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; text-align: right; }
+.foc-kicker { font-size: .62rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: rgba(255,255,255,.7); }
+.foc-nro { font-family: 'Courier New', monospace; font-size: 1.3rem; font-weight: 800; letter-spacing: .02em; }
+.foc-total { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.foc-chips { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .3rem; }
+.foc-chips .rep-chip { font-size: .68rem; padding: .12rem .55rem; }
+.foc-x { position: absolute; top: .75rem; right: .75rem; width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.1); color: #fff; transition: background .15s; }
+.foc-x:hover { background: rgba(255,255,255,.22); }
+.foc-x .icon { width: 15px; height: 15px; }
+
+/* Proveedor: la tarjeta principal del cuerpo. */
+.foc-prov { display: flex; align-items: center; gap: .75rem; background: #f5f8fc; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-lg); padding: .75rem .9rem; margin-bottom: .75rem; }
+.foc-prov-ic { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto; display: inline-flex;
+  align-items: center; justify-content: center; background: #e8eefc; color: #2c4fa8;
+  font-size: .9rem; font-weight: 800; letter-spacing: .02em; }
+.foc-prov-n { font-size: .95rem; font-weight: 800; color: var(--gray-800); word-break: break-word; }
+.foc-prov-s { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .25rem; }
+.foc-tag { font-size: .7rem; font-weight: 600; color: var(--gray-600); background: var(--white);
+  border: 1px solid var(--gray-200); border-radius: 999px; padding: .05rem .5rem; white-space: nowrap; }
+
+.foc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .5rem; margin-bottom: 1.1rem; }
+.foc-f { display: flex; flex-direction: column; gap: .15rem; min-width: 0; padding: .5rem .7rem;
+  border: 1px solid var(--gray-100); border-radius: var(--radius); background: var(--white); }
+.foc-k { font-size: .6rem; text-transform: uppercase; letter-spacing: .07em; color: var(--gray-500); font-weight: 700; }
+.foc-v { font-size: .85rem; color: var(--gray-800); font-weight: 600; word-break: break-word; }
+
+.foc-sec { display: flex; align-items: center; gap: .45rem; font-size: .7rem; text-transform: uppercase; letter-spacing: .07em;
+  font-weight: 800; color: var(--primary); margin-bottom: .45rem; }
+.foc-cnt { background: #e6eefb; color: #1f4f96; border-radius: 999px; padding: .02rem .45rem; font-size: .66rem; letter-spacing: 0; }
+.foc-items { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .8rem; margin-bottom: .9rem; }
+.foc-items th { text-align: left; font-size: .6rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+  color: var(--gray-500); background: #f4f7fb; padding: .45rem .5rem; white-space: nowrap; }
+.foc-items th:first-child { border-radius: 8px 0 0 8px; }
+.foc-items th:last-child  { border-radius: 0 8px 8px 0; }
+.foc-items td { padding: .5rem; color: var(--gray-700); vertical-align: top; }
+.foc-items tbody tr:nth-child(even) td { background: #f8fafd; }
+.foc-items .foc-n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.foc-items td.foc-n:last-child { font-weight: 700; color: var(--gray-800); }
+.foc-un { display: inline-block; font-size: .68rem; font-weight: 700; color: var(--gray-600); background: #eef0f3;
+  border-radius: 999px; padding: .02rem .45rem; }
+
+.foc-tot { margin-left: auto; max-width: 340px; background: #f5f8fc; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-lg); padding: .55rem .8rem; }
+.foc-t { display: flex; justify-content: space-between; gap: 1rem; font-size: .8rem; color: var(--gray-600); padding: .18rem 0; font-variant-numeric: tabular-nums; }
+.foc-t-grand { margin-top: .35rem; padding: .4rem .65rem; border-radius: 999px; background: #e6eefb;
+  font-size: .98rem; font-weight: 800; color: #1f4f96; }
+.foc-conv { margin-top: .9rem; background: #fff4e0; color: #8a5d00;
+  border-radius: var(--radius); padding: .5rem .75rem; font-size: .78rem; }
+
+.foc-foot { justify-content: space-between; flex-wrap: wrap; gap: .5rem; background: #fafbfd; }
+.foc-foot-r { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+/* Botones de la ficha: pastillas con ícono, en los tonos pastel del reporte.
+   Drive en turquesa y PDF en rosa. Se cierra con la cruz del encabezado.
+   Eliminar va aparte, a la izquierda, en rojo suave: presente, pero sin gritar. */
+.foc-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 999px;
+  padding: .45rem 1rem; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; text-decoration: none;
+  transition: filter .15s, transform .15s, box-shadow .15s; }
+.foc-btn .icon { width: 15px; height: 15px; }
+.foc-btn:hover:not(:disabled) { filter: brightness(.96); transform: translateY(-1px); }
+.foc-btn:disabled { opacity: .45; cursor: default; }
+.foc-btn--drive { background: #dcf3ef; color: #16695f; }
+.foc-btn--pdf   { background: #fce8ee; color: #a23a57; }
+.foc-btn--del   { background: #fde6e6; color: #b02a2a; }
+.foc-btn.hidden { display: none; }
+.foc-items-w { overflow-x: auto; margin-bottom: .9rem; }
+.foc-items-w .foc-items { margin-bottom: 0; }
+@media (max-width: 520px) {
+  .foc-head { flex-direction: column; align-items: flex-start; }
+  .foc-head-r { align-items: flex-start; text-align: left; }
+  .foc-grid { grid-template-columns: 1fr 1fr; }
+  /* El unitario se deduce de cantidad y total; en el celular se cede el ancho. */
+  .foc-items .foc-c-unit { display: none; }
+}
+.foc-nodrive { font-size: .76rem; color: var(--gray-500); font-style: italic; }
+/* Vista previa de la OC (app.html): chips sobre el degradé y el total en letras. */
+.foc-chip { display: inline-block; padding: .12rem .55rem; border-radius: 999px; font-size: .68rem; font-weight: 700;
+  background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.28); }
+.foc-letras { margin-top: .55rem; text-align: right; font-size: .76rem; color: var(--gray-500); font-style: italic; }
+#modal-preview .foc-foot .btn { padding-top: .45rem; padding-bottom: .45rem; }
+
+/* Acordeón de la OC: al abrir una sección, su título queda visible debajo del header fijo. */
+.oc-section { scroll-margin-top: calc(60px + .75rem); }
+
+/* ===== Nueva OC: idioma visual de reportes ===== */
+/* Hero: degradé con halo dorado, número de OC y total en vivo como titular. */
+.oc-hero { position: relative; overflow: hidden; display: block;
+  background: var(--grad-header); color: #fff; border-radius: var(--radius-lg);
+  padding: 1rem 1.35rem 1.15rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-glow); }
+.oc-hero::after { content: ''; position: absolute; right: -80px; top: -110px; width: 340px; height: 340px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(200,168,82,.30) 0%, transparent 68%); pointer-events: none; }
+.oc-hero > * { position: relative; z-index: 1; }
+.oc-hero-top { display: flex; justify-content: space-between; align-items: center; gap: .6rem 1rem; flex-wrap: wrap;
+  padding-bottom: .8rem; margin-bottom: .9rem; border-bottom: 1px solid rgba(255,255,255,.14); }
+.oc-hero .oc-number-display { background: none; border: none; padding: 0; gap: .5rem; }
+.oc-hero .oc-number-label { display: inline; font-size: .66rem; font-weight: 700; letter-spacing: .1em; color: rgba(255,255,255,.72); }
+.oc-hero .oc-number-value { color: #fff; font-size: 1.15rem; font-weight: 800; }
+.oc-hero .oc-number-value.oc-number-manual { color: #f3d98b; }
+.oc-hero .oc-number-input { background: #fff; }
+.oc-hero .btn-icon.btn-xs { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.26); color: #fff; box-shadow: none; }
+.oc-hero-date { font-size: .8rem; color: rgba(255,255,255,.72); font-variant-numeric: tabular-nums; }
+.oc-hero-new { border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.08); color: #fff; border-radius: 999px;
+  padding: .32rem .9rem; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; transition: background .15s; }
+.oc-hero-new:hover { background: rgba(255,255,255,.2); }
+.oc-hero-lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: rgba(255,255,255,.72); }
+.oc-hero-val { font-size: clamp(1.9rem, 6vw, 2.8rem); font-weight: 800; line-height: 1.05; margin: .25rem 0 .35rem;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; word-break: break-word; }
+.oc-hero-sub { font-size: .82rem; color: rgba(255,255,255,.78); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Encabezados de sección blancos, como las tarjetas de reportes. */
+.oc-section > .card-header { background: var(--white); border-bottom: 1px solid var(--gray-200); }
+.oc-section .card-title .step-badge { background: var(--grad-header); box-shadow: 0 3px 8px -3px rgba(37,87,167,.6); transition: background .2s; }
+/* Paso completo: la burbuja pasa a verde pastel. */
+.oc-section.oc-completa .card-title .step-badge { background: #dcf3e4; color: #1e7d3a; box-shadow: none; }
+
+/* Total: la pastilla azul pastel de la ficha en vez del amarillo. */
+#imp-total-row td { background: #e6eefb; color: #1f4f96; font-size: .98rem; font-weight: 800; border-top: none !important; font-variant-numeric: tabular-nums; }
+#imp-total-row td:first-child { padding-left: 1rem; }
+
+/* Resumen de las secciones cerradas (sólo mobile, sólo colapsadas). */
+.oc-sum { display: none; }
+@media (max-width: 768px) {
+  .oc-section > .card-header { flex-wrap: wrap; row-gap: .15rem; }
+  .oc-section.collapsed .oc-sum:not(:empty) { display: flex; flex-direction: column; gap: .1rem; flex-basis: 100%;
+    padding-left: calc(17px + .5rem + 22px + .5rem); min-width: 0; }
+  .oc-sum-t { font-size: .78rem; color: var(--gray-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .oc-sum-f { font-size: .74rem; color: #b02a2a; font-weight: 700; }
+  .oc-section.collapsed.oc-incompleta .card-title .step-badge { background: #fde6e6; color: #b02a2a; box-shadow: none; }
+}
+
+/* Barra fija inferior (mobile): total + Vista previa + Generar, en el degradé del hero. */
+.oc-dock { display: none; }
+@media (max-width: 768px) {
+  .oc-dock { position: fixed; left: .6rem; right: .6rem; bottom: calc(.6rem + env(safe-area-inset-bottom, 0px)); z-index: 90;
+    display: flex; align-items: center; gap: .5rem; padding: .55rem .55rem .55rem 1rem; border-radius: 999px;
+    background: var(--grad-header); color: #fff; box-shadow: 0 10px 30px -8px rgba(26,58,92,.65);
+    transition: transform .25s var(--ease-spring), opacity .2s; }
+  .oc-dock--off { transform: translateY(140%); opacity: 0; pointer-events: none; }
+  .oc-dock-l { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+  .oc-dock-cnt { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: rgba(255,255,255,.72); }
+  .oc-dock-total { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .oc-dock-btn { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; height: 40px; min-width: 40px;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.1); color: #fff;
+    font: inherit; font-size: .85rem; font-weight: 700; padding: 0 .7rem; cursor: pointer; }
+  .oc-dock-btn .icon { width: 17px; height: 17px; }
+  .oc-dock-btn--go { background: linear-gradient(120deg, #15803d, #22c55e); border-color: transparent; padding: 0 1rem; }
+  .oc-dock-btn:disabled { opacity: .5; }
+  /* Lugar para que la barra no tape el final del formulario. */
+  body:has(.oc-dock) .app-main { padding-bottom: 5rem; }
+}
+
+/* Avisos de la vista previa. */
+.foc-warn { background: #fff8ec; border: 1px solid #f0dca8; border-radius: var(--radius-lg); padding: .65rem .85rem; margin-bottom: .75rem; }
+.foc-warn-t { display: flex; align-items: center; gap: .4rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 800; color: #8a5a00; margin-bottom: .3rem; }
+.foc-warn-t .icon { width: 15px; height: 15px; }
+.foc-warn ul { margin: 0; padding-left: 1.1rem; }
+.foc-warn li { font-size: .8rem; color: #6b4a00; padding: .1rem 0; }
+.foc-info { font-size: .76rem; color: var(--gray-600); background: #f5f8fc; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-lg); padding: .3rem .8rem; margin-bottom: .75rem; }
+
+/* Encabezados de tabla claros, como la tabla de ítems de la ficha. */
+.oc-section .items-table th, .oc-section .imp-table th { background: #f4f7fb; color: var(--gray-500); font-size: .64rem;
+  font-weight: 700; letter-spacing: .06em; border-bottom: 1px solid var(--gray-200); }
+@media (max-width: 768px) {
+  /* Cerrada, la sección muestra su resumen: los botones del encabezado sobran. */
+  .oc-section.collapsed > .card-header > .btn { display: none; }
+}

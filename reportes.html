@@ -420,96 +420,10 @@
       .rr-row-hit + .rr-row-main td { border-top: none !important; }
     }
 
-    /* ---- Ficha de la OC ---- */
-    /* Encabezado como el hero del panel (degradé azul) y el cuerpo con la
-       estética de burbujas pastel del resto del reporte. */
-    .foc-modal { max-width: 640px; overflow: hidden; }
-    .foc-head { position: relative; display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem;
-      background: var(--grad-header); color: #fff; padding: 1.1rem 3.2rem 1.1rem 1.35rem; flex-shrink: 0; overflow: hidden; }
-    .foc-head::after { content: ''; position: absolute; right: -60px; top: -90px; width: 240px; height: 240px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(200,168,82,.28) 0%, transparent 68%); pointer-events: none; }
-    .foc-head > * { position: relative; z-index: 1; }
-    .foc-head-l { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
-    .foc-head-r { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; text-align: right; }
-    .foc-kicker { font-size: .62rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: rgba(255,255,255,.7); }
-    .foc-nro { font-family: 'Courier New', monospace; font-size: 1.3rem; font-weight: 800; letter-spacing: .02em; }
-    .foc-total { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .foc-chips { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .3rem; }
-    .foc-chips .rep-chip { font-size: .68rem; padding: .12rem .55rem; }
+    /* Ficha de la OC: estilos compartidos en css/styles.css (también la usa la vista previa de app.html). */
     .rem-chip--completa { background: #e3f5e8; color: #1e7d3a; }
     .rem-chip--parcial  { background: #fff4e0; color: #9a6a00; }
     .rem-chip--sin      { background: #eef0f3; color: #4b5563; }
-    .foc-x { position: absolute; top: .75rem; right: .75rem; width: 30px; height: 30px; border-radius: 50%;
-      display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
-      border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.1); color: #fff; transition: background .15s; }
-    .foc-x:hover { background: rgba(255,255,255,.22); }
-    .foc-x .icon { width: 15px; height: 15px; }
-
-    /* Proveedor: la tarjeta principal del cuerpo. */
-    .foc-prov { display: flex; align-items: center; gap: .75rem; background: #f5f8fc; border: 1px solid var(--gray-100);
-      border-radius: var(--radius-lg); padding: .75rem .9rem; margin-bottom: .75rem; }
-    .foc-prov-ic { width: 40px; height: 40px; border-radius: 50%; flex: 0 0 auto; display: inline-flex;
-      align-items: center; justify-content: center; background: #e8eefc; color: #2c4fa8;
-      font-size: .9rem; font-weight: 800; letter-spacing: .02em; }
-    .foc-prov-n { font-size: .95rem; font-weight: 800; color: var(--gray-800); word-break: break-word; }
-    .foc-prov-s { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .25rem; }
-    .foc-tag { font-size: .7rem; font-weight: 600; color: var(--gray-600); background: var(--white);
-      border: 1px solid var(--gray-200); border-radius: 999px; padding: .05rem .5rem; white-space: nowrap; }
-
-    .foc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .5rem; margin-bottom: 1.1rem; }
-    .foc-f { display: flex; flex-direction: column; gap: .15rem; min-width: 0; padding: .5rem .7rem;
-      border: 1px solid var(--gray-100); border-radius: var(--radius); background: var(--white); }
-    .foc-k { font-size: .6rem; text-transform: uppercase; letter-spacing: .07em; color: var(--gray-500); font-weight: 700; }
-    .foc-v { font-size: .85rem; color: var(--gray-800); font-weight: 600; word-break: break-word; }
-
-    .foc-sec { display: flex; align-items: center; gap: .45rem; font-size: .7rem; text-transform: uppercase; letter-spacing: .07em;
-      font-weight: 800; color: var(--primary); margin-bottom: .45rem; }
-    .foc-cnt { background: #e6eefb; color: #1f4f96; border-radius: 999px; padding: .02rem .45rem; font-size: .66rem; letter-spacing: 0; }
-    .foc-items { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .8rem; margin-bottom: .9rem; }
-    .foc-items th { text-align: left; font-size: .6rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
-      color: var(--gray-500); background: #f4f7fb; padding: .45rem .5rem; white-space: nowrap; }
-    .foc-items th:first-child { border-radius: 8px 0 0 8px; }
-    .foc-items th:last-child  { border-radius: 0 8px 8px 0; }
-    .foc-items td { padding: .5rem; color: var(--gray-700); vertical-align: top; }
-    .foc-items tbody tr:nth-child(even) td { background: #f8fafd; }
-    .foc-items .foc-n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .foc-items td.foc-n:last-child { font-weight: 700; color: var(--gray-800); }
-    .foc-un { display: inline-block; font-size: .68rem; font-weight: 700; color: var(--gray-600); background: #eef0f3;
-      border-radius: 999px; padding: .02rem .45rem; }
-
-    .foc-tot { margin-left: auto; max-width: 340px; background: #f5f8fc; border: 1px solid var(--gray-100);
-      border-radius: var(--radius-lg); padding: .55rem .8rem; }
-    .foc-t { display: flex; justify-content: space-between; gap: 1rem; font-size: .8rem; color: var(--gray-600); padding: .18rem 0; font-variant-numeric: tabular-nums; }
-    .foc-t-grand { margin-top: .35rem; padding: .4rem .65rem; border-radius: 999px; background: #e6eefb;
-      font-size: .98rem; font-weight: 800; color: #1f4f96; }
-    .foc-conv { margin-top: .9rem; background: #fff4e0; color: #8a5d00;
-      border-radius: var(--radius); padding: .5rem .75rem; font-size: .78rem; }
-
-    .foc-foot { justify-content: space-between; flex-wrap: wrap; gap: .5rem; background: #fafbfd; }
-    .foc-foot-r { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-    /* Botones de la ficha: pastillas con ícono, en los tonos pastel del reporte.
-       Drive en turquesa y PDF en rosa. Se cierra con la cruz del encabezado.
-       Eliminar va aparte, a la izquierda, en rojo suave: presente, pero sin gritar. */
-    .foc-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 999px;
-      padding: .45rem 1rem; font: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; text-decoration: none;
-      transition: filter .15s, transform .15s, box-shadow .15s; }
-    .foc-btn .icon { width: 15px; height: 15px; }
-    .foc-btn:hover:not(:disabled) { filter: brightness(.96); transform: translateY(-1px); }
-    .foc-btn:disabled { opacity: .45; cursor: default; }
-    .foc-btn--drive { background: #dcf3ef; color: #16695f; }
-    .foc-btn--pdf   { background: #fce8ee; color: #a23a57; }
-    .foc-btn--del   { background: #fde6e6; color: #b02a2a; }
-    .foc-btn.hidden { display: none; }
-    .foc-items-w { overflow-x: auto; margin-bottom: .9rem; }
-    .foc-items-w .foc-items { margin-bottom: 0; }
-    @media (max-width: 520px) {
-      .foc-head { flex-direction: column; align-items: flex-start; }
-      .foc-head-r { align-items: flex-start; text-align: left; }
-      .foc-grid { grid-template-columns: 1fr 1fr; }
-      /* El unitario se deduce de cantidad y total; en el celular se cede el ancho. */
-      .foc-items .foc-c-unit { display: none; }
-    }
-    .foc-nodrive { font-size: .76rem; color: var(--gray-500); font-style: italic; }
 
     /* ---- Modal unificar obras ---- */
     .mmg-group { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .7rem .8rem; margin-bottom: .8rem; }

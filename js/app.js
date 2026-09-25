@@ -178,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupProveedorCombo();
   setupOCNumberEdit();
   setupOCAccordion();
+  setupOCDock();
   renderTable();
   renderImpuestos();
   recalcTotales();
@@ -1147,14 +1148,24 @@ function setupOCAccordion() {
       chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg>';
       title.insertBefore(chev, title.firstChild);
     }
+    if (!header.querySelector('.oc-sum')) {
+      const sum = document.createElement('div');
+      sum.className = 'oc-sum';
+      header.appendChild(sum);
+    }
     header.addEventListener('click', e => {
       if (!isMobileViewport()) return;
       if (e.target.closest('button, input, a, label')) return; // no togglear con controles
       if (sec.classList.contains('collapsed')) openOCSection(sec);
-      else sec.classList.add('collapsed');
+      else { sec.classList.add('collapsed'); updateOCSummaries(); }
     });
   });
+  // Los combos y la IA cargan valores sin disparar `input`: el click y el
+  // recálculo de totales también refrescan el resumen.
+  ['input', 'change', 'click'].forEach(ev =>
+    document.querySelector('.app-main').addEventListener(ev, updateOCSummaries));
   applyOCViewport();
+  updateOCSummaries();
   window.addEventListener('resize', applyOCViewport);
 }
 
@@ -1162,7 +1173,63 @@ function setupOCAccordion() {
 function openOCSection(sec) {
   _ocSections.forEach(s => s.classList.add('collapsed'));
   sec.classList.remove('collapsed');
+  updateOCSummaries();
   sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---- Resumen de las secciones cerradas (mobile) ----
+// Debajo del título de cada sección colapsada: lo cargado en una línea y, en
+// rojo, los obligatorios que faltan. Así no hace falta abrirlas para revisar.
+function ocSectionSummary(i) {
+  const v   = id => $(id).value.trim();
+  const cur = monedaUSD ? 'US$ ' : '$ ';
+  switch (i) {
+    case 0:
+      return { txt: selectedFile ? selectedFile.name : '', falta: [] };
+    case 1: {
+      const falta = [];
+      if (!v('obra')) falta.push('obra');
+      if (rubrosDeObraActual().length && !selectedRubro) falta.push('rubro');
+      if (!v('condicion-pago')) falta.push('cond. de pago');
+      if (selectedEquipo && !selectedCategoria) falta.push('categoría');
+      return { txt: [v('obra'), selectedRubro?.nombre, v('condicion-pago'), selectedEquipo?.codigo].filter(Boolean).join(' · '), falta };
+    }
+    case 2: {
+      const falta = [];
+      if (!v('proveedor')) falta.push('razón social');
+      if (!v('cuit-proveedor')) falta.push('CUIT');
+      return { txt: [v('proveedor'), v('cuit-proveedor')].filter(Boolean).join(' · '), falta };
+    }
+    case 3: {
+      const falta = [];
+      if (!items.length) falta.push('ítems');
+      else if (items.some(it => !String(it.descripcion || '').trim())) falta.push('descripción de ítems');
+      const txt = items.length
+        ? `${items.length} ${items.length === 1 ? 'ítem' : 'ítems'} · ${cur}${fmtMoneyDisplay(calcSubtotal())}`
+        : '';
+      return { txt, falta };
+    }
+    case 4:
+      return { txt: items.length ? `Total ${cur}${fmtMoneyDisplay(calcTotal())}` : '', falta: [] };
+  }
+  return { txt: '', falta: [] };
+}
+
+let _ocSumRaf = 0;
+function updateOCSummaries() {
+  cancelAnimationFrame(_ocSumRaf);
+  _ocSumRaf = requestAnimationFrame(() => {
+    _ocSections.forEach((sec, i) => {
+      const el = sec.querySelector('.oc-sum');
+      if (!el) return;
+      const { txt, falta } = ocSectionSummary(i);
+      el.innerHTML = (txt ? `<span class="oc-sum-t">${esc(txt)}</span>` : '')
+        + (falta.length ? `<span class="oc-sum-f">Falta: ${esc(falta.join(', '))}</span>` : '');
+      sec.classList.toggle('oc-incompleta', falta.length > 0);
+      sec.classList.toggle('oc-completa', !falta.length && !!txt && i > 0);
+    });
+    updateOCDock();
+  });
 }
 
 // Re-aplica el estado solo al cruzar el breakpoint (no en cada resize de mobile).
@@ -1673,6 +1740,42 @@ function recalcTotales() {
   });
 
   $('imp-total-value').textContent = fmtMoneyDisplay(calcTotal());
+  updateOCSummaries();
+}
+
+// ---- Barra fija inferior (mobile): total + Vista previa + Generar ----
+// Se esconde cuando la barra de generar del final ya está a la vista (no
+// duplicar botones) y mientras se escribe (el teclado la empujaría encima).
+let _dockBarVisible = false, _dockTyping = false;
+function setupOCDock() {
+  $('oc-dock-preview').addEventListener('click', () => $('btn-preview').click());
+  $('oc-dock-generate').addEventListener('click', () => $('btn-generate').click());
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([e]) => { _dockBarVisible = e.isIntersecting; updateOCDock(); })
+      .observe(document.querySelector('.generate-bar'));
+  }
+  const main = document.querySelector('.app-main');
+  main.addEventListener('focusin', e => {
+    if (e.target.matches('input, textarea, select')) { _dockTyping = true; updateOCDock(); }
+  });
+  main.addEventListener('focusout', () => { _dockTyping = false; updateOCDock(); });
+  updateOCDock();
+}
+
+// Refresca el total del hero y de la barra fija.
+function updateOCDock() {
+  const dock = $('oc-dock');
+  if (!dock) return;
+  const total = (monedaUSD ? 'US$ ' : '$ ') + fmtMoneyDisplay(calcTotal());
+  const cnt   = items.length ? `${items.length} ${items.length === 1 ? 'ítem' : 'ítems'}` : 'Sin ítems';
+  $('oc-hero-total').textContent = total;
+  $('oc-hero-sub').textContent = items.length
+    ? [cnt, $('proveedor').value.trim(), $('obra').value.trim()].filter(Boolean).join(' · ')
+    : 'Sin ítems todavía';
+  $('oc-dock-total').textContent = total;
+  $('oc-dock-cnt').textContent = cnt;
+  $('oc-dock-generate').disabled = $('btn-generate').disabled;
+  dock.classList.toggle('oc-dock--off', _dockBarVisible || _dockTyping);
 }
 
 function renderImpuestos() {
@@ -2128,36 +2231,193 @@ async function handlePreview() {
   }
 
   btn.disabled = false;
-  openPreview(blob, numero);
+  openPreview(blob, ocData);
 }
 
-function openPreview(blob, numero) {
+// Fila de la ficha: se omite si el campo quedó vacío ('—' es el vacío del PDF).
+function fichaRow(lbl, val) {
+  if (!val || val === '—') return '';
+  return `<div class="foc-f"><span class="foc-k">${esc(lbl)}</span><span class="foc-v">${esc(val)}</span></div>`;
+}
+
+// La vista previa es la misma ficha que muestra reportes, armada con los datos
+// del formulario. El PDF real queda a un toque ("Ver PDF").
+function openPreview(blob, oc) {
   const blobUrl = URL.createObjectURL(blob);
   const modal   = $('modal-preview');
-  const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  const usd     = oc.moneda === 'USD';
+  const money   = n => (usd ? 'US$\u00a0' : '$\u00a0') + fmtMoneyDisplay(n);
+  const prov    = oc.proveedor;
+  const vacio   = v => !v || v === '—';
 
-  $('preview-title').textContent = `Vista previa — OC N° ${numero}`;
-  const body = $('preview-body');
-  body.innerHTML = '';
+  $('preview-title').textContent = oc.nroOC;
+  $('preview-total').textContent = money(oc._total);
+  $('preview-chips').innerHTML = `<span class="foc-chip">${manualOCNumber ? 'N° manual' : 'N° provisorio'}</span>`
+    + (usd ? '<span class="foc-chip">En dólares</span>' : '');
 
-  if (isMobile) {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'padding:2rem;text-align:center;';
-    wrap.innerHTML = `
-      <p style="margin-bottom:1.25rem;color:var(--gray-600);">
-        Los PDF no se pueden previsualizar en el navegador mobile.
-      </p>
-      <a href="${blobUrl}" target="_blank" class="btn btn-primary">Abrir PDF en nueva pestaña</a>`;
-    body.appendChild(wrap);
-  } else {
-    const iframe = document.createElement('iframe');
-    iframe.src   = blobUrl;
-    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
-    body.appendChild(iframe);
-  }
+  const eq = oc.equipo;
+  const equipo = eq ? eq.codigo + (eq.patente ? ` (${eq.patente})` : '') + (eq.tipo ? ' — ' + eq.tipo : '') : '';
 
+  const itemsHtml = oc.items.length ? `
+    <div class="foc-items-w"><table class="foc-items">
+      <thead><tr>
+        <th>Descripción</th><th class="foc-n">Cant.</th><th>Un.</th>
+        <th class="foc-n foc-c-unit">Unitario</th><th class="foc-n">Total</th>
+      </tr></thead>
+      <tbody>
+        ${oc.items.map(it => `<tr>
+          <td>${esc(it.desc)}</td>
+          <td class="foc-n">${esc(it.cant)}</td>
+          <td>${vacio(it.unidad) ? '' : `<span class="foc-un">${esc(it.unidad)}</span>`}</td>
+          <td class="foc-n foc-c-unit">${esc(money(it.unitario))}</td>
+          <td class="foc-n">${esc(money(it.total))}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>` : '';
+
+  const tags = [
+    !vacio(prov.cuit) && `CUIT ${prov.cuit}`,
+    !vacio(prov.iva) && prov.iva,
+    prov.codigoInterno && `Cód. ${prov.codigoInterno}`,
+    !vacio(prov.telefonos) && prov.telefonos,
+    !vacio(prov.domicilio) && prov.domicilio
+  ].filter(Boolean);
+
+  $('preview-body').innerHTML = `
+    <div id="preview-warn">${previewWarningsHtml(checkOCLocal(oc))}</div>
+    <div class="foc-prov">
+      <span class="foc-prov-ic" aria-hidden="true">${esc(inicialesProv(prov.nombre))}</span>
+      <div style="min-width:0">
+        <div class="foc-prov-n">${esc(prov.nombre)}</div>
+        ${tags.length ? `<div class="foc-prov-s">${tags.map(t => `<span class="foc-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      </div>
+    </div>
+    <div class="foc-grid">
+      ${fichaRow('Fecha', oc.fecha)}
+      ${fichaRow('Obra', prov.ubicacion)}
+      ${fichaRow('Rubro', oc.rubro?.nombre)}
+      ${fichaRow('Equipo', equipo)}
+      ${fichaRow('Categoría', eq?.categoria)}
+      ${fichaRow('Cond. pago', prov.pago)}
+      ${fichaRow('Plazo de entrega', prov.plazo)}
+      ${fichaRow('Lugar de entrega', prov.lugar)}
+      ${fichaRow('Contacto', prov.nombre_contacto)}
+      ${fichaRow('Ref. presupuesto', prov.ref)}
+      ${fichaRow('Observaciones', oc.observaciones)}
+    </div>
+    <div class="foc-sec">Ítems <span class="foc-cnt">${oc.items.length}</span></div>
+    ${itemsHtml}
+    <div class="foc-tot">
+      ${oc.impuestos.map(i => `<div class="foc-t ${/^total$/i.test(i.nombre) ? 'foc-t-grand' : ''}">
+        <span>${esc(i.nombre)}</span><span>${esc(money(i.monto))}</span></div>`).join('')}
+    </div>
+    <div class="foc-letras">Son ${usd ? 'dólares' : 'pesos'}: ${esc(oc.totalLetras)}</div>`;
+
+  $('preview-pdf').href = blobUrl;
   modal.dataset.blobUrl = blobUrl;
   modal.classList.remove('hidden');
+  $('preview-body').scrollTop = 0;
+
+  // La comparación con OC anteriores necesita el historial: llega después y se
+  // suma a los avisos, si la vista previa sigue abierta.
+  const token = blobUrl;
+  checkOCHistorial(oc).then(res => {
+    if (modal.dataset.blobUrl !== token || !res) return;
+    $('preview-warn').innerHTML = previewWarningsHtml([...checkOCLocal(oc), ...res.avisos], res.info);
+  }).catch(() => {});
+}
+
+// ---- Avisos de la vista previa ----
+// Revisión antes de firmar: no bloquean, sólo llaman la atención.
+function checkOCLocal(oc) {
+  const avisos = [];
+  const n = oc.items.map((it, i) => ({ i: i + 1, cant: parseFloat(it.cant) || 0, pu: parseFloat(it.unitario) || 0 }));
+  const lista = xs => xs.map(x => x.i).join(', ');
+  const sinCant   = n.filter(x => !x.cant);
+  const sinPrecio = n.filter(x => !x.pu);
+  if (sinCant.length)   avisos.push(`${sinCant.length === 1 ? 'El ítem' : 'Los ítems'} ${lista(sinCant)} ${sinCant.length === 1 ? 'tiene' : 'tienen'} cantidad 0.`);
+  if (sinPrecio.length) avisos.push(`${sinPrecio.length === 1 ? 'El ítem' : 'Los ítems'} ${lista(sinPrecio)} ${sinPrecio.length === 1 ? 'no tiene' : 'no tienen'} precio.`);
+
+  // Sin IVA: salvo que el proveedor no lo discrimine (monotributo / exento).
+  const tieneIVA = impuestos.some(imp => /i\.?\s?v\.?\s?a/i.test(imp.nombre || '') && (imp.monto || 0) !== 0);
+  const noDiscrimina = /monotrib|exent|no\s+resp|consumidor/i.test(oc.proveedor.iva || '');
+  if (!tieneIVA && !noDiscrimina) {
+    avisos.push(ivaActive
+      ? 'Los precios se cargaron con IVA incluido, pero la OC no suma IVA: el total queda neto.'
+      : 'La OC no tiene IVA. Si el proveedor lo factura, agregalo en Impuestos y Totales.');
+  }
+  return avisos;
+}
+
+// Historial completo (una vez por visita a la página).
+let _histPromise = null;
+function historialParaComparar() {
+  if (!_histPromise) {
+    _histPromise = getHistorial('0000').catch(err => { _histPromise = null; throw err; });
+  }
+  return _histPromise;
+}
+
+const normDesc = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Compara con las OC anteriores al mismo proveedor: la última (como dato) y el
+// precio unitario de cada ítem contra la última vez que se compró.
+async function checkOCHistorial(oc) {
+  const cuit = String(oc.proveedor.cuit || '').replace(/\D/g, '');
+  const nom  = normalizeProvName(oc.proveedor.nombre);
+  const mismas = (await historialParaComparar()).filter(h =>
+    h.estado !== 'rechazada' && h.estado !== 'cancelada' && h.nroOC !== oc.nroOC &&
+    (cuit.length >= 11
+      ? String(h.proveedor?.cuit || '').replace(/\D/g, '') === cuit
+      : nom && normalizeProvName(h.proveedor?.nombre) === nom));
+  if (!mismas.length) return { avisos: [], info: 'Primera OC a este proveedor.' };
+
+  const moneda = oc.moneda;
+  const fmt = (n, cur) => (cur === 'USD' ? 'US$\u00a0' : '$\u00a0') + fmtMoneyDisplay(n);
+  const ult = mismas[0]; // getHistorial viene ordenado del más nuevo al más viejo
+  const info = `Última OC a este proveedor: ${ult.nroOC} del ${ult.fecha} por ${fmt(ult.total, ult.moneda)}.`;
+
+  const avisos = [];
+  oc.items.forEach(it => {
+    const d  = normDesc(it.desc);
+    const pu = parseFloat(it.unitario) || 0;
+    if (!d || !pu) return;
+    for (const h of mismas) {
+      if ((h.moneda || 'ARS') !== moneda) continue;
+      const prev = (h.items || []).find(x => normDesc(x.desc) === d);
+      const pp = prev && parseFloat(prev.unitario);
+      if (!pp) continue;
+      const dif = (pu - pp) / pp;
+      if (Math.abs(dif) >= 0.10) {
+        const pct = (dif > 0 ? '+' : '') + (dif * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
+        avisos.push(`"${it.desc}": ${fmt(pu, moneda)} (${pct}). En la OC ${h.nroOC} del ${h.fecha} estaba a ${fmt(pp, moneda)}.`);
+      }
+      break; // sólo contra la compra más reciente de ese ítem
+    }
+  });
+  return { avisos, info };
+}
+
+function previewWarningsHtml(avisos, info) {
+  return (avisos.length ? `
+    <div class="foc-warn">
+      <div class="foc-warn-t">${icSvg('alert')} Revisá antes de generar</div>
+      <ul>${avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul>
+    </div>` : '')
+    + (info ? `<div class="foc-info">${esc(info)}</div>` : '');
+}
+
+// Iniciales del proveedor para la burbuja de la ficha (mismo criterio que reportes):
+// dos primeras palabras sin forma societaria ni conectores; con una sola, dos letras.
+const FORMAS_SOC = /(^|\s)(s\.?\s?r\.?\s?l|s\.?\s?a\.?\s?(s|c\.?i\.?f?\.?i?\.?a?)?|s\.?\s?h)\.?(?=\s|$|-)/gi;
+const CONECTORES = new Set(['y', 'e', 'de', 'del', 'la', 'los', 'las', 'el', 'cia', 'hijos', 'hnos']);
+function inicialesProv(nombre) {
+  const pal = String(nombre || '').replace(FORMAS_SOC, ' ')
+    .split(/[^\p{L}\p{N}]+/u).filter(p => p && !CONECTORES.has(p.toLowerCase()));
+  if (!pal.length) return '?';
+  const ini = pal.length === 1 ? pal[0].slice(0, 2) : pal[0][0] + pal[1][0];
+  return ini.toUpperCase();
 }
 
 function closePreview() {
