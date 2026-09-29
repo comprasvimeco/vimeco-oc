@@ -175,21 +175,124 @@ function renderRemitosList() {
       <div class="adj-oc-bottom">
         <span class="hist-obra">${nItems} ítem${nItems !== 1 ? 's' : ''} · ${r.entrega === 'total' ? 'completó la OC' : 'entrega parcial'}</span>
         <div class="hist-actions">
+          <button class="foc-btn foc-btn--edit btn-ver-remito" data-key="${escHtml(r.key)}" title="Ver el remito">${icSvg('eye')}Ver</button>
           ${r.drive?.url
-            ? `<a class="btn btn-sm btn-outline" href="${escHtml(r.drive.url)}" target="_blank" rel="noopener">${icSvg('folder')} Drive</a>`
-            : ''}
-          ${puedeBorrar(r)
-            ? `<button class="btn btn-sm btn-danger btn-borrar-remito" data-key="${escHtml(r.key)}">Borrar</button>`
+            ? `<a class="foc-btn foc-btn--drive" href="${escHtml(r.drive.url)}" target="_blank" rel="noopener">${icSvg('folder')}Drive</a>`
             : ''}
         </div>
       </div>
     </div>`;
   }).join('');
 
-  box.querySelectorAll('.btn-borrar-remito').forEach(btn =>
-    btn.addEventListener('click', () => borrarRemito(btn.dataset.key)));
+  box.querySelectorAll('.btn-ver-remito').forEach(btn =>
+    btn.addEventListener('click', () => abrirFichaRemito(btn.dataset.key)));
 
   pager.footer('remlist', box, list, renderRemitosList);
+}
+
+// ---- Ficha del remito ----
+// Misma estética que la ficha de la OC (js/fichaOC.js): encabezado en degradé,
+// burbuja del proveedor, grilla de datos y tabla de ítems. Suma cómo quedó la
+// entrega de la OC con todos sus remitos.
+
+let fichaRemKey = null;
+
+function abrirFichaRemito(key) {
+  const r = allRemitos.find(x => x.key === key);
+  if (!r) return;
+  fichaRemKey = key;
+  const oc = allOCs.find(o => o.nroOC === r.nroOC);
+
+  $('frem-nro').textContent = r.nro || '—';
+  $('frem-oc').textContent  = r.nroOC || '—';
+  $('frem-chips').innerHTML =
+    `<span class="foc-chip">${r.entrega === 'total' ? 'Completó la OC' : 'Entrega parcial'}</span>` +
+    (r.recibidoPor?.nombre ? `<span class="foc-chip">Recibió: ${escHtml(r.recibidoPor.nombre)}</span>` : '');
+
+  const prov  = r.proveedor || oc?.proveedor || {};
+  const tags  = [prov.cuit && `CUIT ${prov.cuit}`].filter(Boolean);
+  const items = r.items || [];
+  const cargado = r.timestamp ? new Date(r.timestamp).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+
+  const itemsHtml = items.length ? `
+    <div class="foc-items-w"><table class="foc-items">
+      <thead><tr>
+        <th>Descripción</th><th class="foc-n">Recibido</th><th>Un.</th><th class="foc-n">Pedido OC</th>
+      </tr></thead>
+      <tbody>
+        ${items.map(it => {
+          const ped = oc?.items?.[Number(it.idx)]?.cant;
+          return `<tr>
+            <td>${escHtml(it.desc)}</td>
+            <td class="foc-n">${escHtml(fmtQty(parseFloat(it.cantidad) || 0))}</td>
+            <td>${it.unidad ? `<span class="foc-un">${escHtml(it.unidad)}</span>` : ''}</td>
+            <td class="foc-n">${ped != null ? escHtml(fmtQty(parseFloat(ped) || 0)) : '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div>` : '';
+
+  // Cómo quedó la OC con todos sus remitos (no sólo con éste).
+  let entregaHtml = '';
+  if (oc) {
+    const e = entregasDeOC(oc);
+    const pend = (oc.items || [])
+      .map((it, i) => ({ it, falta: e.pendiente[i] }))
+      .filter(x => x.falta > 0);
+    entregaHtml = `
+      <div class="foc-sec">Entrega de la OC <span class="foc-cnt">${e.remitos.length} remito${e.remitos.length !== 1 ? 's' : ''}</span></div>
+      <div class="rem-prog-wrap">
+        <div class="rem-prog"><div class="rem-prog-fill rem-prog-fill--${e.estado}" style="width:${Math.min(100, e.pct)}%"></div></div>
+        <span class="rem-prog-pct">${e.pct}%</span>
+        ${badgeEntrega(e.estado)}
+      </div>
+      ${pend.length ? `
+        <div class="foc-items-w" style="margin-top:.6rem;"><table class="foc-items">
+          <thead><tr><th>Falta entregar</th><th class="foc-n">Cant.</th><th>Un.</th></tr></thead>
+          <tbody>
+            ${pend.map(({ it, falta }) => `<tr>
+              <td>${escHtml(it.desc)}</td>
+              <td class="foc-n">${escHtml(fmtQty(falta))}</td>
+              <td>${it.unidad ? `<span class="foc-un">${escHtml(it.unidad)}</span>` : ''}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>` : ''}`;
+  }
+
+  const body = $('frem-body');
+  body.innerHTML = `
+    <div class="foc-prov">
+      <span class="foc-prov-ic" aria-hidden="true">${escHtml(inicialesProv(prov.nombre))}</span>
+      <div style="min-width:0">
+        <div class="foc-prov-n">${escHtml(prov.nombre || 'Proveedor sin nombre')}</div>
+        ${tags.length ? `<div class="foc-prov-s">${tags.map(t => `<span class="foc-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
+      </div>
+    </div>
+    <div class="foc-grid">
+      ${fichaRow('Fecha', isoToDisplay(r.fecha))}
+      ${fichaRow('Obra', r.obra || 'Sin obra')}
+      ${fichaRow('Fecha OC', oc?.fecha)}
+      ${fichaRow('Recibió', r.recibidoPor?.nombre)}
+      ${fichaRow('Cargado', cargado)}
+      ${fichaRow('Observaciones', r.observaciones)}
+    </div>
+    <div class="foc-sec">Ítems recibidos <span class="foc-cnt">${items.length}</span></div>
+    ${itemsHtml}
+    ${entregaHtml}`;
+  body.scrollTop = 0;
+
+  const drive = $('frem-drive');
+  drive.classList.toggle('hidden', !r.drive?.url);
+  if (r.drive?.url) drive.href = r.drive.url; else drive.removeAttribute('href');
+  $('frem-borrar').classList.toggle('hidden', !puedeBorrar(r));
+
+  $('modal-ficha-rem').classList.remove('hidden');
+}
+
+function cerrarFichaRemito() {
+  $('modal-ficha-rem').classList.add('hidden');
+  $('frem-body').innerHTML = '';
+  fichaRemKey = null;
 }
 
 // Un remito cargado de más infla lo recibido y puede dar una OC por entregada
@@ -218,6 +321,7 @@ async function borrarRemito(key) {
   }
 
   allRemitos = allRemitos.filter(r => r.key !== key);
+  if (fichaRemKey === key) cerrarFichaRemito();
   const oc = allOCs.find(o => o.nroOC === rem.nroOC);
   if (oc) {
     actualizarEntregaOC(oc);
@@ -811,6 +915,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-rem-guardar').addEventListener('click', guardarRemito);
   $('btn-rem-todo').addEventListener('click',   () => setCantidades('todo'));
   $('btn-rem-vaciar').addEventListener('click', () => setCantidades('vaciar'));
+
+  // Ficha del remito
+  $('frem-close').addEventListener('click', cerrarFichaRemito);
+  $('frem-borrar').addEventListener('click', () => { if (fichaRemKey) borrarRemito(fichaRemKey); });
 
   // Foto del remito
   if ('ontouchstart' in window || window.innerWidth <= 768)
