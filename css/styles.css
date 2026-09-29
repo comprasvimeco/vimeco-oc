@@ -486,7 +486,7 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-actions .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
 /* Factura y remitos de la OC (js/historial.js → docsHtml): pastillas chicas y,
    con más de uno, un desplegable dentro de la tarjeta. */
-.hist-docs { display: flex; gap: .35rem; flex-wrap: wrap; }
+.hist-docs { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 .hist-doc { display: inline-flex; align-items: center; gap: .3rem; border: none; border-radius: 999px; cursor: pointer;
   padding: .18rem .6rem; font-size: .72rem; font-weight: 700; font-family: inherit; transition: filter .15s; }
 .hist-doc .icon { width: 13px; height: 13px; }

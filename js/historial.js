@@ -69,10 +69,11 @@ const refFactura = (oc, f) => ({
 const fechaCorta = ts => ts ? new Date(ts).toLocaleDateString('es-AR') : '';
 const isoAFecha  = d => { const p = String(d || '').split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : (d || ''); };
 
-function docsHtml(oc) {
+// `entrega` (el sello de Entregada / Entrega parcial) va en el mismo renglón.
+function docsHtml(oc, entrega) {
   const facts = facturasDe(oc);
   const rems  = remitosPorOC[oc.nroOC] || [];
-  if (!facts.length && !rems.length) return '';
+  if (!facts.length && !rems.length) return entrega ? `<div class="hist-docs">${entrega}</div>` : '';
 
   const pill = (tipo, txt, varios) =>
     `<button class="hist-doc hist-doc--${tipo}" data-doc="${tipo}" aria-expanded="false">${icSvg(tipo === 'fact' ? 'file' : 'truck')}${esc(txt)}${
@@ -99,6 +100,7 @@ function docsHtml(oc) {
     </div>` : '';
 
   return `<div class="hist-docs">
+      ${entrega || ''}
       ${facts.length ? pill('fact', facts.length > 1 ? `Facturas · ${facts.length}` : 'Factura', facts.length > 1) : ''}
       ${rems.length  ? pill('rem',  rems.length  > 1 ? `Remitos · ${rems.length}` : `Remito ${rems[0].nro || ''}`, rems.length > 1) : ''}
     </div>${listaFact}${listaRem}`;
@@ -178,8 +180,8 @@ function renderCards(ocs) {
       </div>
       <div class="hist-proveedor">${esc(provNombre)}</div>
       <div class="hist-obra">${esc(obra)}</div>
-      ${badge || entrega ? `<div style="margin-top:.35rem;display:flex;gap:.35rem;flex-wrap:wrap;">${badge}${entrega}</div>` : ''}
-      ${docsHtml(oc)}
+      ${badge ? `<div style="margin-top:.35rem;display:flex;gap:.35rem;flex-wrap:wrap;">${badge}</div>` : ''}
+      ${docsHtml(oc, entrega)}
       ${hitsHtml(oc, itemsCoincidentes(oc, searchTerms), esc)}
       <div class="hist-card-bottom">
         <span class="hist-total">${total}</span>
