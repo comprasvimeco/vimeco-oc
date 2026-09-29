@@ -47,6 +47,32 @@
   </div>
 </main>
 
+<!-- ===== MODAL: Ficha de la OC (la misma que la vista previa de la OC) ===== -->
+<div class="modal-overlay hidden" id="modal-preview">
+  <div class="modal foc-modal">
+    <div class="foc-head">
+      <div class="foc-head-l">
+        <span class="foc-kicker">Orden de compra</span>
+        <span class="foc-nro" id="preview-title">—</span>
+        <div class="foc-chips" id="preview-chips"></div>
+      </div>
+      <div class="foc-head-r">
+        <span class="foc-kicker">Total</span>
+        <span class="foc-total" id="preview-total">—</span>
+      </div>
+      <button class="foc-x" id="modal-preview-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="preview-body"></div>
+    <div class="modal-footer foc-foot">
+      <a class="foc-btn foc-btn--pdf" id="preview-pdf" target="_blank" rel="noopener" title="Abrir el PDF de la OC">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Ver PDF</a>
+      <div class="foc-foot-r">
+        <button class="foc-btn foc-btn--gen" id="preview-base" title="Cargar en el formulario"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Usar como base</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <script src="js/jspdf.umd.min.js"></script>
@@ -57,6 +83,7 @@
 <script src="js/firebase.js"></script>
 <script src="js/driveQueue.js"></script>
 <script src="js/ocGenerator.js"></script>
+<script src="js/fichaOC.js"></script>
 <script src="js/buscarOC.js"></script>
 <script src="js/historial.js"></script>
 </body>

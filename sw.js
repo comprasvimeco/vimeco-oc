@@ -18,6 +18,7 @@ const STATIC_ASSETS = [
   BASE + '/js/driveBackup.js',
   BASE + '/js/gemini.js',
   BASE + '/js/ocGenerator.js',
+  BASE + '/js/fichaOC.js',
   BASE + '/js/logoBase64.js',
   BASE + '/obras.html',
   BASE + '/js/obras.js',

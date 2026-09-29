@@ -28,46 +28,6 @@ function fmtMoney(n) {
   return (parseFloat(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// ---- Reconstrucción de los datos de la OC para el PDF ----
-// Los pendientes guardan el payload completo (_payload); si faltara (registros
-// viejos), se reconstruye desde los campos sueltos como en el historial.
-function ocDataFromRecord(oc) {
-  if (oc._payload) return { ...oc._payload };
-  const prov = oc.proveedor || {};
-  return {
-    nroOC:    oc.nroOC,
-    fecha:    oc.fecha,
-    moneda:   oc.moneda || 'ARS',
-    ejecutor: oc.responsable?.nombre || '',
-    proveedor: {
-      nombre:    prov.nombre       || '',
-      cuit:      prov.cuit         || '',
-      codigoInterno: prov.codigoInterno || '',
-      domicilio: prov.domicilio    || '',
-      telefonos: prov.telefonos    || '',
-      iva:       prov.condicionIVA || '',
-      pago:      oc.condicionPago  || '',
-      plazo:     '',
-      lugar:     '',
-      ref:       prov.ref          || '',
-      ubicacion: oc.obra           || ''
-    },
-    rubro:  oc.rubro  || null,
-    equipo: oc.equipo || null,
-    items: (oc.items || []).map(it => ({
-      desc: it.desc || '', unidad: it.unidad || '', cant: it.cant || 0,
-      unitario: it.unitario || 0, total: it.total || 0
-    })),
-    impuestos:       oc.impuestos      || [],
-    totalLetras:     numberToWords(oc.total || 0),
-    _total:          oc.total          || 0,
-    _firma:          null,
-    _descuento:      oc.descuento      || { pct: null, monto: 0 },
-    _noGravado:      oc.noGravado      || { pct: null, monto: 0 },
-    _impuestosExtra: oc.impuestosExtra || []
-  };
-}
-
 // ---- Render de la lista ----
 function render() {
   const list = $('aut-list');
@@ -97,8 +57,8 @@ function render() {
         <span class="aut-meta">Pide: ${esc(solicitante)}</span>
       </div>
       <div class="aut-actions">
-        <button class="btn btn-sm btn-primary btn-revisar">Revisar y firmar</button>
-        <button class="btn btn-sm btn-outline btn-rechazar-rapido">Rechazar</button>
+        <button class="foc-btn foc-btn--gen btn-revisar">${icSvg('edit')}Revisar y firmar</button>
+        <button class="foc-btn foc-btn--del btn-rechazar-rapido">${icSvg('x')}Rechazar</button>
       </div>`;
     card.querySelector('.btn-revisar').addEventListener('click', () => abrirPreview(oc));
     card.querySelector('.btn-rechazar-rapido').addEventListener('click', () => { currentOC = oc; abrirRechazo(); });
@@ -160,10 +120,10 @@ function renderPedidos() {
     } else if (oc.estado === 'cancelada' && a.canceladoEn) {
       extra = `<div class="aut-meta">Cancelaste el pedido el ${esc(new Date(a.canceladoEn).toLocaleDateString('es-AR'))}</div>`;
     }
-    const acciones = oc.estado === 'pendiente'
-      ? `<div class="aut-actions">
-           <button class="btn btn-sm btn-outline btn-cancelar-pedido">Cancelar pedido</button>
-         </div>` : '';
+    const acciones = `<div class="aut-actions">
+           <button class="foc-btn foc-btn--edit btn-ver">${icSvg('eye')}Vista previa</button>
+           ${oc.estado === 'pendiente' ? '<button class="foc-btn foc-btn--clear btn-cancelar-pedido">Cancelar pedido</button>' : ''}
+         </div>`;
     const card = document.createElement('div');
     card.className = 'hist-card';
     card.innerHTML = `
@@ -179,6 +139,7 @@ function renderPedidos() {
       </div>
       ${extra}
       ${acciones}`;
+    card.querySelector('.btn-ver').addEventListener('click', () => abrirPreview(oc, true));
     const btnCanc = card.querySelector('.btn-cancelar-pedido');
     if (btnCanc) btnCanc.addEventListener('click', () => cancelarPedido(oc, btnCanc));
     list.appendChild(card);
@@ -269,7 +230,7 @@ function renderResueltas() {
       </div>
       ${extra}
       <div class="aut-actions">
-        <button class="btn btn-sm btn-outline btn-ver">Ver PDF</button>
+        <button class="foc-btn foc-btn--edit btn-ver">${icSvg('eye')}Vista previa</button>
       </div>`;
     card.querySelector('.btn-ver').addEventListener('click', () => abrirPreview(oc, true));
     list.appendChild(card);
@@ -299,54 +260,66 @@ function setTabCounts(sinVer) {
 }
 
 // ---- Vista previa ----
-function abrirPreview(oc, soloLectura) {
-  currentOC = soloLectura ? null : oc;
-  let blob;
-  try {
-    blob = generateOCBlob(ocDataFromRecord(oc));
-  } catch (e) {
-    toast('No se pudo generar la vista previa.', 'error');
-    console.error('preview:', e);
-    return;
+// La misma ficha que la vista previa de la OC nueva (js/fichaOC.js), con el PDF
+// a un toque. Las autorizadas se ven con la firma de quien las autorizó.
+let _histPromise = null;
+function historialParaComparar() {
+  if (!_histPromise) {
+    _histPromise = getHistorial('0000').catch(err => { _histPromise = null; throw err; });
   }
-  const blobUrl  = URL.createObjectURL(blob);
-  const modal    = $('modal-preview');
-  const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  return _histPromise;
+}
 
-  $('preview-title').textContent = `OC N° ${oc.nroOC}`;
-  const body = $('preview-body');
-  body.innerHTML = '';
-  if (isMobile) {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'padding:2rem;text-align:center;';
-    wrap.innerHTML = `
-      <p style="margin-bottom:1.25rem;color:var(--gray-600);">Abrí el PDF para revisarlo antes de firmar.</p>
-      <a href="${blobUrl}" target="_blank" class="btn btn-primary">Abrir PDF en nueva pestaña</a>`;
-    body.appendChild(wrap);
-  } else {
-    const iframe = document.createElement('iframe');
-    iframe.src = blobUrl;
-    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
-    body.appendChild(iframe);
-  }
+function abrirPreview(oc, soloLectura) {
+  cerrarPreview();
+  currentOC = soloLectura ? null : oc;
+  const modal = $('modal-preview');
+  const data  = ocDataFromRecord(oc);
+  const token = String(Math.random());
+  modal.dataset.token = token;
+  const vigente = () => modal.dataset.token === token;
+
+  const quien = oc.autorizacion?.solicitadoPor?.nombre || oc.responsable?.nombre;
+  pintarFichaOC(data, estadoChipFicha(oc) + (quien ? `<span class="foc-chip">Pide: ${esc(quien)}</span>` : ''));
 
   // Link al archivo fuente (presupuesto/factura) si el solicitante lo adjuntó.
   const fuente = $('preview-fuente');
   if (oc.fuenteUrl) { fuente.href = oc.fuenteUrl; fuente.classList.remove('hidden'); }
-  else { fuente.classList.add('hidden'); }
+  else { fuente.removeAttribute('href'); fuente.classList.add('hidden'); }
 
-  // Las ya resueltas se abren solo para mirarlas.
+  // Las ya resueltas y los pedidos propios se abren solo para mirarlos.
   $('preview-firmar').classList.toggle('hidden', !!soloLectura);
   $('preview-rechazar').classList.toggle('hidden', !!soloLectura);
 
-  modal.dataset.blobUrl = blobUrl;
+  const pdf = $('preview-pdf');
+  pdf.removeAttribute('href');
+  pdf.setAttribute('aria-disabled', 'true');
   modal.classList.remove('hidden');
+
+  ocDataParaPdf(oc).then(d => {
+    if (!vigente()) return;
+    const url = URL.createObjectURL(generateOCBlob(d));
+    modal.dataset.blobUrl = url;
+    pdf.href = url;
+    pdf.removeAttribute('aria-disabled');
+  }).catch(e => {
+    if (vigente()) toast('No se pudo generar el PDF.', 'error');
+    console.error('preview/pdf:', e);
+  });
+
+  // Comparación con las OC anteriores al mismo proveedor (llega después).
+  historialParaComparar().then(hist => {
+    if (!vigente()) return;
+    const res = checkOCHistorial(data, hist, oc.timestamp);
+    $('preview-warn').innerHTML = fichaInfoHtml(res.info) + comparacionHtml(res.cambios);
+  }).catch(() => {});
 }
 
 function cerrarPreview() {
   const modal   = $('modal-preview');
   const blobUrl = modal.dataset.blobUrl;
   if (blobUrl) { URL.revokeObjectURL(blobUrl); delete modal.dataset.blobUrl; }
+  delete modal.dataset.token;
   $('preview-body').innerHTML = '';
   modal.classList.add('hidden');
 }
@@ -554,7 +527,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
   // Modales
   $('modal-preview-close').addEventListener('click', cerrarPreview);
-  $('modal-preview-close2').addEventListener('click', cerrarPreview);
   $('preview-firmar').addEventListener('click', () => firmarOC(currentOC));
   $('preview-rechazar').addEventListener('click', abrirRechazo);
   $('modal-rechazo-close').addEventListener('click', cerrarRechazo);

@@ -498,7 +498,8 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-card-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin-top: .2rem; }
 .hist-total { font-size: .95rem; font-weight: 700; color: var(--success); }
 .hist-responsable { font-size: .75rem; color: var(--gray-400); }
-.hist-actions { display: flex; gap: .4rem; }
+.hist-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+.hist-actions .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
 .hist-empty { text-align: center; padding: 3rem 1rem; color: var(--gray-400); font-size: .95rem; }
 /* Botón "Ver más" del paginador (js/ui.js → pager.footer).
    Márgenes auto y no align-self: la lista de Adjuntar es un div block y las de
@@ -1110,7 +1111,7 @@ body.scan-open { overflow: hidden; }
 }
 .rem-item-input:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
 
-/* ===== Ficha de la OC (reportes + vista previa de la OC) ===== */
+/* ===== Ficha de la OC (reportes, vista previa de la OC, autorizaciones e historial) ===== */
 /* Encabezado como el hero del panel (degradé azul) y el cuerpo con la
    estética de burbujas pastel del resto del reporte. */
 .foc-modal { max-width: 640px; overflow: hidden; }
@@ -1187,6 +1188,7 @@ body.scan-open { overflow: hidden; }
 .foc-btn--pdf   { background: #fce8ee; color: #a23a57; }
 .foc-btn--del   { background: #fde6e6; color: #b02a2a; }
 .foc-btn.hidden { display: none; }
+.foc-btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 .foc-items-w { overflow-x: auto; margin-bottom: .9rem; }
 .foc-items-w .foc-items { margin-bottom: 0; }
 @media (max-width: 520px) {

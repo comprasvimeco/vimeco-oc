@@ -87,12 +87,14 @@ function renderCards(ocs) {
         <span class="hist-total">${total}</span>
         ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
         <div class="hist-actions">
-          ${showRegen ? `<button class="btn btn-sm btn-outline btn-regenerar" title="Regenerar y descargar PDF">${icSvg('print')}</button>` : ''}
-          <button class="btn btn-sm btn-primary btn-usar-base" title="Cargar en formulario">Usar como base</button>
+          <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista previa</button>
+          ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('print')}PDF</button>` : ''}
+          <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en formulario">Usar como base</button>
         </div>
       </div>`;
 
     card.querySelector('.btn-usar-base').addEventListener('click', () => usarComoBase(oc));
+    card.querySelector('.btn-ver').addEventListener('click', () => abrirFicha(oc));
 
     if (showRegen) {
       const regenBtn = card.querySelector('.btn-regenerar');
@@ -152,52 +154,9 @@ function applyFilters() {
 async function regenerarPDF(oc, btn) {
   btn.disabled = true;
   try {
-    const prov = oc.proveedor || {};
-    // Preferir el payload guardado (regenera el PDF idéntico al original);
-    // si no está (registros viejos), reconstruir desde los campos sueltos.
-    const ocData = oc._payload ? { ...oc._payload } : {
-      nroOC:    oc.nroOC,
-      fecha:    oc.fecha,
-      moneda:   oc.moneda || 'ARS',
-      ejecutor: oc.responsable?.nombre || '',
-      proveedor: {
-        nombre:    prov.nombre       || '',
-        cuit:      prov.cuit         || '',
-        codigoInterno: prov.codigoInterno || '',
-        domicilio: prov.domicilio    || '',
-        telefonos: prov.telefonos    || '',
-        iva:       prov.condicionIVA || '',
-        pago:      oc.condicionPago  || '',
-        plazo:     '',
-        lugar:     '',
-        ref:       prov.ref          || '',
-        ubicacion: oc.obra           || ''
-      },
-      rubro:       oc.rubro  || null,
-      equipo:      oc.equipo || null,
-      items: (oc.items || []).map(it => ({
-        desc:    it.desc    || '',
-        unidad:  it.unidad  || '',
-        cant:    it.cant    || 0,
-        unitario: it.unitario || 0,
-        total:   it.total   || 0
-      })),
-      impuestos:       oc.impuestos      || [],
-      totalLetras:     numberToWords(oc.total || 0),
-      _total:          oc.total          || 0,
-      _firma:          null,
-      _descuento:      oc.descuento      || { pct: null, monto: 0 },
-      _noGravado:      oc.noGravado      || { pct: null, monto: 0 },
-      _impuestosExtra: oc.impuestosExtra || []
-    };
-
-    // OC autorizada por otro usuario → re-incrustar su firma y su nombre.
-    if (oc.estado === 'autorizada' && oc.autorizacion) {
-      ocData._firmante = oc.autorizacion.firmante || ocData.ejecutor;
-      if (oc.autorizacion.firmaCodigo && typeof getFirma === 'function') {
-        try { ocData._firma = await getFirma(oc.autorizacion.firmaCodigo); } catch (_) {}
-      }
-    }
+    const prov   = oc.proveedor || {};
+    // Payload guardado (o reconstruido) y, si la autorizó otro, su firma.
+    const ocData = await ocDataParaPdf(oc);
 
     const blob  = generateOCBlob(ocData);
     const fname = `OC_${oc.nroOC}_${sanitizeStr(prov.nombre || 'SinProveedor')}.pdf`;
@@ -230,6 +189,60 @@ async function regenerarPDF(oc, btn) {
   }
 }
 
+// ---- Ficha de la OC ----
+// La misma ficha que la vista previa de la OC nueva (js/fichaOC.js), con el PDF
+// a un toque. Las pendientes y canceladas no tienen PDF definitivo.
+let fichaOC = null;
+
+function abrirFicha(oc) {
+  cerrarFicha();
+  fichaOC = oc;
+  const modal = $('modal-preview');
+  const data  = ocDataFromRecord(oc);
+  const token = String(Math.random());
+  modal.dataset.token = token;
+  const vigente = () => modal.dataset.token === token;
+
+  const resp = viewerIsAdmin && oc.responsable?.nombre
+    ? `<span class="foc-chip">${esc(oc.responsable.nombre)}</span>` : '';
+  pintarFichaOC(data, estadoChipFicha(oc) + resp);
+
+  const pdf = $('preview-pdf');
+  const sinPdf = oc.estado === 'pendiente' || oc.estado === 'cancelada';
+  pdf.removeAttribute('href');
+  pdf.setAttribute('aria-disabled', 'true');
+  pdf.title = sinPdf ? (oc.estado === 'pendiente' ? 'Todavía no tiene PDF: está pendiente de firma' : 'La OC se canceló: no tiene PDF')
+                     : 'Abrir el PDF de la OC';
+  modal.classList.remove('hidden');
+
+  if (!sinPdf) {
+    ocDataParaPdf(oc).then(d => {
+      if (!vigente()) return;
+      const url = URL.createObjectURL(generateOCBlob(d));
+      modal.dataset.blobUrl = url;
+      pdf.href = url;
+      pdf.removeAttribute('aria-disabled');
+    }).catch(e => {
+      if (vigente()) toast('No se pudo generar el PDF.', 'error');
+      console.error('ficha/pdf:', e);
+    });
+  }
+
+  // Comparación con las OC anteriores al mismo proveedor.
+  const res = checkOCHistorial(data, allOCs, oc.timestamp);
+  $('preview-warn').innerHTML = fichaInfoHtml(res.info) + comparacionHtml(res.cambios);
+}
+
+function cerrarFicha() {
+  const modal   = $('modal-preview');
+  const blobUrl = modal.dataset.blobUrl;
+  if (blobUrl) { URL.revokeObjectURL(blobUrl); delete modal.dataset.blobUrl; }
+  delete modal.dataset.token;
+  $('preview-body').innerHTML = '';
+  modal.classList.add('hidden');
+  fichaOC = null;
+}
+
 function usarComoBase(oc) {
   sessionStorage.setItem('oc_base', JSON.stringify(oc));
   window.location.href = 'app.html';
@@ -247,6 +260,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-facturas').addEventListener('click', () => { window.location.href = 'facturas.html'; });
   $('btn-back').addEventListener('click',    () => { window.location.href = 'compras.html'; });
   $('hist-search').addEventListener('input',  applyFilters);
+  $('modal-preview-close').addEventListener('click', cerrarFicha);
+  $('preview-base').addEventListener('click', () => { if (fichaOC) usarComoBase(fichaOC); });
   $('hist-desde').addEventListener('change',  applyFilters);
   $('hist-hasta').addEventListener('change',  applyFilters);
   $('btn-clear-dates').addEventListener('click', () => {

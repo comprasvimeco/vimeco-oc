@@ -2309,95 +2309,25 @@ async function handlePreview() {
   openPreview(blob, ocData);
 }
 
-// Fila de la ficha: se omite si el campo quedó vacío ('—' es el vacío del PDF).
-function fichaRow(lbl, val) {
-  if (!val || val === '—') return '';
-  return `<div class="foc-f"><span class="foc-k">${esc(lbl)}</span><span class="foc-v">${esc(val)}</span></div>`;
-}
-
-// La vista previa es la misma ficha que muestra reportes, armada con los datos
-// del formulario. El PDF real queda a un toque ("Ver PDF").
+// La vista previa es la misma ficha que muestra reportes (js/fichaOC.js),
+// armada con los datos del formulario. El PDF real queda a un toque ("Ver PDF").
 function openPreview(blob, oc) {
   const blobUrl = URL.createObjectURL(blob);
   const modal   = $('modal-preview');
-  const usd     = oc.moneda === 'USD';
-  const money   = n => (usd ? 'US$\u00a0' : '$\u00a0') + fmtMoneyDisplay(n);
-  const prov    = oc.proveedor;
-  const vacio   = v => !v || v === '—';
 
-  $('preview-title').textContent = oc.nroOC;
-  $('preview-total').textContent = money(oc._total);
-  $('preview-chips').innerHTML = `<span class="foc-chip">${manualOCNumber ? 'N° manual' : 'N° provisorio'}</span>`
-    + (usd ? '<span class="foc-chip">En dólares</span>' : '');
-
-  const eq = oc.equipo;
-  const equipo = eq ? eq.codigo + (eq.patente ? ` (${eq.patente})` : '') + (eq.tipo ? ' — ' + eq.tipo : '') : '';
-
-  const itemsHtml = oc.items.length ? `
-    <div class="foc-items-w"><table class="foc-items">
-      <thead><tr>
-        <th>Descripción</th><th class="foc-n">Cant.</th><th>Un.</th>
-        <th class="foc-n foc-c-unit">Unitario</th><th class="foc-n">Total</th>
-      </tr></thead>
-      <tbody>
-        ${oc.items.map(it => `<tr>
-          <td>${esc(it.desc)}</td>
-          <td class="foc-n">${esc(it.cant)}</td>
-          <td>${vacio(it.unidad) ? '' : `<span class="foc-un">${esc(it.unidad)}</span>`}</td>
-          <td class="foc-n foc-c-unit">${esc(money(it.unitario))}</td>
-          <td class="foc-n">${esc(money(it.total))}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table></div>` : '';
-
-  const tags = [
-    !vacio(prov.cuit) && `CUIT ${prov.cuit}`,
-    !vacio(prov.iva) && prov.iva,
-    prov.codigoInterno && `Cód. ${prov.codigoInterno}`,
-    !vacio(prov.telefonos) && prov.telefonos,
-    !vacio(prov.domicilio) && prov.domicilio
-  ].filter(Boolean);
-
-  $('preview-body').innerHTML = `
-    <div id="preview-warn">${previewWarningsHtml(checkOCLocal(oc))}</div>
-    <div class="foc-prov">
-      <span class="foc-prov-ic" aria-hidden="true">${esc(inicialesProv(prov.nombre))}</span>
-      <div style="min-width:0">
-        <div class="foc-prov-n">${esc(prov.nombre)}</div>
-        ${tags.length ? `<div class="foc-prov-s">${tags.map(t => `<span class="foc-tag">${esc(t)}</span>`).join('')}</div>` : ''}
-      </div>
-    </div>
-    <div class="foc-grid">
-      ${fichaRow('Fecha', oc.fecha)}
-      ${fichaRow('Obra', prov.ubicacion)}
-      ${fichaRow('Rubro', oc.rubro?.nombre)}
-      ${fichaRow('Equipo', equipo)}
-      ${fichaRow('Categoría', eq?.categoria)}
-      ${fichaRow('Cond. pago', prov.pago)}
-      ${fichaRow('Plazo de entrega', prov.plazo)}
-      ${fichaRow('Lugar de entrega', prov.lugar)}
-      ${fichaRow('Contacto', prov.nombre_contacto)}
-      ${fichaRow('Ref. presupuesto', prov.ref)}
-      ${fichaRow('Observaciones', oc.observaciones)}
-    </div>
-    <div class="foc-sec">Ítems <span class="foc-cnt">${oc.items.length}</span></div>
-    ${itemsHtml}
-    <div class="foc-tot">
-      ${oc.impuestos.map(i => `<div class="foc-t ${/^total$/i.test(i.nombre) ? 'foc-t-grand' : ''}">
-        <span>${esc(i.nombre)}</span><span>${esc(money(i.monto))}</span></div>`).join('')}
-    </div>
-    <div class="foc-letras">Son ${usd ? 'dólares' : 'pesos'}: ${esc(oc.totalLetras)}</div>`;
+  pintarFichaOC(oc, `<span class="foc-chip">${manualOCNumber ? 'N° manual' : 'N° provisorio'}</span>`,
+    previewWarningsHtml(checkOCLocal(oc)));
 
   $('preview-pdf').href = blobUrl;
   modal.dataset.blobUrl = blobUrl;
   modal.classList.remove('hidden');
-  $('preview-body').scrollTop = 0;
 
   // La comparación con OC anteriores necesita el historial: llega después y se
   // agrega debajo de los avisos, si la vista previa sigue abierta.
   const token = blobUrl;
-  checkOCHistorial(oc).then(res => {
-    if (modal.dataset.blobUrl !== token || !res) return;
+  historialParaComparar().then(hist => {
+    if (modal.dataset.blobUrl !== token) return;
+    const res = checkOCHistorial(oc, hist);
     $('preview-warn').innerHTML = previewWarningsHtml(checkOCLocal(oc), res.info) + comparacionHtml(res.cambios);
   }).catch(() => {});
 }
@@ -2433,98 +2363,13 @@ function historialParaComparar() {
   return _histPromise;
 }
 
-const normDesc = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/[^a-z0-9]+/g, ' ').trim();
-
-// Compara con las OC anteriores al mismo proveedor: la última (como dato) y el
-// precio unitario de cada ítem contra la última vez que se compró.
-async function checkOCHistorial(oc) {
-  const cuit = String(oc.proveedor.cuit || '').replace(/\D/g, '');
-  const nom  = normalizeProvName(oc.proveedor.nombre);
-  const mismas = (await historialParaComparar()).filter(h =>
-    h.estado !== 'rechazada' && h.estado !== 'cancelada' && h.nroOC !== oc.nroOC &&
-    (cuit.length >= 11
-      ? String(h.proveedor?.cuit || '').replace(/\D/g, '') === cuit
-      : nom && normalizeProvName(h.proveedor?.nombre) === nom));
-  if (!mismas.length) return { cambios: [], info: 'Primera OC a este proveedor.' };
-
-  const moneda = oc.moneda;
-  const ult = mismas[0]; // getHistorial viene ordenado del más nuevo al más viejo
-  const info = `Última OC a este proveedor: ${ult.fecha}, por ${fmtMonto(ult.total, ult.moneda)}.`;
-
-  const cambios = [];
-  oc.items.forEach(it => {
-    const d  = normDesc(it.desc);
-    const pu = parseFloat(it.unitario) || 0;
-    if (!d || !pu) return;
-    for (const h of mismas) {
-      if ((h.moneda || 'ARS') !== moneda) continue;
-      const prev = (h.items || []).find(x => normDesc(x.desc) === d);
-      const pp = prev && parseFloat(prev.unitario);
-      if (!pp) continue;
-      const dif = (pu - pp) / pp;
-      if (Math.abs(dif) >= 0.10) {
-        cambios.push({ desc: it.desc, antes: pp, ahora: pu, dif, moneda, fecha: h.fecha });
-      }
-      break; // sólo contra la compra más reciente de ese ítem
-    }
-  });
-  return { cambios, info };
-}
-
-const fmtMonto = (n, cur) => (cur === 'USD' ? 'US$ ' : '$ ') + fmtMoneyDisplay(n);
-
-// Desplegable con una tarjeta por ítem cuyo precio cambió respecto de la
-// última compra. Sube = rojo, baja = verde.
-function comparacionHtml(cambios) {
-  if (!cambios || !cambios.length) return '';
-  const suben = cambios.filter(c => c.dif > 0).length;
-  const bajan = cambios.length - suben;
-  const pct = d => (d > 0 ? '+' : '') + (d * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
-  const cards = cambios.map(c => {
-    const cls = c.dif > 0 ? 'up' : 'down';
-    const delta = (c.dif > 0 ? '+' : '−') + fmtMonto(Math.abs(c.ahora - c.antes), c.moneda);
-    return `<div class="foc-cmp-card">
-      <div class="foc-cmp-desc">${esc(c.desc)}</div>
-      <div class="foc-cmp-row">
-        <span class="foc-cmp-tag"><small>Antes</small>${esc(fmtMonto(c.antes, c.moneda))}</span>
-        ${icSvg('arrowRight', 'foc-cmp-arr')}
-        <span class="foc-cmp-tag foc-cmp-now"><small>Ahora</small>${esc(fmtMonto(c.ahora, c.moneda))}</span>
-        <span class="foc-cmp-dif ${cls}">${esc(pct(c.dif))}<small>${esc(delta)}</small></span>
-      </div>
-      <div class="foc-cmp-ref">Última compra: ${esc(c.fecha)}</div>
-    </div>`;
-  }).join('');
-  return `<details class="foc-cmp">
-    <summary>
-      ${icSvg('trend')}<span class="foc-cmp-t">Comparación<span class="foc-cmp-t2"> de precios</span></span>
-      ${suben ? `<span class="foc-cmp-chip up">${suben} ${suben === 1 ? 'sube' : 'suben'}</span>` : ''}
-      ${bajan ? `<span class="foc-cmp-chip down">${bajan} ${bajan === 1 ? 'baja' : 'bajan'}</span>` : ''}
-      ${icSvg('chevron', 'foc-cmp-chev')}
-    </summary>
-    <div class="foc-cmp-list">${cards}</div>
-  </details>`;
-}
-
 function previewWarningsHtml(avisos, info) {
   return (avisos.length ? `
     <div class="foc-warn">
       <div class="foc-warn-t">${icSvg('alert')} Revisá antes de generar</div>
       <ul>${avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul>
     </div>` : '')
-    + (info ? `<div class="foc-info">${esc(info)}</div>` : '');
-}
-
-// Iniciales del proveedor para la burbuja de la ficha (mismo criterio que reportes):
-// dos primeras palabras sin forma societaria ni conectores; con una sola, dos letras.
-const FORMAS_SOC = /(^|\s)(s\.?\s?r\.?\s?l|s\.?\s?a\.?\s?(s|c\.?i\.?f?\.?i?\.?a?)?|s\.?\s?h)\.?(?=\s|$|-)/gi;
-const CONECTORES = new Set(['y', 'e', 'de', 'del', 'la', 'los', 'las', 'el', 'cia', 'hijos', 'hnos']);
-function inicialesProv(nombre) {
-  const pal = String(nombre || '').replace(FORMAS_SOC, ' ')
-    .split(/[^\p{L}\p{N}]+/u).filter(p => p && !CONECTORES.has(p.toLowerCase()));
-  if (!pal.length) return '?';
-  const ini = pal.length === 1 ? pal[0].slice(0, 2) : pal[0][0] + pal[1][0];
-  return ini.toUpperCase();
+    + fichaInfoHtml(info);
 }
 
 function closePreview() {

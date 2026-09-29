@@ -33,6 +33,9 @@
     .aut-estado-aprob  { background:#e3f5e8; color:#1e7d3a; }
     .aut-estado-rech   { background:#fde6e6; color:#b02a2a; }
     .aut-estado-canc   { background:#eceef1; color:#5b6573; }
+    /* Pie de la ficha: con cuatro pastillas, en el celular pasa a dos renglones. */
+    #modal-preview .foc-foot { flex-wrap: wrap; }
+    .aut-actions .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
     .aut-motivo { color:var(--gray-600); font-size:.85rem; margin-top:.45rem; font-style:italic; }
   </style>
 </head>
@@ -93,19 +96,33 @@
   </div>
 </main>
 
-<!-- ===== MODAL: Vista previa ===== -->
+<!-- ===== MODAL: Vista previa (la misma ficha que la vista previa de la OC) ===== -->
 <div class="modal-overlay hidden" id="modal-preview">
-  <div class="modal modal--xl">
-    <div class="modal-header">
-      <span class="modal-title" id="preview-title">Vista previa</span>
-      <button class="modal-close" id="modal-preview-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div class="modal foc-modal">
+    <div class="foc-head">
+      <div class="foc-head-l">
+        <span class="foc-kicker">Orden de compra</span>
+        <span class="foc-nro" id="preview-title">—</span>
+        <div class="foc-chips" id="preview-chips"></div>
+      </div>
+      <div class="foc-head-r">
+        <span class="foc-kicker">Total</span>
+        <span class="foc-total" id="preview-total">—</span>
+      </div>
+      <button class="foc-x" id="modal-preview-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="modal-body" id="preview-body"></div>
-    <div class="modal-footer" id="preview-footer">
-      <a class="btn btn-outline hidden" id="preview-fuente" target="_blank" rel="noopener"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Ver archivo adjunto</a>
-      <button class="btn btn-secondary" id="modal-preview-close2">Cerrar</button>
-      <button class="btn btn-danger"  id="preview-rechazar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Rechazar</button>
-      <button class="btn btn-success" id="preview-firmar"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Firmar y autorizar</button>
+    <div class="modal-footer foc-foot">
+      <div class="foc-foot-r">
+        <a class="foc-btn foc-btn--pdf" id="preview-pdf" target="_blank" rel="noopener" title="Abrir el PDF de la OC">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Ver PDF</a>
+        <a class="foc-btn foc-btn--drive hidden" id="preview-fuente" target="_blank" rel="noopener" title="Presupuesto o factura que adjuntó el solicitante">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>Adjunto</a>
+      </div>
+      <div class="foc-foot-r">
+        <button class="foc-btn foc-btn--del" id="preview-rechazar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Rechazar</button>
+        <button class="foc-btn foc-btn--gen" id="preview-firmar"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Firmar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -159,6 +176,7 @@
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>
 <script src="js/ocGenerator.js"></script>
+<script src="js/fichaOC.js"></script>
 <script src="js/autorizaciones.js"></script>
 </body>
 </html>
