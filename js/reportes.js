@@ -1663,9 +1663,19 @@ function openOCDetail(key) {
   $('foc-total').textContent = fmtDec(oc.total, cur);
   const ent = oc.entrega?.estado || 'sin';
   const REM_TXT = { sin: 'No', parcial: 'Parcial', completa: 'Sí' };
+  // Las pastillas de Factura y Remito abren los documentos (js/fichaRemito.js):
+  // la factura, el archivo; el remito, su ficha. Con más de uno, se despliega
+  // la lista arriba del cuerpo. La cantidad de remitos sale del resumen que
+  // Remitos espeja en la OC; el detalle llega aparte (remitosPorOCAsync).
+  const facts = facturasDeOC(oc);
+  const nRem  = Object.values(oc.entrega?.remitos || {}).length;
+  const chev  = n => n > 1 ? icSvg('chevron', 'hist-doc-chev') : '';
+  const chip  = (doc, n, cls, txt) => n
+    ? `<button class="rep-chip foc-doc ${cls}" data-doc="${doc}" aria-expanded="false">${txt}${chev(n)}</button>`
+    : `<span class="rep-chip ${cls}">${txt}</span>`;
   $('foc-estado').innerHTML  = estadoChip(oc)
-    + `<span class="rep-chip rr-f rr-f--${f.estado}">Factura: ${esc(textoFactura(f, vencida))}</span>`
-    + `<span class="rep-chip rem-chip rem-chip--${ent}">Remito: ${REM_TXT[ent] || 'No'}</span>`;
+    + chip('fact', facts.length, `rr-f rr-f--${f.estado}`, `Factura: ${esc(textoFactura(f, vencida))}`)
+    + chip('rem',  nRem, `rem-chip rem-chip--${ent}`, `Remito: ${REM_TXT[ent] || 'No'}`);
 
   const items = oc.items || [];
   const itemsHtml = items.length ? `
@@ -1715,6 +1725,7 @@ function openOCDetail(key) {
   const cmp = checkOCHistorial(oc, ALL_RAW, oc.timestamp);
 
   $('foc-body').innerHTML = `
+    <div id="foc-docs"></div>
     ${fichaInfoHtml(cmp.info)}${comparacionHtml(cmp.cambios)}
     <div class="foc-prov">
       <span class="foc-prov-ic" aria-hidden="true">${esc(inicialesProv(prov.nombre))}</span>
@@ -1752,6 +1763,17 @@ function openOCDetail(key) {
 
   $('foc-pdf').disabled = oc.estado === 'pendiente' || oc.estado === 'cancelada';
   $('modal-oc').classList.remove('hidden');
+
+  // Sin los remitos igual se enganchan las pastillas: la factura no los necesita.
+  const enganchar = rems => {
+    if (detailKey !== key) return;
+    $('foc-docs').innerHTML = docsListasHtml(facts, rems);
+    bindDocsOC($('modal-oc'), oc, facts, rems, { encima: true });
+  };
+  if (!nRem) enganchar([]);
+  else remitosPorOCAsync()
+    .then(map => enganchar(map[oc.nroOC] || []))
+    .catch(e => { console.warn('getRemitos:', e); enganchar([]); });
 }
 
 async function eliminarDesdeFicha() {
@@ -2004,6 +2026,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('rep-loading').classList.add('hidden');
     $('rep-content').classList.remove('hidden');
     render();
+    remitosPorOCAsync().catch(() => {});   // para que la ficha los tenga al abrir
   } catch (e) {
     console.error('getHistorial:', e);
     $('rep-loading').innerHTML = 'No se pudieron cargar las órdenes. Revisá tu conexión y recargá.';

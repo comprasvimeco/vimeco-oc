@@ -1135,6 +1135,13 @@ body.scan-open { overflow: hidden; }
 .foc-total { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .foc-chips { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .3rem; }
 .foc-chips .rep-chip { font-size: .68rem; padding: .12rem .55rem; }
+/* Pastillas de Factura / Remito que abren los documentos (Reportes). */
+.foc-chips .foc-doc { display: inline-flex; align-items: center; gap: .25rem; border: none; cursor: pointer;
+  font-family: inherit; line-height: inherit; transition: filter .15s; }
+.foc-chips .foc-doc:hover { filter: brightness(.94); }
+.foc-doc .icon { width: 12px; height: 12px; }
+.foc-doc[aria-expanded="true"] .hist-doc-chev { transform: rotate(180deg); }
+#foc-docs .hist-doc-list { margin-bottom: .75rem; }
 .foc-x { position: absolute; top: .75rem; right: .75rem; width: 30px; height: 30px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
   border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.1); color: #fff; transition: background .15s; }

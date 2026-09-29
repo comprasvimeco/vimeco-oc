@@ -52,26 +52,11 @@ function entregaBadge(oc) {
 let remitosPorOC = {};   // nroOC → remitos (del más nuevo al más viejo); llega después que las OC
 let ultimaLista  = [];   // lo último pintado, para repintar cuando llegan los remitos
 
-function facturasDe(oc) {
-  return Object.values(oc.adjuntos || {})
-    .filter(a => a && a.tipo === 'factura')
-    .sort((a, b) => (b.ts || 0) - (a.ts || 0));
-}
-
-// Las facturas cargadas antes de que se guardara la carpeta se buscan en la de
-// la OC: se subieron a las dos y la de OBRAS es la que se prueba primero.
-const refFactura = (oc, f) => ({
-  fileId:   f.fileId || null,
-  folderId: f.folderId || oc.drive_folder_obras_id || oc.drive_folder_proveedores_id || oc.drive_folder_id || null,
-  nombre:   f.nombre
-});
-
-const fechaCorta = ts => ts ? new Date(ts).toLocaleDateString('es-AR') : '';
-const isoAFecha  = d => { const p = String(d || '').split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : (d || ''); };
-
+// Las listas desplegables y qué abre cada renglón viven en js/fichaRemito.js
+// (las comparte la ficha de la OC en Reportes).
 // `entrega` (el sello de Entregada / Entrega parcial) va en el mismo renglón.
 function docsHtml(oc, entrega) {
-  const facts = facturasDe(oc);
+  const facts = facturasDeOC(oc);
   const rems  = remitosPorOC[oc.nroOC] || [];
   if (!facts.length && !rems.length) return entrega ? `<div class="hist-docs">${entrega}</div>` : '';
 
@@ -79,64 +64,20 @@ function docsHtml(oc, entrega) {
     `<button class="hist-doc hist-doc--${tipo}" data-doc="${tipo}" aria-expanded="false">${icSvg(tipo === 'fact' ? 'file' : 'truck')}${esc(txt)}${
       varios ? icSvg('chevron', 'hist-doc-chev') : ''}</button>`;
 
-  const archivoBtn = i =>
-    `<button class="hist-doc-file" data-i="${i}" title="Ver la foto del remito">${icSvg('file')}</button>`;
-
-  const listaFact = facts.length > 1 ? `
-    <div class="hist-doc-list hidden" data-list="fact">
-      ${facts.map((f, i) => `<div class="hist-doc-row">
-        <button class="hist-doc-open" data-tipo="fact" data-i="${i}">
-          <b>Factura ${esc(fechaCorta(f.ts))}</b><span>${esc(f.nombre || '')}</span></button>
-      </div>`).join('')}
-    </div>` : '';
-
-  const listaRem = rems.length > 1 ? `
-    <div class="hist-doc-list hidden" data-list="rem">
-      ${rems.map((r, i) => `<div class="hist-doc-row">
-        <button class="hist-doc-open" data-tipo="rem" data-i="${i}">
-          <b>Remito ${esc(r.nro || '—')}</b><span>${esc(isoAFecha(r.fecha))} · ${r.entrega === 'total' ? 'completó la OC' : 'parcial'}</span></button>
-        ${r.drive?.fileId || (r.drive?.folderId && r.drive?.archivo) ? archivoBtn(i) : ''}
-      </div>`).join('')}
-    </div>` : '';
-
   return `<div class="hist-docs">
       ${entrega || ''}
       ${facts.length ? pill('fact', facts.length > 1 ? `Facturas · ${facts.length}` : 'Factura', facts.length > 1) : ''}
       ${rems.length  ? pill('rem',  rems.length  > 1 ? `Remitos · ${rems.length}` : `Remito ${rems[0].nro || ''}`, rems.length > 1) : ''}
-    </div>${listaFact}${listaRem}`;
+    </div>${docsListasHtml(facts, rems)}`;
 }
 
-function bindDocs(card, oc) {
-  const facts = facturasDe(oc);
-  const rems  = remitosPorOC[oc.nroOC] || [];
-  const verFactura = i => abrirArchivoDrive(refFactura(oc, facts[i]), 'la factura');
-  const verRemito  = i => abrirFichaRemito(rems[i], oc, rems);
-
-  card.querySelectorAll('.hist-doc').forEach(btn => btn.addEventListener('click', () => {
-    const tipo  = btn.dataset.doc;
-    const lista = tipo === 'fact' ? facts : rems;
-    if (lista.length === 1) { tipo === 'fact' ? verFactura(0) : verRemito(0); return; }
-    // Una lista abierta a la vez: la otra se cierra.
-    card.querySelectorAll('.hist-doc-list').forEach(l => {
-      const esta = l.dataset.list === tipo;
-      l.classList.toggle('hidden', !esta || !l.classList.contains('hidden'));
-    });
-    card.querySelectorAll('.hist-doc').forEach(b => b.setAttribute('aria-expanded',
-      String(!card.querySelector(`.hist-doc-list[data-list="${b.dataset.doc}"]`)?.classList.contains('hidden'))));
-  }));
-  card.querySelectorAll('.hist-doc-open').forEach(btn => btn.addEventListener('click', () =>
-    btn.dataset.tipo === 'fact' ? verFactura(+btn.dataset.i) : verRemito(+btn.dataset.i)));
-  card.querySelectorAll('.hist-doc-file').forEach(btn => btn.addEventListener('click', () =>
-    abrirArchivoDrive(rems[+btn.dataset.i].drive, 'la foto del remito')));
-}
+const bindDocs = (card, oc) => bindDocsOC(card, oc, facturasDeOC(oc), remitosPorOC[oc.nroOC] || []);
 
 // Los remitos no hacen falta para ver la lista: llegan en segundo plano y se
 // repinta la página actual.
 async function cargarRemitos() {
   try {
-    const rems = await getRemitos();
-    remitosPorOC = {};
-    rems.forEach(r => { (remitosPorOC[r.nroOC] = remitosPorOC[r.nroOC] || []).push(r); });
+    remitosPorOC = await remitosPorOCAsync();
     renderCards(ultimaLista);
   } catch (e) {
     console.warn('getRemitos:', e);

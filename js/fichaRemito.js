@@ -1,12 +1,14 @@
 /* VIMECO S.A. — Ficha del remito
    Misma estética que la ficha de la OC (js/fichaOC.js): encabezado en degradé,
    burbuja del proveedor, grilla de datos y tabla de ítems, más cómo quedó la
-   entrega de la OC con todos sus remitos. La usan Remitos y el Historial.
+   entrega de la OC con todos sus remitos. La usan Remitos, el Historial y la
+   ficha de la OC en Reportes; al final están las pastillas de factura y
+   remitos que comparten esas dos últimas.
 
    A diferencia de la ficha de la OC, el modal lo arma este archivo: así las dos
    páginas no repiten el markup.
 
-   Requiere: ui.js (escHtml, toast), fichaOC.js (fichaRow, inicialesProv),
+   Requiere: ui.js (escHtml, toast), firebase.js (getRemitos), fichaOC.js (fichaRow, inicialesProv),
    entregas.js (calcEntrega) y drive.js (findFileInFolder) para abrir archivos. */
 
 const _frQty  = n => (parseFloat(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 });
@@ -64,9 +66,11 @@ function _frModal() {
 
 // `oc` y `remitosDeOC` pueden faltar (OC que el usuario no ve): la ficha se
 // arma igual, sin la columna de lo pedido ni la sección de entrega.
-// `onBorrar(key)`, si viene, muestra el botón Borrar.
-function abrirFichaRemito(r, oc, remitosDeOC, { onBorrar } = {}) {
+// `onBorrar(key)`, si viene, muestra el botón Borrar. `encima` la pone sobre
+// otro modal abierto (la ficha de la OC en Reportes).
+function abrirFichaRemito(r, oc, remitosDeOC, { onBorrar, encima } = {}) {
   const modal = _frModal();
+  modal.style.zIndex = encima ? '1000' : '';
   _frActual = { r, onBorrar };
 
   document.getElementById('frem-nro').textContent = r.nro || '—';
@@ -195,4 +199,80 @@ async function abrirArchivoDrive(ref, que) {
     toast('No se pudo buscar el archivo en Drive: se abre la carpeta de la OC.', 'warning');
     if (w) w.location.href = carpeta; else window.open(carpeta, '_blank', 'noopener');
   }
+}
+
+// ---- Factura y remitos de una OC (pastillas del Historial y de Reportes) ----
+
+function facturasDeOC(oc) {
+  return Object.values(oc.adjuntos || {})
+    .filter(a => a && a.tipo === 'factura')
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+}
+
+// Las facturas cargadas antes de que se guardara la carpeta se buscan en la de
+// la OC: se subieron a las dos y la de OBRAS es la que se prueba primero.
+const refFacturaOC = (oc, f) => ({
+  fileId:   f.fileId || null,
+  folderId: f.folderId || oc.drive_folder_obras_id || oc.drive_folder_proveedores_id || oc.drive_folder_id || null,
+  nombre:   f.nombre
+});
+
+// nroOC → remitos (del más nuevo al más viejo). Se baja una sola vez por página;
+// si falla, el próximo pedido reintenta.
+let _frRemitosProm = null;
+function remitosPorOCAsync() {
+  if (!_frRemitosProm) {
+    _frRemitosProm = getRemitos().then(rems => {
+      const map = {};
+      rems.forEach(r => { (map[r.nroOC] = map[r.nroOC] || []).push(r); });
+      return map;
+    }).catch(e => { _frRemitosProm = null; throw e; });
+  }
+  return _frRemitosProm;
+}
+
+// Listas que despliegan las pastillas cuando hay más de una factura o remito.
+// Arrancan ocultas; `toggleDocsLista` las abre.
+function docsListasHtml(facts, rems) {
+  const fechaCorta = ts => ts ? new Date(ts).toLocaleDateString('es-AR') : '';
+  const listaFact = facts.length > 1 ? `
+    <div class="hist-doc-list hidden" data-list="fact">
+      ${facts.map((f, i) => `<div class="hist-doc-row">
+        <button class="hist-doc-open" data-tipo="fact" data-i="${i}">
+          <b>Factura ${escHtml(fechaCorta(f.ts))}</b><span>${escHtml(f.nombre || '')}</span></button>
+      </div>`).join('')}
+    </div>` : '';
+  const listaRem = rems.length > 1 ? `
+    <div class="hist-doc-list hidden" data-list="rem">
+      ${rems.map((r, i) => `<div class="hist-doc-row">
+        <button class="hist-doc-open" data-tipo="rem" data-i="${i}">
+          <b>Remito ${escHtml(r.nro || '—')}</b><span>${escHtml(_frFecha(r.fecha))} · ${r.entrega === 'total' ? 'completó la OC' : 'parcial'}</span></button>
+        ${r.drive?.fileId || (r.drive?.folderId && r.drive?.archivo)
+          ? `<button class="hist-doc-file" data-i="${i}" title="Ver la foto del remito">${icSvg('file')}</button>` : ''}
+      </div>`).join('')}
+    </div>` : '';
+  return listaFact + listaRem;
+}
+
+// Engancha las pastillas (`[data-doc="fact|rem"]`) y las listas que haya dentro
+// de `root`. Con un solo documento, la pastilla lo abre directo; con más,
+// despliega la lista (una abierta a la vez).
+function bindDocsOC(root, oc, facts, rems, { encima } = {}) {
+  const verFactura = i => abrirArchivoDrive(refFacturaOC(oc, facts[i]), 'la factura');
+  const verRemito  = i => abrirFichaRemito(rems[i], oc, rems, { encima });
+
+  root.querySelectorAll('[data-doc]').forEach(btn => btn.addEventListener('click', () => {
+    const tipo  = btn.dataset.doc;
+    const lista = tipo === 'fact' ? facts : rems;
+    if (!lista.length) return;
+    if (lista.length === 1) { tipo === 'fact' ? verFactura(0) : verRemito(0); return; }
+    root.querySelectorAll('.hist-doc-list').forEach(l =>
+      l.classList.toggle('hidden', l.dataset.list !== tipo || !l.classList.contains('hidden')));
+    root.querySelectorAll('[data-doc]').forEach(b => b.setAttribute('aria-expanded',
+      String(!root.querySelector(`.hist-doc-list[data-list="${b.dataset.doc}"]`)?.classList.contains('hidden'))));
+  }));
+  root.querySelectorAll('.hist-doc-open').forEach(btn => btn.addEventListener('click', () =>
+    btn.dataset.tipo === 'fact' ? verFactura(+btn.dataset.i) : verRemito(+btn.dataset.i)));
+  root.querySelectorAll('.hist-doc-file').forEach(btn => btn.addEventListener('click', () =>
+    abrirArchivoDrive(rems[+btn.dataset.i].drive, 'la foto del remito')));
 }
