@@ -1646,23 +1646,8 @@ function borrarDuplicado(key) { return borrarOC(key, 'Borrar OC duplicada'); }
 
 let detailKey = null;
 
-// Iniciales del proveedor para la burbuja de la ficha: primeras letras de las
-// dos primeras palabras, sin la forma societaria ni conectores. Con una sola
-// palabra, sus dos primeras letras ("DGB SRL" → DG).
-const FORMAS_SOC = /(^|\s)(s\.?\s?r\.?\s?l|s\.?\s?a\.?\s?(s|c\.?i\.?f?\.?i?\.?a?)?|s\.?\s?h)\.?(?=\s|$|-)/gi;
-const CONECTORES = new Set(['y', 'e', 'de', 'del', 'la', 'los', 'las', 'el', 'cia', 'hijos', 'hnos']);
-function iniciales(nombre) {
-  const pal = String(nombre || '').replace(FORMAS_SOC, ' ')
-    .split(/[^\p{L}\p{N}]+/u).filter(p => p && !CONECTORES.has(p.toLowerCase()));
-  if (!pal.length) return '?';
-  const ini = pal.length === 1 ? pal[0].slice(0, 2) : pal[0][0] + pal[1][0];
-  return ini.toUpperCase();
-}
-
-function fichaRow(lbl, val) {
-  if (!val) return '';
-  return `<div class="foc-f"><span class="foc-k">${esc(lbl)}</span><span class="foc-v">${esc(val)}</span></div>`;
-}
+// Las iniciales del proveedor, las filas de la ficha y la comparación de
+// precios vienen de js/fichaOC.js (compartido con la vista previa de la OC).
 
 function openOCDetail(key) {
   const oc = ocByKey(key);
@@ -1726,9 +1711,13 @@ function openOCDetail(key) {
     : '';
 
   const tags = [prov.cuit && `CUIT ${prov.cuit}`, prov.condicionIVA].filter(Boolean);
+  // Comparación con las OC anteriores al mismo proveedor, como en la vista previa.
+  const cmp = checkOCHistorial(oc, ALL_RAW, oc.timestamp);
+
   $('foc-body').innerHTML = `
+    ${fichaInfoHtml(cmp.info)}${comparacionHtml(cmp.cambios)}
     <div class="foc-prov">
-      <span class="foc-prov-ic" aria-hidden="true">${esc(iniciales(prov.nombre))}</span>
+      <span class="foc-prov-ic" aria-hidden="true">${esc(inicialesProv(prov.nombre))}</span>
       <div style="min-width:0">
         <div class="foc-prov-n">${esc(prov.nombre || 'Proveedor sin nombre')}</div>
         ${tags.length ? `<div class="foc-prov-s">${tags.map(t => `<span class="foc-tag">${esc(t)}</span>`).join('')}</div>` : ''}
