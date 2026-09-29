@@ -1,4 +1,4 @@
-/* VIMECO S.A. — Búsqueda de OC por texto (Remitos, Historial, Novedades) */
+/* VIMECO S.A. — Búsqueda de OC por texto (Remitos, Historial, Novedades, Facturas, Reportes) */
 
 // Sin acentos ni mayúsculas: en obra se escribe "caneria" y el ítem dice
 // "Cañería". Se normaliza igual el texto buscado y el buscado adentro.
@@ -11,14 +11,14 @@ function terminosBusqueda(q) {
   return normTxt(q).trim().split(/\s+/).filter(Boolean);
 }
 
-// Todo lo buscable de una OC en un solo texto: proveedor, obra, número y la
-// descripción de cada ítem. Así "hierro" encuentra la OC por su renglón aunque
-// el proveedor no se llame así.
+// Todo lo buscable de una OC en un solo texto: proveedor, obra, número,
+// responsable y la descripción de cada ítem. Así "hierro" encuentra la OC por
+// su renglón aunque el proveedor no se llame así.
 const _hayCacheOC = new WeakMap();
 function haystackOC(oc) {
   let h = _hayCacheOC.get(oc);
   if (h === undefined) {
-    h = normTxt([oc.proveedor?.nombre, oc.obra, oc.nroOC,
+    h = normTxt([oc.proveedor?.nombre, oc.obra, oc.nroOC, oc.responsable?.nombre,
                  ...(oc.items || []).map(it => it.desc)].join(' '));
     _hayCacheOC.set(oc, h);
   }

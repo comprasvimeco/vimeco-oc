@@ -282,7 +282,7 @@ function renderOCListItems(ocs) {
 
 function renderManualListHTML(ocs) {
   return `<input type="search" class="hist-search" id="adj-search"
-    placeholder="Buscar por proveedor, obra o N° OC…"
+    placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…"
     style="margin-bottom:.75rem;width:100%;">
   <div id="adj-oc-list">${renderOCListItems(ocs)}</div>`;
 }
@@ -319,18 +319,13 @@ function renderPrimaryListItems(ocs) {
 }
 
 function renderPrimaryList(filter = '') {
-  const q = filter.toLowerCase().trim();
+  const terms = terminosBusqueda(filter);
   // 'otros' cae del lado de "sin": que haya un archivo viejo sin rotular no
   // prueba que la factura esté cargada.
   let list = filtroOC === 'todas'
     ? allOCs
     : allOCs.filter(oc => (estadoFactura(oc).estado === 'con') === (filtroOC === 'con'));
-  if (q) {
-    list = list.filter(oc =>
-      (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
-      (oc.obra || '').toLowerCase().includes(q) ||
-      (oc.nroOC || '').toLowerCase().includes(q));
-  }
+  if (terms.length) list = list.filter(oc => coincideOC(oc, terms));
   const box = $('adj-oc-list-main');
   box.innerHTML = renderPrimaryListItems(pager.take('adj', list));
   bindPickButtons();
@@ -422,14 +417,9 @@ function bindButtons() {
   const search = $('adj-search');
   if (search) {
     search.addEventListener('input', () => {
-      const q      = search.value.toLowerCase().trim();
+      const terms  = terminosBusqueda(search.value);
       const list   = $('adj-oc-list');
-      const result = q
-        ? allOCs.filter(oc =>
-            (oc.proveedor?.nombre || '').toLowerCase().includes(q) ||
-            (oc.obra || '').toLowerCase().includes(q) ||
-            (oc.nroOC || '').toLowerCase().includes(q))
-        : allOCs;
+      const result = terms.length ? allOCs.filter(oc => coincideOC(oc, terms)) : allOCs;
       list.innerHTML = renderOCListItems(result);
       bindButtons();
     });
