@@ -475,8 +475,11 @@ async function checkSharedFile() {
   }
   try {
     const cache = await caches.open('share-target');
+    // El SW deja 'shared-info' cuando el envío llegó sin archivo: en ese caso
+    // no tiene sentido esperarlo.
+    const info = compartido ? await cache.match('shared-info') : null;
     let match = await cache.match('shared-file');
-    for (let i = 0; !match && compartido && i < 10; i++) {
+    for (let i = 0; !match && compartido && !info && i < 10; i++) {
       await new Promise(res => setTimeout(res, 300));
       match = await cache.match('shared-file');
     }
@@ -484,9 +487,11 @@ async function checkSharedFile() {
       if (compartido) {
         // Chrome 153 en Android entrega el envío sin el archivo (regresión de
         // Chrome, GoogleChromeLabs/squoosh#1503). Mismo cartel, pero cada opción
-        // pide elegir el archivo a mano.
+        // pide elegir el archivo a mano; si llegó el nombre, se indica cuál.
+        let nombre = '';
+        try { if (info) nombre = (await info.json()).nombre || ''; } catch (_) {}
         await cache.delete('shared-info');
-        showShareChoiceModal(null);
+        showShareChoiceModal(null, nombre);
       }
       return;
     }
@@ -518,11 +523,14 @@ function elegirArchivo() {
   });
 }
 
-// file = null: el archivo compartido no llegó y cada opción lo pide a mano.
-function showShareChoiceModal(file) {
+// file = null: el archivo compartido no llegó y cada opción lo pide a mano;
+// nombreBuscado es el nombre que mandó la app de origen, si lo mandó.
+function showShareChoiceModal(file, nombreBuscado = '') {
   $('share-choice-filename').textContent = file ? file.name : '';
   $('share-choice-file').classList.toggle('hidden', !file);
   $('share-choice-aviso').classList.toggle('hidden', !!file);
+  $('share-choice-buscar-nombre').textContent = nombreBuscado;
+  $('share-choice-buscar').classList.toggle('hidden', !!file || !nombreBuscado);
   $('modal-share-choice').classList.remove('hidden');
 
   $('btn-share-generar').onclick = async () => {

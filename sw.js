@@ -92,20 +92,17 @@ self.addEventListener('fetch', event => {
   if (event.request.method === 'POST' &&
       (url.pathname === BASE + '/app.html' || url.pathname === BASE + '/facturas.html')) {
     event.respondWith((async () => {
-      // Tamaño y tipo del cuerpo, para el diagnóstico si no llega ningún archivo.
-      const ct  = event.request.headers.get('content-type') || 'sin content-type';
-      const len = (await event.request.clone().arrayBuffer()).byteLength;
       const formData = await event.request.formData();
       // Se toma el primer archivo con contenido, venga en el campo que venga:
       // algunas apps no respetan el nombre 'file' del manifest.
       let file = null;
-      const recibido = [];
-      for (const [k, v] of formData.entries()) {
-        if (typeof v === 'string') { recibido.push(k + ' (texto)'); continue; }
-        recibido.push(k + ' (' + (v.type || 'sin tipo') + ', ' + v.size + ' bytes)');
+      const textos = [];
+      for (const [, v] of formData.entries()) {
+        if (typeof v === 'string') { if (v.trim()) textos.push(v.trim()); continue; }
         if (!file && v.size > 0) file = v;
       }
       const cache = await caches.open('share-target');
+      await cache.delete('shared-info');
       if (file) {
         // Algunas apps declaran el PDF con un tipo genérico: el tipo real se
         // saca de los primeros bytes (y el nombre se completa con su extensión).
@@ -116,9 +113,13 @@ self.addEventListener('fetch', event => {
           headers: { 'X-File-Name': name, 'Content-Type': type }
         }));
       } else {
-        // Diagnóstico: qué llegó en el envío, para mostrarlo en la página.
-        recibido.push('cuerpo de ' + len + ' bytes, ' + ct.split(';')[0]);
-        await cache.put('shared-info', new Response(JSON.stringify(recibido)));
+        // Chrome 153 descarta el archivo pero entrega título y texto; algunas
+        // apps (Files de Google) mandan ahí el nombre del archivo. Se guarda
+        // para decirle al usuario qué buscar al elegirlo a mano.
+        // Sin archivo, uno que haya quedado de un envío anterior no es este.
+        await cache.delete('shared-file');
+        const nombre = textos.find(t => !/\n/.test(t) && t.length <= 150 && /\.[a-z0-9]{2,5}$/i.test(t)) || '';
+        await cache.put('shared-info', new Response(JSON.stringify({ nombre })));
       }
       return Response.redirect(BASE + '/app.html?compartido=1', 303);
     })());
