@@ -484,6 +484,30 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-responsable { font-size: .75rem; color: var(--gray-400); }
 .hist-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
 .hist-actions .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
+/* Factura y remitos de la OC (js/historial.js → docsHtml): pastillas chicas y,
+   con más de uno, un desplegable dentro de la tarjeta. */
+.hist-docs { display: flex; gap: .35rem; flex-wrap: wrap; }
+.hist-doc { display: inline-flex; align-items: center; gap: .3rem; border: none; border-radius: 999px; cursor: pointer;
+  padding: .18rem .6rem; font-size: .72rem; font-weight: 700; font-family: inherit; transition: filter .15s; }
+.hist-doc .icon { width: 13px; height: 13px; }
+.hist-doc:hover { filter: brightness(.95); }
+.hist-doc--fact { background: #f1e8fb; color: #6b3fa0; }
+.hist-doc--rem  { background: #dcf3ef; color: #16695f; }
+.hist-doc-chev { transition: transform .15s; }
+.hist-doc[aria-expanded="true"] .hist-doc-chev { transform: rotate(180deg); }
+.hist-doc-list { display: flex; flex-direction: column; gap: .3rem; background: #f5f8fc;
+  border: 1px solid var(--gray-100); border-radius: var(--radius-lg); padding: .4rem; }
+.hist-doc-list.hidden { display: none; }
+.hist-doc-row { display: flex; align-items: stretch; gap: .3rem; }
+.hist-doc-open { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: .05rem;
+  text-align: left; border: 1px solid var(--gray-100); background: var(--white); border-radius: 8px;
+  padding: .35rem .6rem; cursor: pointer; font-family: inherit; }
+.hist-doc-open:hover { border-color: var(--primary-light); }
+.hist-doc-open b { font-size: .78rem; color: var(--gray-800); }
+.hist-doc-open span { font-size: .72rem; color: var(--gray-500); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-doc-file { flex: 0 0 auto; width: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 8px; background: #fce8ee; color: #a23a57; cursor: pointer; }
+.hist-doc-file .icon { width: 15px; height: 15px; }
 .hist-empty { text-align: center; padding: 3rem 1rem; color: var(--gray-400); font-size: .95rem; }
 /* Botón "Ver más" del paginador (js/ui.js → pager.footer).
    Márgenes auto y no align-self: la lista de Adjuntar es un div block y las de

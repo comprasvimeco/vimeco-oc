@@ -15,6 +15,7 @@
     window.renameDriveItem      = noDrive;
     window.trashDriveFile       = noDrive;
     window.listDriveFolderFiles = noDrive;
+    window.findFileInFolder     = noDrive;
     return;
   }
 
@@ -912,8 +913,8 @@
 
       // OC pre-reorganización: tiene solo drive_folder_id apuntando a COMPRAS/{obra}/...
       if (!drive_folder_obras_id && !drive_folder_proveedores_id && drive_folder_id) {
-        await subir(drive_folder_id);
-        return { folderId: drive_folder_id };
+        const fileId = await subir(drive_folder_id);
+        return { folderId: drive_folder_id, fileId: fileId || null };
       }
 
       // Resolver IDs: usar los guardados o reconstruir bajo OBRAS/PROVEEDORES
@@ -935,8 +936,10 @@
         }
       }
 
-      await Promise.all([subir(obrasFid), subir(provsFid)]);
-      return { folderId: obrasFid || provsFid };
+      // El id devuelto es el de la copia que está en la carpeta devuelta, así el
+      // link al archivo y el link a la carpeta apuntan al mismo lugar.
+      const [idObras, idProvs] = await Promise.all([subir(obrasFid), subir(provsFid)]);
+      return { folderId: obrasFid || provsFid, fileId: (obrasFid ? idObras : idProvs) || null };
     } catch (err) {
       await logDriveError(nroOC, new Error(`Adjunto: ${err.message}`));
       throw err;
@@ -945,6 +948,14 @@
 
   window.attachToDriveOC          = (file, meta) => _attachToOC(file, meta, false);
   window.attachToDriveOCIfMissing = (file, meta) => _attachToOC(file, meta, true);
+
+  // Id de un archivo por nombre dentro de una carpeta (o null). Las facturas y
+  // los remitos cargados antes de que se guardara el id sólo tienen carpeta y
+  // nombre: así se los puede abrir directo igual.
+  window.findFileInFolder = async function (folderId, name) {
+    const token = await getAccessToken();
+    return _findChild(token, name, folderId, false);
+  };
 
   // ─── EQUIPOS: documentación de cada equipo (títulos, manuales, etc.) ───
   // Estructura: EQUIPOS → {Código - Descripción} → archivos. EQUIPOS es hermana

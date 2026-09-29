@@ -79,12 +79,16 @@ function confirmarDuplicado(oc) {
 // Deja registrado el archivo en el historial para que la lista pueda mostrar el
 // estado sin consultar Drive. Best-effort: si falla, el archivo ya está subido.
 // Se refleja primero en memoria, así el sello cambia sin recargar la pantalla.
-async function registrarAdjunto(oc, file) {
+// Con `fileId` el Historial abre el archivo directo; sin él (cargas viejas) lo
+// busca por nombre en `folderId`.
+async function registrarAdjunto(oc, file, res) {
   const registro = {
-    tipo:   tipoCarga === 'factura' ? 'factura' : 'otro',
-    nombre: file.name,
-    ts:     Date.now(),
-    por:    sessionStorage.getItem('responsable_name') || ''
+    tipo:     tipoCarga === 'factura' ? 'factura' : 'otro',
+    nombre:   file.name,
+    ts:       Date.now(),
+    por:      sessionStorage.getItem('responsable_name') || '',
+    fileId:   res?.fileId   || null,
+    folderId: res?.folderId || null
   };
   oc.adjuntos = oc.adjuntos || {};
   oc.adjuntos['local_' + registro.ts] = registro;
@@ -394,7 +398,7 @@ async function doAttachPick(file, oc) {
       nroOC:     oc.nroOC
     });
     logAdjuntoActivity(oc, subida, res?.folderId);
-    await registrarAdjunto(oc, subida);
+    await registrarAdjunto(oc, subida, res);
     refrescarBadge(oc);
     await clearShareFile();
     toast(`${tipoCarga === 'factura' ? 'Factura cargada' : 'Archivo cargado'} en OC ${oc.nroOC}`, 'success');
@@ -484,7 +488,7 @@ async function doAttach(file, oc, btn) {
       nroOC:     oc.nroOC
     });
     logAdjuntoActivity(oc, subida, res?.folderId);
-    await registrarAdjunto(oc, subida);
+    await registrarAdjunto(oc, subida, res);
     await clearShareFile();
     $('card-result').classList.add('hidden');
     $('success-detail').textContent = `${subida.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
