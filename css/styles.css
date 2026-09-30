@@ -492,7 +492,7 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hist-doc .icon { width: 13px; height: 13px; }
 .hist-doc:hover { filter: brightness(.95); }
 .hist-doc--fact { background: #f1e8fb; color: #6b3fa0; }
-.hist-doc--rem  { background: #dcf3ef; color: #16695f; }
+.hist-doc--rem  { background: #fbeedd; color: #8a4f0d; }   /* ámbar: el verde agua es el de Drive */
 .hist-doc-chev { transition: transform .15s; }
 .hist-doc[aria-expanded="true"] .hist-doc-chev { transform: rotate(180deg); }
 .hist-doc-list { display: flex; flex-direction: column; gap: .3rem; background: #f5f8fc;
