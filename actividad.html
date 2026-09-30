@@ -80,7 +80,7 @@
     .act-card-seen .act-title, .act-card-seen .act-detalle { color: var(--gray-500); }
     /* Fuera de la ventana de novedades: es historial, no reclama atención. */
     .act-card-old .act-title, .act-card-old .act-detalle { color: var(--gray-500); }
-    .act-row { display: flex; align-items: center; gap: .7rem; }
+    .act-row { display: flex; align-items: flex-start; gap: .7rem; }
     .act-badge {
       display: inline-flex; align-items: center; gap: .3rem; flex: 0 0 auto;
       font-size: .72rem; font-weight: 700; padding: .25rem .5rem; border-radius: 6px;
@@ -99,29 +99,30 @@
     }
     .act-detalle { font-size: .82rem; color: var(--gray-600); margin-top: .1rem; }
     .act-meta { font-size: .74rem; color: var(--gray-500); margin-top: .15rem; }
-    .act-actions { flex: 0 0 auto; display: flex; flex-direction: column; gap: .35rem; align-items: stretch; }
-    .act-drive { white-space: nowrap; text-align: center; }
-    .act-mark { white-space: nowrap; }
+    /* Acciones: las pastillas de las fichas, en un renglón al pie de la tarjeta.
+       Borrar va aparte, a la derecha, como Eliminar en la ficha de Reportes. */
+    .act-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
+      margin-top: .6rem; padding-top: .55rem; border-top: 1px solid var(--gray-100); }
+    .act-actions .foc-btn { font-size: .76rem; padding: .35rem .8rem; white-space: nowrap; }
+    .act-actions .foc-btn .icon { width: 13px; height: 13px; }
+    .act-actions .act-del { margin-left: auto; }
+    .foc-btn--fact { background: #f1e8fb; color: #6b3fa0; }   /* los tonos de las pastillas del Historial */
+    .foc-btn--rem  { background: #dcf3ef; color: #16695f; }
     .act-seen-label {
-      display: inline-flex; align-items: center; justify-content: center; gap: .25rem;
+      display: inline-flex; align-items: center; gap: .25rem; padding: 0 .3rem;
       font-size: .74rem; font-weight: 700; color: #1b6b3a;
     }
     .act-seen-label .icon { width: 13px; height: 13px; }
-    .act-nodrive { font-size: .74rem; color: var(--gray-400); font-style: italic; text-align: center; }
-    /* ---- Fichas: la OC, su factura y sus remitos desde la tarjeta ---- */
-    .act-ver { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; white-space: nowrap; }
-    .act-ver .icon { width: 13px; height: 13px; }
+    .act-card-seen .act-actions { border-top-color: #d6ebdd; }
+    /* ---- Factura y remitos de la OC en la tarjeta ---- */
     .act-card .hist-docs { margin-top: .35rem; }
     .act-card .hist-doc-list { margin-top: .35rem; }
-    /* La OC a la que pertenece una factura, un adjunto o un remito. */
-    .hist-doc--oc { background: #e6f0fb; color: #1a3a5c; }
     /* Los chips de los paneles de arriba abren la ficha de su OC. */
     button.act-alert-oc, button.act-pend-oc { font-family: inherit; color: inherit; cursor: pointer; text-align: left; }
     button.act-alert-oc:hover, button.act-pend-oc:hover { border-color: var(--primary-light); }
     @media (max-width: 560px) {
       .act-row { flex-wrap: wrap; }
-      /* Renglón propio: con la ficha son hasta cuatro botones y no entran al lado. */
-      .act-actions { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+      .act-body { flex-basis: 100%; }
     }
   </style>
 </head>

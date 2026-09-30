@@ -162,15 +162,9 @@ function facturaDeEvento(e, oc) {
 }
 
 // Debajo del detalle. En la novedad de una OC, lo mismo que en el Historial: el
-// sello de entrega y las pastillas de su factura y sus remitos. En la de una
-// factura o un remito (`verOC`), el camino a la ficha de la OC.
-function docsHtml(e, oc, verOC) {
-  if (!oc) return '';
-  if (e.tipo !== 'oc') {
-    return verOC
-      ? `<div class="hist-docs"><button class="hist-doc hist-doc--oc act-oc" title="Ver la ficha de la OC ${esc(oc.nroOC)}">${icSvg('eye')}Ver OC</button></div>`
-      : '';
-  }
+// sello de entrega y las pastillas de su factura y sus remitos.
+function docsHtml(e, oc) {
+  if (!oc || e.tipo !== 'oc') return '';
   const facts = facturasDeOC(oc);
   const rems  = remitosPorOC[oc.nroOC] || [];
   const ent   = oc.entrega?.estado;
@@ -253,28 +247,34 @@ function render() {
     const meta     = tipoMeta(e.tipo);
     const reciente = esReciente(e);
     const vista    = !sinVer(e);
+    // Las acciones son las pastillas de las fichas (foc-btn), en un renglón al
+    // pie de la tarjeta: Borrar queda aparte, a la derecha.
     const drive  = e.driveUrl
-      ? `<a class="btn btn-sm btn-primary act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener">Abrir en Drive</a>`
-      : '<span class="act-nodrive">sin link</span>';
+      ? `<a class="foc-btn foc-btn--drive act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive">${icSvg('folder')}Drive</a>`
+      : '';
     // Fuera de la ventana de novedades no se ofrece "marcar vista": ya no aplica.
     const accion = !reciente ? ''
       : vista
         ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
-        : `<button class="btn btn-sm btn-outline act-mark" data-key="${esc(e.key)}">Marcar vista</button>`;
+        : `<button class="foc-btn foc-btn--clear act-mark" data-key="${esc(e.key)}">${icSvg('check')}Marcar vista</button>`;
     const borrar = isSuper
-      ? `<button class="btn btn-sm btn-danger act-del" data-key="${esc(e.key)}">Borrar</button>`
+      ? `<button class="foc-btn foc-btn--del act-del" data-key="${esc(e.key)}" title="Borrar la novedad para todos">${icSvg('trash')}Borrar</button>`
       : '';
     const ocEv    = ocDeEvento(e);
     // Lo que abre la tarjeta: cada novedad, su propio documento. La de un
-    // remito, su ficha; la de una factura, el archivo; el resto, la ficha de la OC.
+    // remito, su ficha; la de una factura, el archivo; el resto, la ficha de la
+    // OC. Las de factura y remito suman el camino a su OC.
     const rem = remitoDeEvento(e);
     const fac = facturaDeEvento(e, ocEv);
-    const verBtn = (que, icon, txt) =>
-      `<button class="btn btn-sm btn-secondary act-ver" data-ver="${que}">${icSvg(icon)} ${txt}</button>`;
-    const ver = rem  ? verBtn('rem', 'truck', 'Ver remito')
-              : fac  ? verBtn('fact', 'file', 'Ver factura')
-              : ocEv ? verBtn('oc', 'eye', e.tipo === 'oc' ? 'Ver ficha' : 'Ver OC')
+    const verBtn = (que, cls, icon, txt) =>
+      `<button class="foc-btn foc-btn--${cls} act-ver" data-ver="${que}">${icSvg(icon)}${txt}</button>`;
+    const ver = rem  ? verBtn('rem', 'rem', 'truck', 'Ver remito')
+              : fac  ? verBtn('fact', 'fact', 'file', 'Ver factura')
+              : ocEv ? verBtn('oc', 'edit', 'eye', e.tipo === 'oc' ? 'Ver ficha' : 'Ver OC')
               : '';
+    const verOC = (rem || fac) && ocEv
+      ? `<button class="foc-btn foc-btn--edit act-oc" title="Ver la ficha de la OC ${esc(ocEv.nroOC)}">${icSvg('eye')}Ver OC</button>`
+      : '';
     const cardCls = !reciente ? 'act-card-old' : (vista ? 'act-card-seen' : 'act-card-unseen');
     html += `
       <div class="hist-card act-card ${cardCls}" data-key="${esc(e.key)}">
@@ -283,11 +283,11 @@ function render() {
           <div class="act-body">
             <div class="act-title">${esc(e.titulo)}</div>
             <div class="act-detalle">${esc(e.detalle)}</div>
-            ${docsHtml(e, ocEv, !!(rem || fac))}
+            ${docsHtml(e, ocEv)}
             ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc)}
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
+            <div class="act-actions">${ver}${verOC}${drive}${accion}${borrar}</div>
           </div>
-          <div class="act-actions">${ver}${drive}${accion}${borrar}</div>
         </div>
       </div>`;
   });
