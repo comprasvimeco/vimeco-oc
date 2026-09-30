@@ -23,66 +23,67 @@ function esc(s) {
 
 let allUsuarios = [];
 
+// Iniciales para el avatar, sin el título ("Arq.", "Ing."): "Arq. Gustavo Pes" → "GP".
+function iniciales(nombre) {
+  const pal = String(nombre || '').split(/\s+/).filter(p => p && !p.endsWith('.'));
+  if (!pal.length) return '?';
+  const ini = pal.length > 1 ? pal[0][0] + pal[pal.length - 1][0] : pal[0].slice(0, 2);
+  return ini.toUpperCase();
+}
+
+function permsHtml(u) {
+  const perm = (tono, icon, txt) => `<span class="usr-perm usr-perm--${tono}">${icSvg(icon)}${txt}</span>`;
+  if (u.codigo === '0000')
+    return perm('admin', 'settings', 'Admin (super)') + perm('caja', 'calc', 'Caja (todas)');
+  const out = [];
+  if (u.admin)             out.push(perm('admin',    'settings', 'Admin'));
+  if (u.caja)              out.push(perm('caja',     'calc',     'Caja'));
+  if (u.jefeObra)          out.push(perm('obra',     'user',     'Jefe de Obra'));
+  if (u.jefeTaller)        out.push(perm('taller',   'layers',   'Jefe de Taller'));
+  if (u.reportes)          out.push(perm('reportes', 'sheet',    'Reportes'));
+  if (tieneNovedades(u))   out.push(perm('nov',      'info',     'Novedades'));
+  if (u.autorizaDesde > 0) out.push(perm('autoriza', 'check',    `Autoriza OC &gt; <b>$ ${fmtMonto(u.autorizaDesde)}</b>`));
+  return out.length ? out.join('') : '<span class="usr-noperms">Sin permisos adicionales</span>';
+}
+
 function renderUsers(list) {
   const container = $('users-list');
+  const activos = list.filter(u => u.activo).length;
+  $('users-count').textContent = list.length
+    ? `${list.length} usuario${list.length !== 1 ? 's' : ''} · ${activos} activo${activos !== 1 ? 's' : ''}` : '';
   if (!list.length) {
     container.innerHTML = '<div class="hist-empty">No hay usuarios cargados.</div>';
     return;
   }
   container.innerHTML = list.map(u => {
     const esSuper = u.codigo === '0000';
-    const cajaBadge = esSuper
-      ? `<span class="u-badge u-badge-activo">${icSvg('calc')} Caja (admin)</span>`
-      : (u.caja ? `<span class="u-badge u-badge-activo">${icSvg('calc')} Caja</span>` : '');
-    const adminBadge = esSuper
-      ? `<span class="u-badge u-badge-activo">${icSvg('settings')} Admin (super)</span>`
-      : (u.admin ? `<span class="u-badge u-badge-activo">${icSvg('settings')} Admin</span>` : '');
-    const jefeBadge = (!esSuper && u.jefeObra)
-      ? `<span class="u-badge u-badge-activo">${icSvg('user')} Jefe de Obra</span>`
-      : '';
-    const tallerBadge = (!esSuper && u.jefeTaller)
-      ? `<span class="u-badge u-badge-activo">${icSvg('layers')} Jefe de Taller</span>`
-      : '';
-    const reportesBadge = (!esSuper && u.reportes)
-      ? `<span class="u-badge u-badge-activo">${icSvg('sheet')} Reportes</span>`
-      : '';
-    const novedadesBadge = (!esSuper && tieneNovedades(u))
-      ? `<span class="u-badge u-badge-activo">${icSvg('info')} Novedades</span>`
-      : '';
-    const autorizaBadge = (!esSuper && u.autorizaDesde > 0)
-      ? `<span class="u-badge u-badge-activo">${icSvg('check')} Autoriza &gt; $ ${fmtMonto(u.autorizaDesde)}</span>`
-      : '';
-    const permBtn = esSuper
-      ? ''
-      : `<button class="btn btn-sm btn-outline btn-permisos">Permisos</button>`;
+    const pwd = u.passwordHash
+      ? `<span class="usr-meta-i">${icSvg('key')}Con contraseña</span>`
+      : `<span class="usr-meta-i usr-warn">${icSvg('alert')}Sin contraseña</span>`;
     return `
-    <div class="user-card ${u.activo ? '' : 'user-card--inactive'}">
-      <div class="user-card-info">
-        <span class="user-card-code">${esc(u.codigo)}</span>
-        <span class="user-card-name">${esc(u.nombre)}</span>
-        <span class="u-badge ${u.activo ? 'u-badge-activo' : 'u-badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span>
-        <span class="u-badge ${u.passwordHash ? 'u-badge-pwd-ok' : 'u-badge-pwd-none'}">${u.passwordHash ? icSvg('key') + ' Con contraseña' : icSvg('alert') + ' Sin contraseña'}</span>
-        ${cajaBadge}
-        ${adminBadge}
-        ${jefeBadge}
-        ${tallerBadge}
-        ${reportesBadge}
-        ${novedadesBadge}
-        ${autorizaBadge}
+    <div class="usr-card ${u.activo ? '' : 'usr-card--off'}">
+      <div class="usr-head">
+        <div class="usr-avatar" aria-hidden="true">${esc(iniciales(u.nombre))}</div>
+        <div class="usr-id">
+          <div class="usr-name" title="${esc(u.nombre)}">${esc(u.nombre)}</div>
+          <div class="usr-meta"><span class="usr-code">${esc(u.codigo)}</span>${pwd}</div>
+        </div>
+        ${u.activo ? '' : '<span class="usr-off">Inactivo</span>'}
       </div>
-      <div class="user-card-actions">
-        <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
-        <button class="btn btn-sm btn-secondary btn-reset-pwd">Reset pwd</button>
-        ${permBtn}
-        <button class="btn btn-sm ${u.activo ? 'btn-danger' : 'btn-success'} btn-toggle-user">
-          ${u.activo ? 'Desactivar' : 'Activar'}
+      <div class="usr-perms">${permsHtml(u)}</div>
+      <div class="usr-actions">
+        <button class="foc-btn foc-btn--edit btn-edit-user">${icSvg('edit')}Editar</button>
+        ${esSuper ? '' : `<button class="foc-btn foc-btn--gen btn-permisos">${icSvg('userCheck')}Permisos</button>`}
+        <button class="foc-btn foc-btn--clear btn-reset-pwd">${icSvg('key')}Resetear clave</button>
+        <button class="foc-btn ${u.activo ? 'foc-btn--del' : 'foc-btn--gen'} usr-toggle btn-toggle-user">
+          ${u.activo ? icSvg('x') + 'Desactivar' : icSvg('checkSm') + 'Activar'}
         </button>
       </div>
     </div>
   `;
   }).join('');
 
-  container.querySelectorAll('.user-card').forEach((card, i) => {
+  container.querySelectorAll('.usr-card').forEach((card, i) => {
     const u = list[i];
     card.querySelector('.btn-edit-user').addEventListener('click',   () => editUser(u.codigo, u.nombre));
     card.querySelector('.btn-reset-pwd').addEventListener('click',   () => resetPwd(u.codigo, u.nombre));

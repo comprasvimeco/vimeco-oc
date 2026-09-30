@@ -20,6 +20,69 @@
     .perm-monto small { color:var(--gray-500); font-size:.8rem; line-height:1.3; }
     .perm-monto-input { display:flex; align-items:center; gap:.4rem; }
     .perm-monto-input span { color:var(--gray-600); font-weight:600; }
+
+    /* ---- Lista de usuarios ---- */
+    .usr-page { max-width: 1040px; margin: 0 auto; padding: 1rem; }
+    .usr-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: .75rem;
+      flex-wrap: wrap; margin: .5rem 0 1.1rem; }
+    .usr-title { font-size: 1.25rem; font-weight: 800; color: var(--primary); line-height: 1.2; }
+    .usr-count { font-size: .8rem; color: var(--gray-500); margin-top: .15rem; }
+    .usr-add { background: var(--grad-header); color: #fff; box-shadow: 0 6px 18px -8px rgba(26,58,92,.55); }
+    .usr-add .icon { width: 16px; height: 16px; }
+
+    .usr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: .8rem; }
+    .usr-grid > .hist-loading, .usr-grid > .hist-empty { grid-column: 1 / -1; }
+    .usr-card { display: flex; flex-direction: column; background: var(--glass-bg-strong);
+      border: 1px solid var(--glass-border); border-radius: 14px; box-shadow: var(--shadow-glass);
+      padding: .9rem 1rem .75rem; transition: transform .18s var(--ease-spring), box-shadow .18s; }
+    .usr-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-glow); }
+    .usr-card--off { opacity: .6; }
+    .usr-card--off:hover { opacity: .85; }
+
+    .usr-head { display: flex; align-items: center; gap: .75rem; }
+    .usr-avatar { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; background: var(--grad-header); color: #fff; font-weight: 800; font-size: .95rem;
+      letter-spacing: .03em; }
+    .usr-card--off .usr-avatar { background: var(--gray-400); }
+    .usr-id { min-width: 0; flex: 1; }
+    .usr-name { font-size: 1rem; font-weight: 700; color: var(--gray-900); line-height: 1.25;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .usr-meta { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .2rem;
+      font-size: .76rem; color: var(--gray-500); }
+    .usr-code { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 700;
+      color: var(--gray-600); background: var(--gray-100); border-radius: 5px; padding: 0 .35rem; }
+    .usr-meta-i { display: inline-flex; align-items: center; gap: .25rem; }
+    .usr-meta-i .icon { width: 12px; height: 12px; }
+    .usr-warn { color: #854d0e; background: #fef9c3; border-radius: 999px; padding: 0 .45rem; font-weight: 700; }
+    .usr-off { flex-shrink: 0; font-size: .7rem; font-weight: 700; padding: .12rem .55rem; border-radius: 999px;
+      background: #fde6e6; color: #b02a2a; }
+
+    .usr-perms { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .7rem; }
+    .usr-perm { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .6rem .16rem .5rem;
+      border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+    .usr-perm .icon { width: 12px; height: 12px; }
+    .usr-perm--caja     { background: #dcf3ef; color: #16695f; }
+    .usr-perm--admin    { background: #efebfd; color: #5a45a8; }
+    .usr-perm--obra     { background: #fdf0dc; color: #8a5a0b; }
+    .usr-perm--taller   { background: #e8eefc; color: #2c4fa8; }
+    .usr-perm--reportes { background: #fce8ee; color: #a23a57; }
+    .usr-perm--nov      { background: #e0f2fe; color: #0369a1; }
+    .usr-perm--autoriza { background: #fbf3dc; color: #7a5c0f; box-shadow: inset 0 0 0 1px #ecd9a0; }
+    .usr-perm--autoriza b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+    .usr-noperms { font-size: .76rem; color: var(--gray-400); font-style: italic; }
+
+    /* Acciones: pastillas en un renglón al pie, como en Novedades. Desactivar va aparte, a la derecha. */
+    .usr-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
+      margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--gray-100); }
+    .usr-perms + .usr-actions { margin-top: .75rem; }
+    .usr-actions .foc-btn { font-size: .76rem; padding: .35rem .8rem; white-space: nowrap; }
+    .usr-actions .foc-btn .icon { width: 13px; height: 13px; }
+    .usr-actions .usr-toggle { margin-left: auto; }
+
+    @media (max-width: 520px) {
+      .usr-grid { grid-template-columns: 1fr; }
+      .usr-toolbar { align-items: center; }
+    }
   </style>
 </head>
 <body>
@@ -38,12 +101,15 @@
 </header>
 
 <main class="app-main">
-  <div class="hist-page">
-    <div class="hist-toolbar">
-      <span style="font-weight:600;color:var(--gray-700);">Usuarios del sistema</span>
-      <button class="btn btn-primary btn-sm" id="btn-add-user">+ Agregar usuario</button>
+  <div class="usr-page">
+    <div class="usr-toolbar">
+      <div>
+        <div class="usr-title">Usuarios del sistema</div>
+        <div class="usr-count" id="users-count"></div>
+      </div>
+      <button class="foc-btn usr-add" id="btn-add-user"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar usuario</button>
     </div>
-    <div id="users-list" class="users-list">
+    <div id="users-list" class="usr-grid">
       <div class="hist-loading">Cargando usuarios…</div>
     </div>
   </div>
