@@ -180,7 +180,7 @@
     // Personal: visible para 0000, admins o jefes de obra.
     const personalCard = document.getElementById('menu-card-personal');
 
-    // Novedades: visible para admins (0000 o permiso `admin`), con badge de no vistas.
+    // Novedades: visible para 0000 o con permiso `novedades`, con badge de no vistas.
     const novCard = document.getElementById('menu-card-novedades');
     function revealNovedades() {
       novCard.style.display = '';
@@ -212,7 +212,8 @@
             if (u && (u.admin || u.jefeObra)) personalCard.style.display = '';
             if (u && u.jefeTaller) document.getElementById('menu-card-equipos').style.display = '';
             if (u && (u.admin || u.reportes)) document.getElementById('menu-card-reportes').style.display = '';
-            if (u && u.admin) revealNovedades();
+            // Permiso propio `novedades`; sin él, lo que diga `admin` (el criterio anterior).
+            if (u && (u.novedades != null ? u.novedades : u.admin)) revealNovedades();
           })
           .catch(() => {});
       }

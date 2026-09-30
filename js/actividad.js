@@ -1,4 +1,4 @@
-/* VIMECO S.A. — Feed de Actividad / Novedades (solo admins) */
+/* VIMECO S.A. — Feed de Actividad / Novedades (permiso `novedades`) */
 
 const $ = id => document.getElementById(id);
 
@@ -488,12 +488,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('hdr-name').textContent = name || '';
 
   $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
-  // Sólo admins acceden a Novedades
-  let isAdmin = code === '0000';
-  if (!isAdmin) {
-    try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
+  // Novedades: 0000 o permiso `novedades`. Quien nunca lo tuvo asignado entra
+  // si es admin, que era el criterio antes de que existiera el permiso propio.
+  let puedeVer = code === '0000';
+  if (!puedeVer) {
+    try {
+      const u = await getUsuario(code);
+      puedeVer = !!(u && (u.novedades != null ? u.novedades : u.admin));
+    } catch (_) {}
   }
-  if (!isAdmin) { window.location.href = 'menu.html'; return; }
+  if (!puedeVer) { window.location.href = 'menu.html'; return; }
 
   // Solo Administración (super-admin 0000) puede borrar novedades para todos.
   isSuper = code === '0000';

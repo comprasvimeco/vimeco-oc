@@ -15,6 +15,11 @@
     .perm-row span { display:flex; flex-direction:column; gap:.15rem; }
     .perm-row strong { color:var(--gray-800); font-size:.95rem; font-weight:600; }
     .perm-row small { color:var(--gray-500); font-size:.8rem; line-height:1.3; }
+    .perm-monto { display:flex; flex-direction:column; gap:.35rem; padding:.8rem .25rem .4rem; border-top:1px solid var(--gray-100); }
+    .perm-monto strong { color:var(--gray-800); font-size:.95rem; font-weight:600; }
+    .perm-monto small { color:var(--gray-500); font-size:.8rem; line-height:1.3; }
+    .perm-monto-input { display:flex; align-items:center; gap:.4rem; }
+    .perm-monto-input span { color:var(--gray-600); font-weight:600; }
   </style>
 </head>
 <body>
@@ -97,6 +102,15 @@
         <input type="checkbox" id="perm-reportes">
         <span><strong>Reportes</strong><small>Accede al panel de Reportes (gasto por obra, equipo, proveedor).</small></span>
       </label>
+      <label class="perm-row">
+        <input type="checkbox" id="perm-novedades">
+        <span><strong>Novedades</strong><small>Ve el feed de Novedades (OC, remitos y facturas que se cargan).</small></span>
+      </label>
+      <div class="perm-monto">
+        <label for="perm-autorizaDesde"><strong>Autoriza OC desde</strong></label>
+        <div class="perm-monto-input"><span>$</span><input type="text" id="perm-autorizaDesde" class="form-control" inputmode="numeric" placeholder="Sin monto"></div>
+        <small>Las OC que superen este monto se le tienen que pedir a este usuario o a quien tenga un monto mayor. Si varios comparten el mismo monto, sirve cualquiera de ellos. Vacío: no participa.</small>
+      </div>
       <div id="modal-permisos-error" class="alert alert-error hidden"></div>
     </div>
     <div class="modal-footer">

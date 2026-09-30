@@ -2016,14 +2016,59 @@ function buildOCData(numero, firma = null) {
   };
 }
 
+// ---- Autorización por monto ----
+// Cada usuario puede tener `autorizaDesde` (en pesos, se carga en Usuarios →
+// Permisos). Una OC que supera uno o más de esos montos cae en el escalón más
+// alto que supera, y la puede firmar quien tenga ese monto o uno mayor: con
+// 2M para A y 10M para B y C, una OC de 5M la firma A (o B o C) y una de 12M,
+// B o C. Nadie más puede generarla: sólo pedir autorización a uno de ellos.
+function totalEnPesos(total) {
+  if (!monedaUSD) return total;
+  const d  = typeof getDolarCached === 'function' ? getDolarCached() : null;
+  const tc = d?.oficial?.venta || d?.blue?.venta;
+  // Sin cotización no se puede ubicar la OC: se exige el escalón más alto.
+  return tc ? total * tc : Infinity;
+}
+
+// null si la OC no requiere autorización por monto; si no, el escalón y la
+// lista de quienes pueden firmarla. Lanza si no se pudo leer el padrón.
+async function reglaDeMonto(total) {
+  const usuarios = await getUsuariosActivos();
+  const pesos    = totalEnPesos(total);
+  const superados = usuarios.map(u => u.autorizaDesde).filter(m => m > 0 && pesos > m);
+  if (!superados.length) return null;
+  const escalon = Math.max(...superados);
+  const autorizadores = usuarios
+    .filter(u => u.autorizaDesde >= escalon)
+    .sort((a, b) => a.autorizaDesde - b.autorizaDesde || a.codigo.localeCompare(b.codigo));
+  return { escalon, autorizadores };
+}
+
+function nombresEnLista(us) {
+  const n = us.map(u => u.nombre);
+  return n.length > 1 ? n.slice(0, -1).join(', ') + ' o ' + n[n.length - 1] : (n[0] || '');
+}
+
 // Modal de autorización: devuelve la acción elegida.
 //   'con'   → firmar yo y generar        'sin'   → generar sin firma
 //   'pedir' → pedir autorización a otro   'cancel'→ no hacer nada
-function elegirAutorizacion() {
+// Con `regla` (la OC supera un monto) y sin ser uno de sus autorizadores, sólo
+// queda pedir autorización.
+function elegirAutorizacion(regla) {
   return new Promise(resolve => {
-    const modal = $('modal-firma-confirm');
+    const modal  = $('modal-firma-confirm');
+    const myCode = sessionStorage.getItem('responsable_code');
+    const soloPedir = !!regla && !regla.autorizadores.some(u => u.codigo === myCode);
+    const aviso  = $('firma-monto-aviso');
+    if (soloPedir) {
+      aviso.textContent = `Esta OC supera $ ${Math.round(regla.escalon).toLocaleString('es-AR')}: ` +
+        `la tiene que autorizar ${nombresEnLista(regla.autorizadores)}.`;
+    }
+    aviso.classList.toggle('hidden', !soloPedir);
+    $('firma-confirm-pregunta').classList.toggle('hidden', soloPedir);
     // "Firmar yo" solo tiene sentido si el usuario tiene firma guardada.
-    $('btn-firma-con').classList.toggle('hidden', !firmaBase64);
+    $('btn-firma-con').classList.toggle('hidden', !firmaBase64 || soloPedir);
+    $('btn-firma-sin').classList.toggle('hidden', soloPedir);
     modal.classList.remove('hidden');
     const close = val => { modal.classList.add('hidden'); resolve(val); };
     $('btn-firma-con').onclick    = () => close('con');
@@ -2034,7 +2079,8 @@ function elegirAutorizacion() {
 }
 
 // Modal de selección de autorizador. Resuelve {codigo,nombre} o null si cancela.
-function elegirAutorizador() {
+// Con `regla`, sólo se ofrecen quienes pueden firmar ese monto.
+function elegirAutorizador(regla) {
   return new Promise(resolve => {
     const modal  = $('modal-pedir-autorizacion');
     const select = $('select-autorizador');
@@ -2045,10 +2091,14 @@ function elegirAutorizador() {
     empty.classList.add('hidden');
     btnOk.disabled = true;
     select.innerHTML = '<option value="">Cargando usuarios…</option>';
+    $('pedir-texto').textContent = regla
+      ? `Por el monto, esta OC sólo la puede firmar ${nombresEnLista(regla.autorizadores)}. Le va a aparecer en su bandeja de autorizaciones.`
+      : 'Elegí a quién le pedís que firme esta OC. Le va a aparecer en su bandeja de autorizaciones.';
     modal.classList.remove('hidden');
 
     const myCode = sessionStorage.getItem('responsable_code');
-    const loader = typeof getUsuariosActivos === 'function' ? getUsuariosActivos() : Promise.resolve([]);
+    const loader = regla ? Promise.resolve(regla.autorizadores)
+      : typeof getUsuariosActivos === 'function' ? getUsuariosActivos() : Promise.resolve([]);
     loader.then(list => {
       const opts = (list || []).filter(u => u.codigo !== myCode);
       select.innerHTML = '';
@@ -2077,15 +2127,25 @@ function elegirAutorizador() {
 async function handleGenerate() {
   if (!validateOCForm()) return;
 
+  // Si el total supera un monto con autorizador asignado, sólo ellos la firman.
+  let regla;
+  try {
+    regla = await reglaDeMonto(calcTotal());
+  } catch (e) {
+    console.warn('reglaDeMonto:', e);
+    toast('No se pudo verificar quién autoriza este monto. Revisá tu conexión.', 'error');
+    return;
+  }
+
   // Elegir cómo se autoriza la OC antes de bloquear el botón.
-  const accion = await elegirAutorizacion();
+  const accion = await elegirAutorizacion(regla);
   if (accion === 'cancel') return;
 
   // Pedir autorización a otro usuario → flujo aparte (no genera PDF ahora).
   if (accion === 'pedir') {
-    const autorizador = await elegirAutorizador();
+    const autorizador = await elegirAutorizador(regla);
     if (!autorizador) return;
-    return solicitarAutorizacion(autorizador);
+    return solicitarAutorizacion(autorizador, regla);
   }
 
   const usarFirma = accion === 'con';
@@ -2206,7 +2266,7 @@ async function handleGenerate() {
 // Reserva número, guarda la OC como 'pendiente' con su payload completo (para
 // regenerar el PDF idéntico al firmar), sube el archivo fuente a Drive para que
 // el autorizador lo pueda ver, y le manda una novedad dirigida. No genera PDF.
-async function solicitarAutorizacion(autorizador) {
+async function solicitarAutorizacion(autorizador, regla = null) {
   const btn = $('btn-generate');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Reservando número…';
@@ -2241,7 +2301,9 @@ async function solicitarAutorizacion(autorizador) {
     solicitadoEn:  Date.now(),
     resueltoEn:    null,
     firmaCodigo:   null,
-    motivoRechazo: null
+    motivoRechazo: null,
+    // Escalón de monto que obligó a pedirla (null si se pidió por elección).
+    montoRequerido: regla ? regla.escalon : null
   };
 
   const histKey = numero.replace(/-/g, '');

@@ -46,6 +46,12 @@ function renderUsers(list) {
     const reportesBadge = (!esSuper && u.reportes)
       ? `<span class="u-badge u-badge-activo">${icSvg('sheet')} Reportes</span>`
       : '';
+    const novedadesBadge = (!esSuper && tieneNovedades(u))
+      ? `<span class="u-badge u-badge-activo">${icSvg('info')} Novedades</span>`
+      : '';
+    const autorizaBadge = (!esSuper && u.autorizaDesde > 0)
+      ? `<span class="u-badge u-badge-activo">${icSvg('check')} Autoriza &gt; $ ${fmtMonto(u.autorizaDesde)}</span>`
+      : '';
     const permBtn = esSuper
       ? ''
       : `<button class="btn btn-sm btn-outline btn-permisos">Permisos</button>`;
@@ -61,6 +67,8 @@ function renderUsers(list) {
         ${jefeBadge}
         ${tallerBadge}
         ${reportesBadge}
+        ${novedadesBadge}
+        ${autorizaBadge}
       </div>
       <div class="user-card-actions">
         <button class="btn btn-sm btn-outline btn-edit-user">Editar</button>
@@ -183,6 +191,22 @@ window.resetPwd = async function (codigo, nombre) {
 // ---- Permisos (modal unificado) ----
 let permisosCodigo = null;
 
+// Novedades era parte de `admin`: quien nunca tuvo el permiso propio lo
+// conserva mientras sea admin, hasta que se lo toque desde acá.
+function tieneNovedades(u) {
+  return u.novedades != null ? !!u.novedades : !!u.admin;
+}
+
+function fmtMonto(n) {
+  return Number(n).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+}
+
+// "2.000.000" / "2000000" / "$ 2.000.000,00" → 2000000. Vacío o 0 → null.
+function parseMonto(str) {
+  const n = parseInt(String(str || '').replace(/,\d*$/, '').replace(/\D/g, ''), 10);
+  return n > 0 ? n : null;
+}
+
 window.openPermisos = function (u) {
   permisosCodigo = u.codigo;
   $('modal-permisos-name').textContent = u.nombre;
@@ -191,6 +215,8 @@ window.openPermisos = function (u) {
   $('perm-jefeObra').checked   = !!u.jefeObra;
   $('perm-jefeTaller').checked = !!u.jefeTaller;
   $('perm-reportes').checked   = !!u.reportes;
+  $('perm-novedades').checked  = tieneNovedades(u);
+  $('perm-autorizaDesde').value = u.autorizaDesde > 0 ? fmtMonto(u.autorizaDesde) : '';
   $('modal-permisos-error').classList.add('hidden');
   $('modal-permisos').classList.remove('hidden');
 };
@@ -202,7 +228,9 @@ async function savePermisos() {
     admin:      $('perm-admin').checked,
     jefeObra:   $('perm-jefeObra').checked,
     jefeTaller: $('perm-jefeTaller').checked,
-    reportes:   $('perm-reportes').checked
+    reportes:   $('perm-reportes').checked,
+    novedades:  $('perm-novedades').checked,
+    autorizaDesde: parseMonto($('perm-autorizaDesde').value)
   };
   const btn = $('modal-permisos-save');
   btn.disabled = true;
@@ -255,6 +283,10 @@ document.addEventListener('DOMContentLoaded', () => {
   $('modal-permisos-close').addEventListener('click',  () => $('modal-permisos').classList.add('hidden'));
   $('modal-permisos-cancel').addEventListener('click', () => $('modal-permisos').classList.add('hidden'));
   $('modal-permisos-save').addEventListener('click', savePermisos);
+  $('perm-autorizaDesde').addEventListener('blur', e => {
+    const n = parseMonto(e.target.value);
+    e.target.value = n ? fmtMonto(n) : '';
+  });
 
   loadUsers();
 });

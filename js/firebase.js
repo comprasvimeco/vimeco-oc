@@ -649,7 +649,7 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     if (!data) return [];
     return Object.entries(data)
       .filter(([, u]) => u && u.nombre && u.activo)
-      .map(([codigo, u]) => ({ codigo, nombre: u.nombre }))
+      .map(([codigo, u]) => ({ codigo, nombre: u.nombre, autorizaDesde: u.autorizaDesde || null }))
       .sort((a, b) => a.codigo.localeCompare(b.codigo));
   };
 
