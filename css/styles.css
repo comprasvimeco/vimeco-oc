@@ -1224,6 +1224,9 @@ body.scan-open { overflow: hidden; }
 .foc-btn--edit { background: #e8eef7; color: var(--primary); }
 .foc-btn--gen  { background: #dff3e5; color: #1a7f3c; }
 .foc-btn--clear { background: var(--gray-100); color: var(--gray-600); }
+/* Modal "¿Cómo querés autorizar esta OC?": las opciones, pastillas a lo ancho. */
+.firma-opciones { display: flex; flex-direction: column; gap: .55rem; }
+.firma-opciones .foc-btn { justify-content: center; font-size: .9rem; padding: .65rem 1.2rem; }
 /* Barra de generar del formulario: las mismas pastillas, Generar un poco más grande. */
 .generate-bar .foc-btn { justify-content: center; }
 .generate-bar .foc-btn.btn-generate { font-size: .9rem; padding: .6rem 1.4rem; }
