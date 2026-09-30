@@ -132,6 +132,63 @@ function ocDeEvento(e) {
   return nro ? ocPorNro.get(nro) : null;
 }
 
+let histAll      = [];   // /historial del más nuevo al más viejo: la comparación de precios de la ficha
+let remitosPorOC = {};   // nroOC → remitos (del más nuevo al más viejo); llega después que el historial
+
+// De varios candidatos, el cargado más cerca de la novedad.
+function masCercano(lista, ts, tsDe) {
+  return lista.reduce((m, x) =>
+    !m || Math.abs((tsDe(x) || 0) - ts) < Math.abs((tsDe(m) || 0) - ts) ? x : m, null);
+}
+
+// El remito del que habla la novedad. El evento sólo guarda su número, en el
+// título ("Remito 0001-12 — Proveedor"). Si lo borraron, no hay ficha que abrir.
+function remitoDeEvento(e) {
+  if (e.tipo !== 'remito') return null;
+  const m = /^Remito\s+(.+?)\s+—/.exec(e.titulo || '');
+  if (!m) return null;
+  const rems = (remitosPorOC[e.nroOC] || []).filter(r => String(r.nro) === m[1]);
+  return masCercano(rems, e.timestamp || 0, r => r.timestamp);
+}
+
+// La factura de la novedad, entre las registradas en la OC: el evento guarda el
+// nombre del archivo al principio del detalle. Sin coincidencia de nombre no se
+// adivina: abrir otra factura sería peor que no ofrecer el botón.
+function facturaDeEvento(e, oc) {
+  if (e.tipo !== 'factura' || !oc) return null;
+  const nombre = String(e.detalle || '').split(' · ')[0];
+  const facts  = facturasDeOC(oc).filter(f => f.nombre === nombre);
+  return masCercano(facts, e.timestamp || 0, f => f.ts);
+}
+
+// Debajo del detalle. En la novedad de una OC, lo mismo que en el Historial: el
+// sello de entrega y las pastillas de su factura y sus remitos. En la de una
+// factura o un remito (`verOC`), el camino a la ficha de la OC.
+function docsHtml(e, oc, verOC) {
+  if (!oc) return '';
+  if (e.tipo !== 'oc') {
+    return verOC
+      ? `<div class="hist-docs"><button class="hist-doc hist-doc--oc act-oc" title="Ver la ficha de la OC ${esc(oc.nroOC)}">${icSvg('eye')}Ver OC</button></div>`
+      : '';
+  }
+  const facts = facturasDeOC(oc);
+  const rems  = remitosPorOC[oc.nroOC] || [];
+  const ent   = oc.entrega?.estado;
+  const sello = ent === 'parcial' || ent === 'completa'
+    ? `<span class="rem-badge rem-badge--${ent}">${ent === 'parcial' ? 'Entrega parcial' : 'Entregada'}</span>` : '';
+  if (!sello && !facts.length && !rems.length) return '';
+
+  const pill = (tipo, txt, varios) =>
+    `<button class="hist-doc hist-doc--${tipo}" data-doc="${tipo}" aria-expanded="false">${icSvg(tipo === 'fact' ? 'file' : 'truck')}${esc(txt)}${
+      varios ? icSvg('chevron', 'hist-doc-chev') : ''}</button>`;
+
+  return `<div class="hist-docs">
+      ${sello}
+      ${facts.length ? pill('fact', facts.length > 1 ? `Facturas · ${facts.length}` : 'Factura', facts.length > 1) : ''}
+      ${rems.length  ? pill('rem',  rems.length  > 1 ? `Remitos · ${rems.length}` : `Remito ${rems[0].nro || ''}`, rems.length > 1) : ''}
+    </div>${docsListasHtml(facts, rems)}`;
+}
+
 // El texto se busca sobre título y detalle, que es donde viven proveedor, obra
 // y monto, más el nroOC de los eventos que lo guardan aparte y —si el evento es
 // de una OC (la OC, su factura o su remito)— la descripción de sus ítems. Cada
@@ -186,7 +243,8 @@ function render() {
   let html    = '';
   let lastDay = null;
   // `act-count` sigue contando todo el rango; acá se pinta sólo la página.
-  pager.take('act', events).forEach(e => {
+  const page = pager.take('act', events);
+  page.forEach(e => {
     const dk = dayKey(e.timestamp);
     if (dk !== lastDay) {
       html += `<div class="act-day">${esc(dayLabel(e.timestamp))}</div>`;
@@ -207,22 +265,51 @@ function render() {
       ? `<button class="btn btn-sm btn-danger act-del" data-key="${esc(e.key)}">Borrar</button>`
       : '';
     const ocEv    = ocDeEvento(e);
+    // Lo que abre la tarjeta: cada novedad, su propio documento. La de un
+    // remito, su ficha; la de una factura, el archivo; el resto, la ficha de la OC.
+    const rem = remitoDeEvento(e);
+    const fac = facturaDeEvento(e, ocEv);
+    const verBtn = (que, icon, txt) =>
+      `<button class="btn btn-sm btn-secondary act-ver" data-ver="${que}">${icSvg(icon)} ${txt}</button>`;
+    const ver = rem  ? verBtn('rem', 'truck', 'Ver remito')
+              : fac  ? verBtn('fact', 'file', 'Ver factura')
+              : ocEv ? verBtn('oc', 'eye', e.tipo === 'oc' ? 'Ver ficha' : 'Ver OC')
+              : '';
     const cardCls = !reciente ? 'act-card-old' : (vista ? 'act-card-seen' : 'act-card-unseen');
     html += `
-      <div class="hist-card act-card ${cardCls}">
+      <div class="hist-card act-card ${cardCls}" data-key="${esc(e.key)}">
         <div class="act-row">
           <span class="act-badge ${meta.cls}">${icSvg(meta.icon)} ${meta.label}</span>
           <div class="act-body">
             <div class="act-title">${esc(e.titulo)}</div>
             <div class="act-detalle">${esc(e.detalle)}</div>
+            ${docsHtml(e, ocEv, !!(rem || fac))}
             ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc)}
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
           </div>
-          <div class="act-actions">${drive}${accion}${borrar}</div>
+          <div class="act-actions">${ver}${drive}${accion}${borrar}</div>
         </div>
       </div>`;
   });
   list.innerHTML = html;
+
+  // Fichas y documentos de cada tarjeta. Abrir el documento de la novedad
+  // también la marca como vista, igual que abrirla en Drive.
+  const porKey = new Map(page.map(e => [e.key, e]));
+  list.querySelectorAll('.act-card').forEach(card => {
+    const e  = porKey.get(card.dataset.key);
+    const oc = e && ocDeEvento(e);
+    if (!oc && e?.tipo !== 'remito') return;
+    card.querySelector('.act-ver')?.addEventListener('click', ev => {
+      const que = ev.currentTarget.dataset.ver;
+      if (que === 'rem')       abrirFichaRemito(remitoDeEvento(e), oc, remitosPorOC[e.nroOC]);
+      else if (que === 'fact') abrirArchivoDrive(refFacturaOC(oc, facturaDeEvento(e, oc)), 'la factura');
+      else                     abrirFicha(oc);
+      marcarVista(e.key);
+    });
+    card.querySelector('.act-oc')?.addEventListener('click', () => abrirFicha(oc));
+    if (oc && e.tipo === 'oc') bindDocsOC(card, oc, facturasDeOC(oc), remitosPorOC[oc.nroOC] || []);
+  });
 
   // Abrir en Drive también marca como vista (sin frenar la apertura del link)
   list.querySelectorAll('.act-drive').forEach(a =>
@@ -273,6 +360,80 @@ async function borrarNovedad(key) {
     }
   }
   showToast('Novedad borrada.');
+}
+
+// ===================================================
+//  Ficha de la OC
+// ===================================================
+// La misma del Historial y de la vista previa (js/fichaOC.js), con lo que
+// Reportes le suma: las pastillas de factura y remitos en el encabezado y la
+// carpeta de Drive al pie.
+
+function abrirFicha(oc) {
+  if (!oc) return;
+  cerrarFicha();
+  const modal = $('modal-preview');
+  const data  = ocDataFromRecord(oc);
+  const token = String(Math.random());
+  modal.dataset.token = token;
+  const vigente = () => modal.dataset.token === token;
+
+  const facts = facturasDeOC(oc);
+  const rems  = remitosPorOC[oc.nroOC] || [];
+  const pill  = (tipo, n, txt) => n
+    ? `<button class="hist-doc hist-doc--${tipo}" data-doc="${tipo}" aria-expanded="false">${icSvg(tipo === 'fact' ? 'file' : 'truck')}${esc(txt)}${
+        n > 1 ? icSvg('chevron', 'hist-doc-chev') : ''}</button>`
+    : '';
+  const resp = oc.responsable?.nombre ? `<span class="foc-chip">${esc(oc.responsable.nombre)}</span>` : '';
+  // Comparación con las OC anteriores al mismo proveedor.
+  const cmp = checkOCHistorial(data, histAll, oc.timestamp);
+
+  pintarFichaOC(data,
+    estadoChipFicha(oc) + resp
+      + pill('fact', facts.length, facts.length > 1 ? `Facturas · ${facts.length}` : 'Factura')
+      + pill('rem',  rems.length,  rems.length  > 1 ? `Remitos · ${rems.length}` : `Remito ${rems[0]?.nro || ''}`),
+    `<div id="foc-docs">${docsListasHtml(facts, rems)}</div>` + fichaInfoHtml(cmp.info) + comparacionHtml(cmp.cambios));
+  // La ficha del remito se abre encima de ésta.
+  bindDocsOC(modal, oc, facts, rems, { encima: true });
+
+  // Drive: sólo si la OC ya tiene su carpeta registrada. A las que no tienen
+  // PDF (pendientes, rechazadas, canceladas) no se les reclama el respaldo.
+  const sinPdf = SIN_PDF.has(oc.estado);
+  const url    = driveUrlOf(oc);
+  const drv    = $('preview-drive');
+  drv.classList.toggle('hidden', !url);
+  if (url) drv.href = url; else drv.removeAttribute('href');
+  $('preview-nodrive').classList.toggle('hidden', !!url || sinPdf);
+
+  const pdf = $('preview-pdf');
+  pdf.removeAttribute('href');
+  pdf.setAttribute('aria-disabled', 'true');
+  pdf.title = !sinPdf ? 'Abrir el PDF de la OC'
+            : oc.estado === 'pendiente' ? 'Todavía no tiene PDF: está pendiente de firma'
+            : `La OC fue ${oc.estado}: no tiene PDF`;
+  modal.classList.remove('hidden');
+
+  if (!sinPdf) {
+    ocDataParaPdf(oc).then(d => {
+      if (!vigente()) return;
+      const blobUrl = URL.createObjectURL(generateOCBlob(d));
+      modal.dataset.blobUrl = blobUrl;
+      pdf.href = blobUrl;
+      pdf.removeAttribute('aria-disabled');
+    }).catch(e => {
+      if (vigente()) toast('No se pudo generar el PDF.', 'error');
+      console.error('ficha/pdf:', e);
+    });
+  }
+}
+
+function cerrarFicha() {
+  const modal   = $('modal-preview');
+  const blobUrl = modal.dataset.blobUrl;
+  if (blobUrl) { URL.revokeObjectURL(blobUrl); delete modal.dataset.blobUrl; }
+  delete modal.dataset.token;
+  $('preview-body').innerHTML = '';
+  modal.classList.add('hidden');
 }
 
 // Las novedades previas al campo `nroOC` sólo lo tienen en el título
@@ -353,6 +514,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('act-desde').addEventListener('change', onCustomDate);
   $('act-hasta').addEventListener('change', onCustomDate);
+  $('modal-preview-close').addEventListener('click', cerrarFicha);
   syncRangeUI();
 
   try {
@@ -385,12 +547,17 @@ async function cargarPaneles(code) {
   try { hist = await getHistorial(code, true); }
   catch (e) { console.warn('paneles:', e); return; }
   miCodigo       = code;
+  histAll        = hist;
   ocPorNro       = new Map(hist.map(oc => [oc.nroOC, oc]));
-  if (searchQuery.trim()) render();   // ahora la búsqueda alcanza también los ítems
+  render();   // ahora las tarjetas ofrecen la ficha y la búsqueda alcanza los ítems
   sinRespaldoOCs = ocsSinRespaldo(hist);
   pendientesOCs  = ocsPendientes(hist);
   renderSinRespaldo();
   renderPendientes();
+  // Los remitos no hacen falta para ver el feed: llegan aparte y se repinta.
+  remitosPorOCAsync()
+    .then(map => { remitosPorOC = map; render(); })
+    .catch(e => console.warn('getRemitos:', e));
   await reconciliarNovedadesOC(hist);
   await reconciliarLinksOC(hist);
 }
@@ -441,11 +608,11 @@ function renderPendientes() {
 
   const fecha = ts => new Date(ts || 0).toLocaleDateString('es-AR');
   const chips = pendientesOCs.map(oc => `
-    <div class="act-pend-oc">
+    <button class="act-pend-oc" data-nro="${esc(oc.nroOC)}" title="Ver la ficha de la OC">
       <b>${esc(oc.nroOC)}</b>
       <span>${esc(oc.proveedor?.nombre || 'Sin proveedor')} · espera a ${esc(oc.autorizacion.solicitadoA.nombre || '—')}
         · ${esc(fecha(oc.autorizacion.solicitadoEn || oc.timestamp))}</span>
-    </div>`).join('');
+    </button>`).join('');
 
   const n = pendientesOCs.length;
   const mias = pendientesOCs.filter(oc => oc.autorizacion.solicitadoA.codigo === miCodigo).length;
@@ -460,6 +627,13 @@ function renderPendientes() {
       </button></div>` : ''}`;
 
   if (mias) $('act-ir-autorizar').addEventListener('click', () => { window.location.href = 'autorizaciones.html'; });
+  bindChipsOC(box);
+}
+
+// Los chips de los paneles abren la ficha de su OC.
+function bindChipsOC(box) {
+  box.querySelectorAll('[data-nro]').forEach(b =>
+    b.addEventListener('click', () => abrirFicha(ocPorNro.get(b.dataset.nro))));
 }
 
 function renderSinRespaldo() {
@@ -471,10 +645,10 @@ function renderSinRespaldo() {
   const fecha = ts => new Date(ts || 0).toLocaleDateString('es-AR');
 
   const chips = sinRespaldoOCs.map(oc => `
-    <div class="act-alert-oc">
+    <button class="act-alert-oc" data-nro="${esc(oc.nroOC)}" title="Ver la ficha de la OC">
       <b>${esc(oc.nroOC)}</b>
       <span>${esc(oc.obra || 'Sin obra')} · ${esc(fecha(oc.timestamp))}</span>
-    </div>`).join('');
+    </button>`).join('');
 
   const n = sinRespaldoOCs.length;
   box.innerHTML = `
@@ -486,6 +660,7 @@ function renderSinRespaldo() {
     </div>`;
 
   $('act-resubir').addEventListener('click', resubirTodas);
+  bindChipsOC(box);
 }
 
 async function resubirTodas() {

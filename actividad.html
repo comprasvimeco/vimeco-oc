@@ -108,9 +108,20 @@
     }
     .act-seen-label .icon { width: 13px; height: 13px; }
     .act-nodrive { font-size: .74rem; color: var(--gray-400); font-style: italic; text-align: center; }
+    /* ---- Fichas: la OC, su factura y sus remitos desde la tarjeta ---- */
+    .act-ver { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; white-space: nowrap; }
+    .act-ver .icon { width: 13px; height: 13px; }
+    .act-card .hist-docs { margin-top: .35rem; }
+    .act-card .hist-doc-list { margin-top: .35rem; }
+    /* La OC a la que pertenece una factura, un adjunto o un remito. */
+    .hist-doc--oc { background: #e6f0fb; color: #1a3a5c; }
+    /* Los chips de los paneles de arriba abren la ficha de su OC. */
+    button.act-alert-oc, button.act-pend-oc { font-family: inherit; color: inherit; cursor: pointer; text-align: left; }
+    button.act-alert-oc:hover, button.act-pend-oc:hover { border-color: var(--primary-light); }
     @media (max-width: 560px) {
       .act-row { flex-wrap: wrap; }
-      .act-actions { flex-direction: row; margin-left: auto; align-items: center; }
+      /* Renglón propio: con la ficha son hasta cuatro botones y no entran al lado. */
+      .act-actions { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
     }
   </style>
 </head>
@@ -178,6 +189,34 @@
   </div>
 </main>
 
+<!-- ===== MODAL: Ficha de la OC (la misma que la vista previa y el Historial) ===== -->
+<div class="modal-overlay hidden" id="modal-preview">
+  <div class="modal foc-modal">
+    <div class="foc-head">
+      <div class="foc-head-l">
+        <span class="foc-kicker">Orden de compra</span>
+        <span class="foc-nro" id="preview-title">—</span>
+        <div class="foc-chips" id="preview-chips"></div>
+      </div>
+      <div class="foc-head-r">
+        <span class="foc-kicker">Total</span>
+        <span class="foc-total" id="preview-total">—</span>
+      </div>
+      <button class="foc-x" id="modal-preview-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="preview-body"></div>
+    <div class="modal-footer foc-foot">
+      <a class="foc-btn foc-btn--pdf" id="preview-pdf" target="_blank" rel="noopener" title="Abrir el PDF de la OC">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Ver PDF</a>
+      <div class="foc-foot-r">
+        <span class="foc-nodrive hidden" id="preview-nodrive">Respaldo en Drive pendiente</span>
+        <a class="foc-btn foc-btn--drive hidden" id="preview-drive" target="_blank" rel="noopener" title="Abrir la carpeta de la OC en Drive">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Drive</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Confirmar acción -->
 <div class="modal-overlay hidden" id="modal-confirm">
   <div class="modal modal--sm">
@@ -199,13 +238,16 @@
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <!-- jspdf/logoBase64/ocGenerator/drive: para regenerar y resubir el PDF de una
-     OC sin respaldo desde el panel de arriba. -->
+     OC sin respaldo desde el panel de arriba, y para el PDF de la ficha. -->
 <script src="js/jspdf.umd.min.js"></script>
 <script src="js/logoBase64.js"></script>
 <script src="js/ocGenerator.js"></script>
+<script src="js/fichaOC.js"></script>
 <script src="js/drive.js"></script>
 <script src="js/driveQueue.js"></script>
 <script src="js/driveBackup.js"></script>
+<script src="js/entregas.js"></script>
+<script src="js/fichaRemito.js"></script>
 <script src="js/buscarOC.js"></script>
 <script src="js/actividad.js"></script>
 </body>
