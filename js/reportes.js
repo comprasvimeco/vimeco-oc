@@ -392,7 +392,8 @@ function estadoChip(oc) {
     cancelada:  ['Cancelada',  '#eceef1', '#5b6573'],
   };
   const [txt, bg, fg] = map[e] || map.emitida;
-  return `<span class="rep-chip" style="background:${bg};color:${fg}">${txt}</span>`;
+  const quien = e === 'autorizada' ? oc.autorizacion?.firmante : '';
+  return `<span class="rep-chip" style="background:${bg};color:${fg}">${txt}${quien ? ' — ' + esc(quien) : ''}</span>`;
 }
 
 // Chip de categoría de la compra de un equipo (Repuestos / Mantenimiento).

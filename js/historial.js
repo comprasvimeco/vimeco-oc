@@ -2,6 +2,7 @@
 
 let allOCs = [];
 let viewerIsAdmin = false;   // 0000 o usuario con permiso admin
+let viewerCode    = '';
 let searchTerms = [];        // búsqueda vigente, para marcar los ítems que coinciden
 
 const $ = id => document.getElementById(id);
@@ -84,9 +85,13 @@ async function cargarRemitos() {
   }
 }
 
+// El responsable se muestra a los admin y en las OC ajenas que aparecen por
+// haber pedido o firmado su autorización.
+const verResp = oc => !!oc.responsable?.nombre &&
+  (viewerIsAdmin || oc.responsable.codigo !== viewerCode);
+
 function renderCards(ocs) {
   ultimaLista = ocs;
-  const isAdmin = viewerIsAdmin;
   const list = $('hist-list');
 
   $('hist-count').textContent = ocs.length === 0 ? '' : `${ocs.length} orden${ocs.length !== 1 ? 'es' : ''}`;
@@ -126,10 +131,10 @@ function renderCards(ocs) {
       ${hitsHtml(oc, itemsCoincidentes(oc, searchTerms), esc)}
       <div class="hist-card-bottom">
         <span class="hist-total">${total}</span>
-        ${isAdmin && resp ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
+        ${verResp(oc) ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
         <div class="hist-actions">
           <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista previa</button>
-          ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('print')}PDF</button>` : ''}
+          ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('share')}PDF</button>` : ''}
           <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en formulario">Usar como base</button>
         </div>
       </div>`;
@@ -245,7 +250,7 @@ function abrirFicha(oc) {
   modal.dataset.token = token;
   const vigente = () => modal.dataset.token === token;
 
-  const resp = viewerIsAdmin && oc.responsable?.nombre
+  const resp = verResp(oc)
     ? `<span class="foc-chip">${esc(oc.responsable.nombre)}</span>` : '';
   pintarFichaOC(data, estadoChipFicha(oc) + resp);
 
@@ -326,9 +331,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
   }
   viewerIsAdmin = isAdmin;
+  viewerCode    = code;
 
   try {
-    allOCs = await getHistorial(code, isAdmin);
+    allOCs = await getHistorial(code, isAdmin, true);
     renderCards(allOCs);
     cargarRemitos();
   } catch (e) {
