@@ -209,7 +209,8 @@ function checkOCHistorial(oc, historial, antesDe) {
       const pp = prev && parseFloat(prev.unitario);
       if (!pp) continue;
       const dif = (pu - pp) / pp;
-      if (Math.abs(dif) >= 0.10) {
+      // Cualquier cambio de precio, al centavo (antes sólo desde el 10%).
+      if (Math.round(pu * 100) !== Math.round(pp * 100)) {
         cambios.push({ desc: it.desc, antes: pp, ahora: pu, dif, moneda, fecha: h.fecha });
       }
       break; // sólo contra la compra más reciente de ese ítem
@@ -220,13 +221,15 @@ function checkOCHistorial(oc, historial, antesDe) {
 
 const fichaInfoHtml = info => info ? `<div class="foc-info">${_fEsc(info)}</div>` : '';
 
-// Desplegable con una tarjeta por ítem cuyo precio cambió respecto de la
-// última compra. Sube = rojo, baja = verde.
+// Desplegable con una tarjeta por ítem cuyo precio cambió (en cualquier
+// medida) respecto de la última compra. Sube = rojo, baja = verde.
 function comparacionHtml(cambios) {
   if (!cambios || !cambios.length) return '';
   const suben = cambios.filter(c => c.dif > 0).length;
   const bajan = cambios.length - suben;
-  const pct = d => (d > 0 ? '+' : '') + (d * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
+  // Un cambio de centavos sobre un precio alto redondearía a "0%".
+  const pct = d => Math.abs(d) < 0.001 ? (d > 0 ? '+' : '−') + '<0,1%'
+    : (d > 0 ? '+' : '') + (d * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
   const cards = cambios.map(c => {
     const cls = c.dif > 0 ? 'up' : 'down';
     const delta = (c.dif > 0 ? '+' : '−') + fmtMonto(Math.abs(c.ahora - c.antes), c.moneda);
