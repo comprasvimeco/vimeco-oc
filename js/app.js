@@ -2094,6 +2094,9 @@ function elegirAutorizador(regla) {
     $('pedir-texto').textContent = regla
       ? `Por el monto, esta OC sólo la puede firmar ${nombresEnLista(regla.autorizadores)}. Le va a aparecer en su bandeja de autorizaciones.`
       : 'Elegí a quién le pedís que firme esta OC. Le va a aparecer en su bandeja de autorizaciones.';
+    // Por monto, la OC queda frenada hasta que la firmen: que no dependa de
+    // que el autorizador abra la bandeja por su cuenta.
+    $('pedir-comunicate').classList.toggle('hidden', !regla);
     modal.classList.remove('hidden');
 
     const myCode = sessionStorage.getItem('responsable_code');
