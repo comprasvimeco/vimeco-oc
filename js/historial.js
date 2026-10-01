@@ -133,9 +133,9 @@ function renderCards(ocs) {
         <span class="hist-total">${total}</span>
         ${verResp(oc) ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
         <div class="hist-actions">
-          <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista previa</button>
+          <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista</button>
           ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('share')}PDF</button>` : ''}
-          <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en formulario">Usar como base</button>
+          <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en formulario">${icSvg('undo')}Usar como base</button>
         </div>
       </div>`;
 
