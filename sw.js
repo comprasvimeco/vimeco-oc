@@ -91,35 +91,11 @@ self.addEventListener('fetch', event => {
   if (event.request.method === 'POST' &&
       (url.pathname === BASE + '/app.html' || url.pathname === BASE + '/facturas.html')) {
     event.respondWith((async () => {
-      const formData = await event.request.formData();
-      // Se toma el primer archivo con contenido, venga en el campo que venga:
-      // algunas apps no respetan el nombre 'file' del manifest.
-      let file = null;
-      const textos = [];
-      for (const [, v] of formData.entries()) {
-        if (typeof v === 'string') { if (v.trim()) textos.push(v.trim()); continue; }
-        if (!file && v.size > 0) file = v;
-      }
-      const cache = await caches.open('share-target');
-      await cache.delete('shared-info');
-      if (file) {
-        // Algunas apps declaran el PDF con un tipo genérico: el tipo real se
-        // saca de los primeros bytes (y el nombre se completa con su extensión).
-        const { type, ext } = await tipoReal(file);
-        let name = file.name || 'compartido';
-        if (ext && !/\.[a-z0-9]{2,4}$/i.test(name)) name += ext;
-        await cache.put('shared-file', new Response(file, {
-          headers: { 'X-File-Name': name, 'Content-Type': type }
-        }));
-      } else {
-        // Chrome 153 descarta el archivo pero entrega título y texto; algunas
-        // apps (Files de Google) mandan ahí el nombre del archivo. Se guarda
-        // para decirle al usuario qué buscar al elegirlo a mano.
-        // Sin archivo, uno que haya quedado de un envío anterior no es este.
-        await cache.delete('shared-file');
-        const nombre = textos.find(t => !/\n/.test(t) && t.length <= 150 && /\.[a-z0-9]{2,5}$/i.test(t)) || '';
-        await cache.put('shared-info', new Response(JSON.stringify({ nombre })));
-      }
+      // Pase lo que pase se redirige a app.html: si algo falla acá (multipart
+      // mal formado, caché llena) la app muestra igual el cartel de "no llegó
+      // el archivo". Sin el redirect quedaba una pantalla de error de Chrome.
+      try { await guardarCompartido(event.request); }
+      catch (e) { console.warn('share-target:', e); }
       return Response.redirect(BASE + '/app.html?compartido=1', 303);
     })());
     return;
@@ -192,6 +168,43 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
+// Web Share Target: deja en la caché 'share-target' el archivo compartido o,
+// si no vino, 'shared-info' con el nombre que mandó la app de origen.
+async function guardarCompartido(request) {
+  const cache = await caches.open('share-target');
+  await cache.delete('shared-info');
+  // Sin archivo (o si el envío no se puede leer), uno que haya quedado de un
+  // envío anterior no es este.
+  await cache.put('shared-info', new Response(JSON.stringify({ nombre: '' })));
+  await cache.delete('shared-file');
+  const formData = await request.formData();
+  // Se toma el primer archivo con contenido, venga en el campo que venga:
+  // algunas apps no respetan el nombre 'file' del manifest.
+  let file = null;
+  const textos = [];
+  for (const [, v] of formData.entries()) {
+    if (typeof v === 'string') { if (v.trim()) textos.push(v.trim()); continue; }
+    if (!file && v.size > 0) file = v;
+  }
+  if (file) {
+    // Algunas apps declaran el PDF con un tipo genérico: el tipo real se
+    // saca de los primeros bytes (y el nombre se completa con su extensión).
+    const { type, ext } = await tipoReal(file);
+    let name = file.name || 'compartido';
+    if (ext && !/\.[a-z0-9]{2,4}$/i.test(name)) name += ext;
+    await cache.put('shared-file', new Response(file, {
+      headers: { 'X-File-Name': name, 'Content-Type': type }
+    }));
+    await cache.delete('shared-info');
+  } else {
+    // Chrome 153 descarta el archivo pero entrega título y texto; algunas
+    // apps (Files de Google) mandan ahí el nombre del archivo. Se guarda
+    // para decirle al usuario qué buscar al elegirlo a mano.
+    const nombre = textos.find(t => !/\n/.test(t) && t.length <= 150 && /\.[a-z0-9]{2,5}$/i.test(t)) || '';
+    await cache.put('shared-info', new Response(JSON.stringify({ nombre })));
+  }
+}
 
 // Tipo real de un archivo por su firma (magic bytes). Si no se reconoce, se
 // deja el tipo declarado.

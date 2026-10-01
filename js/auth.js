@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (s.codigo && s.nombre) {
         sessionStorage.setItem('responsable_code', s.codigo);
         sessionStorage.setItem('responsable_name', s.nombre);
-        window.location.href = 'menu.html';
+        window.location.href = destinoTrasLogin();
         return;
       }
     } catch (_) {}
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('responsable_name', nombre);
     sessionStorage.setItem('responsable_code', codigo);
     sessionStorage.setItem('responsable_name', nombre);
-    window.location.href = 'menu.html';
+    window.location.href = destinoTrasLogin();
   }
 
   // Cargar usuarios desde Firebase
@@ -141,3 +141,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   pwdInput.addEventListener('keydown', e => { if (e.key === 'Enter') btnLogin.click(); });
   newPwd2.addEventListener('keydown',  e => { if (e.key === 'Enter') btnLogin.click(); });
 });
+
+// Si se llegó al login desde un archivo compartido (app.html sin sesión), se
+// vuelve a la pantalla de OC para mostrar el cartel en vez de perderlo.
+function destinoTrasLogin() {
+  if (sessionStorage.getItem('vimeco_share_pendiente')) {
+    sessionStorage.removeItem('vimeco_share_pendiente');
+    return 'app.html?compartido=1';
+  }
+  return 'menu.html';
+}

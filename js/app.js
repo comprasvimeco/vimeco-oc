@@ -101,7 +101,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sess = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')) || {}; } catch (_) { return {}; } })();
   const code = sessionStorage.getItem('responsable_code') || sess.codigo || localStorage.getItem('responsable_code');
   const name = sessionStorage.getItem('responsable_name') || sess.nombre || localStorage.getItem('responsable_name');
-  if (!code || !name) { window.location.href = 'index.html'; return; }
+  if (!code || !name) {
+    // Sin sesión se pasa por el login: el envío compartido se retoma después.
+    if (location.search || !document.referrer) sessionStorage.setItem('vimeco_share_pendiente', '1');
+    window.location.href = 'index.html'; return;
+  }
   sessionStorage.setItem('responsable_code', code);
   sessionStorage.setItem('responsable_name', name);
 
@@ -466,9 +470,19 @@ async function _procesarCola(items) {
 async function checkSharedFile() {
   // El SW redirige con ?compartido=1: si el archivo no aparece, se avisa en vez
   // de abrir el formulario como si nada.
+  // Desde WhatsApp, Chrome 153 a veces ni siquiera hace el POST: abre app.html
+  // como una navegación común (a lo sumo con title/text en la URL) y el SW no se
+  // entera. Se reconoce porque llega sin referrer a la app instalada: adentro se
+  // entra siempre desde compras.html o el historial, que sí lo dejan.
   const params     = new URLSearchParams(location.search);
-  const compartido = params.has('compartido');
-  if (compartido) history.replaceState(null, '', location.pathname);
+  const nav        = performance.getEntriesByType?.('navigation')[0];
+  const lanzada    = !document.referrer && nav?.type === 'navigate' &&
+                     matchMedia('(display-mode: standalone)').matches;
+  const compartido = params.has('compartido') || params.has('title') || params.has('text') || lanzada;
+  // Nombre del archivo, si la app de origen lo mandó en la URL (mismo criterio que el SW).
+  const nombreUrl  = [params.get('title'), params.get('text')].map(t => (t || '').trim())
+    .find(t => t && !/\n/.test(t) && t.length <= 150 && /\.[a-z0-9]{2,5}$/i.test(t)) || '';
+  if (location.search) history.replaceState(null, '', location.pathname);
   if (!('caches' in window)) {
     if (compartido) toast('Este navegador no permite recibir archivos compartidos.', 'error');
     return;
@@ -479,7 +493,8 @@ async function checkSharedFile() {
     // no tiene sentido esperarlo.
     const info = compartido ? await cache.match('shared-info') : null;
     let match = await cache.match('shared-file');
-    for (let i = 0; !match && compartido && !info && i < 10; i++) {
+    // Sólo si pasó por el SW (?compartido=1) puede estar todavía escribiéndose.
+    for (let i = 0; !match && params.has('compartido') && !info && i < 10; i++) {
       await new Promise(res => setTimeout(res, 300));
       match = await cache.match('shared-file');
     }
@@ -488,8 +503,8 @@ async function checkSharedFile() {
         // Chrome 153 en Android entrega el envío sin el archivo (regresión de
         // Chrome, GoogleChromeLabs/squoosh#1503). Mismo cartel, pero cada opción
         // pide elegir el archivo a mano; si llegó el nombre, se indica cuál.
-        let nombre = '';
-        try { if (info) nombre = (await info.json()).nombre || ''; } catch (_) {}
+        let nombre = nombreUrl;
+        try { if (info) nombre = (await info.json()).nombre || nombre; } catch (_) {}
         await cache.delete('shared-info');
         showShareChoiceModal(null, nombre);
       }

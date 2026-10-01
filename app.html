@@ -467,18 +467,14 @@
       <p id="share-choice-file" style="color:var(--gray-600);margin-bottom:.35rem;font-size:.82rem;word-break:break-all;">
         <strong id="share-choice-filename"></strong>
       </p>
-      <p style="color:var(--gray-500);margin-bottom:1.5rem;font-size:.875rem;">¿Qué querés hacer con este archivo?</p>
-      <div style="display:flex;flex-direction:column;gap:.6rem;">
-        <button class="btn btn-primary" id="btn-share-generar" style="justify-content:center;">
-          <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generar OC
-        </button>
-        <button class="btn btn-outline" id="btn-share-facturas" style="justify-content:center;">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Cargar en una OC
-        </button>
+      <p style="color:var(--gray-600);text-align:center;margin-bottom:1.1rem;">¿Qué querés hacer con este archivo?</p>
+      <div class="firma-opciones">
+        <button class="foc-btn foc-btn--gen" id="btn-share-generar"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Generar OC</button>
+        <button class="foc-btn foc-btn--edit" id="btn-share-facturas"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>Cargar en una OC</button>
       </div>
-    </div>
-    <div class="modal-footer" style="justify-content:flex-end;">
-      <button class="btn btn-secondary" id="btn-share-cancelar">Cancelar</button>
+      <div style="text-align:center;">
+        <button id="btn-share-cancelar" style="background:none;border:none;color:var(--gray-500);cursor:pointer;font-size:.85rem;text-decoration:underline;margin-top:.9rem;">Cancelar</button>
+      </div>
     </div>
   </div>
 </div>
