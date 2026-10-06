@@ -33,6 +33,7 @@ const STATIC_ASSETS = [
   BASE + '/icono_app.png',
   BASE + '/icons/icon-192.png',
   BASE + '/icons/icon-512.png',
+  BASE + '/icons/badge-96.png',
   BASE + '/js/jspdf.umd.min.js',
   BASE + '/historial.html',
   BASE + '/js/historial.js',
@@ -182,6 +183,8 @@ self.addEventListener('push', event => {
   const opts = {
     body: d.body || '',
     icon: BASE + '/icons/icon-192.png',
+    // Ícono chico de la barra de estado (Android): silueta blanca, se usa sólo el alfa.
+    badge: BASE + '/icons/badge-96.png',
     data: { url: d.url || 'autorizaciones.html' }
   };
   if (d.tag) { opts.tag = d.tag; opts.renotify = true; }
