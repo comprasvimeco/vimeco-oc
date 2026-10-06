@@ -94,7 +94,7 @@
       <div class="menu-card-title">Compras</div>
       <div class="menu-card-sub">Órdenes, facturas, remitos e historial</div>
     </a>
-    <a href="caja.html" class="menu-card" id="menu-card-caja" data-tone="green">
+    <a href="caja.html" class="menu-card" id="menu-card-caja" data-tone="green" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -178,6 +178,23 @@
   <div class="menu-version" id="menu-version">v251</div>
 </main>
 
+<script>
+  // Pinta el menú como quedó la última vez (tarjetas y globitos), antes de que carguen
+  // los scripts: los permisos y Autorizaciones (que baja todo el historial) tardan, y
+  // sin esto las tarjetas aparecen de a una y el mosaico salta. Después se corrige solo.
+  (() => { try {
+    const s = JSON.parse(localStorage.getItem('vimeco_session'));
+    const c = s && s.codigo && JSON.parse(localStorage.getItem('vimeco_menu_' + s.codigo));
+    if (!c) return;
+    document.querySelectorAll('.menu-grid--tiles .menu-card[id]').forEach(el => {
+      el.style.display = c.visible.includes(el.id) ? '' : 'none';
+    });
+    for (const [id, n] of Object.entries(c.badges || {})) {
+      const b = document.getElementById(id);
+      if (b && n > 0) { b.textContent = n > 99 ? '99+' : String(n); b.classList.remove('hidden'); }
+    }
+  } catch (_) {} })();
+</script>
 <script src="js/icons.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/config.js"></script>
@@ -198,83 +215,80 @@
       localStorage.removeItem('vimeco_session');
       window.location.href = 'index.html';
     });
-    // Administración: solo super-admin (0000).
-    if (_s.codigo === '0000') {
-      document.getElementById('menu-card-admin').style.display = '';
-      // Equipos: el admin lo ve en el menú igual que un Jefe de Taller.
-      document.getElementById('menu-card-equipos').style.display = '';
-      document.getElementById('menu-card-reportes').style.display = '';
+    const show = (id, on) => { document.getElementById(id).style.display = on ? '' : 'none'; };
+    const badge = (id, n) => {
+      const b = document.getElementById(id);
+      b.textContent = n > 99 ? '99+' : String(n);
+      b.classList.toggle('hidden', !(n > 0));
+    };
+    // Cuando terminan de llegar los datos se guarda lo que quedó a la vista, para la próxima entrada.
+    // Si una consulta falla, su parte queda como estaba (la de la última vez), no se oculta.
+    function guardarMenu() {
+      try {
+        const visible = [...document.querySelectorAll('.menu-grid--tiles .menu-card[id]')]
+          .filter(el => el.style.display !== 'none').map(el => el.id);
+        const badges = {};
+        document.querySelectorAll('.menu-card-badge').forEach(b => {
+          badges[b.id] = b.classList.contains('hidden') ? 0 : (parseInt(b.textContent, 10) || 0);
+        });
+        localStorage.setItem('vimeco_menu_' + _s.codigo, JSON.stringify({ visible, badges }));
+      } catch (_) {}
     }
 
     // Autorizaciones: visible si tengo OC para firmar (me las pidieron), si yo
     // pedí autorización de alguna, o si ya autoricé/rechacé alguna (para poder
     // volver a la pestaña "Autorizadas"). El globito cuenta lo accionable:
     // pendientes de mi firma + pedidos míos ya resueltos que no vi.
+    const tareas = [];
     if (typeof getAutorizacionesPendientes === 'function' && typeof getMisSolicitudes === 'function') {
-      Promise.all([
-        getAutorizacionesPendientes(_s.codigo).catch(() => []),
-        getMisSolicitudes(_s.codigo).catch(() => []),
-        (typeof getAutorizacionesResueltas === 'function'
-          ? getAutorizacionesResueltas(_s.codigo) : Promise.resolve([])).catch(() => [])
+      tareas.push(Promise.all([
+        getAutorizacionesPendientes(_s.codigo),
+        getMisSolicitudes(_s.codigo),
+        typeof getAutorizacionesResueltas === 'function' ? getAutorizacionesResueltas(_s.codigo) : []
       ]).then(([paraFirmar, misPedidos, yaResueltas]) => {
         let seen = [];
         try { seen = JSON.parse(localStorage.getItem('vimeco_solicitudes_vistas_' + _s.codigo) || '[]'); } catch (_) {}
         const resueltasSinVer = misPedidos.filter(oc =>
           (oc.estado === 'autorizada' || oc.estado === 'rechazada') && !seen.includes(oc._key)).length;
-        if (paraFirmar.length || misPedidos.length || yaResueltas.length) {
-          document.getElementById('menu-card-autorizaciones').style.display = '';
-        }
+        show('menu-card-autorizaciones', paraFirmar.length || misPedidos.length || yaResueltas.length);
         const n = paraFirmar.length + resueltasSinVer;
         if (typeof ponerBadge === 'function') ponerBadge(n);
-        if (n > 0) {
-          const b = document.getElementById('autorizaciones-badge');
-          b.textContent = n > 99 ? '99+' : String(n);
-          b.classList.remove('hidden');
-        }
-      }).catch(() => {});
+        badge('autorizaciones-badge', n);
+      }).catch(() => {}));
     }
-
-    // Personal: visible para 0000, admins o jefes de obra.
-    const personalCard = document.getElementById('menu-card-personal');
 
     // Novedades: visible para 0000 o con permiso `novedades`, con badge de no vistas.
-    const novCard = document.getElementById('menu-card-novedades');
-    function revealNovedades() {
-      novCard.style.display = '';
-      if (typeof getActividad !== 'function') return;
-      getActividad(7).then(evs => {
+    function novedades(on) {
+      show('menu-card-novedades', on);
+      if (!on || typeof getActividad !== 'function') return;
+      return getActividad(7).then(evs => {
         let seen = [];
         try { seen = JSON.parse(localStorage.getItem('vimeco_actividad_vistas_' + _s.codigo) || '[]'); } catch (_) {}
-        const nuevos = evs.filter(e => !seen.includes(e.key)).length;
-        if (nuevos > 0) {
-          const b = document.getElementById('novedades-badge');
-          b.textContent = nuevos > 99 ? '99+' : String(nuevos);
-          b.classList.remove('hidden');
-        }
+        badge('novedades-badge', evs.filter(e => !seen.includes(e.key)).length);
       }).catch(() => {});
     }
 
-    // Caja: visible para 0000, o para usuarios con permiso `caja` o `admin`.
-    const cajaCard = document.getElementById('menu-card-caja');
+    // 0000 ve todo. El resto según sus permisos: Caja con `caja` o `admin`; Personal con
+    // `admin` o `jefeObra`; Equipos con `jefeTaller`; Reportes con `admin` o `reportes`;
+    // Novedades con su permiso propio o, si no lo tiene, lo que diga `admin`. Administración, solo 0000.
     if (_s.codigo === '0000') {
-      cajaCard.style.display = '';
-      personalCard.style.display = '';
-      revealNovedades();
+      ['menu-card-caja', 'menu-card-personal', 'menu-card-equipos', 'menu-card-reportes', 'menu-card-admin']
+        .forEach(id => show(id, true));
+      tareas.push(novedades(true));
     } else {
-      cajaCard.style.display = 'none';
+      show('menu-card-admin', false);
       if (typeof getUsuario === 'function') {
-        getUsuario(_s.codigo)
-          .then(u => {
-            if (u && (u.caja || u.admin)) cajaCard.style.display = '';
-            if (u && (u.admin || u.jefeObra)) personalCard.style.display = '';
-            if (u && u.jefeTaller) document.getElementById('menu-card-equipos').style.display = '';
-            if (u && (u.admin || u.reportes)) document.getElementById('menu-card-reportes').style.display = '';
-            // Permiso propio `novedades`; sin él, lo que diga `admin` (el criterio anterior).
-            if (u && (u.novedades != null ? u.novedades : u.admin)) revealNovedades();
-          })
-          .catch(() => {});
+        tareas.push(getUsuario(_s.codigo).then(u => {
+          u = u || {};
+          show('menu-card-caja', u.caja || u.admin);
+          show('menu-card-personal', u.admin || u.jefeObra);
+          show('menu-card-equipos', u.jefeTaller);
+          show('menu-card-reportes', u.admin || u.reportes);
+          return novedades(u.novedades != null ? u.novedades : u.admin);
+        }).catch(() => {}));
       }
     }
+    Promise.all(tareas).then(guardarMenu);
   }
 
   if ('serviceWorker' in navigator) {
