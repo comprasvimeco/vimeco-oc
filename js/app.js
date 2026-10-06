@@ -220,6 +220,7 @@ function setupIVAToggle() {
     if (ivaActive) {
       ivaPct = parseFloat(pctInput.value) || 21;
       applyIVAToggle();
+      ensureIVAImpuesto(null);
     } else {
       revertIVAToggle();
     }
@@ -230,8 +231,10 @@ function setupIVAToggle() {
   pctInput.addEventListener('change', () => {
     if (!ivaActive) return;
     revertIVAToggle();
+    const pctAnterior = ivaPct;
     ivaPct = parseFloat(pctInput.value) || 21;
     applyIVAToggle();
+    ensureIVAImpuesto(pctAnterior);
     renderTable();
     recalcTotales();
   });
@@ -245,6 +248,21 @@ function applyIVAToggle() {
       item.precio_unitario  = Math.round((item.precio_unitario / factor) * 100) / 100;
     }
   });
+}
+
+// Precios con IVA incluido → el IVA se descuenta de los ítems, así que la OC
+// tiene que sumarlo como impuesto. Si no hay fila de IVA se agrega; si hay una
+// vacía (sin % ni monto) o con el % anterior del toggle, toma el % actual.
+function ensureIVAImpuesto(pctAnterior) {
+  const imp = impuestos.find(i => /i\.?\s?v\.?\s?a/i.test(i.nombre || ''));
+  if (!imp) {
+    impuestos.push({ nombre: 'IVA', pct: ivaPct, monto: 0 });
+  } else if ((imp.pct == null && !(imp.monto || 0)) || (pctAnterior != null && imp.pct === pctAnterior)) {
+    imp.pct = ivaPct;
+  } else {
+    return;
+  }
+  renderImpuestos();
 }
 
 function revertIVAToggle() {

@@ -341,6 +341,10 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .imp-table input { border: 1px solid transparent; border-radius: var(--radius); padding: .25rem .5rem; width: 100%; font-size: .84rem; background: transparent; color: var(--gray-900); transition: all .15s; }
 .imp-table input:focus { outline: none; border-color: var(--primary-light); background: var(--white); box-shadow: 0 0 0 2px rgba(37,87,167,.1); }
 .imp-table input.text-right { text-align: right; }
+/* Divisiones verticales sutiles entre Concepto, % y Monto (en TOTAL el colspan deja el monto en la 2ª celda). */
+.imp-table thead th:nth-child(2), .imp-table thead th:nth-child(3),
+.imp-table tbody td:nth-child(2), .imp-table tbody td:nth-child(3),
+.imp-table tfoot td:nth-child(2) { border-left: 1px solid var(--gray-200); }
 /* Filas fijas computadas (no editables) */
 #row-subtotal td { background: var(--gray-100); color: var(--gray-500); font-style: italic; padding: .4rem .5rem; }
 #row-gravado  td { background: var(--gray-100); color: var(--gray-700); font-weight: 600;    padding: .4rem .5rem; }
