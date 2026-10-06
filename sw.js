@@ -60,7 +60,8 @@ const STATIC_ASSETS = [
   BASE + '/reportes.html',
   BASE + '/js/reportes.js',
   BASE + '/js/resumenPDF.js',
-  BASE + '/js/dolar.js'
+  BASE + '/js/dolar.js',
+  BASE + '/js/push.js'
 ];
 
 self.addEventListener('install', event => {
@@ -167,6 +168,41 @@ self.addEventListener('fetch', event => {
       });
     })
   );
+});
+
+// Notificaciones push (js/push.js + apps-script/notificaciones.gs). Llegan como
+// mensajes de datos de FCM y se dibujan acá: sin el SDK de Firebase en el SW
+// nadie más las muestra, y iOS da de baja la suscripción si un push no muestra nada.
+self.addEventListener('push', event => {
+  let d = {};
+  try {
+    const j = event.data ? event.data.json() : {};
+    d = { ...(j.notification || {}), ...(j.data || {}) };
+  } catch (_) {}
+  const opts = {
+    body: d.body || '',
+    icon: BASE + '/icons/icon-192.png',
+    data: { url: d.url || 'autorizaciones.html' }
+  };
+  if (d.tag) { opts.tag = d.tag; opts.renotify = true; }
+  event.waitUntil(self.registration.showNotification(d.title || 'VIMECO OC', opts));
+});
+
+// Al tocarla: si ya hay una ventana en Autorizaciones se la lleva a la pestaña
+// pedida; si no, se abre una nueva. No se reusa cualquier ventana de la app
+// porque podría tener una OC a medio cargar.
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || 'autorizaciones.html',
+                      self.registration.scope).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const w = wins.find(c => new URL(c.url).pathname === BASE + '/autorizaciones.html');
+    if (w) {
+      try { await w.focus(); await w.navigate(url); return; } catch (_) {}
+    }
+    await self.clients.openWindow(url);
+  })());
 });
 
 // Web Share Target: deja en la caché 'share-target' el archivo compartido o,

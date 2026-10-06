@@ -2363,6 +2363,15 @@ async function solicitarAutorizacion(autorizador, regla = null) {
   const driveFecha = new Date().toISOString().slice(0, 10);
   const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
 
+  if (typeof notificarUsuario === 'function' && autorizador.codigo !== solicitante.codigo) {
+    notificarUsuario(autorizador.codigo, {
+      title: 'Autorización pendiente',
+      body:  `OC ${numero} · ${driveProv} · ${driveObra}\n${monedaUSD ? 'USD' : '$'} ${fmtMoneyDisplay(ocData._total)} — pide ${solicitante.nombre}`,
+      url:   'autorizaciones.html?tab=firmar',
+      tag:   'aut-' + histKey
+    });
+  }
+
   // Subir el archivo fuente a Drive (si hay) para que el autorizador lo revise.
   if (typeof uploadSourceToDrive === 'function') {
     uploadSourceToDrive({ obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)

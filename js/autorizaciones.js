@@ -31,6 +31,7 @@ function fmtMoney(n) {
 // ---- Render de la lista ----
 function render() {
   const list = $('aut-list');
+  if (typeof ponerBadge === 'function') ponerBadge(pendientes.length);
   $('aut-count').textContent = pendientes.length
     ? `${pendientes.length} pendiente${pendientes.length !== 1 ? 's' : ''}` : '';
 
@@ -378,6 +379,8 @@ async function firmarOC(oc) {
     agregarAResueltas(oc, 'autorizada', nuevaAut);
     cerrarPreview();
     toast(`OC ${oc.nroOC} autorizada.`, 'success');
+    avisarSolicitante(oc, `OC ${oc.nroOC} autorizada`,
+      `${myName} firmó la OC a ${ocData.proveedor.nombre || 'el proveedor'}.`);
 
     // Respaldo en Drive. Ya no condiciona la autorización, pero se espera igual
     // para poder avisar si el PDF no quedó archivado.
@@ -442,6 +445,20 @@ async function rechazarOC(oc, motivo) {
   cerrarRechazo();
   cerrarPreview();
   toast(`OC ${oc.nroOC} rechazada.`, 'info');
+  avisarSolicitante(oc, `OC ${oc.nroOC} rechazada`, motivo
+    ? `${myName}: ${motivo}`
+    : `${myName} rechazó la OC a ${oc.proveedor?.nombre || 'el proveedor'}.`);
+}
+
+// Push al que pidió la autorización (js/push.js), salvo que sea yo mismo.
+function avisarSolicitante(oc, title, body) {
+  const codigo = oc.autorizacion?.solicitadoPor?.codigo;
+  if (!codigo || codigo === myCode || typeof notificarUsuario !== 'function') return;
+  notificarUsuario(codigo, {
+    title, body,
+    url: 'autorizaciones.html?tab=pedidos',
+    tag: 'aut-' + oc.nroOC.replace(/-/g, '')
+  });
 }
 
 function quitarDeLista(oc) {
@@ -564,7 +581,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderPedidos();
   renderResueltas();
   setTabCounts(sinVer);
-  // Abre en la pestaña con algo para hacer: firmar si tengo pendientes, si no mis pedidos.
-  showTab(pendientes.length ? 'firmar' : (misPedidos.length ? 'pedidos' : 'firmar'));
+  // Abre en la pestaña pedida (las notificaciones push traen ?tab=) o en la que
+  // tenga algo para hacer: firmar si tengo pendientes, si no mis pedidos.
+  const tabPedida = new URLSearchParams(location.search).get('tab');
+  showTab(['firmar', 'pedidos', 'resueltas'].includes(tabPedida) ? tabPedida
+    : (pendientes.length ? 'firmar' : (misPedidos.length ? 'pedidos' : 'firmar')));
   marcarPedidosVistos();
 });

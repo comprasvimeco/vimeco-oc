@@ -20,6 +20,13 @@
       font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center;
       box-shadow: 0 1px 3px rgba(0,0,0,.25);
     }
+    .push-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius);
+      padding: .7rem 1rem; margin-bottom: 1.25rem; font-size: .85rem; color: #1e40af;
+    }
+    .push-banner-actions { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+    .push-banner-later { background: none; border: none; color: #1e40af; font-size: .8rem; cursor: pointer; padding: .35rem .3rem; text-decoration: underline; }
     .menu-version { text-align: center; color: var(--gray-400); font-size: .72rem; margin-top: 1.75rem; }
   </style>
 </head>
@@ -42,6 +49,13 @@
 
 <main class="app-main menu-main">
   <p class="menu-welcome">Bienvenido/a, <strong id="menu-nombre">—</strong>. ¿Qué querés hacer?</p>
+  <div class="push-banner hidden" id="push-banner">
+    <span id="push-banner-txt"></span>
+    <div class="push-banner-actions">
+      <button class="btn btn-sm btn-primary hidden" id="push-banner-btn">Activar</button>
+      <button class="push-banner-later" id="push-banner-later">Ahora no</button>
+    </div>
+  </div>
   <div class="menu-grid">
     <a href="compras.html" class="menu-card">
       <div class="menu-card-icon">
@@ -132,6 +146,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
+<script src="js/push.js"></script>
 <script>
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch(_) { return null; } })();
   if (!_s?.codigo) {
@@ -170,6 +185,7 @@
           document.getElementById('menu-card-autorizaciones').style.display = '';
         }
         const n = paraFirmar.length + resueltasSinVer;
+        if (typeof ponerBadge === 'function') ponerBadge(n);
         if (n > 0) {
           const b = document.getElementById('autorizaciones-badge');
           b.textContent = n > 99 ? '99+' : String(n);
@@ -228,6 +244,41 @@
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible')
         navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
+    });
+  }
+
+  // Notificaciones push de autorizaciones (js/push.js). Con el permiso dado sólo
+  // refresca el token; si falta, un aviso que se puede posponer dos semanas.
+  if (_s?.codigo && typeof initPush === 'function') {
+    const LATER_KEY = 'vimeco_push_later';
+    const banner = document.getElementById('push-banner');
+    const txt    = document.getElementById('push-banner-txt');
+    const btn    = document.getElementById('push-banner-btn');
+    initPush(_s.codigo).then(estado => {
+      let later = 0;
+      try { later = parseInt(localStorage.getItem(LATER_KEY) || '0', 10); } catch (_) {}
+      if (Date.now() - later < 14 * 864e5) return;
+      if (estado === 'pedir') {
+        txt.textContent = 'Activá las notificaciones para enterarte cuando te pidan una autorización o te respondan un pedido.';
+        btn.classList.remove('hidden');
+      } else if (estado === 'ios-instalar') {
+        txt.textContent = 'Para recibir notificaciones en iPhone, agregá la app a la pantalla de inicio (Compartir → Agregar a inicio) y abrila desde ahí.';
+      } else return;
+      banner.classList.remove('hidden');
+    });
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      let ok = false;
+      try { ok = await activarPush(_s.codigo); } catch (e) { console.warn('push:', e); }
+      if (ok) { banner.classList.add('hidden'); return; }
+      btn.classList.add('hidden');
+      txt.textContent = Notification.permission === 'denied'
+        ? 'Las notificaciones quedaron bloqueadas. Se pueden habilitar desde los ajustes del navegador para este sitio.'
+        : 'No se pudieron activar las notificaciones. Probá de nuevo más tarde.';
+    });
+    document.getElementById('push-banner-later').addEventListener('click', () => {
+      try { localStorage.setItem(LATER_KEY, String(Date.now())); } catch (_) {}
+      banner.classList.add('hidden');
     });
   }
 </script>
