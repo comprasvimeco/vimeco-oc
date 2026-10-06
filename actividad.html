@@ -19,6 +19,19 @@
     .act-head .act-ver-todas .icon { width: 12px; height: 12px; }
     .act-search { width: 100%; border-radius: 12px; margin-bottom: .7rem; }
 
+    /* ---- Confirmación: tarjeta con ícono en pastilla y botones pastilla ---- */
+    .act-confirm { width: 100%; max-width: 340px; background: var(--white); border-radius: 18px; padding: 1.5rem 1.35rem 1.2rem;
+      box-shadow: 0 24px 60px -20px rgba(26,58,92,.5); display: flex; flex-direction: column; align-items: center; text-align: center;
+      animation: popIn .22s var(--ease-spring) both; }
+    .act-confirm-ic { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; margin-bottom: .85rem; }
+    .act-confirm-ic .icon { width: 25px; height: 25px; }
+    .act-confirm--ok  .act-confirm-ic { background: #dff3e5; color: #1a7f3c; }
+    .act-confirm--del .act-confirm-ic { background: #fde6e6; color: #b02a2a; }
+    .act-confirm-title { font-size: 1.08rem; font-weight: 700; color: var(--primary-dark); }
+    .act-confirm-msg { font-size: .88rem; color: var(--gray-600); line-height: 1.45; margin-top: .35rem; overflow-wrap: anywhere; }
+    .act-confirm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; width: 100%; margin-top: 1.25rem; }
+    .act-confirm-btns .foc-btn { justify-content: center; padding: .6rem .8rem; font-size: .86rem; }
+
     /* ---- Tipo y período: desplegables con forma de pastilla ---- */
     .act-bar { display: flex; align-items: center; gap: .5rem; }
     .act-dd { position: relative; z-index: 20; }
@@ -237,16 +250,15 @@
   </div>
 </div>
 
-<!-- Modal: Confirmar acción -->
+<!-- Modal: Confirmar acción (el botón y el tono los pone showConfirm según la acción) -->
 <div class="modal-overlay hidden" id="modal-confirm">
-  <div class="modal modal--sm">
-    <div class="modal-header"><span class="modal-title" id="modal-confirm-title">Confirmar</span></div>
-    <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
-      <p id="modal-confirm-msg" style="color:var(--gray-600);"></p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-confirm-no">Cancelar</button>
-      <button class="btn btn-danger" id="modal-confirm-yes">Borrar</button>
+  <div class="act-confirm" role="dialog" aria-modal="true" aria-labelledby="modal-confirm-title">
+    <span class="act-confirm-ic" id="modal-confirm-ic"></span>
+    <div class="act-confirm-title" id="modal-confirm-title">Confirmar</div>
+    <p class="act-confirm-msg" id="modal-confirm-msg"></p>
+    <div class="act-confirm-btns">
+      <button class="foc-btn foc-btn--clear" id="modal-confirm-no">Cancelar</button>
+      <button class="foc-btn" id="modal-confirm-yes"></button>
     </div>
   </div>
 </div>

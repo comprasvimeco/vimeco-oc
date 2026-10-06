@@ -26,10 +26,16 @@ function esc(str) {
 
 
 
-function showConfirm(title, msg) {
+// `accion`: { boton, tono: 'ok' | 'del', icono }. Sin ella, es la de borrar.
+function showConfirm(title, msg, accion = { boton: 'Borrar', tono: 'del', icono: 'trash' }) {
   return new Promise(resolve => {
     $('modal-confirm-title').textContent = title;
     $('modal-confirm-msg').textContent   = msg;
+    $('modal-confirm-ic').innerHTML      = icSvg(accion.icono);
+    const yes = $('modal-confirm-yes');
+    yes.className = 'foc-btn ' + (accion.tono === 'ok' ? 'foc-btn--gen' : 'foc-btn--del');
+    yes.innerHTML = icSvg(accion.icono) + esc(accion.boton);
+    document.querySelector('#modal-confirm .act-confirm').className = 'act-confirm act-confirm--' + accion.tono;
     const modal = $('modal-confirm');
     modal.classList.remove('hidden');
     $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
@@ -107,7 +113,8 @@ async function verTodas() {
   if (!keys.length) return;
   const ok = await showConfirm('Ver todas',
     keys.length === 1 ? 'Se va a marcar como vista la novedad sin ver.'
-                      : `Se van a marcar como vistas las ${keys.length} novedades sin ver.`);
+                      : `Se van a marcar como vistas las ${keys.length} novedades sin ver.`,
+    { boton: 'Marcar vistas', tono: 'ok', icono: 'check' });
   if (!ok) return;
   keys.forEach(k => seen.add(k));
   persistSeen();
