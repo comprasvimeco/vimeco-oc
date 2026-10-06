@@ -128,7 +128,9 @@ function estadoChipFicha(oc) {
   const txt = oc.estado === 'pendiente'  ? 'Pendiente de firma' + (a.solicitadoA?.nombre ? ' — ' + a.solicitadoA.nombre : '')
             : oc.estado === 'autorizada' ? 'Autorizada' + (a.firmante ? ' — ' + a.firmante : '')
             : oc.estado === 'rechazada'  ? 'Rechazada'
-            : oc.estado === 'cancelada'  ? 'Cancelada' : '';
+            : oc.estado === 'cancelada'  ? 'Cancelada'
+            : oc.estado === 'anulada'    ? 'Duplicada' + (oc.anulacion?.reemplazadaPor ? ', se reemplazó por OC ' + oc.anulacion.reemplazadaPor : '')
+            : oc.reemplazaA?.length      ? 'Reemplaza a OC ' + oc.reemplazaA.join(', ') : '';
   return txt ? `<span class="foc-chip">${_fEsc(txt)}</span>` : '';
 }
 
@@ -228,7 +230,7 @@ function checkOCHistorial(oc, historial, antesDe) {
   const cuit = String(oc.proveedor?.cuit || '').replace(/\D/g, '');
   const nom  = _fNormProv(oc.proveedor?.nombre);
   const mismas = (historial || []).filter(h =>
-    h.estado !== 'rechazada' && h.estado !== 'cancelada' && h.nroOC !== oc.nroOC &&
+    h.estado !== 'rechazada' && h.estado !== 'cancelada' && h.estado !== 'anulada' && h.nroOC !== oc.nroOC &&
     (!antesDe || (h.timestamp || 0) < antesDe) &&
     (cuit.length >= 11
       ? String(h.proveedor?.cuit || '').replace(/\D/g, '') === cuit

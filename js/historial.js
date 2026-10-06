@@ -32,7 +32,14 @@ function estadoBadge(oc) {
   if (e === 'cancelada') {
     return `<span style="${base}background:#eceef1;color:#5b6573;">Cancelada</span>`;
   }
+  if (e === 'anulada') return `<span class="dup-tag">${esc(textoDuplicada(oc))}</span>`;
   return '';
+}
+
+// La OC que corrigió a otra lo dice (la otra quedó anulada como duplicada).
+function reemplazaBadge(oc) {
+  const nros = oc.reemplazaA || [];
+  return nros.length ? `<span class="dup-tag dup-tag--nueva">Reemplaza a OC ${esc(nros.join(', '))}</span>` : '';
 }
 
 // Estado de entrega, espejado en la OC por Remitos (`entrega.estado`). Las OC
@@ -107,13 +114,13 @@ function renderCards(ocs) {
   // `hist-count` sigue mostrando el total del filtro; acá se pinta sólo la página.
   pager.take('hist', ocs).forEach(oc => {
     const card = document.createElement('div');
-    card.className = 'hist-card';
+    card.className = 'hist-card' + (oc.estado === 'anulada' ? ' hist-card--anulada' : '');
 
     const provNombre = oc.proveedor?.nombre || '—';
     const obra       = oc.obra || '—';
     const total      = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
     const resp       = oc.responsable?.nombre || '';
-    const badge      = estadoBadge(oc);
+    const badge      = estadoBadge(oc) + reemplazaBadge(oc);
     const entrega    = entregaBadge(oc);
     // Las OC pendientes todavía no tienen PDF definitivo, y las canceladas no lo
     // van a tener → no se descarga.
@@ -191,6 +198,103 @@ function applyFilters() {
   }
 
   renderCards(result);
+}
+
+// ---- OC duplicadas por resolver ----
+// Las propias que se parecen (criterio en js/duplicados.js) y que nadie resolvió:
+// las que se escaparon del aviso al emitir, o las de antes de que existiera.
+// Por defecto se marcan para anular todas menos la última, que es la que queda;
+// el responsable puede elegir otra o decir que son compras distintas.
+let gruposDup = [];
+
+function renderDuplicadas() {
+  const box = $('hist-dup');
+  gruposDup = typeof duplicadosPorRevisar === 'function' ? duplicadosPorRevisar(allOCs, viewerCode) : [];
+  if (!gruposDup.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+
+  const n = gruposDup.length;
+  const money = oc => (oc.moneda === 'USD' ? 'USD ' : '$ ') + fmtMoney(oc.total);
+  box.innerHTML = `
+    <div class="dup-panel-t">${icSvg('alert')} ${n > 1 ? n + ' posibles OC duplicadas' : 'Posible OC duplicada'}</div>
+    <div class="dup-panel-sub">Le emitiste más de una OC al mismo proveedor, en menos de una hora, por un monto parecido.
+      Marcá la que quedó sin validez: sigue en el historial como "Duplicada", pero deja de contar en Reportes.</div>
+    ${gruposDup.map((g, gi) => `
+      <div class="dup-grupo" data-g="${gi}">
+        <div class="dup-grupo-head"><b>${esc(g[0].proveedor?.nombre || 'Sin proveedor')}</b> · ${esc(g[0].fecha || '')}</div>
+        <div class="dup-lista">${g.map((oc, i) => {
+          const anular = i < g.length - 1;
+          return `
+          <label class="dup-oc${anular ? ' dup-oc--anular' : ''}">
+            <input type="checkbox" value="${i}"${anular ? ' checked' : ''}>
+            <span class="dup-oc-main">
+              <span class="dup-oc-nro">${esc(oc.nroOC)}</span>
+              <span class="dup-oc-sub">${esc(horaDe(oc.timestamp))} · ${esc(oc.obra || 'Sin obra')}</span>
+            </span>
+            <span class="dup-oc-monto">${esc(money(oc))}<small>${esc(etiquetaDup(oc, g[0]))}</small></span>
+          </label>`;
+        }).join('')}</div>
+        <div class="dup-grupo-foot">
+          <button class="foc-btn foc-btn--clear dup-distintas">Son compras distintas</button>
+          <button class="foc-btn foc-btn--del dup-anular"></button>
+        </div>
+      </div>`).join('')}`;
+  box.querySelectorAll('.dup-grupo').forEach(syncAnularBtn);
+  box.classList.remove('hidden');
+
+  if (!box._wired) {
+    box._wired = true;
+    box.addEventListener('change', e => {
+      const lbl = e.target.closest('.dup-oc');
+      if (!lbl) return;
+      lbl.classList.toggle('dup-oc--anular', e.target.checked);
+      syncAnularBtn(e.target.closest('.dup-grupo'));
+    });
+    box.addEventListener('click', e => {
+      const grupo = e.target.closest('.dup-grupo');
+      if (!grupo) return;
+      if (e.target.closest('.dup-anular'))    resolverDup(grupo, 'anular', e.target.closest('button'));
+      if (e.target.closest('.dup-distintas')) resolverDup(grupo, 'distintas', e.target.closest('button'));
+    });
+  }
+}
+
+function marcadasDe(grupo) {
+  const g = gruposDup[+grupo.dataset.g];
+  const sel = new Set([...grupo.querySelectorAll('input:checked')].map(c => +c.value));
+  return { anular: g.filter((_, i) => sel.has(i)), quedan: g.filter((_, i) => !sel.has(i)) };
+}
+
+function syncAnularBtn(grupo) {
+  const { anular } = marcadasDe(grupo);
+  const btn = grupo.querySelector('.dup-anular');
+  btn.innerHTML = icSvg('x') + (anular.length === 1 ? `Anular la ${esc(anular[0].nroOC)}`
+    : anular.length ? `Anular ${anular.length} OC` : 'Anular');
+  btn.disabled = !anular.length;
+}
+
+async function resolverDup(grupo, accion, btn) {
+  const { anular, quedan } = marcadasDe(grupo);
+  if (accion === 'anular' && !quedan.length) {
+    toast('Tiene que quedar al menos una OC sin anular: la que vale.', 'error');
+    return;
+  }
+  grupo.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  try {
+    if (accion === 'distintas') {
+      await marcarComprasDistintas([...anular, ...quedan]);
+      toast('Listo: no se marcan más como duplicadas.', 'success');
+    } else {
+      // La reemplaza la más nueva de las que quedan. Si quedan varias, el
+      // responsable dijo que entre ellas son compras distintas.
+      await anularPorReemplazo(anular, quedan[quedan.length - 1].nroOC);
+      if (quedan.length > 1) await marcarComprasDistintas(quedan);
+      toast(`${anular.map(oc => 'OC ' + oc.nroOC).join(', ')} anulada${anular.length > 1 ? 's' : ''} como duplicada.`, 'success');
+    }
+  } catch (e) {
+    toast('No se pudo guardar. ' + e.message, 'error');
+  }
+  renderDuplicadas();
+  renderCards(ultimaLista);
 }
 
 // ---- Ficha de la OC ----
@@ -293,6 +397,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     allOCs = await getHistorial(code, isAdmin, true);
     renderCards(allOCs);
+    renderDuplicadas();
     cargarRemitos();
   } catch (e) {
     const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;

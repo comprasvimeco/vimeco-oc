@@ -275,7 +275,15 @@ function render() {
     const verOC = (rem || fac) && ocEv
       ? `<button class="foc-btn foc-btn--edit act-oc" title="Ver la ficha de la OC ${esc(ocEv.nroOC)}">${icSvg('eye')}Ver OC</button>`
       : '';
-    const cardCls = !reciente ? 'act-card-old' : (vista ? 'act-card-seen' : 'act-card-unseen');
+    // La OC anulada por duplicada sigue en el feed, tachada y diciendo cuál la
+    // reemplazó; la que la reemplaza también lo dice.
+    const anulada = e.tipo === 'oc' && ocEv?.estado === 'anulada';
+    const dupTag  = e.tipo !== 'oc' || !ocEv ? ''
+      : anulada ? `<span class="dup-tag">${esc(textoDuplicada(ocEv))}</span>`
+      : ocEv.reemplazaA?.length ? `<span class="dup-tag dup-tag--nueva">Reemplaza a OC ${esc(ocEv.reemplazaA.join(', '))}</span>`
+      : '';
+    const cardCls = (!reciente ? 'act-card-old' : (vista ? 'act-card-seen' : 'act-card-unseen'))
+      + (anulada ? ' act-card-anulada' : '');
     html += `
       <div class="hist-card act-card ${cardCls}" data-key="${esc(e.key)}">
         <div class="act-row">
@@ -283,6 +291,7 @@ function render() {
           <div class="act-body">
             <div class="act-title">${esc(e.titulo)}</div>
             <div class="act-detalle">${esc(e.detalle)}</div>
+            ${dupTag ? `<div style="margin-top:.3rem;">${dupTag}</div>` : ''}
             ${docsHtml(e, ocEv)}
             ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc)}
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>

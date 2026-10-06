@@ -140,7 +140,7 @@ function amountIn(oc, cur) {
 }
 
 // ---- Filtro ----
-// Sólo lo que se compró (pendientes, rechazadas y canceladas nunca entran) y,
+// Sólo lo que se compró (pendientes, rechazadas, canceladas y anuladas nunca entran) y,
 // si hay, sólo la obra o el equipo elegidos. Lo usan el panel y el resumen,
 // también para el período anterior con que se comparan.
 function pasaFiltros(oc) {
@@ -186,73 +186,16 @@ function groupAgg(list, keyFn, labelFn) {
 
 // ---- Identidad del proveedor ----
 // El CUIT es la identidad real; `proveedor.nombre` es un snapshot de texto libre
-// que varía entre OC del mismo proveedor ("MARCU SA" vs "MARCU S.A", "SOPPE
-// INGENIERIA S.R.L." vs "...S.R.L"). Agrupar por nombre partía un proveedor en
-// varias filas del ranking (SOPPE salía #5 y #7 en vez de #2) aunque todas esas
-// OC ya traían el mismo CUIT. Gemelo de normalizeProvName() en app.js.
-function normProvName(s) {
-  return String(s || '').toLowerCase()
-    .replace(/\b(s\.a\.s\.|s\.r\.l\.|s\.a\.|s\.a\.s|s\.r\.l|s\.a|sas|srl|sa)\b/g, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Un CUIT de menos de 10 dígitos no es un CUIT: el OCR a veces mete el código
-// interno del proveedor en ese campo (una OC de GER-VIAL guardó "00003658").
-function cuitDigits(oc) {
-  const d = String(oc.proveedor?.cuit || '').replace(/\D/g, '');
-  return d.length >= 10 ? d : '';
-}
-
-let _provUnion = new Map();   // átomo → átomo padre (conjuntos de proveedor)
+// que varía entre OC del mismo proveedor. Agrupar por nombre partía un proveedor
+// en varias filas del ranking (SOPPE salía #5 y #7 en vez de #2). La identidad
+// (CUIT y nombre, transitiva) se arma en indiceProveedores() de js/duplicados.js,
+// que la comparte con el detector de duplicados.
+let _provKeyFn = indiceProveedores([]);
 let _provCanon = new Map();   // clave → { name, score }
-
-// El CUIT solo no alcanza como identidad: se tipea a mano (o lo saca la IA de
-// un presupuesto) y un dígito de más parte al proveedor en dos. Pasó con
-// INDUTERM INGENIERIA S.R.L., que salía dos veces en el ranking —#6 y #7, una OC
-// cada una— y cuyas dos órdenes del mismo día por el mismo importe no se
-// detectaban como duplicadas porque el detector agrupa por proveedor.
-//
-// Así que la identidad se arma con las DOS señales, CUIT y nombre normalizado,
-// y es transitiva: dos OC son del mismo proveedor si comparten cualquiera de
-// las dos. Eso une "mismo nombre, CUIT mal tipeado" (el caso de arriba) y
-// "mismo CUIT, nombre escrito distinto" (el que ya resolvía el CUIT).
-//
-// El precio: dos proveedores realmente distintos que compartan nombre
-// normalizado quedan en un solo grupo aunque tengan CUIT distinto. Con nombres
-// de empresa completos es mucho menos probable que el error de tipeo inverso.
-function _provFind(atom, crear) {
-  if (!_provUnion.has(atom)) {
-    if (!crear) return atom;          // fuera del índice: vale por sí mismo
-    _provUnion.set(atom, atom);
-  }
-  let raiz = atom;
-  while (_provUnion.get(raiz) !== raiz) raiz = _provUnion.get(raiz);
-  // Compresión de camino: las próximas búsquedas son directas.
-  let k = atom;
-  while (_provUnion.get(k) !== raiz) { const sig = _provUnion.get(k); _provUnion.set(k, raiz); k = sig; }
-  return raiz;
-}
-
-// Átomos de una OC: su CUIT (si es válido) y su nombre normalizado.
-function _provAtoms(oc) {
-  const d = cuitDigits(oc);
-  const n = normProvName(oc.proveedor?.nombre);
-  return { cuit: d ? 'c' + d : null, nombre: n ? 'n' + n : null };
-}
 
 // Se reconstruye en cada render(): provKey() depende de estos índices.
 function buildProvIndex(list) {
-  _provUnion = new Map();
-  list.forEach(oc => {
-    const { cuit, nombre } = _provAtoms(oc);
-    if (!cuit && !nombre) return;
-    const a = _provFind(cuit || nombre, true);
-    const b = _provFind(nombre || cuit, true);
-    // La raíz del CUIT gana cuando hay uno: es la clave más estable.
-    if (a !== b) _provUnion.set(b, a);
-  });
+  _provKeyFn = indiceProveedores(list);
 
   // Nombre a mostrar: gana el de la base maestra (el que trae codigoInterno);
   // si ninguna OC del grupo pasó por la base, la más reciente.
@@ -265,11 +208,7 @@ function buildProvIndex(list) {
   });
 }
 
-function provKey(oc) {
-  const { cuit, nombre } = _provAtoms(oc);
-  if (!cuit && !nombre) return '—';
-  return _provFind(cuit || nombre, false);
-}
+function provKey(oc) { return _provKeyFn(oc); }
 
 function provLabel(oc) {
   return _provCanon.get(provKey(oc))?.name || oc.proveedor?.nombre || 'Sin proveedor';
@@ -390,6 +329,7 @@ function estadoChip(oc) {
     pendiente:  ['Pendiente',  '#fff4e0', '#9a6a00'],
     rechazada:  ['Rechazada',  '#fde6e6', '#b02a2a'],
     cancelada:  ['Cancelada',  '#eceef1', '#5b6573'],
+    anulada:    ['Duplicada',  '#eceef1', '#5b6573'],
   };
   const [txt, bg, fg] = map[e] || map.emitida;
   const quien = e === 'autorizada' ? oc.autorizacion?.firmante : '';
@@ -995,10 +935,8 @@ function rangoAnterior(r) {
   return { tipo: null, desde: isoDe(pIni), hasta: isoDe(pFin) };
 }
 
-function esFirme(oc) {
-  const e = oc.estado || 'emitida';
-  return e !== 'pendiente' && e !== 'rechazada' && e !== 'cancelada';
-}
+// Una OC anulada por duplicada tampoco cuenta: la reemplazó otra (js/duplicados.js).
+function esFirme(oc) { return esCompraFirme(oc); }
 
 function ocsDeRango(r) {
   return ALL
@@ -1457,79 +1395,16 @@ function render() {
 // ===================================================
 //  OC duplicadas
 // ===================================================
-// La misma persona emite al mismo proveedor, dentro de una hora, una OC por un
-// monto parecido (±25%): es la misma compra hecha dos veces (doble clic, "parecía
-// que falló y la hice de nuevo", o rehecha corrigiendo un precio). La huella es
-// que los números suelen salir consecutivos: 0004-00000157 y 158.
-//
-// Hasta v201 bastaba mismo proveedor + mismo día + mismo monto exacto, sin mirar
-// quién ni a qué hora: marcaba en falso dos obras que le compraban lo mismo al
-// mismo corralón en el día, y se le escapaba la OC rehecha con un ajuste.
-//
-// La obra NO se exige: rehacerla por haber elegido mal la obra también es un
-// duplicado (la obra se ve en cada renglón). Las OC sin hora no se comparan.
-//
-// El monto se compara en su moneda original, no en la de visualización: el toggle
-// ARS/USD no puede cambiar qué es un duplicado.
-const DUP_VENTANA_MS = 60 * 60 * 1000;
-const DUP_TOLERANCIA = 0.25;
-
-function montoDe(oc) { return parseFloat(oc.total) || 0; }
-
-function grupoDuplicados(list) {
-  const map = new Map();
-  list.forEach(oc => {
-    if (!montoDe(oc) || !oc.timestamp) return;   // una OC en $0 no es un duplicado
-    const k = [provKey(oc), oc.responsable?.codigo || '—', oc.moneda || 'ARS'].join('|');
-    if (!map.has(k)) map.set(k, []);
-    map.get(k).push(oc);
-  });
-
-  // Dentro de cada proveedor+persona+moneda, en orden de emisión, cada OC se
-  // suma al grupo cuya última OC cae dentro de la ventana y de la tolerancia.
-  // Se busca entre todos los grupos (no sólo el último) para que otra compra
-  // distinta emitida en el medio no corte el duplicado.
-  const grupos = [];
-  const pareja = (a, b) => b.timestamp - a.timestamp <= DUP_VENTANA_MS &&
-    Math.abs(montoDe(b) - montoDe(a)) <= DUP_TOLERANCIA * Math.max(montoDe(a), montoDe(b));
-  map.forEach(ocs => {
-    const abiertos = [];
-    ocs.sort((a, b) => a.timestamp - b.timestamp).forEach(oc => {
-      const g = abiertos.find(g => pareja(g[g.length - 1], oc));
-      if (g) g.push(oc); else abiertos.push([oc]);
-    });
-    grupos.push(...abiertos);
-  });
-  return grupos
-    .filter(g => g.length > 1)
-    .sort((a, b) => montoDe(b[0]) - montoDe(a[0]));
-}
-
-function horaDe(ts) {
-  const d = new Date(ts);
-  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-}
-
-// Leyenda bajo el monto de cada OC de un grupo de duplicados.
-function etiquetaDup(oc, head) {
-  if (oc === head) return 'primera';
-  const d = difDup(oc, head);
-  return d ? d + ' vs. la primera' : 'mismo monto';
-}
-
-// Diferencia de una OC contra la primera del grupo, o '' si es idéntica.
-function difDup(oc, head) {
-  const base = montoDe(head);
-  const pct = base ? (montoDe(oc) - base) / base * 100 : 0;
-  if (Math.abs(pct) < 0.05) return '';
-  return (pct > 0 ? '+' : '−') + Math.abs(pct).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
-}
+// El criterio (misma persona, mismo proveedor, dentro de una hora, ±25%) y el
+// agrupamiento viven en js/duplicados.js: los comparten la emisión, que avisa
+// antes de generar, e Historial, donde el responsable resuelve las suyas. Acá
+// llegan sólo compras firmes: una OC anulada por duplicada ya no está en la lista.
 
 function renderDuplicados(list) {
   const card   = $('rep-dup-card');
   // Un grupo que alguien ya revisó ("No son duplicadas") no se vuelve a mostrar,
   // salvo que se le sume una OC nueva sin revisar: por eso se mira OC por OC.
-  const grupos = grupoDuplicados(list).filter(g => !g.every(oc => oc.noDuplicada));
+  const grupos = grupoDuplicados(list, provKey).filter(g => !g.every(oc => oc.noDuplicada));
 
   if (!grupos.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');

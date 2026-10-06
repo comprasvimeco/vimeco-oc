@@ -11,6 +11,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    #menu-card-historial .menu-card-icon { position: relative; }
+    .menu-card-badge {
+      position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px;
+      padding: 0 5px; border-radius: 999px; background: #d64545; color: #fff;
+      font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    }
+  </style>
 </head>
 <body>
 
@@ -64,8 +73,9 @@
       </div>
       <div class="menu-card-title">Remitos</div>
     </a>
-    <a href="historial.html" class="menu-card">
+    <a href="historial.html" class="menu-card" id="menu-card-historial">
       <div class="menu-card-icon">
+        <span id="historial-badge" class="menu-card-badge hidden" title="OC posiblemente duplicadas por revisar"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12 6 12 12 16 14"/>
@@ -80,12 +90,25 @@
 <script src="js/ui.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
+<script src="js/duplicados.js"></script>
 <script>
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch(_) { return null; } })();
   if (!_s?.codigo) {
     window.location.href = 'index.html';
   } else {
     document.getElementById('hdr-name').textContent = _s.nombre;
+
+    // Historial: globito con las OC propias posiblemente duplicadas que falta
+    // resolver (anular la que sobra o decir que son compras distintas).
+    if (typeof getHistorial === 'function' && typeof duplicadosPorRevisar === 'function') {
+      getHistorial(_s.codigo).then(list => {
+        const n = duplicadosPorRevisar(list, _s.codigo).length;
+        if (!n) return;
+        const b = document.getElementById('historial-badge');
+        b.textContent = n > 99 ? '99+' : String(n);
+        b.classList.remove('hidden');
+      }).catch(() => {});
+    }
   }
 
   if ('serviceWorker' in navigator) {

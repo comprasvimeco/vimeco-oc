@@ -428,6 +428,25 @@
   </div>
 </div>
 
+<!-- ===== MODAL: OC que repite otra reciente ===== -->
+<div class="modal-overlay hidden" id="modal-dup">
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <span class="modal-title">¿Esta OC repite otra?</span>
+      <button class="modal-close" id="modal-dup-close" aria-label="Volver al formulario" title="Volver al formulario"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" style="padding:1.35rem 1.25rem;">
+      <p id="dup-texto" class="dup-texto"></p>
+      <div id="dup-lista" class="dup-lista"></div>
+      <p id="dup-nota" class="dup-nota"></p>
+      <div class="firma-opciones">
+        <button class="foc-btn foc-btn--gen" id="btn-dup-correccion"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Es una corrección</button>
+        <button class="foc-btn foc-btn--edit" id="btn-dup-otra"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Es otra compra</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL: Pedir autorización (elegir usuario) ===== -->
 <div class="modal-overlay hidden" id="modal-pedir-autorizacion">
   <div class="modal modal--sm">
@@ -510,6 +529,7 @@
 <script src="js/gemini.js"></script>
 <script src="js/ocGenerator.js"></script>
 <script src="js/fichaOC.js"></script>
+<script src="js/duplicados.js"></script>
 <script src="js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

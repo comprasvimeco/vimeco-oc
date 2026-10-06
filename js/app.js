@@ -2160,8 +2160,110 @@ function elegirAutorizador(regla) {
   });
 }
 
+// ---- OC que repite otra reciente ----
+// Antes de generar se mira si quien emite ya le hizo, en la última hora, una OC
+// al mismo proveedor por un monto parecido (el criterio está en js/duplicados.js).
+// Si la hay, decide qué es la nueva:
+//   'otra'       → otra compra: valen las dos y no se vuelven a marcar.
+//   'correccion' → corrige a las marcadas, que quedan anuladas ("Duplicada, se
+//                  reemplazó por OC …") y salen de Reportes.
+// Resuelve { tipo, ocs }, null si no hay ninguna parecida, o 'volver' si cerró
+// el aviso para seguir editando. Sin red no se frena la emisión: se sigue.
+async function revisarRepetida() {
+  if (typeof duplicadosDeNueva !== 'function') return null;
+  const code = sessionStorage.getItem('responsable_code') || '';
+  let hist;
+  try {
+    // Se pide de nuevo (no el de historialParaComparar): la OC que se acaba de
+    // emitir en esta misma visita tiene que estar.
+    hist = await Promise.race([
+      getHistorial(code),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+    ]);
+  } catch (e) {
+    console.warn('revisarRepetida:', e);
+    return null;
+  }
+  const previas = duplicadosDeNueva({
+    proveedor:   { nombre: $('proveedor').value.trim(), cuit: $('cuit-proveedor').value.trim() },
+    responsable: { codigo: code },
+    moneda:      monedaUSD ? 'USD' : 'ARS',
+    total:       calcTotal()
+  }, hist);
+  return previas.length ? elegirRepetida(previas) : null;
+}
+
+function elegirRepetida(previas) {
+  return new Promise(resolve => {
+    const modal  = $('modal-dup');
+    const varias = previas.length > 1;
+    const prov   = previas[0].proveedor?.nombre || 'este proveedor';
+    const min    = Math.max(1, Math.round((Date.now() - previas[previas.length - 1].timestamp) / 60000));
+    $('dup-texto').textContent = varias
+      ? `En la última hora ya le emitiste ${previas.length} OC a ${prov} por un monto parecido:`
+      : `Hace ${min} min ya le emitiste a ${prov} una OC por un monto parecido:`;
+    const nueva = calcTotal();
+    $('dup-lista').innerHTML = previas.map((oc, i) => {
+      const dif = difDup({ total: nueva }, oc);
+      return `
+      <label class="dup-oc dup-oc--anular">
+        <input type="checkbox" value="${i}" checked${varias ? '' : ' hidden'}>
+        <span class="dup-oc-main">
+          <span class="dup-oc-nro">${esc(oc.nroOC)}</span>
+          <span class="dup-oc-sub">${esc(horaDe(oc.timestamp))} · ${esc(oc.obra || 'Sin obra')}</span>
+        </span>
+        <span class="dup-oc-monto">${oc.moneda === 'USD' ? 'USD' : '$'} ${esc(fmtMoneyDisplay(oc.total))}
+          <small>${dif ? 'la nueva ' + esc(dif) : 'mismo monto'}</small></span>
+      </label>`;
+    }).join('');
+    $('dup-nota').textContent = (varias ? 'Si es una corrección, las marcadas quedan anuladas' : 'Si es una corrección, la anterior queda anulada')
+      + ': siguen en el historial como "Duplicada" pero no cuentan en Reportes.';
+    const lista = $('dup-lista');
+    lista.onchange = e => e.target.closest('.dup-oc')?.classList.toggle('dup-oc--anular', e.target.checked);
+    modal.classList.remove('hidden');
+
+    const close = val => { modal.classList.add('hidden'); lista.onchange = null; resolve(val); };
+    $('btn-dup-correccion').onclick = () => {
+      const ocs = [...lista.querySelectorAll('input:checked')].map(c => previas[+c.value]);
+      if (!ocs.length) { toast('Marcá cuál corrige esta OC, o elegí "Es otra compra".', 'error'); return; }
+      close({ tipo: 'correccion', ocs });
+    };
+    $('btn-dup-otra').onclick    = () => close({ tipo: 'otra', ocs: previas });
+    $('modal-dup-close').onclick = () => close('volver');
+  });
+}
+
+// Campos que la OC nueva guarda según lo que se decidió en el aviso.
+function extraRepetida(rep) {
+  if (!rep) return {};
+  if (rep.tipo === 'otra')
+    return { noDuplicada: { ts: Date.now(), por: sessionStorage.getItem('responsable_name') || '' } };
+  return { reemplazaA: rep.ocs.map(oc => oc.nroOC) };
+}
+
+// Ya guardada la OC nueva, marcar las anteriores. Si falla no se pierde nada:
+// el grupo sigue apareciendo en Historial para resolverlo desde ahí.
+async function aplicarRepetida(rep, numero) {
+  if (!rep) return;
+  try {
+    if (rep.tipo === 'otra') await marcarComprasDistintas(rep.ocs);
+    else {
+      await anularPorReemplazo(rep.ocs, numero);
+      toast(`${rep.ocs.map(oc => 'OC ' + oc.nroOC).join(', ')} anulada${rep.ocs.length > 1 ? 's' : ''}: la reemplaza la ${numero}.`, 'info');
+    }
+  } catch (e) {
+    console.warn('aplicarRepetida:', e);
+    if (rep.tipo === 'correccion')
+      toast('No se pudo anular la OC anterior. Anulala desde Historial.', 'warning');
+  }
+}
+
 async function handleGenerate() {
   if (!validateOCForm()) return;
+
+  // ¿Repite una OC que la misma persona acaba de emitir?
+  const repetida = await revisarRepetida();
+  if (repetida === 'volver') return;
 
   // Si el total supera un monto con autorizador asignado, sólo ellos la firman.
   let regla;
@@ -2181,7 +2283,7 @@ async function handleGenerate() {
   if (accion === 'pedir') {
     const autorizador = await elegirAutorizador(regla);
     if (!autorizador) return;
-    return solicitarAutorizacion(autorizador, regla);
+    return solicitarAutorizacion(autorizador, regla, repetida);
   }
 
   const usarFirma = accion === 'con';
@@ -2226,8 +2328,8 @@ async function handleGenerate() {
   // Guardar en historial; una vez guardado, subir a Drive y salvar folder_id
   const histKey   = numero.replace(/-/g, '');
   recordarObra(ocData.proveedor.ubicacion);
-  const histSaved = saveOCToHistory(ocData, ocData._total, { estado: 'emitida' })
-    .then(() => { updateProveedoresCache(); return true; })
+  const histSaved = saveOCToHistory(ocData, ocData._total, { estado: 'emitida', ...extraRepetida(repetida) })
+    .then(() => { updateProveedoresCache(); aplicarRepetida(repetida, numero); return true; })
     .catch(e => { console.warn('saveOCToHistory:', e); return false; });
 
   // Compartir (solo mobile/táctil) o descargar
@@ -2302,7 +2404,9 @@ async function handleGenerate() {
 // Reserva número, guarda la OC como 'pendiente' con su payload completo (para
 // regenerar el PDF idéntico al firmar), sube el archivo fuente a Drive para que
 // el autorizador lo pueda ver, y le manda una novedad dirigida. No genera PDF.
-async function solicitarAutorizacion(autorizador, regla = null) {
+// Si corrige a otra OC (`repetida`), la anterior se anula recién cuando la firman
+// (autorizaciones.js): si la rechazan, la anterior sigue valiendo.
+async function solicitarAutorizacion(autorizador, regla = null, repetida = null) {
   const btn = $('btn-generate');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Reservando número…';
@@ -2348,9 +2452,11 @@ async function solicitarAutorizacion(autorizador, regla = null) {
     await saveOCToHistory(ocData, ocData._total, {
       estado:       'pendiente',
       autorizacion,
-      _payload:     ocData
+      _payload:     ocData,
+      ...extraRepetida(repetida)
     });
     updateProveedoresCache();
+    if (repetida?.tipo === 'otra') aplicarRepetida(repetida, numero);
   } catch (e) {
     console.warn('saveOCToHistory (pendiente):', e);
     toast('No se pudo registrar la solicitud. Revisá tu conexión.', 'error');
@@ -2385,7 +2491,8 @@ async function solicitarAutorizacion(autorizador, regla = null) {
   }
 
   refreshOCNumberDisplay();
-  toast(`OC ${numero} enviada a ${autorizador.nombre} para autorización.`, 'success');
+  toast(`OC ${numero} enviada a ${autorizador.nombre} para autorización.` +
+    (repetida?.tipo === 'correccion' ? ' La anterior se anula cuando la firme.' : ''), 'success');
   btn.disabled = false;
   btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
   $('btn-same-provider').classList.remove('hidden');

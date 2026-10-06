@@ -401,6 +401,14 @@ async function firmarOC(oc) {
       return;
     }
 
+    // Si corrige a otra OC, la anterior queda anulada recién ahora (app.js).
+    if (oc.reemplazaA?.length && typeof anularReemplazadasDe === 'function') {
+      anularReemplazadasDe(oc).catch(e => {
+        console.warn('firmarOC/anular:', e);
+        toast(`No se pudo anular la OC ${oc.reemplazaA.join(', ')}, que esta reemplaza.`, 'warning');
+      });
+    }
+
     quitarDeLista(oc);
     agregarAResueltas(oc, 'autorizada', nuevaAut);
     cerrarPreview();

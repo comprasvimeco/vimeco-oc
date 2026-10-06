@@ -1236,6 +1236,37 @@ body.scan-open { overflow: hidden; }
   color: #854d0e; font-size: .85rem; font-weight: 600; line-height: 1.35; }
 .pedir-comunicate .icon { width: 16px; height: 16px; flex-shrink: 0; }
 .pedir-footer .foc-btn { font-size: .88rem; padding: .55rem 1.1rem; }
+/* OC duplicadas: aviso al emitir (app.html) y panel del responsable (historial.html). */
+.dup-texto { color: var(--gray-700); font-size: .9rem; line-height: 1.4; margin-bottom: .7rem; }
+.dup-nota  { color: var(--gray-500); font-size: .8rem; line-height: 1.35; margin: .7rem 0 1rem; }
+.dup-lista { display: flex; flex-direction: column; gap: .4rem; }
+.dup-oc { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem;
+  border: 1px solid var(--gray-200); border-radius: var(--radius); background: var(--gray-100); }
+.dup-oc input[type=checkbox] { width: 17px; height: 17px; flex-shrink: 0; accent-color: #b02a2a; }
+.dup-oc-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dup-oc-nro  { font-weight: 700; font-size: .88rem; color: var(--gray-900); }
+.dup-oc-sub  { font-size: .76rem; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dup-oc-monto { display: flex; flex-direction: column; align-items: flex-end; font-size: .84rem; font-weight: 700;
+  color: var(--gray-900); white-space: nowrap; }
+.dup-oc-monto small { font-weight: 500; font-size: .72rem; color: var(--gray-500); }
+.dup-oc.dup-oc--anular { border-color: #f3c2c2; background: #fdf2f2; }
+.dup-oc.dup-oc--anular .dup-oc-nro { color: #b02a2a; text-decoration: line-through; }
+.dup-panel { margin-bottom: 1rem; padding: .9rem 1rem; border-radius: var(--radius-lg);
+  background: #fff8eb; border: 1px solid #f5d9a8; }
+.dup-panel-t { display: flex; align-items: center; gap: .45rem; font-weight: 700; color: #8a5a00; font-size: .92rem; }
+.dup-panel-t .icon { width: 17px; height: 17px; }
+.dup-panel-sub { color: #8a5a00; font-size: .8rem; margin: .2rem 0 .7rem; line-height: 1.35; }
+.dup-grupo + .dup-grupo { margin-top: .9rem; padding-top: .9rem; border-top: 1px dashed #f0cf95; }
+.dup-grupo-head { font-size: .82rem; color: var(--gray-600); margin-bottom: .45rem; }
+.dup-grupo-head b { color: var(--gray-900); }
+.dup-grupo-foot { display: flex; flex-wrap: wrap; gap: .45rem; justify-content: flex-end; margin-top: .55rem; }
+/* Etiqueta de OC anulada por duplicada / que reemplaza a otra (Historial, Novedades). */
+.dup-tag { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 700;
+  background: #eceef1; color: #5b6573; }
+.dup-tag--nueva { background: #e8eef7; color: var(--primary); }
+.act-card-anulada .act-title { text-decoration: line-through; color: var(--gray-500); }
+.hist-card--anulada { opacity: .72; }
+.hist-card--anulada .hist-nro, .hist-card--anulada .hist-total { text-decoration: line-through; }
 /* Barra de generar del formulario: las mismas pastillas, Generar un poco más grande. */
 .generate-bar .foc-btn { justify-content: center; }
 .generate-bar .foc-btn.btn-generate { font-size: .9rem; padding: .6rem 1.4rem; }
