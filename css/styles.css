@@ -1397,7 +1397,7 @@ body.scan-open { overflow: hidden; }
 /* ===== MENÚ PRINCIPAL: mosaico con ícono en pastilla pastel (menu.html) =====
    Cada módulo tiene su tono (data-tone), los mismos de las pastillas (.foc-btn, .hist-doc, .cat-tag).
    Flex con wrap y no grid: según los permisos se ven de 1 a 8 tarjetas, y así las que sobran quedan centradas. */
-.menu-main:has(.menu-grid--tiles) { max-width: 1000px; }
+.menu-main:has(.menu-grid--tiles) { max-width: 1000px; margin-top: 1rem; }
 .menu-hello { text-align: center; margin: .25rem 0 1.6rem; }
 .menu-hello h1 { font-size: 1.6rem; font-weight: 700; color: var(--primary-dark); letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }
 .menu-hello p { font-size: .92rem; color: var(--gray-500); margin-top: .2rem; }
@@ -1438,6 +1438,7 @@ body.scan-open { overflow: hidden; }
   .menu-grid--tiles .menu-card { width: calc((100% - 2rem) / 3); }
 }
 @media (max-width: 500px) {
+  .menu-main:has(.menu-grid--tiles) { margin-top: .25rem; }
   .menu-hello { margin-bottom: 1.1rem; }
   .menu-hello h1 { font-size: 1.3rem; }
   .menu-hello p { font-size: .84rem; }
