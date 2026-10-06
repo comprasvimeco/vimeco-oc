@@ -1393,3 +1393,60 @@ body.scan-open { overflow: hidden; }
 /* Aviso en el cartel de archivo compartido cuando Chrome no entrega el archivo. */
 .share-aviso { background: #fde6e6; color: #b02a2a; border: 1px solid #f5c2c2; border-radius: var(--radius-lg);
   padding: .65rem .8rem; margin-bottom: .9rem; font-size: .84rem; font-weight: 600; line-height: 1.4; }
+
+/* ===== MENÚ PRINCIPAL: mosaico con ícono en pastilla pastel (menu.html) =====
+   Cada módulo tiene su tono (data-tone), los mismos de las pastillas (.foc-btn, .hist-doc, .cat-tag).
+   Flex con wrap y no grid: según los permisos se ven de 1 a 8 tarjetas, y así las que sobran quedan centradas. */
+.menu-main:has(.menu-grid--tiles) { max-width: 1000px; }
+.menu-hello { text-align: center; margin: .25rem 0 1.6rem; }
+.menu-hello h1 { font-size: 1.6rem; font-weight: 700; color: var(--primary-dark); letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }
+.menu-hello p { font-size: .92rem; color: var(--gray-500); margin-top: .2rem; }
+.menu-hello p::first-letter { text-transform: uppercase; }
+.menu-grid--tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+.menu-grid--tiles .menu-card {
+  --t-bg: #e8eef7; --t-fg: var(--primary);
+  width: calc((100% - 3rem) / 4); flex-direction: column; justify-content: flex-start; align-items: center;
+  gap: .85rem; padding: 1.4rem 1.1rem 1.25rem; text-align: center; border-radius: 16px;
+  background: rgba(255,255,255,.85); box-shadow: 0 6px 22px -10px rgba(26,58,92,.25);
+}
+.menu-grid--tiles .menu-card::before { display: none; }
+.menu-grid--tiles .menu-card:hover { transform: translateY(-3px); background: rgba(255,255,255,.95);
+  border-color: rgba(255,255,255,.8); box-shadow: 0 14px 30px -12px rgba(26,58,92,.35); }
+.menu-grid--tiles .menu-card-icon,
+.menu-grid--tiles .menu-card:hover .menu-card-icon {
+  width: 52px; height: 52px; border-radius: 14px; background: var(--t-bg); color: var(--t-fg);
+  box-shadow: none; transform: none; position: static;
+}
+.menu-grid--tiles .menu-card-icon svg { width: 25px; height: 25px; stroke: currentColor; stroke-width: 1.7; }
+.menu-grid--tiles .menu-card-title { font-size: 1.05rem; font-weight: 700; color: var(--primary-dark); text-transform: none; letter-spacing: 0; text-align: center; }
+.menu-grid--tiles .menu-card-sub { font-size: .78rem; line-height: 1.35; margin-top: -.55rem; text-align: center; }
+.menu-grid--tiles .menu-card-badge {
+  position: absolute; top: .85rem; right: .85rem; display: inline-flex; align-items: center; gap: .3rem;
+  height: auto; min-width: 0; padding: .14rem .55rem; border-radius: 999px; line-height: 1.4;
+  background: #fde6e6; color: #b02a2a; font-size: .7rem; font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: none;
+}
+.menu-grid--tiles .menu-card-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+.menu-grid--tiles .menu-card-badge.hidden { display: none; }
+.menu-card[data-tone="green"]  { --t-bg: #dff3e5; --t-fg: #1a7f3c; }
+.menu-card[data-tone="amber"]  { --t-bg: #fbeedd; --t-fg: #8a4f0d; }
+.menu-card[data-tone="pink"]   { --t-bg: #fce8ee; --t-fg: #a23a57; }
+.menu-card[data-tone="violet"] { --t-bg: #f1e8fb; --t-fg: #6b3fa0; }
+.menu-card[data-tone="teal"]   { --t-bg: #dcf3ef; --t-fg: #16695f; }
+.menu-card[data-tone="sky"]    { --t-bg: #e0f0fb; --t-fg: #0e6a96; }
+.menu-card[data-tone="gray"]   { --t-bg: #eef0f3; --t-fg: #4b5563; }
+@media (max-width: 760px) {
+  .menu-grid--tiles .menu-card { width: calc((100% - 2rem) / 3); }
+}
+@media (max-width: 500px) {
+  .menu-hello { margin-bottom: 1.1rem; }
+  .menu-hello h1 { font-size: 1.3rem; }
+  .menu-hello p { font-size: .84rem; }
+  .menu-grid--tiles { gap: .7rem; }
+  .menu-grid--tiles .menu-card { width: calc((100% - .7rem) / 2); padding: 1.05rem .8rem; gap: .7rem; border-radius: 14px; }
+  .menu-grid--tiles .menu-card-icon,
+  .menu-grid--tiles .menu-card:hover .menu-card-icon { width: 44px; height: 44px; border-radius: 12px; }
+  .menu-grid--tiles .menu-card-icon svg { width: 22px; height: 22px; }
+  .menu-grid--tiles .menu-card-title { font-size: .95rem; }
+  .menu-grid--tiles .menu-card-sub { display: none; }
+  .menu-grid--tiles .menu-card-badge { top: .65rem; right: .65rem; }
+}

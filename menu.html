@@ -12,14 +12,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
   <style>
-    #menu-card-novedades .menu-card-icon,
-    #menu-card-autorizaciones .menu-card-icon { position: relative; }
-    .menu-card-badge {
-      position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px;
-      padding: 0 5px; border-radius: 999px; background: #d64545; color: #fff;
-      font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,.25);
-    }
     /* Aviso de notificaciones: misma superficie glass y ícono en círculo que las tarjetas del menú. */
     .push-banner {
       display: flex; align-items: center; gap: 1rem;
@@ -75,7 +67,10 @@
 </header>
 
 <main class="app-main menu-main">
-  <p class="menu-welcome">Bienvenido/a, <strong id="menu-nombre">—</strong>. ¿Qué querés hacer?</p>
+  <div class="menu-hello">
+    <h1><span id="menu-saludo">Hola</span>, <span id="menu-nombre">—</span></h1>
+    <p id="menu-fecha"></p>
+  </div>
   <div class="push-banner hidden" id="push-banner" role="status">
     <div class="push-banner-icon"><svg viewBox="0 0 24 24" aria-hidden="true" id="push-banner-svg"></svg></div>
     <div class="push-banner-body">
@@ -87,7 +82,7 @@
       <button class="foc-btn push-btn-on hidden" id="push-banner-btn">Activar</button>
     </div>
   </div>
-  <div class="menu-grid">
+  <div class="menu-grid menu-grid--tiles">
     <a href="compras.html" class="menu-card">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -97,8 +92,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Compras</div>
+      <div class="menu-card-sub">Órdenes, facturas, remitos e historial</div>
     </a>
-    <a href="caja.html" class="menu-card" id="menu-card-caja">
+    <a href="caja.html" class="menu-card" id="menu-card-caja" data-tone="green">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -106,8 +102,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Caja</div>
+      <div class="menu-card-sub">Movimientos y saldo del mes</div>
     </a>
-    <a href="personal.html" class="menu-card" id="menu-card-personal" style="display:none">
+    <a href="personal.html" class="menu-card" id="menu-card-personal" data-tone="amber" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
@@ -117,8 +114,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Personal</div>
+      <div class="menu-card-sub">Horas y viáticos por obra</div>
     </a>
-    <a href="actividad.html" class="menu-card" id="menu-card-novedades" style="display:none">
+    <a href="actividad.html" class="menu-card" id="menu-card-novedades" data-tone="pink" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -127,8 +125,9 @@
         <span id="novedades-badge" class="menu-card-badge hidden"></span>
       </div>
       <div class="menu-card-title">Novedades</div>
+      <div class="menu-card-sub">Lo último que pasó</div>
     </a>
-    <a href="autorizaciones.html" class="menu-card" id="menu-card-autorizaciones" style="display:none">
+    <a href="autorizaciones.html" class="menu-card" id="menu-card-autorizaciones" data-tone="violet" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
@@ -138,8 +137,9 @@
         <span id="autorizaciones-badge" class="menu-card-badge hidden"></span>
       </div>
       <div class="menu-card-title">Autorizaciones</div>
+      <div class="menu-card-sub">OC para firmar y pedidos</div>
     </a>
-    <a href="equipos.html" class="menu-card" id="menu-card-equipos" style="display:none">
+    <a href="equipos.html" class="menu-card" id="menu-card-equipos" data-tone="teal" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="1" y="3" width="15" height="13"/>
@@ -149,8 +149,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Equipos</div>
+      <div class="menu-card-sub">Fichas y documentación</div>
     </a>
-    <a href="reportes.html" class="menu-card" id="menu-card-reportes" style="display:none">
+    <a href="reportes.html" class="menu-card" id="menu-card-reportes" data-tone="sky" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3.5" y="15" width="4" height="6" rx="1"/>
@@ -161,8 +162,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Reportes</div>
+      <div class="menu-card-sub">Gasto por obra y equipo</div>
     </a>
-    <a href="administracion.html" class="menu-card" id="menu-card-admin" style="display:none">
+    <a href="administracion.html" class="menu-card" id="menu-card-admin" data-tone="gray" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
@@ -170,11 +172,14 @@
         </svg>
       </div>
       <div class="menu-card-title">Administración</div>
+      <div class="menu-card-sub">Usuarios, obras y permisos</div>
     </a>
   </div>
   <div class="menu-version" id="menu-version">v248</div>
 </main>
 
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/push.js"></script>
@@ -185,6 +190,10 @@
   } else {
     document.getElementById('hdr-name').textContent = _s.nombre;
     document.getElementById('menu-nombre').textContent = _s.nombre;
+    const _h = new Date().getHours();
+    document.getElementById('menu-saludo').textContent = _h < 13 ? 'Buen día' : _h < 20 ? 'Buenas tardes' : 'Buenas noches';
+    document.getElementById('menu-fecha').textContent =
+      new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
     document.getElementById('btn-logout').addEventListener('click', () => {
       localStorage.removeItem('vimeco_session');
       window.location.href = 'index.html';

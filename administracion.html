@@ -30,8 +30,11 @@
 </header>
 
 <main class="app-main menu-main">
-  <p class="menu-welcome">Administración — acciones especiales</p>
-  <div class="menu-grid">
+  <div class="menu-hello">
+    <h1>Administración</h1>
+    <p>Acciones especiales</p>
+  </div>
+  <div class="menu-grid menu-grid--tiles">
     <a href="usuarios.html" class="menu-card">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -42,8 +45,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Usuarios</div>
+      <div class="menu-card-sub">Altas, permisos y claves</div>
     </a>
-    <a href="obras.html" class="menu-card">
+    <a href="obras.html" class="menu-card" data-tone="green">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
@@ -51,8 +55,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Obras</div>
+      <div class="menu-card-sub">Alta y estado de las obras</div>
     </a>
-    <a href="reportes.html" class="menu-card">
+    <a href="reportes.html" class="menu-card" data-tone="sky">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <!-- Barras con la flecha de tendencia: las líneas finas sobre un eje se
@@ -65,8 +70,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Reportes</div>
+      <div class="menu-card-sub">Gasto por obra y equipo</div>
     </a>
-    <a href="personal-config.html" class="menu-card">
+    <a href="personal-config.html" class="menu-card" data-tone="amber">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
@@ -76,10 +82,13 @@
         </svg>
       </div>
       <div class="menu-card-title">Personal (config)</div>
+      <div class="menu-card-sub">Categorías, valores, feriados y padrón</div>
     </a>
   </div>
 </main>
 
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script>

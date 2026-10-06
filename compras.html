@@ -11,15 +11,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
-  <style>
-    #menu-card-historial .menu-card-icon { position: relative; }
-    .menu-card-badge {
-      position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px;
-      padding: 0 5px; border-radius: 999px; background: #d64545; color: #fff;
-      font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,.25);
-    }
-  </style>
 </head>
 <body>
 
@@ -39,8 +30,11 @@
 </header>
 
 <main class="app-main menu-main">
-  <p class="menu-welcome">Compras — ¿qué querés hacer?</p>
-  <div class="menu-grid">
+  <div class="menu-hello">
+    <h1>Compras</h1>
+    <p>¿Qué querés hacer?</p>
+  </div>
+  <div class="menu-grid menu-grid--tiles">
     <a href="app.html" class="menu-card">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -50,8 +44,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Orden de Compra</div>
+      <div class="menu-card-sub">Crear una orden nueva</div>
     </a>
-    <a href="facturas.html" class="menu-card">
+    <a href="facturas.html" class="menu-card" data-tone="violet">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -61,8 +56,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Facturas y otros</div>
+      <div class="menu-card-sub">Cargar facturas y comprobantes</div>
     </a>
-    <a href="remitos.html" class="menu-card">
+    <a href="remitos.html" class="menu-card" data-tone="amber">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="1" y="3" width="15" height="13"/>
@@ -72,8 +68,9 @@
         </svg>
       </div>
       <div class="menu-card-title">Remitos</div>
+      <div class="menu-card-sub">Controlar entregas sobre la OC</div>
     </a>
-    <a href="historial.html" class="menu-card" id="menu-card-historial">
+    <a href="historial.html" class="menu-card" id="menu-card-historial" data-tone="sky">
       <div class="menu-card-icon">
         <span id="historial-badge" class="menu-card-badge hidden" title="OC posiblemente duplicadas por revisar"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -82,6 +79,7 @@
         </svg>
       </div>
       <div class="menu-card-title">Historial</div>
+      <div class="menu-card-sub">Buscar y ver todas las OC</div>
     </a>
   </div>
 </main>
