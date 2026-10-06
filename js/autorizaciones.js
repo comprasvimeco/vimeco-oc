@@ -134,7 +134,7 @@ function renderPedidos() {
       extra = `<div class="aut-meta">Cancelaste el pedido el ${esc(new Date(a.canceladoEn).toLocaleDateString('es-AR'))}</div>`;
     }
     const acciones = `<div class="aut-actions">
-           <button class="foc-btn foc-btn--edit btn-ver">${icSvg('eye')}Vista previa</button>
+           <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista</button>
            ${btnPdfHtml(oc)}
            ${oc.estado === 'rechazada' ? `<button class="foc-btn foc-btn--gen btn-rehacer" title="Cargar en el formulario para corregirla">${icSvg('undo')}Rehacer</button>` : ''}
            ${oc.estado === 'pendiente' ? '<button class="foc-btn foc-btn--clear btn-cancelar-pedido">Cancelar pedido</button>' : ''}
@@ -255,7 +255,7 @@ function renderResueltas() {
       </div>
       ${extra}
       <div class="aut-actions">
-        <button class="foc-btn foc-btn--edit btn-ver">${icSvg('eye')}Vista previa</button>
+        <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista</button>
         ${btnPdfHtml(oc)}
       </div>`;
     card.querySelector('.btn-ver').addEventListener('click', () => abrirPreview(oc, true));
