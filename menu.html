@@ -20,13 +20,40 @@
       font-size: .72rem; font-weight: 700; line-height: 20px; text-align: center;
       box-shadow: 0 1px 3px rgba(0,0,0,.25);
     }
+    /* Aviso de notificaciones: misma superficie glass y ícono en círculo que las tarjetas del menú. */
     .push-banner {
-      display: flex; align-items: center; justify-content: space-between; gap: .75rem;
-      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius);
-      padding: .7rem 1rem; margin-bottom: 1.25rem; font-size: .85rem; color: #1e40af;
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1rem 1.15rem; margin-bottom: 1.25rem; border-radius: var(--radius-lg);
+      background: var(--glass-bg-strong); border: 1px solid var(--glass-border);
+      box-shadow: var(--shadow-glass);
+      backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+      animation: fadeInUp .4s var(--ease-spring) both;
+      transition: opacity .3s, transform .3s;
     }
-    .push-banner-actions { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
-    .push-banner-later { background: none; border: none; color: #1e40af; font-size: .8rem; cursor: pointer; padding: .35rem .3rem; text-decoration: underline; }
+    .push-banner.saliendo { opacity: 0; transform: translateY(-8px); }
+    .push-banner-icon {
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--grad-header); box-shadow: 0 6px 16px -6px rgba(37,87,167,.7);
+    }
+    .push-banner-icon svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round; }
+    .push-banner--ok   .push-banner-icon { background: linear-gradient(120deg, #1a7f3c, #34a853); box-shadow: 0 6px 16px -6px rgba(26,127,60,.6); }
+    .push-banner--warn .push-banner-icon { background: linear-gradient(120deg, #b45309, #e0a526); box-shadow: 0 6px 16px -6px rgba(180,83,9,.6); }
+    .push-banner-body { flex: 1; min-width: 0; }
+    .push-banner-title { font-weight: 800; color: var(--primary); font-size: .95rem; line-height: 1.25; }
+    .push-banner-txt { color: var(--gray-600); font-size: .84rem; line-height: 1.4; margin-top: .15rem; }
+    .push-banner-txt b { color: var(--gray-700); }
+    .push-banner-txt .icon-inline { width: 14px; height: 14px; vertical-align: -2px; stroke: currentColor; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .push-banner-actions { display: flex; align-items: center; gap: .45rem; flex-shrink: 0; }
+    .push-btn-on { background: var(--grad-header); color: #fff; box-shadow: 0 4px 12px -4px rgba(37,87,167,.6); }
+    .push-btn-on .spinner { width: 13px; height: 13px; }
+    @media (max-width: 520px) {
+      .push-banner { flex-wrap: wrap; }
+      .push-banner-actions { width: 100%; justify-content: flex-end; }
+    }
     .menu-version { text-align: center; color: var(--gray-400); font-size: .72rem; margin-top: 1.75rem; }
   </style>
 </head>
@@ -49,11 +76,15 @@
 
 <main class="app-main menu-main">
   <p class="menu-welcome">Bienvenido/a, <strong id="menu-nombre">—</strong>. ¿Qué querés hacer?</p>
-  <div class="push-banner hidden" id="push-banner">
-    <span id="push-banner-txt"></span>
+  <div class="push-banner hidden" id="push-banner" role="status">
+    <div class="push-banner-icon"><svg viewBox="0 0 24 24" aria-hidden="true" id="push-banner-svg"></svg></div>
+    <div class="push-banner-body">
+      <div class="push-banner-title" id="push-banner-title"></div>
+      <div class="push-banner-txt" id="push-banner-txt"></div>
+    </div>
     <div class="push-banner-actions">
-      <button class="btn btn-sm btn-primary hidden" id="push-banner-btn">Activar</button>
-      <button class="push-banner-later" id="push-banner-later">Ahora no</button>
+      <button class="foc-btn foc-btn--clear" id="push-banner-later">Ahora no</button>
+      <button class="foc-btn push-btn-on hidden" id="push-banner-btn">Activar</button>
     </div>
   </div>
   <div class="menu-grid">
@@ -252,33 +283,73 @@
   if (_s?.codigo && typeof initPush === 'function') {
     const LATER_KEY = 'vimeco_push_later';
     const banner = document.getElementById('push-banner');
+    const svg    = document.getElementById('push-banner-svg');
+    const title  = document.getElementById('push-banner-title');
     const txt    = document.getElementById('push-banner-txt');
     const btn    = document.getElementById('push-banner-btn');
+    const later  = document.getElementById('push-banner-later');
+    const ICON = {
+      bell:  '<path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>',
+      phone: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+      check: '<polyline points="20 6 9 17 4 12"/>',
+      off:   '<path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0118 8"/><path d="M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 00-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    };
+    // Ícono "Compartir" de Safari, dentro del texto de iPhone.
+    const SHARE = '<svg class="icon-inline" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>';
+
+    function pintar(icono, tono, titulo, html) {
+      svg.innerHTML = ICON[icono];
+      banner.classList.toggle('push-banner--ok', tono === 'ok');
+      banner.classList.toggle('push-banner--warn', tono === 'warn');
+      title.textContent = titulo;
+      txt.innerHTML = html;
+    }
+    function cerrar() {
+      banner.classList.add('saliendo');
+      setTimeout(() => banner.classList.add('hidden'), 300);
+    }
+
     initPush(_s.codigo).then(estado => {
-      let later = 0;
-      try { later = parseInt(localStorage.getItem(LATER_KEY) || '0', 10); } catch (_) {}
-      if (Date.now() - later < 14 * 864e5) return;
+      let pospuesto = 0;
+      try { pospuesto = parseInt(localStorage.getItem(LATER_KEY) || '0', 10); } catch (_) {}
+      if (Date.now() - pospuesto < 14 * 864e5) return;
       if (estado === 'pedir') {
-        txt.textContent = 'Activá las notificaciones para enterarte cuando te pidan una autorización o te respondan un pedido.';
+        pintar('bell', '', 'Enterate al instante',
+          'Te avisamos cuando te pidan firmar una OC y cuando te respondan un pedido.');
         btn.classList.remove('hidden');
       } else if (estado === 'ios-instalar') {
-        txt.textContent = 'Para recibir notificaciones en iPhone, agregá la app a la pantalla de inicio (Compartir → Agregar a inicio) y abrila desde ahí.';
+        pintar('phone', '', 'Avisos en iPhone',
+          `Tocá ${SHARE} <b>Compartir</b> y elegí <b>Agregar a inicio</b>. Abrí la app desde ese ícono y activalos desde acá.`);
+        later.textContent = 'Entendido';
       } else return;
       banner.classList.remove('hidden');
     });
+
     btn.addEventListener('click', async () => {
       btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Activando…';
       let ok = false;
       try { ok = await activarPush(_s.codigo); } catch (e) { console.warn('push:', e); }
-      if (ok) { banner.classList.add('hidden'); return; }
-      btn.classList.add('hidden');
-      txt.textContent = Notification.permission === 'denied'
-        ? 'Las notificaciones quedaron bloqueadas. Se pueden habilitar desde los ajustes del navegador para este sitio.'
-        : 'No se pudieron activar las notificaciones. Probá de nuevo más tarde.';
+      if (ok) {
+        btn.classList.add('hidden'); later.classList.add('hidden');
+        pintar('check', 'ok', 'Notificaciones activadas', 'Vas a recibir los avisos en este dispositivo.');
+        setTimeout(cerrar, 2500);
+        return;
+      }
+      btn.disabled = false;
+      btn.textContent = 'Reintentar';
+      if (Notification.permission === 'denied') {
+        btn.classList.add('hidden');
+        later.textContent = 'Entendido';
+        pintar('off', 'warn', 'Quedaron bloqueadas',
+          'Para recibirlas, habilitá las notificaciones de este sitio en los ajustes del navegador.');
+      } else {
+        pintar('bell', 'warn', 'No se pudieron activar', 'Revisá la conexión y probá de nuevo.');
+      }
     });
-    document.getElementById('push-banner-later').addEventListener('click', () => {
+    later.addEventListener('click', () => {
       try { localStorage.setItem(LATER_KEY, String(Date.now())); } catch (_) {}
-      banner.classList.add('hidden');
+      cerrar();
     });
   }
 </script>
