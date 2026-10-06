@@ -95,13 +95,23 @@ function marcarVista(key) {
 
 function updateBanner() {
   const n = allEvents.filter(sinVer).length;
-  const banner = $('act-banner');
-  if (n > 0) {
-    banner.textContent = `${n} novedad${n !== 1 ? 'es' : ''} sin ver`;
-    banner.classList.remove('hidden');
-  } else {
-    banner.classList.add('hidden');
-  }
+  $('act-banner').textContent = `${n} sin ver`;
+  $('act-banner').classList.toggle('hidden', !n);
+  $('act-ver-todas').classList.toggle('hidden', !n);
+}
+
+// "Ver todas": marca como vistas todas las de la pastilla de sin ver, sin
+// importar el tipo o el período elegidos.
+async function verTodas() {
+  const keys = allEvents.filter(sinVer).map(e => e.key);
+  if (!keys.length) return;
+  const ok = await showConfirm('Ver todas',
+    keys.length === 1 ? 'Se va a marcar como vista la novedad sin ver.'
+                      : `Se van a marcar como vistas las ${keys.length} novedades sin ver.`);
+  if (!ok) return;
+  keys.forEach(k => seen.add(k));
+  persistSeen();
+  render();
 }
 
 // Límites del rango elegido, en timestamps.
@@ -201,14 +211,88 @@ function coincideTexto(e, terms) {
   return terms.every(t => hay.includes(t) || hayOC.includes(t));
 }
 
-function getVisible() {
+// Con `todosLosTipos` ignora el tipo elegido: sirve para contar cuántas hay de cada uno.
+function getVisible(todosLosTipos) {
   const { from, to } = rangeBounds();
   const terms = terminosBusqueda(searchQuery);
   return allEvents.filter(e => {
     const ts = e.timestamp || 0;
     if (ts < from || ts > to) return false;
-    if (currentFilter !== 'all' && e.tipo !== currentFilter) return false;
+    if (!todosLosTipos && currentFilter !== 'all' && e.tipo !== currentFilter) return false;
     return coincideTexto(e, terms);
+  });
+}
+
+// ---- Desplegables de tipo y período ----
+// En el teléfono la pastilla usa el nombre corto, para que las dos entren en un renglón.
+const TIPOS = [
+  { v: 'all',     nombre: 'Todas',             corto: 'Todas',    icon: 'layers' },
+  { v: 'oc',      nombre: 'Órdenes de Compra', corto: 'OC',       icon: 'print'  },
+  { v: 'factura', nombre: 'Facturas',          corto: 'Facturas', icon: 'file'   },
+  { v: 'adjunto', nombre: 'Adjuntos',          corto: 'Adjuntos', icon: 'clip'   },
+  { v: 'remito',  nombre: 'Remitos',           corto: 'Remitos',  icon: 'cart'   },
+  { v: 'caja',    nombre: 'Caja',              corto: 'Caja',     icon: 'dollar' }
+];
+const PERIODOS = [
+  { v: '7',      nombre: 'Últimos 7 días',  corto: '7 días'  },
+  { v: '30',     nombre: 'Últimos 30 días', corto: '30 días' },
+  { v: '90',     nombre: 'Últimos 90 días', corto: '90 días' },
+  { v: 'all',    nombre: 'Todo',            corto: 'Todo'    },
+  { v: 'custom', nombre: 'Elegir fechas…',  corto: 'Fechas'  }
+];
+const tonoTipo = v => v === 'all' ? 'act-t-all' : tipoMeta(v).cls;
+const etiqueta = (x, extra = '') =>
+  `<span class="act-largo">${esc(x.nombre)}</span><span class="act-corto">${esc(x.corto)}</span>${extra}`;
+const CHEV = () => icSvg('chevron', 'act-chev');
+
+// Cantidad de cada tipo en el período y la búsqueda actuales.
+function contarTipos() {
+  const todos = getVisible(true);
+  const n = { all: todos.length };
+  todos.forEach(e => { n[e.tipo] = (n[e.tipo] || 0) + 1; });
+  return n;
+}
+
+function pintarTipo() {
+  const n = contarTipos();
+  const sel = TIPOS.find(t => t.v === currentFilter) || TIPOS[0];
+  const btn = $('act-tipo-btn');
+  btn.className = 'act-pick' + (sel.v === 'all' ? '' : ' ' + tonoTipo(sel.v));
+  btn.innerHTML = icSvg(sel.icon) + etiqueta(sel, ` <span class="act-pick-n">· ${n[sel.v] || 0}</span>`) + CHEV();
+  $('act-tipo-menu').innerHTML = TIPOS.map(t => `
+    <button type="button" class="act-opt" role="option" data-v="${t.v}" aria-selected="${t.v === sel.v}">
+      <span class="act-opt-ic ${tonoTipo(t.v)}">${icSvg(t.icon)}</span>${esc(t.nombre)}
+      <span class="act-opt-n">${n[t.v] || 0}</span>
+    </button>`).join('');
+}
+
+function pintarPeriodo() {
+  const sel = PERIODOS.find(p => p.v === range.preset) || PERIODOS[1];
+  $('act-periodo-btn').innerHTML = icSvg('calendar') + etiqueta(sel) + CHEV();
+  $('act-periodo-menu').innerHTML = PERIODOS.map(p => `
+    <button type="button" class="act-opt" role="option" data-v="${p.v}" aria-selected="${p.v === sel.v}">${esc(p.nombre)}</button>`).join('');
+}
+
+function cerrarMenus() {
+  ['tipo', 'periodo'].forEach(k => {
+    $(`act-${k}-menu`).classList.add('hidden');
+    $(`act-${k}-btn`).setAttribute('aria-expanded', 'false');
+  });
+}
+
+function bindDesplegable(k, alElegir) {
+  const btn = $(`act-${k}-btn`), menu = $(`act-${k}-menu`);
+  btn.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const abrir = menu.classList.contains('hidden');
+    cerrarMenus();
+    if (abrir) { menu.classList.remove('hidden'); btn.setAttribute('aria-expanded', 'true'); }
+  });
+  menu.addEventListener('click', ev => {
+    const opt = ev.target.closest('.act-opt');
+    if (!opt) return;
+    cerrarMenus();
+    alElegir(opt.dataset.v);
   });
 }
 
@@ -225,6 +309,7 @@ function render() {
     : '';
 
   updateBanner();
+  pintarTipo();
 
   if (!events.length) {
     list.innerHTML = searchQuery.trim()
@@ -252,11 +337,9 @@ function render() {
     const drive  = e.driveUrl
       ? `<a class="foc-btn foc-btn--drive act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive">${icSvg('folder')}Drive</a>`
       : '';
-    // Fuera de la ventana de novedades no se ofrece "marcar vista": ya no aplica.
-    const accion = !reciente ? ''
-      : vista
-        ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
-        : `<button class="foc-btn foc-btn--clear act-mark" data-key="${esc(e.key)}">${icSvg('check')}Marcar vista</button>`;
+    // Se marcan como vistas al abrir su documento o su carpeta, o todas juntas con
+    // "Ver todas". Fuera de la ventana de novedades la etiqueta ya no aplica.
+    const accion = reciente && vista ? `<span class="act-seen-label">${icSvg('check')} Vista</span>` : '';
     const borrar = isSuper
       ? `<button class="foc-btn foc-btn--del act-del" data-key="${esc(e.key)}" title="Borrar la novedad para todos">${icSvg('trash')}Borrar</button>`
       : '';
@@ -323,8 +406,6 @@ function render() {
   // Abrir en Drive también marca como vista (sin frenar la apertura del link)
   list.querySelectorAll('.act-drive').forEach(a =>
     a.addEventListener('click', () => marcarVista(a.dataset.key)));
-  list.querySelectorAll('.act-mark').forEach(b =>
-    b.addEventListener('click', () => marcarVista(b.dataset.key)));
   list.querySelectorAll('.act-del').forEach(b =>
     b.addEventListener('click', () => borrarNovedad(b.dataset.key)));
 
@@ -455,21 +536,26 @@ function nroDeTitulo(titulo) {
 function setFilter(f) {
   currentFilter = f;
   pager.reset('act');   // otro filtro → otra lista, se vuelve a la primera página
-  document.querySelectorAll('.act-filter').forEach(b =>
-    b.classList.toggle('active', b.dataset.filter === f));
   render();
 }
 
 function syncRangeUI() {
-  document.querySelectorAll('.act-range').forEach(b =>
-    b.classList.toggle('active', b.dataset.range === range.preset));
+  pintarPeriodo();
+  $('act-custom').classList.toggle('hidden', range.preset !== 'custom');
   $('act-desde').value = range.desde;
   $('act-hasta').value = range.hasta;
 }
 
+// "Elegir fechas…" arranca con los últimos 30 días cargados, para ajustar desde ahí.
 function setRange(preset) {
   range.preset = preset;
   if (preset !== 'custom') { range.desde = ''; range.hasta = ''; }
+  else if (!range.desde && !range.hasta) {
+    const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const hoy = new Date();
+    range.desde = iso(new Date(hoy.getTime() - 30 * 86400000));
+    range.hasta = iso(hoy);
+  }
   pager.reset('act');
   syncRangeUI();
   persistRange();
@@ -516,10 +602,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { seen = new Set(JSON.parse(localStorage.getItem(seenKey) || '[]')); } catch (_) { seen = new Set(); }
   try { Object.assign(range, JSON.parse(localStorage.getItem(rangeKey) || 'null') || {}); } catch (_) {}
 
-  document.querySelectorAll('.act-filter').forEach(b =>
-    b.addEventListener('click', () => setFilter(b.dataset.filter)));
-  document.querySelectorAll('.act-range').forEach(b =>
-    b.addEventListener('click', () => setRange(b.dataset.range)));
+  bindDesplegable('tipo', setFilter);
+  bindDesplegable('periodo', setRange);
+  document.addEventListener('click', ev => { if (!ev.target.closest('.act-dd')) cerrarMenus(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') cerrarMenus(); });
+  $('act-ver-todas').innerHTML = icSvg('check') + 'Ver todas';
+  $('act-ver-todas').addEventListener('click', verTodas);
+  pintarTipo();
   $('act-search').addEventListener('input', e => {
     searchQuery = e.target.value;
     pager.reset('act');   // otra búsqueda → otra lista, se vuelve a la primera página

@@ -9,18 +9,40 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .act-banner {
-      background: #fffae6; border: 1px solid #f5d97a; color: #7a5b00;
-      border-radius: var(--radius); padding: .6rem .85rem; margin-bottom: .9rem;
-      font-size: .88rem; font-weight: 600;
-    }
-    .act-filters { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .25rem; }
-    /* act-chip es sólo el aspecto; act-filter y act-range son los hooks de JS. */
-    .act-chip {
-      border: 1px solid var(--gray-300); background: #fff; color: var(--gray-600);
-      border-radius: 999px; padding: .35rem .85rem; font-size: .82rem; cursor: pointer;
-    }
-    .act-chip.active { background: var(--primary, #1a3a5c); color: #fff; border-color: var(--primary, #1a3a5c); }
+    /* ---- Cabecera: título, pastilla de sin ver y "Ver todas" en un renglón ---- */
+    .act-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .9rem; }
+    .act-head h1 { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; white-space: nowrap; }
+    .act-unseen { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 999px;
+      background: #fde6e6; color: #b02a2a; font-size: .76rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .act-unseen::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+    .act-head .act-ver-todas { margin-left: auto; font-size: .72rem; padding: .26rem .65rem; white-space: nowrap; }
+    .act-head .act-ver-todas .icon { width: 12px; height: 12px; }
+    .act-search { width: 100%; border-radius: 12px; margin-bottom: .7rem; }
+
+    /* ---- Tipo y período: desplegables con forma de pastilla ---- */
+    .act-bar { display: flex; align-items: center; gap: .5rem; }
+    .act-dd { position: relative; z-index: 20; }
+    .act-pick { display: inline-flex; align-items: center; gap: .4rem; padding: .34rem .7rem; border-radius: 999px;
+      background: var(--white); border: 1px solid var(--gray-200); color: var(--primary-dark);
+      font: inherit; font-size: .82rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
+    .act-pick:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37,87,167,.18); }
+    .act-pick .icon { width: 14px; height: 14px; flex-shrink: 0; }
+    .act-pick .act-chev { width: 13px; height: 13px; opacity: .55; transition: transform .15s; }
+    .act-pick[aria-expanded="true"] .act-chev { transform: rotate(180deg); }
+    .act-pick .act-corto { display: none; }
+    .act-pick-n { font-variant-numeric: tabular-nums; }
+    .act-menu { position: absolute; top: calc(100% + 6px); left: 0; min-width: 230px; padding: .35rem;
+      background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px;
+      box-shadow: 0 14px 34px -12px rgba(26,58,92,.45); display: flex; flex-direction: column; gap: 1px; }
+    .act-opt { display: flex; align-items: center; gap: .55rem; width: 100%; padding: .45rem .6rem; border: 0; border-radius: 8px;
+      background: transparent; font: inherit; font-size: .84rem; font-weight: 600; color: var(--gray-700); cursor: pointer; text-align: left; }
+    .act-opt:hover, .act-opt:focus-visible { background: var(--gray-100); outline: none; }
+    .act-opt[aria-selected="true"] { background: #eef2f8; color: var(--primary-dark); }
+    .act-opt-ic { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; }
+    .act-opt-ic .icon { width: 13px; height: 13px; }
+    .act-opt-n { margin-left: auto; font-size: .74rem; color: var(--gray-400); font-variant-numeric: tabular-nums; }
+    .act-t-all { background: #eef0f3; color: #4b5563; }
+    .act-bar .hist-count { margin-left: auto; font-size: .78rem; }
 
     /* ---- Alerta: OC sin respaldo en Drive ---- */
     /* Rojo: no es una novedad más del feed, es una OC cuyo PDF no está
@@ -52,14 +74,9 @@
     .act-pend-oc span { color: var(--gray-500); }
     .act-pend-actions { margin-top: .8rem; }
 
-    /* ---- Rango de fechas ---- */
-    .act-dates {
-      display: flex; flex-wrap: wrap; gap: .5rem .9rem; align-items: center;
-      justify-content: space-between; margin: .55rem 0 .9rem;
-      padding-bottom: .8rem; border-bottom: 1px solid var(--gray-200);
-    }
-    .act-ranges { display: flex; gap: .4rem; flex-wrap: wrap; }
-    .act-custom { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+    /* ---- Filtros + fechas a medida (sólo con "Elegir fechas…") ---- */
+    .act-dates { margin: 0 0 .9rem; padding-bottom: .8rem; border-bottom: 1px solid var(--gray-200); }
+    .act-custom { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin-top: .6rem; }
     .act-custom label {
       font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
       color: var(--gray-500); font-weight: 700;
@@ -106,6 +123,8 @@
     .act-actions .foc-btn { font-size: .76rem; padding: .35rem .8rem; white-space: nowrap; }
     .act-actions .foc-btn .icon { width: 13px; height: 13px; }
     .act-actions .act-del { margin-left: auto; }
+    /* La pastilla del tipo elegido toma el color de su etiqueta (act-t-*). */
+    .act-pick[class*="act-t-"] { border-color: transparent; }
     .foc-btn--fact { background: #f1e8fb; color: #6b3fa0; }   /* los tonos de las pastillas del Historial */
     .foc-btn--rem  { background: #fbeedd; color: #8a4f0d; }
     .act-seen-label {
@@ -121,6 +140,11 @@
     button.act-alert-oc, button.act-pend-oc { font-family: inherit; color: inherit; cursor: pointer; text-align: left; }
     button.act-alert-oc:hover, button.act-pend-oc:hover { border-color: var(--primary-light); }
     @media (max-width: 560px) {
+      .act-head h1 { font-size: 1.2rem; }
+      /* Los dos desplegables entran en un renglón: nombres cortos y sin el total. */
+      .act-pick .act-largo { display: none; }
+      .act-pick .act-corto { display: inline; }
+      .act-bar .hist-count { display: none; }
       .act-row { flex-wrap: wrap; }
       .act-body { flex-basis: 100%; }
     }
@@ -146,37 +170,32 @@
 <main class="app-main">
   <div class="hist-page">
 
-    <div id="act-banner" class="act-banner hidden"></div>
+    <div class="act-head">
+      <h1>Novedades</h1>
+      <span id="act-banner" class="act-unseen hidden"></span>
+      <button class="foc-btn foc-btn--clear act-ver-todas hidden" id="act-ver-todas"></button>
+    </div>
 
     <div id="act-sinrespaldo" class="act-alert hidden"></div>
 
     <div id="act-pendientes" class="act-pend hidden"></div>
 
-    <div class="hist-toolbar">
-      <div class="act-filters">
-        <button class="act-chip act-filter active" data-filter="all">Todas</button>
-        <button class="act-chip act-filter" data-filter="oc">Órdenes de Compra</button>
-        <button class="act-chip act-filter" data-filter="factura">Facturas</button>
-        <button class="act-chip act-filter" data-filter="adjunto">Adjuntos</button>
-        <button class="act-chip act-filter" data-filter="remito">Remitos</button>
-        <button class="act-chip act-filter" data-filter="caja">Caja</button>
-      </div>
-      <span class="hist-count" id="act-count"></span>
-    </div>
-
-    <div class="hist-toolbar">
-      <input type="search" id="act-search" class="hist-search"
-             placeholder="Buscar por artículo, proveedor, obra, responsable, N° OC…">
-    </div>
+    <input type="search" id="act-search" class="hist-search act-search"
+           placeholder="Buscar por artículo, proveedor, obra, responsable, N° OC…">
 
     <div class="act-dates">
-      <div class="act-ranges">
-        <button class="act-chip act-range" data-range="7">7 días</button>
-        <button class="act-chip act-range active" data-range="30">30 días</button>
-        <button class="act-chip act-range" data-range="90">90 días</button>
-        <button class="act-chip act-range" data-range="all">Todo</button>
+      <div class="act-bar">
+        <div class="act-dd">
+          <button type="button" class="act-pick" id="act-tipo-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Tipo de novedad"></button>
+          <div class="act-menu hidden" id="act-tipo-menu" role="listbox"></div>
+        </div>
+        <div class="act-dd">
+          <button type="button" class="act-pick" id="act-periodo-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Período"></button>
+          <div class="act-menu hidden" id="act-periodo-menu" role="listbox"></div>
+        </div>
+        <span class="hist-count" id="act-count"></span>
       </div>
-      <div class="act-custom">
+      <div class="act-custom hidden" id="act-custom">
         <label for="act-desde">Desde</label>
         <input type="date" id="act-desde">
         <label for="act-hasta">Hasta</label>
