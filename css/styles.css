@@ -1406,7 +1406,7 @@ body.scan-open { overflow: hidden; }
 .menu-grid--tiles .menu-card {
   --t-bg: #e8eef7; --t-fg: var(--primary);
   width: calc((100% - 3rem) / 4); flex-direction: column; justify-content: flex-start; align-items: center;
-  gap: .85rem; padding: 1.4rem 1.1rem 1.25rem; text-align: center; border-radius: 16px;
+  gap: 1rem; padding: 1.75rem 1.1rem 1.5rem; text-align: center; border-radius: 16px;
   background: rgba(255,255,255,.85); box-shadow: 0 6px 22px -10px rgba(26,58,92,.25);
 }
 .menu-grid--tiles .menu-card::before { display: none; }
@@ -1414,11 +1414,11 @@ body.scan-open { overflow: hidden; }
   border-color: rgba(255,255,255,.8); box-shadow: 0 14px 30px -12px rgba(26,58,92,.35); }
 .menu-grid--tiles .menu-card-icon,
 .menu-grid--tiles .menu-card:hover .menu-card-icon {
-  width: 52px; height: 52px; border-radius: 14px; background: var(--t-bg); color: var(--t-fg);
+  width: 72px; height: 72px; border-radius: 18px; background: var(--t-bg); color: var(--t-fg);
   box-shadow: none; transform: none; position: static;
 }
-.menu-grid--tiles .menu-card-icon svg { width: 25px; height: 25px; stroke: currentColor; stroke-width: 1.7; }
-.menu-grid--tiles .menu-card-title { font-size: 1.05rem; font-weight: 700; color: var(--primary-dark); text-transform: none; letter-spacing: 0; text-align: center; }
+.menu-grid--tiles .menu-card-icon svg { width: 36px; height: 36px; stroke: currentColor; stroke-width: 1.6; }
+.menu-grid--tiles .menu-card-title { font-size: 1.12rem; font-weight: 700; color: var(--primary-dark); text-transform: none; letter-spacing: 0; text-align: center; }
 .menu-grid--tiles .menu-card-sub { font-size: .78rem; line-height: 1.35; margin-top: -.55rem; text-align: center; }
 .menu-grid--tiles .menu-card-badge {
   position: absolute; top: .85rem; right: .85rem; display: inline-flex; align-items: center; gap: .3rem;
@@ -1442,11 +1442,11 @@ body.scan-open { overflow: hidden; }
   .menu-hello h1 { font-size: 1.3rem; }
   .menu-hello p { font-size: .84rem; }
   .menu-grid--tiles { gap: .7rem; }
-  .menu-grid--tiles .menu-card { width: calc((100% - .7rem) / 2); padding: 1.05rem .8rem; gap: .7rem; border-radius: 14px; }
+  .menu-grid--tiles .menu-card { width: calc((100% - .7rem) / 2); padding: 1.35rem .8rem 1.25rem; gap: .85rem; border-radius: 14px; }
   .menu-grid--tiles .menu-card-icon,
-  .menu-grid--tiles .menu-card:hover .menu-card-icon { width: 44px; height: 44px; border-radius: 12px; }
-  .menu-grid--tiles .menu-card-icon svg { width: 22px; height: 22px; }
-  .menu-grid--tiles .menu-card-title { font-size: .95rem; }
+  .menu-grid--tiles .menu-card:hover .menu-card-icon { width: 60px; height: 60px; border-radius: 16px; }
+  .menu-grid--tiles .menu-card-icon svg { width: 30px; height: 30px; }
+  .menu-grid--tiles .menu-card-title { font-size: 1rem; }
   .menu-grid--tiles .menu-card-sub { display: none; }
   .menu-grid--tiles .menu-card-badge { top: .65rem; right: .65rem; }
 }
