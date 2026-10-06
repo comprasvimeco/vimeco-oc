@@ -282,9 +282,37 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     return _histCache;
   }
 
+  // Las bandejas sólo necesitan las OC donde el usuario participa (pocas), no el
+  // historial entero (~600 KB). Con los índices de las reglas de la base
+  //   "historial": { ".indexOn": ["autorizacion/solicitadoA/codigo",
+  //                               "autorizacion/solicitadoPor/codigo",
+  //                               "autorizacion/firmaCodigo"] }
+  // se piden filtradas por el servidor. Si el índice falta, Firebase responde 400
+  // y se cae al historial completo, como antes.
+  let _sinIndice = false;
+  const _porCampoCache = {};
+  function _historialPor(campo, codigo) {
+    if (_sinIndice) return _historialEntries();
+    const id = campo + '=' + codigo;
+    if (_porCampoCache[id]) return _porCampoCache[id];
+    const p = (async () => {
+      const q = '?orderBy=' + encodeURIComponent(JSON.stringify(campo)) +
+                '&equalTo=' + encodeURIComponent(JSON.stringify(String(codigo)));
+      const resp = await fetch(_base() + '/historial.json' + q);
+      if (resp.status === 400) { _sinIndice = true; return _historialEntries(); }
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      return Object.entries(data || {}).map(([key, oc]) => ({ _key: key, ...oc })).filter(Boolean);
+    })();
+    _porCampoCache[id] = p;
+    p.catch(() => { delete _porCampoCache[id]; });
+    setTimeout(() => { delete _porCampoCache[id]; }, 10000);
+    return p;
+  }
+
   // OC en estado 'pendiente' cuya autorización fue solicitada al usuario dado.
   window.getAutorizacionesPendientes = async function (codigo) {
-    return (await _historialEntries())
+    return (await _historialPor('autorizacion/solicitadoA/codigo', codigo))
       .filter(oc => oc && oc.estado === 'pendiente' &&
                     oc.autorizacion && oc.autorizacion.solicitadoA &&
                     oc.autorizacion.solicitadoA.codigo === codigo)
@@ -294,7 +322,7 @@ window._fetchConTope = function (url, opts, ms = 20000) {
   // Espejo de la anterior, del lado del solicitante: OC cuya autorización pedí YO
   // (cualquier estado: pendiente / autorizada / rechazada), para ver en qué quedó.
   window.getMisSolicitudes = async function (codigo) {
-    return (await _historialEntries())
+    return (await _historialPor('autorizacion/solicitadoPor/codigo', codigo))
       .filter(oc => oc && oc.autorizacion && oc.autorizacion.solicitadoPor &&
                     oc.autorizacion.solicitadoPor.codigo === codigo)
       .sort((a, b) => (b.autorizacion.solicitadoEn || b.timestamp || 0) -
@@ -305,9 +333,15 @@ window._fetchConTope = function (url, opts, ms = 20000) {
   // que rechazó. El rechazo no guarda quién lo hizo, así que también se toman
   // las que le fueron dirigidas (solicitadoA).
   window.getAutorizacionesResueltas = async function (codigo) {
-    return (await _historialEntries())
+    const [dirigidas, firmadas] = await Promise.all([
+      _historialPor('autorizacion/solicitadoA/codigo', codigo),
+      _historialPor('autorizacion/firmaCodigo', codigo)
+    ]);
+    const vistas = new Set();
+    return [...dirigidas, ...firmadas]
       .filter(oc => {
-        if (!oc || !oc.autorizacion) return false;
+        if (!oc || !oc.autorizacion || vistas.has(oc._key)) return false;
+        vistas.add(oc._key);
         if (oc.estado !== 'autorizada' && oc.estado !== 'rechazada') return false;
         const a = oc.autorizacion;
         return a.firmaCodigo === codigo || (a.solicitadoA && a.solicitadoA.codigo === codigo);
