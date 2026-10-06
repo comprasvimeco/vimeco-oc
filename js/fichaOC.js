@@ -81,6 +81,47 @@ async function ocDataParaPdf(oc) {
   return data;
 }
 
+// Botón "PDF" de las tarjetas (Historial, Autorizaciones): en el celular abre
+// el menú de compartir; si no se puede, lo descarga.
+async function compartirPdfOC(oc, btn) {
+  btn.disabled = true;
+  try {
+    const prov   = oc.proveedor || {};
+    // Payload guardado (o reconstruido) y, si la autorizó otro, su firma.
+    const ocData = await ocDataParaPdf(oc);
+
+    const blob  = generateOCBlob(ocData);
+    const nom   = (prov.nombre || 'SinProveedor').replace(/[^\w\s\-\.]/g, '_').substring(0, 60).trim();
+    const fname = `OC_${oc.nroOC}_${nom}.pdf`;
+
+    const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+    if (isMobile && navigator.canShare) {
+      const shareFile = new File([blob], fname, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [shareFile] })) {
+        try {
+          await navigator.share({ title: `OC ${oc.nroOC} — VIMECO S.A.`, files: [shareFile] });
+          toast(`PDF de OC ${oc.nroOC} compartido.`, 'success');
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return;
+          // otro error → caer al download
+        }
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    toast(`PDF de OC ${oc.nroOC} generado.`, 'success');
+  } catch (e) {
+    toast('Error al generar el PDF.', 'error');
+    console.error('compartirPdfOC:', e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Chip de estado para el encabezado de la ficha. Las OC viejas (sin estado) no llevan.
 function estadoChipFicha(oc) {
   const a = oc.autorizacion || {};

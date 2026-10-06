@@ -67,6 +67,18 @@ function render() {
   });
 }
 
+// Botón "PDF" (compartir/descargar) como en Historial. Sólo las autorizadas:
+// las pendientes no tienen PDF definitivo y una rechazada no se manda a nadie.
+function btnPdfHtml(oc) {
+  return oc.estado === 'autorizada'
+    ? `<button class="foc-btn foc-btn--pdf btn-pdf" title="Descargar o compartir el PDF">${icSvg('share')}PDF</button>`
+    : '';
+}
+function bindPdf(card, oc) {
+  const btn = card.querySelector('.btn-pdf');
+  if (btn) btn.addEventListener('click', () => compartirPdfOC(oc, btn));
+}
+
 // ---- "Mis pedidos": estado de las OC que YO mandé a autorizar ----
 const SEEN_KEY = () => 'vimeco_solicitudes_vistas_' + myCode;
 
@@ -123,6 +135,8 @@ function renderPedidos() {
     }
     const acciones = `<div class="aut-actions">
            <button class="foc-btn foc-btn--edit btn-ver">${icSvg('eye')}Vista previa</button>
+           ${btnPdfHtml(oc)}
+           ${oc.estado === 'rechazada' ? `<button class="foc-btn foc-btn--gen btn-rehacer" title="Cargar en el formulario para corregirla">${icSvg('undo')}Rehacer</button>` : ''}
            ${oc.estado === 'pendiente' ? '<button class="foc-btn foc-btn--clear btn-cancelar-pedido">Cancelar pedido</button>' : ''}
          </div>`;
     const card = document.createElement('div');
@@ -141,10 +155,20 @@ function renderPedidos() {
       ${extra}
       ${acciones}`;
     card.querySelector('.btn-ver').addEventListener('click', () => abrirPreview(oc, true));
+    bindPdf(card, oc);
+    const btnRehacer = card.querySelector('.btn-rehacer');
+    if (btnRehacer) btnRehacer.addEventListener('click', () => rehacerOC(oc));
     const btnCanc = card.querySelector('.btn-cancelar-pedido');
     if (btnCanc) btnCanc.addEventListener('click', () => cancelarPedido(oc, btnCanc));
     list.appendChild(card);
   });
+}
+
+// Rechazada → se carga en el formulario como "Usar como base" de Historial,
+// para corregirla y mandarla de nuevo (sale con número nuevo).
+function rehacerOC(oc) {
+  sessionStorage.setItem('oc_base', JSON.stringify(oc));
+  window.location.href = 'app.html';
 }
 
 // El solicitante se arrepiente antes de que la firmen: la OC queda 'cancelada'
@@ -232,8 +256,10 @@ function renderResueltas() {
       ${extra}
       <div class="aut-actions">
         <button class="foc-btn foc-btn--edit btn-ver">${icSvg('eye')}Vista previa</button>
+        ${btnPdfHtml(oc)}
       </div>`;
     card.querySelector('.btn-ver').addEventListener('click', () => abrirPreview(oc, true));
+    bindPdf(card, oc);
     list.appendChild(card);
   });
 }

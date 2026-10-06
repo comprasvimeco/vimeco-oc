@@ -145,7 +145,7 @@ function renderCards(ocs) {
 
     if (showRegen) {
       const regenBtn = card.querySelector('.btn-regenerar');
-      regenBtn.addEventListener('click', () => regenerarPDF(oc, regenBtn));
+      regenBtn.addEventListener('click', () => compartirPdfOC(oc, regenBtn));
     }
 
     list.appendChild(card);
@@ -163,10 +163,6 @@ function esc(str) {
   return String(str || '')
     .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
     .replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function sanitizeStr(str) {
-  return (str || '').replace(/[^\w\s\-\.]/g, '_').substring(0, 60).trim();
 }
 
 // ---- Filtros ----
@@ -195,45 +191,6 @@ function applyFilters() {
   }
 
   renderCards(result);
-}
-
-// ---- Regenerar PDF ----
-async function regenerarPDF(oc, btn) {
-  btn.disabled = true;
-  try {
-    const prov   = oc.proveedor || {};
-    // Payload guardado (o reconstruido) y, si la autorizó otro, su firma.
-    const ocData = await ocDataParaPdf(oc);
-
-    const blob  = generateOCBlob(ocData);
-    const fname = `OC_${oc.nroOC}_${sanitizeStr(prov.nombre || 'SinProveedor')}.pdf`;
-
-    const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-    if (isMobile && navigator.canShare) {
-      const shareFile = new File([blob], fname, { type: 'application/pdf' });
-      if (navigator.canShare({ files: [shareFile] })) {
-        try {
-          await navigator.share({ title: `OC ${oc.nroOC} — VIMECO S.A.`, files: [shareFile] });
-          toast(`PDF de OC ${oc.nroOC} compartido.`, 'success');
-          return;
-        } catch (e) {
-          if (e.name === 'AbortError') return;
-          // otro error → caer al download
-        }
-      }
-    }
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href = url; a.download = fname;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-    toast(`PDF de OC ${oc.nroOC} generado.`, 'success');
-  } catch (e) {
-    toast('Error al regenerar el PDF.', 'error');
-    console.error('regenerarPDF:', e);
-  } finally {
-    btn.disabled = false;
-  }
 }
 
 // ---- Ficha de la OC ----
