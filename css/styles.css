@@ -1313,19 +1313,28 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
 /* Barra fija inferior (mobile): total + Vista previa + Generar, en el degradé del hero. */
 .oc-dock { display: none; }
 @media (max-width: 768px) {
-  .oc-dock { position: fixed; left: .6rem; right: .6rem; bottom: calc(.6rem + env(safe-area-inset-bottom, 0px)); z-index: 90;
-    display: flex; align-items: center; gap: .5rem; padding: .55rem .55rem .55rem 1rem; border-radius: 999px;
-    background: var(--grad-header); color: #fff; box-shadow: 0 10px 30px -8px rgba(26,58,92,.65);
+  /* Pegada al borde de abajo, a todo el ancho, con una línea de avance por pasos completos. */
+  .oc-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+    display: flex; align-items: center; gap: .5rem; padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0; background: var(--white); box-shadow: 0 -6px 22px -8px rgba(26,58,92,.32);
     transition: transform .25s var(--ease-spring), opacity .2s; }
   .oc-dock--off { transform: translateY(140%); opacity: 0; pointer-events: none; }
-  .oc-dock-l { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
-  .oc-dock-cnt { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: rgba(255,255,255,.72); }
-  .oc-dock-total { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .oc-dock-btn { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; height: 40px; min-width: 40px;
-    border-radius: 999px; border: 1px solid rgba(255,255,255,.26); background: rgba(255,255,255,.1); color: #fff;
-    font: inherit; font-size: .85rem; font-weight: 700; padding: 0 .7rem; cursor: pointer; }
+  .oc-dock-bar { position: absolute; top: 0; left: 18px; right: 18px; height: 4px; border-radius: 0 0 4px 4px; background: #eef1f5; overflow: hidden; }
+  .oc-dock-bar i { display: block; height: 100%; width: 0; background: #1a7f3c; border-radius: 0 4px 4px 0; transition: width .3s ease; }
+  .oc-dock-l { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2;
+    border: none; background: none; padding: 0; font: inherit; text-align: left; cursor: pointer; }
+  .oc-dock--lista .oc-dock-l { cursor: default; }
+  .oc-dock-cnt { font-size: .74rem; font-weight: 600; color: var(--gray-500); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .oc-dock-cnt b { color: #b02a2a; font-weight: 700; }
+  .oc-dock-cnt b.ok { color: #1a7f3c; }
+  .oc-dock-total { font-size: 1.1rem; font-weight: 800; color: var(--primary-dark); font-variant-numeric: tabular-nums; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .oc-dock-btn { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; height: 42px; min-width: 42px; flex: none;
+    border-radius: 999px; border: none; background: #e8eef7; color: var(--primary);
+    font: inherit; font-size: .88rem; font-weight: 700; padding: 0 .7rem; cursor: pointer; }
   .oc-dock-btn .icon { width: 17px; height: 17px; }
-  .oc-dock-btn--go { background: linear-gradient(120deg, #15803d, #22c55e); border-color: transparent; padding: 0 1rem; }
+  /* Generar: verde claro mientras falte algo (igual abre la lista de faltantes), verde lleno cuando está lista. */
+  .oc-dock-btn--go { background: #dff3e5; color: #1a7f3c; padding: 0 1.1rem; }
+  .oc-dock--lista .oc-dock-btn--go { background: #1a7f3c; color: #fff; }
   .oc-dock-btn:disabled { opacity: .5; }
   /* Lugar para que la barra no tape el final del formulario. */
   body:has(.oc-dock) .app-main { padding-bottom: 5rem; }
@@ -1374,7 +1383,25 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
   font-weight: 700; letter-spacing: .06em; border-bottom: 1px solid var(--gray-200); }
 @media (max-width: 768px) {
   /* Cerrada, la sección muestra su resumen: los botones del encabezado sobran. */
-  .oc-section.collapsed > .card-header > .btn { display: none; }
+  .oc-section.collapsed > .card-header > .oc-hd-btn { display: none; }
+}
+
+/* Botones del encabezado de cada paso (Agregar ítem / impuesto, Guardar en base).
+   En el teléfono quedan solo con el ícono, para que título, estado, botón y flecha
+   entren en un renglón. */
+.oc-hd-btn { font-size: .78rem; padding: .38rem .85rem; white-space: nowrap; flex: none; }
+.oc-hd-btn .icon { width: 14px; height: 14px; }
+@media (max-width: 768px) {
+  .oc-section > .card-header .card-title { min-width: 0; }
+  .oc-hd-btn { padding: 0; width: 32px; height: 32px; justify-content: center; }
+  .oc-hd-btn .oc-hd-l { display: none; }
+  #btn-save-proveedor-base { width: auto; padding: 0 .8rem; }
+  /* Flecha de desplegar: chevrón en un circulito gris, a la derecha. */
+  .oc-section > .card-header > .oc-chevron { width: 28px; height: 28px; margin: 0; border-radius: 50%;
+    background: var(--gray-100); color: var(--gray-500); flex: none; }
+  .oc-section > .card-header > .oc-chevron svg { width: 16px; height: 16px; }
+  .oc-section:not(.collapsed) > .card-header > .oc-chevron { transform: rotate(180deg); }
+  .oc-section.collapsed .oc-chevron { transform: none; }
 }
 
 

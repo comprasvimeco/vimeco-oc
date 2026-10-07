@@ -117,7 +117,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('date-display').textContent = formatDateDisplay(new Date());
   refreshOCNumberDisplay();
 
-  $('btn-clear-form').addEventListener('click', resetForm);
+  // Con algo cargado pide confirmación: borra también el borrador guardado.
+  $('btn-clear-form').addEventListener('click', () => borradorTieneAlgo() ? empezarDeCero() : resetForm());
   $('btn-add-row').addEventListener('click', addEmptyRow);
   $('btn-generate').addEventListener('click', handleGenerate);
   $('btn-extract').addEventListener('click', handleExtract);
@@ -1136,7 +1137,7 @@ function setupProveedorCombo() {
   // Guardar/corregir el proveedor en la base maestra desde la app.
   const btnSave = $('btn-save-proveedor-base');
   if (btnSave) {
-    btnSave.innerHTML = icSvg('edit') + ' Guardar en base';
+    btnSave.innerHTML = icSvg('checkSm') + 'Guardar<span class="oc-hd-l">&nbsp;en base</span>';
     btnSave.addEventListener('click', saveProveedorToBase);
     // El botón aparece solo cuando los datos difieren del snapshot (proveedor
     // cargado/guardado/vacío). Elegir uno del listado toma un snapshot nuevo, así
@@ -1278,7 +1279,7 @@ function setupOCAccordion() {
     if (title && !header.querySelector('.oc-chevron')) {
       const chev = document.createElement('span');
       chev.className = 'oc-chevron';
-      chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg>';
+      chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
       header.appendChild(chev);
     }
     if (!header.querySelector('.oc-sum')) {
@@ -1886,6 +1887,11 @@ let _dockBarVisible = false, _dockTyping = false;
 function setupOCDock() {
   $('oc-dock-preview').addEventListener('click', () => $('btn-preview').click());
   $('oc-dock-generate').addEventListener('click', () => $('btn-generate').click());
+  // Tocar el estado muestra lo que falta (lo mismo que Generar con datos incompletos).
+  $('oc-dock-estado').addEventListener('click', () => {
+    const faltan = faltantesOC();
+    if (faltan.length) { marcarFaltantes(faltan); mostrarFaltantes(faltan); }
+  });
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(([e]) => { _dockBarVisible = e.isIntersecting; updateOCDock(); })
       .observe(document.querySelector('.generate-bar'));
@@ -1909,7 +1915,15 @@ function updateOCDock() {
     ? [cnt, $('proveedor').value.trim(), $('obra').value.trim()].filter(Boolean).join(' · ')
     : 'Sin ítems todavía';
   $('oc-dock-total').textContent = total;
-  $('oc-dock-cnt').textContent = cnt;
+  // Avance: los tres pasos obligatorios (datos, proveedor, ítems) sin faltantes.
+  const faltan = faltantesOC();
+  const pasosConFalta = new Set(faltan.map(f => SECCION_FALTA[f.id])).size;
+  const lista = !faltan.length;
+  $('oc-dock-prog').style.width = `${Math.round((3 - pasosConFalta) / 3 * 100)}%`;
+  $('oc-dock-cnt').innerHTML = lista
+    ? `<b class="ok">Lista para generar</b> · ${cnt}`
+    : `<b>${faltan.length === 1 ? 'Falta 1 dato' : `Faltan ${faltan.length} datos`}</b> · ${3 - pasosConFalta} de 3 pasos`;
+  dock.classList.toggle('oc-dock--lista', lista);
   $('oc-dock-generate').disabled = $('btn-generate').disabled;
   dock.classList.toggle('oc-dock--off', _dockBarVisible || _dockTyping);
 }
