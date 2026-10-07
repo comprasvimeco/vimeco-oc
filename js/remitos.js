@@ -16,6 +16,7 @@ let colaRemitos   = [];   // remitos guardados en este navegador que esperan se�
 let viewerCode    = '';
 let viewerName    = '';
 let viewerIsAdmin = false;
+let viewerObras   = null;    // obras a cargo si es Jefe de Obra (ver alcanceOC)
 let filtroOC      = 'pendientes';   // pendientes | entregadas | todas | remitos
 let modalOC       = null; // OC abierta en el formulario de carga
 let modalFile     = null; // foto elegida para el remito en curso (la que se sube)
@@ -204,10 +205,13 @@ function renderOCList() {
 
 // ---- Render: remitos cargados ----
 
+// El Jefe de Obra ve también los que cargaron otros en las OC de sus obras.
 function remitosVisibles() {
-  return viewerIsAdmin
-    ? allRemitos
-    : allRemitos.filter(r => r.recibidoPor?.codigo === viewerCode);
+  if (viewerIsAdmin) return allRemitos;
+  const deSusObras = viewerObras
+    ? new Set(allOCs.filter(oc => esDeObrasJefe(oc, viewerObras)).map(oc => oc.nroOC))
+    : new Set();
+  return allRemitos.filter(r => r.recibidoPor?.codigo === viewerCode || deSusObras.has(r.nroOC));
 }
 
 // Los cargados más los que esperan señal en este dispositivo, del más nuevo al
@@ -232,7 +236,7 @@ function filaRemito(r, terms) {
   const estado = r._cola
     ? `<span class="rv-pill rv-pill--cola">${icSvg('wifi0')}Esperando señal</span>`
     : `<span class="rv-pill rv-pill--${r.entrega === 'total' ? 'completa' : 'parcial'}">${r.entrega === 'total' ? 'Completó la OC' : 'Entrega parcial'}</span>`;
-  const quien = viewerIsAdmin && r.recibidoPor?.nombre ? ` · recibió ${hl(r.recibidoPor.nombre)}` : '';
+  const quien = r.recibidoPor?.nombre && r.recibidoPor.codigo !== viewerCode ? ` · recibió ${hl(r.recibidoPor.nombre)}` : '';
   return `<div class="rv-row">
     <span class="rv-sq rv-sq--${r._cola ? 'cola' : 'rem'}">${icSvg(r._cola ? 'wifi0' : 'file')}</span>
     <div style="min-width:0">
@@ -1069,10 +1073,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('hdr-name').textContent = name;
   $('btn-back').addEventListener('click', () => { window.location.href = 'compras.html'; });
 
-  viewerIsAdmin = code === '0000';
-  if (!viewerIsAdmin) {
-    try { const u = await getUsuario(code); viewerIsAdmin = !!(u && u.admin); } catch (_) {}
-  }
+  ({ isAdmin: viewerIsAdmin, obrasJefe: viewerObras } = await alcanceOC(code));
 
   // Pestañas: Pendientes / Entregadas / Todas / Remitos cargados
   $('rem-filtro').addEventListener('click', ev => {

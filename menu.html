@@ -269,7 +269,7 @@
     }
 
     // 0000 ve todo. El resto según sus permisos: Caja con `caja` o `admin`; Personal con
-    // `admin` o `jefeObra`; Equipos con `jefeTaller`; Reportes con `admin` o `reportes`;
+    // `admin` o `personal` (que requiere `jefeObra`); Equipos con `jefeTaller`; Reportes con `admin` o `reportes`;
     // Novedades con su permiso propio o, si no lo tiene, lo que diga `admin`. Administración, solo 0000.
     if (_s.codigo === '0000') {
       ['menu-card-caja', 'menu-card-personal', 'menu-card-equipos', 'menu-card-reportes', 'menu-card-admin']
@@ -281,7 +281,7 @@
         tareas.push(getUsuario(_s.codigo).then(u => {
           u = u || {};
           show('menu-card-caja', u.caja || u.admin);
-          show('menu-card-personal', u.admin || u.jefeObra);
+          show('menu-card-personal', u.admin || tienePersonal(u));
           show('menu-card-equipos', u.jefeTaller);
           show('menu-card-reportes', u.admin || u.reportes);
           return novedades(u.novedades != null ? u.novedades : u.admin);

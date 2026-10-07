@@ -133,9 +133,11 @@ function grupoDuplicados(list, provKeyFn = indiceProveedores(list)) {
 
 // Grupos que `codigo` tiene que resolver: sus propias compras firmes que se
 // parecen, salvo que ya haya dicho que son compras distintas. Un grupo vuelve a
-// aparecer sólo si se le suma una OC nueva sin revisar.
-function duplicadosPorRevisar(list, codigo) {
-  const mias = list.filter(oc => oc.responsable?.codigo === codigo && esCompraFirme(oc));
+// aparecer sólo si se le suma una OC nueva sin revisar. Al Jefe de Obra
+// (`obrasJefe`, de alcanceOC) le tocan también las de sus obras.
+function duplicadosPorRevisar(list, codigo, obrasJefe = null) {
+  const mias = list.filter(oc => (oc.responsable?.codigo === codigo || (obrasJefe && esDeObrasJefe(oc, obrasJefe))) &&
+                                 esCompraFirme(oc));
   return grupoDuplicados(mias).filter(g => !g.every(oc => oc.noDuplicada));
 }
 
@@ -208,6 +210,23 @@ function difDup(oc, head) {
   const pct = base ? (montoDe(oc) - base) / base * 100 : 0;
   if (Math.abs(pct) < 0.05) return '';
   return (pct > 0 ? '+' : '−') + Math.abs(pct).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%';
+}
+
+// La OC de otra persona que se usó como base, si la nueva le compra al mismo
+// proveedor: quien la usa (típicamente el Jefe de Obra, que ve las OC de sus
+// obras) puede estar corrigiéndola, aunque no haya sido en la última hora. Se
+// lee del servidor si sigue existiendo y vale, por lo mismo que abajo.
+// Devuelve la OC o null.
+async function baseParaCorregir(baseOC, nueva) {
+  if (!baseOC?.nroOC || !baseOC.responsable?.codigo ||
+      baseOC.responsable.codigo === nueva.responsable?.codigo) return null;
+  const prov = indiceProveedores([baseOC, nueva]);
+  if (prov(baseOC) !== prov(nueva)) return null;
+  const key  = baseOC.nroOC.replace(/-/g, '');
+  const resp = await _fetchConTope(FIREBASE_CONFIG.databaseURL + '/historial/' + key + '/nroOC.json');
+  if (!resp.ok || !(await resp.json())) return null;
+  const estado = await getHistorialEstado(key);
+  return esCompraFirme({ estado }) ? { ...baseOC, estado: estado || 'emitida' } : null;
 }
 
 // Una corrección que tuvo que pedir autorización anula a las que reemplaza

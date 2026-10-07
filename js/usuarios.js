@@ -28,6 +28,7 @@ function permsHtml(u) {
   if (u.admin)             out.push(perm('admin',    'settings', 'Admin'));
   if (u.caja)              out.push(perm('caja',     'calc',     'Caja'));
   if (u.jefeObra)          out.push(perm('obra',     'user',     'Jefe de Obra'));
+  if (tienePersonal(u))    out.push(perm('personal', 'users',    'Personal'));
   if (u.jefeTaller)        out.push(perm('taller',   'layers',   'Jefe de Taller'));
   if (u.reportes)          out.push(perm('reportes', 'sheet',    'Reportes'));
   if (tieneNovedades(u))   out.push(perm('nov',      'info',     'Novedades'));
@@ -207,6 +208,8 @@ window.openPermisos = function (u) {
   $('perm-caja').checked       = !!u.caja;
   $('perm-admin').checked      = !!u.admin;
   $('perm-jefeObra').checked   = !!u.jefeObra;
+  $('perm-personal').checked   = tienePersonal(u);
+  syncPersonal();
   $('perm-jefeTaller').checked = !!u.jefeTaller;
   $('perm-reportes').checked   = !!u.reportes;
   $('perm-novedades').checked  = tieneNovedades(u);
@@ -215,12 +218,21 @@ window.openPermisos = function (u) {
   $('modal-permisos').classList.remove('hidden');
 };
 
+// Personal cuelga de Jefe de Obra: sin jefe se apaga y se destilda.
+function syncPersonal() {
+  const jefe = $('perm-jefeObra').checked;
+  $('perm-personal').disabled = !jefe;
+  if (!jefe) $('perm-personal').checked = false;
+  $('perm-personal-row').classList.toggle('is-off', !jefe);
+}
+
 async function savePermisos() {
   if (!permisosCodigo) return;
   const fields = {
     caja:       $('perm-caja').checked,
     admin:      $('perm-admin').checked,
     jefeObra:   $('perm-jefeObra').checked,
+    personal:   $('perm-jefeObra').checked && $('perm-personal').checked,
     jefeTaller: $('perm-jefeTaller').checked,
     reportes:   $('perm-reportes').checked,
     novedades:  $('perm-novedades').checked,
@@ -275,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('modal-user-cancel').addEventListener('click', () => $('modal-user').classList.add('hidden'));
   $('modal-user-save').addEventListener('click', saveUser);
   $('user-nombre').addEventListener('keydown', e => { if (e.key === 'Enter') saveUser(); });
+  $('perm-jefeObra').addEventListener('change', syncPersonal);
   $('modal-permisos-close').addEventListener('click',  () => $('modal-permisos').classList.add('hidden'));
   $('modal-permisos-cancel').addEventListener('click', () => $('modal-permisos').classList.add('hidden'));
   $('modal-permisos-save').addEventListener('click', savePermisos);

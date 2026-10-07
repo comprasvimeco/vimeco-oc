@@ -3,6 +3,7 @@
 let allOCs = [];
 let viewerIsAdmin = false;   // 0000 o usuario con permiso admin
 let viewerCode    = '';
+let viewerObras   = null;    // obras a cargo si es Jefe de Obra (ver alcanceOC)
 let searchTerms = [];        // búsqueda vigente, para marcar los ítems que coinciden
 
 const $ = id => document.getElementById(id);
@@ -100,6 +101,8 @@ async function cargarRemitos() {
 // haber pedido o firmado su autorización.
 const verResp = oc => !!oc.responsable?.nombre &&
   (viewerIsAdmin || oc.responsable.codigo !== viewerCode);
+
+const esAjena = oc => !!oc.responsable?.nombre && oc.responsable.codigo !== viewerCode;
 
 const moneyOC = oc => oc.total != null ? (oc.moneda === 'USD' ? 'US$ ' : '$ ') + fmtMoney(oc.total) : '—';
 
@@ -273,12 +276,13 @@ function applyFilters() {
 // Las propias que se parecen (criterio en js/duplicados.js) y que nadie resolvió:
 // las que se escaparon del aviso al emitir, o las de antes de que existiera.
 // Por defecto se marcan para anular todas menos la última, que es la que queda;
-// el responsable puede elegir otra o decir que son compras distintas.
+// el responsable puede elegir otra o decir que son compras distintas. El Jefe de
+// Obra resuelve también las de sus obras, aunque las haya emitido otro.
 let gruposDup = [];
 
 function renderDuplicadas() {
   const box = $('hist-dup');
-  gruposDup = typeof duplicadosPorRevisar === 'function' ? duplicadosPorRevisar(allOCs, viewerCode) : [];
+  gruposDup = typeof duplicadosPorRevisar === 'function' ? duplicadosPorRevisar(allOCs, viewerCode, viewerObras) : [];
   const pill = $('hist-dupn');
   pill.classList.toggle('hidden', !gruposDup.length);
   if (!gruposDup.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
@@ -291,13 +295,14 @@ function renderDuplicadas() {
       <span class="dup-panel-ic">${icSvg('alert')}</span>
       <div>
         <div class="dup-panel-t">${n > 1 ? n + ' posibles OC duplicadas' : 'Posible OC duplicada'}</div>
-        <div class="dup-panel-sub">Le emitiste más de una OC al mismo proveedor, en menos de una hora, por un monto parecido.
+        <div class="dup-panel-sub">${gruposDup.every(g => !esAjena(g[0])) ? 'Le emitiste' : 'Se le emitió'} más de una OC al mismo proveedor, en menos de una hora, por un monto parecido.
           Marcá la que quedó sin validez: sigue en el historial como "Duplicada", pero deja de contar en Reportes.</div>
       </div>
     </div>
     ${gruposDup.map((g, gi) => `
       <div class="dup-grupo" data-g="${gi}">
-        <div class="dup-grupo-head"><b>${esc(g[0].proveedor?.nombre || 'Sin proveedor')}</b> · ${esc(g[0].fecha || '')}</div>
+        <div class="dup-grupo-head"><b>${esc(g[0].proveedor?.nombre || 'Sin proveedor')}</b> · ${esc(g[0].fecha || '')}${
+          esAjena(g[0]) ? ' · emitió ' + esc(g[0].responsable.nombre) : ''}</div>
         <div class="dup-lista">${g.map((oc, i) => {
           const anular = i < g.length - 1;
           return `
@@ -463,15 +468,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (_) {}
   }
 
-  let isAdmin = code === '0000';
-  if (!isAdmin) {
-    try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
-  }
+  const { isAdmin, obrasJefe } = await alcanceOC(code);
   viewerIsAdmin = isAdmin;
   viewerCode    = code;
+  viewerObras   = obrasJefe;
 
   try {
-    allOCs = await getHistorial(code, isAdmin, true);
+    allOCs = await getHistorial(code, isAdmin, true, obrasJefe);
     applyFilters();
     renderDuplicadas();
     cargarRemitos();

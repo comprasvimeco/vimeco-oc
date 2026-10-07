@@ -4,6 +4,7 @@ let currentFile = null;
 let allOCs      = [];
 let pendingOC   = null;   // OC elegida para cargar manualmente (vista principal)
 let viewerIsAdmin = false; // 0000 o usuario con permiso admin
+let viewerCode    = '';
 let tipoCarga   = null;   // 'factura' | 'otro' — arranca sin elegir (ver elegirTipo)
 let rawFile     = null;   // imagen original (sin escanear), para volver a pasarla por el escáner
 let filePrevUrl = null;   // objectURL del preview actual
@@ -311,7 +312,7 @@ function accionesHtml(oc, modo) {
 
 function filaHtml(oc, modo, terms = [], score = null) {
   const hl   = t => resaltarTxt(t, terms, esc);
-  const por  = viewerIsAdmin && oc.responsable?.nombre ? `<div class="fac-por">por ${hl(oc.responsable.nombre)}</div>` : '';
+  const por  = oc.responsable?.nombre && (viewerIsAdmin || oc.responsable.codigo !== viewerCode) ? `<div class="fac-por">por ${hl(oc.responsable.nombre)}</div>` : '';
   const dots = score == null ? '' : `<span class="fac-score" title="Nivel de coincidencia">${score >= 7 ? '●●●' : score >= 4 ? '●●○' : '●○○'}</span>`;
   const fact = facturasDeOC(oc);
   return `<div class="fac-row${cargaOC.get(oc.nroOC) === 'ok' ? ' fac-row--ok' : ''}" data-nro="${esc(oc.nroOC)}" data-modo="${modo}"${
@@ -519,14 +520,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-another').addEventListener('click', resetToStart);
 
   // Cargar historial y renderizar la lista principal.
-  // El super-admin (0000) y los usuarios admin ven todas las OC.
-  let isAdmin = code === '0000';
-  if (!isAdmin) {
-    try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
-  }
+  // El super-admin (0000) y los usuarios admin ven todas las OC; el Jefe de
+  // Obra, además de las suyas, las de sus obras (ver alcanceOC).
+  const { isAdmin, obrasJefe } = await alcanceOC(code);
   viewerIsAdmin = isAdmin;
+  viewerCode    = code;
   const pintarTodo = () => { actualizarContadores(); renderPrimaryList($('adj-search-main').value); };
-  getHistorial(code, isAdmin)
+  getHistorial(code, isAdmin, false, obrasJefe)
     .then(async ocs => {
       allOCs = ocs;
       pintarTodo();

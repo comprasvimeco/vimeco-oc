@@ -232,7 +232,10 @@ window._fetchConTope = function (url, opts, ms = 20000) {
   // Con `conAutorizaciones`, además de las propias entran las OC en las que el
   // usuario participó de la autorización: las que pidió, las que le pidieron y
   // las que firmó (Historial).
-  window.getHistorial = async function (codigoResponsable, isAdmin = false, conAutorizaciones = false) {
+  //
+  // Con `obrasJefe` (el Set de alcanceOC) entran también todas las OC de las
+  // obras que el usuario tiene a cargo como Jefe de Obra.
+  window.getHistorial = async function (codigoResponsable, isAdmin = false, conAutorizaciones = false, obrasJefe = null) {
     const resp = await fetch(_base() + '/historial.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
@@ -247,7 +250,8 @@ window._fetchConTope = function (url, opts, ms = 20000) {
                        a.firmaCodigo           === codigoResponsable);
       };
       ocs = ocs.filter(oc => oc.responsable?.codigo === codigoResponsable ||
-                             (conAutorizaciones && participo(oc)));
+                             (conAutorizaciones && participo(oc)) ||
+                             esDeObrasJefe(oc, obrasJefe));
     }
     const sorted = ocs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     try { localStorage.setItem(`vimeco_hist_${codigoResponsable}`, JSON.stringify(sorted.slice(0, 5))); } catch (_) {}
@@ -1037,6 +1041,32 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     (codigos || []).forEach(c => { obj[c] = true; });
     await _put('/obras/' + obraKey + '/jefes.json', obj);
   };
+
+  // Qué OC ve cada uno en Historial, Facturas y Remitos: 0000 y admin, todas;
+  // el Jefe de Obra, además de las propias, todas las de las obras que tiene
+  // asignadas, las haya emitido quien sea. Cuentan también las obras inactivas:
+  // una obra terminada sigue teniendo sus OC. La OC guarda el nombre de la
+  // obra (no la clave), así que se compara por nombre.
+  window.normObraNombre = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  window.esDeObrasJefe  = (oc, obrasJefe) => !!obrasJefe && !!oc?.obra && obrasJefe.has(normObraNombre(oc.obra));
+
+  window.alcanceOC = async function (codigo) {
+    if (codigo === '0000') return { isAdmin: true, obrasJefe: null };
+    let u = null;
+    try { u = await getUsuario(codigo); } catch (_) {}
+    if (u && u.admin) return { isAdmin: true, obrasJefe: null };
+    if (!(u && u.jefeObra)) return { isAdmin: false, obrasJefe: null };
+    let obras = null;
+    try { obras = await _get('/obras.json'); } catch (_) {}
+    const set = new Set(Object.values(obras || {})
+      .filter(o => o && o.nombre && o.jefes && o.jefes[codigo])
+      .map(o => normObraNombre(o.nombre)));
+    return { isAdmin: false, obrasJefe: set.size ? set : null };
+  };
+
+  // Permiso Personal: sólo lo puede tener un Jefe de Obra. Los jefes de antes de
+  // que fuera un permiso aparte no lo tienen cargado y lo conservan.
+  window.tienePersonal = u => !!(u && u.jefeObra && u.personal !== false);
 
   window.getObrasDeJefe = async function (codigo) {
     const data = await _get('/obras.json');

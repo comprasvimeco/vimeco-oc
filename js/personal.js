@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const u = await getUsuario(_s.codigo);
       esAdmin = !!(u && u.admin);
-      esJefe  = !!(u && u.jefeObra);
+      esJefe  = tienePersonal(u);
     } catch (_) {}
     if (!esAdmin && !esJefe) { window.location.href = 'menu.html'; return; }
   }

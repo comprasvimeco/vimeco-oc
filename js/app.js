@@ -2673,24 +2673,37 @@ async function revisarRepetida() {
     console.warn('revisarRepetida:', e);
     return null;
   }
-  const previas = duplicadosDeNueva({
+  const nueva = {
     proveedor:   { nombre: $('proveedor').value.trim(), cuit: $('cuit-proveedor').value.trim() },
     responsable: { codigo: code },
     moneda:      monedaUSD ? 'USD' : 'ARS',
     total:       calcTotal()
-  }, hist);
-  return previas.length ? elegirRepetida(previas) : null;
+  };
+  const previas = duplicadosDeNueva(nueva, hist);
+  // La OC de otra persona usada como base (ver baseParaCorregir) también se
+  // ofrece para anular. Si no se puede leer, se sigue sin ella.
+  let base = null;
+  try { base = _ocBase ? await baseParaCorregir(_ocBase, nueva) : null; } catch (e) { console.warn('baseParaCorregir:', e); }
+  const lista = base ? [...previas, base] : previas;
+  return lista.length ? elegirRepetida(lista, base) : null;
 }
 
-function elegirRepetida(previas) {
+function elegirRepetida(previas, base = null) {
   return new Promise(resolve => {
     const modal  = $('modal-dup');
     const varias = previas.length > 1;
     const prov   = previas[0].proveedor?.nombre || 'este proveedor';
-    const min    = Math.max(1, Math.round((Date.now() - previas[previas.length - 1].timestamp) / 60000));
-    $('dup-texto').textContent = varias
-      ? `En la última hora ya le emitiste ${previas.length} OC a ${prov} por un monto parecido:`
-      : `Hace ${min} min ya le emitiste a ${prov} una OC por un monto parecido:`;
+    const quien  = base?.responsable?.nombre || 'otra persona';
+    if (base) {
+      $('dup-texto').textContent = varias
+        ? `Usaste como base la OC ${base.nroOC} de ${quien}, y en la última hora ya le emitiste otras OC a ${prov}:`
+        : `Usaste como base la OC ${base.nroOC} de ${quien}, también a ${prov}:`;
+    } else {
+      const min = Math.max(1, Math.round((Date.now() - previas[previas.length - 1].timestamp) / 60000));
+      $('dup-texto').textContent = varias
+        ? `En la última hora ya le emitiste ${previas.length} OC a ${prov} por un monto parecido:`
+        : `Hace ${min} min ya le emitiste a ${prov} una OC por un monto parecido:`;
+    }
     const nueva = calcTotal();
     $('dup-lista').innerHTML = previas.map((oc, i) => {
       const dif = difDup({ total: nueva }, oc);
@@ -2699,7 +2712,9 @@ function elegirRepetida(previas) {
         <input type="checkbox" value="${i}" checked${varias ? '' : ' hidden'}>
         <span class="dup-oc-main">
           <span class="dup-oc-nro">${esc(oc.nroOC)}</span>
-          <span class="dup-oc-sub">${esc(horaDe(oc.timestamp))} · ${esc(oc.obra || 'Sin obra')}</span>
+          <span class="dup-oc-sub">${oc === base
+            ? `${esc(oc.fecha || '')} · ${esc(oc.obra || 'Sin obra')} · ${esc(quien)}`
+            : `${esc(horaDe(oc.timestamp))} · ${esc(oc.obra || 'Sin obra')}`}</span>
         </span>
         <span class="dup-oc-monto">${oc.moneda === 'USD' ? 'USD' : '$'} ${esc(fmtMoneyDisplay(oc.total))}
           <small>${dif ? 'la nueva ' + esc(dif) : 'mismo monto'}</small></span>
@@ -3094,7 +3109,12 @@ function closePreview() {
 }
 
 // ---- Cargar OC como base (desde historial) ----
+// La OC cargada con "Usar como base", hasta que se genera o se limpia el
+// formulario: si es de otra persona, al emitir se ofrece anularla (revisarRepetida).
+let _ocBase = null;
+
 function loadOCBase(oc) {
+  _ocBase = oc;
   const prov = oc.proveedor || {};
   $('proveedor').value                = prov.nombre          || '';
   $('cuit-proveedor').value           = prov.cuit            || '';
@@ -3155,6 +3175,7 @@ function loadOCBase(oc) {
 
 // ---- Nueva OC mismo proveedor ----
 function resetFormKeepProvider() {
+  _ocBase = null;
   $('ref-presupuesto').value  = '';
   $('obra').value             = '';
   setRubro(null);
@@ -3192,6 +3213,7 @@ function resetFormKeepProvider() {
 
 // ---- Reset ----
 function resetForm() {
+  _ocBase = null;
   ['proveedor','cuit-proveedor','nombre-proveedor','codigo-interno-proveedor',
    'domicilio-proveedor','telefonos-proveedor',
    'ref-presupuesto','obra','condicion-pago','plazo-entrega','lugar-entrega','observaciones']
