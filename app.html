@@ -240,11 +240,11 @@
               <button type="button" data-chk="iva-toggle" data-v="0">Sin IVA</button>
               <button type="button" data-chk="iva-toggle" data-v="1">Con IVA incluido</button>
             </span>
+            <!-- Alícuota del IVA incluido: se descuenta de cada precio para llegar al neto -->
+            <label class="iva-pct-wrap hidden" id="iva-pct-wrap" title="IVA incluido en los precios: se descuenta para llegar al precio neto">
+              <input type="text" id="iva-pct" class="iva-pct-input" value="21" inputmode="decimal" aria-label="Porcentaje de IVA incluido">%
+            </label>
           </span>
-          <div class="iva-pct-wrap hidden" id="iva-pct-wrap">
-            <input type="text" id="iva-pct" class="iva-pct-input" value="21">
-            <span class="iva-pct-label">%  →  precio neto</span>
-          </div>
           <span class="oc-seg-g">
             <span class="oc-seg-l">Moneda</span>
             <span class="oc-seg" role="group" aria-label="Moneda">

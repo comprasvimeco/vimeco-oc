@@ -225,7 +225,7 @@ function setupIVAToggle() {
     ivaActive = checkbox.checked;
     pctWrap.classList.toggle('hidden', !ivaActive);
     if (ivaActive) {
-      ivaPct = parseFloat(pctInput.value) || 21;
+      ivaPct = parseArgFloat(pctInput.value) || 21;
       applyIVAToggle();
       ensureIVAImpuesto(null);
     } else {
@@ -239,7 +239,7 @@ function setupIVAToggle() {
     if (!ivaActive) return;
     revertIVAToggle();
     const pctAnterior = ivaPct;
-    ivaPct = parseFloat(pctInput.value) || 21;
+    ivaPct = parseArgFloat(pctInput.value) || 21;
     applyIVAToggle();
     ensureIVAImpuesto(pctAnterior);
     renderTable();
