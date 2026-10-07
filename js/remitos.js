@@ -12,14 +12,16 @@ const $ = id => document.getElementById(id);
 
 let allOCs        = [];   // todas las OC, no sólo las del usuario (ver cargarDatos)
 let allRemitos    = [];   // todos los remitos: las cantidades se calculan sobre todos
+let colaRemitos   = [];   // remitos guardados en este navegador que esperan señal (driveQueue)
 let viewerCode    = '';
 let viewerName    = '';
 let viewerIsAdmin = false;
-let filtroOC      = 'pendientes';
-let modalOC       = null; // OC abierta en el modal de carga
+let filtroOC      = 'pendientes';   // pendientes | entregadas | todas | remitos
+let modalOC       = null; // OC abierta en el formulario de carga
 let modalFile     = null; // foto elegida para el remito en curso (la que se sube)
 let modalRawFile  = null; // la misma foto sin escanear, para volver a pasarla por el escáner
 let modalPrevUrl  = null; // objectURL del preview, a revocar al cambiarla
+const recientes   = new Set();   // OC con un remito cargado en esta visita: quedan a la vista, en verde
 
 // ---- Formato ----
 
@@ -62,14 +64,36 @@ function hoyISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+
+// ---- Cola offline (lo que se ve en pantalla) ----
+
+// Remitos que quedaron en este navegador sin poder crearse en Firebase. Los que
+// ya tienen key existen en /remitos y sólo les falta la foto: esos ya están en
+// allRemitos y no se cuentan dos veces.
+const colaSinGuardar = () => colaRemitos.filter(p => !p.remitoKey && p.record);
+const colaDeOC       = nro => colaRemitos.filter(p => p.record?.nroOC === nro);
+
+async function refrescarCola() {
+  if (typeof driveQueue === 'undefined') { colaRemitos = []; return; }
+  try { colaRemitos = await driveQueue.getAllRemitos(); } catch (_) { colaRemitos = []; }
+}
+
 // ---- Cálculo de entregas ----
 
 // Estado de entrega de una OC contra TODOS sus remitos, los haya cargado quien
 // los haya cargado. El cálculo vive en entregas.js: es el mismo que arma las
 // planillas, y tener dos copias sería tener dos verdades.
-function entregasDeOC(oc) {
-  return calcEntrega(oc, allRemitos.filter(r => r.nroOC === oc.nroOC));
+// `conCola` suma los remitos que esperan señal en este navegador: para la
+// pantalla y el formulario cuentan (si no, lo ya cargado figura como pendiente
+// e invita a cargarlo otra vez), pero no para lo que se escribe en la OC.
+function entregasDeOC(oc, conCola) {
+  const rems = allRemitos.filter(r => r.nroOC === oc.nroOC);
+  if (conCola) colaSinGuardar().forEach(p => { if (p.record.nroOC === oc.nroOC) rems.push(p.record); });
+  return calcEntrega(oc, rems);
 }
+
+const renglonesCompletos = e => e.pedido.filter((p, i) => e.recibido[i] >= p).length;
 
 // OC contra las que tiene sentido cargar un remito: las que realmente se
 // emitieron (una pendiente de autorización todavía no es una compra, y una
@@ -83,54 +107,91 @@ function ocsElegibles() {
     (verPruebas || (!esObraPrueba(oc) && !esProveedorPrueba(oc))));
 }
 
+// Remitos de una OC, del más nuevo al más viejo (para la pastilla "N remitos").
+function remitosDeOC(nro) {
+  return allRemitos.filter(r => r.nroOC === nro).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
+
 // ---- Render: lista de OC ----
 // La búsqueda (normTxt, coincideOC, itemsCoincidentes…) vive en buscarOC.js.
 
-function badgeEntrega(estado) {
-  const txt = { sin: 'Sin entregas', parcial: 'Entrega parcial', completa: 'Entregada' };
-  return `<span class="rem-badge rem-badge--${estado}">${txt[estado] || ''}</span>`;
+const ESTADO_TXT = { sin: 'Sin entregas', parcial: 'Parcial', completa: 'Entregada' };
+
+function pillEstado(e) {
+  return `<span class="rv-pill rv-pill--${e.estado}">${e.estado === 'completa' ? icSvg('checkSm') : ''}${
+    ESTADO_TXT[e.estado]}${e.estado === 'parcial' ? ` ${e.pct}%` : ''}</span>`;
+}
+
+function barraAvance(e, cls) {
+  const w = e.estado === 'sin' ? 0 : Math.max(4, Math.min(100, e.pct));
+  return `<div class="rv-prog${cls ? ' ' + cls : ''}"><div class="rv-bar"><i class="f-${e.estado}" style="width:${w}%"></i></div><b>${e.pct}%</b></div>`;
+}
+
+function botonCargar(oc, chico) {
+  const nro = escHtml(oc.nroOC);
+  return chico
+    ? `<button type="button" class="foc-btn foc-btn--ambl rv-ib btn-cargar-remito" data-nro="${nro}" title="Cargar otro remito" aria-label="Cargar otro remito">${icSvg('plus')}</button>`
+    : `<button type="button" class="foc-btn foc-btn--amb rv-add btn-cargar-remito" data-nro="${nro}" title="Cargar remito" aria-label="Cargar remito">${icSvg('plus')}<span class="rv-largo">Remito</span></button>`;
+}
+
+function accionesOC(oc) {
+  if (colaDeOC(oc.nroOC).length)
+    return `<span class="rv-cola" title="El remito quedó guardado en este dispositivo y se sube solo cuando haya señal">${icSvg('wifi0')}<span class="rv-largo">Esperando señal</span><span class="rv-corto">En cola</span></span>${botonCargar(oc, true)}`;
+  if (recientes.has(oc.nroOC))
+    return `<span class="rv-ok">${icSvg('checkSm')}Cargado</span>${botonCargar(oc, true)}`;
+  return botonCargar(oc);
+}
+
+function filaOC(oc, e, terms) {
+  const hl    = t => resaltarTxt(t, terms, escHtml);
+  const rems  = remitosDeOC(oc.nroOC);
+  const cola  = colaDeOC(oc.nroOC).length > 0;
+  const n     = (oc.items || []).length;
+  const icono = e.estado === 'completa' ? icSvg('checkSm') : icSvg(cola ? 'wifi0' : 'truck');
+  return `<div class="rv-row${recientes.has(oc.nroOC) ? ' rv-row--ok' : ''}" data-nro="${escHtml(oc.nroOC)}">
+    <span class="rv-sq rv-sq--${cola ? 'cola' : e.estado}" title="${ESTADO_TXT[e.estado]}">${icono}</span>
+    <div style="min-width:0">
+      <div class="rv-prov">${hl(oc.proveedor?.nombre || '—')}</div>
+      <div class="rv-sub">${hl(oc.nroOC)} · <span class="rv-desk">${escHtml(oc.fecha || '')}</span><span class="rv-ph">${hl(oc.obra || '—')}</span></div>
+      ${barraAvance(e, 'rv-ph')}
+    </div>
+    <div class="rv-mid"><div>${hl(oc.obra || '—')}</div><small>${n ? `${renglonesCompletos(e)} de ${plural(n, 'renglón completo', 'renglones completos')}` : 'Sin ítems cargados'}</small></div>
+    <div class="rv-est">${pillEstado(e)}${rems.length
+      ? `<button type="button" class="rv-pill" data-doc="rem" aria-expanded="false" title="${rems.length > 1 ? 'Ver los remitos' : 'Ver el remito'}">${icSvg('file')}${plural(rems.length, 'remito', 'remitos')}</button>` : ''}</div>
+    <div class="rv-acts">${accionesOC(oc)}</div>
+    ${hitsHtml(oc, itemsCoincidentes(oc, terms), escHtml, terms).replace('class="rem-hits"', 'class="rem-hits rv-hits"')}
+    ${docsListasHtml([], rems)}
+  </div>`;
+}
+
+function listaOCs(filtro) {
+  let list = ocsElegibles().map(oc => ({ oc, e: entregasDeOC(oc, true) }));
+  if (filtro === 'pendientes') list = list.filter(({ oc, e }) => e.estado !== 'completa' || recientes.has(oc.nroOC));
+  if (filtro === 'entregadas') list = list.filter(({ e }) => e.estado === 'completa');
+  return list;
 }
 
 function renderOCList() {
   const terms = terminosBusqueda($('rem-search').value);
   const box   = $('rem-oc-list');
 
-  let list = ocsElegibles().map(oc => ({ oc, e: entregasDeOC(oc) }));
-  if (filtroOC === 'pendientes') list = list.filter(({ e }) => e.estado !== 'completa');
+  let list = listaOCs(filtroOC);
   if (terms.length) list = list.filter(({ oc }) => coincideOC(oc, terms));
 
   if (!list.length) {
-    box.innerHTML = `<div class="hist-empty">${
-      filtroOC === 'pendientes' && !terms.length
-        ? 'No hay OC pendientes de entrega.'
-        : 'No se encontraron OC.'}</div>`;
+    const vacio = terms.length ? 'No se encontraron OC.'
+      : filtroOC === 'pendientes' ? 'No hay OC pendientes de entrega.'
+      : filtroOC === 'entregadas' ? 'Todavía no hay OC entregadas.' : 'No hay OC.';
+    box.innerHTML = `<div class="rv-panel"><div class="rv-vacio">${vacio}</div></div>`;
     return;
   }
 
-  box.innerHTML = pager.take('remoc', list).map(({ oc, e }) => {
-    const hits = terms.length ? itemsCoincidentes(oc, terms) : [];
-    return `
-    <div class="adj-oc-card">
-      <div class="adj-oc-top">
-        <span class="hist-nro">${escHtml(oc.nroOC)}</span>
-        <span class="hist-fecha">${escHtml(oc.fecha || '')}</span>
-      </div>
-      <div class="hist-proveedor">${escHtml(oc.proveedor?.nombre || '—')}</div>
-      <div class="hist-obra">${escHtml(oc.obra || '—')}</div>
-      ${hitsHtml(oc, hits, escHtml, terms)}
-      <div class="rem-prog-wrap">
-        <div class="rem-prog"><div class="rem-prog-fill rem-prog-fill--${e.estado}" style="width:${Math.min(100, e.pct)}%"></div></div>
-        <span class="rem-prog-pct">${e.pct}%</span>
-      </div>
-      <div class="adj-oc-bottom">
-        ${badgeEntrega(e.estado)}
-        <button class="btn btn-sm btn-primary btn-cargar-remito" data-nro="${escHtml(oc.nroOC)}">
-          ${icSvg('plus')} Remito
-        </button>
-      </div>
-    </div>`;
-  }).join('');
+  box.innerHTML = `<div class="rv-panel">${pager.take('remoc', list).map(({ oc, e }) => filaOC(oc, e, terms)).join('')}</div>`;
 
+  box.querySelectorAll('.rv-row').forEach(row => {
+    const oc = allOCs.find(o => o.nroOC === row.dataset.nro);
+    if (oc) bindDocsOC(row, oc, [], remitosDeOC(oc.nroOC));
+  });
   box.querySelectorAll('.btn-cargar-remito').forEach(btn => {
     btn.addEventListener('click', () => {
       const oc = allOCs.find(o => o.nroOC === btn.dataset.nro);
@@ -149,45 +210,117 @@ function remitosVisibles() {
     : allRemitos.filter(r => r.recibidoPor?.codigo === viewerCode);
 }
 
-function renderRemitosList() {
-  const list = remitosVisibles();
-  const box  = $('rem-list');
+// Los cargados más los que esperan señal en este dispositivo, del más nuevo al
+// más viejo. `_cola` marca los que todavía no subieron (o les falta la foto).
+function remitosParaListar() {
+  const conFotoPend = new Set(colaRemitos.map(p => p.remitoKey).filter(Boolean));
+  return [
+    ...colaSinGuardar().map(p => ({ ...p.record, _cola: true })),
+    ...remitosVisibles().map(r => conFotoPend.has(r.key) ? { ...r, _cola: true } : r)
+  ].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
 
-  $('rem-count').textContent = list.length ? `${list.length} remito${list.length !== 1 ? 's' : ''}` : '';
+function coincideRemito(r, terms) {
+  const hay = normTxt([r.nro, r.proveedor?.nombre, r.obra, r.nroOC, r.recibidoPor?.nombre,
+                       ...(r.items || []).map(it => it.desc)].join(' '));
+  return terms.every(t => hay.includes(t));
+}
+
+function filaRemito(r, terms) {
+  const hl = t => resaltarTxt(t, terms, escHtml);
+  const n  = (r.items || []).length;
+  const estado = r._cola
+    ? `<span class="rv-pill rv-pill--cola">${icSvg('wifi0')}Esperando señal</span>`
+    : `<span class="rv-pill rv-pill--${r.entrega === 'total' ? 'completa' : 'parcial'}">${r.entrega === 'total' ? 'Completó la OC' : 'Entrega parcial'}</span>`;
+  const quien = viewerIsAdmin && r.recibidoPor?.nombre ? ` · recibió ${hl(r.recibidoPor.nombre)}` : '';
+  return `<div class="rv-row">
+    <span class="rv-sq rv-sq--${r._cola ? 'cola' : 'rem'}">${icSvg(r._cola ? 'wifi0' : 'file')}</span>
+    <div style="min-width:0">
+      <div class="rv-prov">Remito ${hl(r.nro || '—')}</div>
+      <div class="rv-sub">${escHtml(isoToDisplay(r.fecha))} · ${hl(r.proveedor?.nombre || '—')}</div>
+      <div class="rv-sub rv-ph">OC ${hl(r.nroOC || '—')} · ${plural(n, 'ítem', 'ítems')}${r._cola ? ' · esperando señal' : ''}</div>
+    </div>
+    <div class="rv-mid"><div>OC ${hl(r.nroOC || '—')}</div><small>${hl(r.obra || 'Sin obra')}${quien}</small></div>
+    <div class="rv-est">${estado}<span class="rv-n-items">${plural(n, 'ítem', 'ítems')}</span></div>
+    <div class="rv-acts">
+      ${r.key ? `<button type="button" class="foc-btn foc-btn--clear rv-ib btn-ver-remito" data-key="${escHtml(r.key)}" title="Ver el remito" aria-label="Ver el remito">${icSvg('eye')}</button>` : ''}
+      ${r.drive?.url ? `<a class="foc-btn foc-btn--drive rv-ib rv-desk" href="${escHtml(r.drive.url)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive" aria-label="Abrir la carpeta en Drive">${icSvg('folder')}</a>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderRemitosList() {
+  const terms = terminosBusqueda($('rem-search').value);
+  const box   = $('rem-oc-list');
+  let list = remitosParaListar();
+  if (terms.length) list = list.filter(r => coincideRemito(r, terms));
 
   if (!list.length) {
-    box.innerHTML = '<div class="hist-empty">Todavía no cargaste ningún remito.</div>';
+    box.innerHTML = `<div class="rv-panel"><div class="rv-vacio">${
+      terms.length ? 'No se encontraron remitos.' : 'Todavía no cargaste ningún remito.'}</div></div>`;
     return;
   }
 
-  box.innerHTML = pager.take('remlist', list).map(r => {
-    const nItems = (r.items || []).length;
-    return `<div class="adj-oc-card">
-      <div class="adj-oc-top">
-        <span class="hist-nro">Remito ${escHtml(r.nro || '—')}</span>
-        <span class="hist-fecha">${escHtml(isoToDisplay(r.fecha))}</span>
-      </div>
-      <div class="hist-proveedor">${escHtml(r.proveedor?.nombre || '—')}</div>
-      <div class="hist-obra">OC ${escHtml(r.nroOC || '—')} · ${escHtml(r.obra || 'Sin obra')}</div>
-      ${viewerIsAdmin && r.recibidoPor?.nombre
-        ? `<div class="hist-obra" style="color:var(--gray-500);font-size:.78rem;">recibió ${escHtml(r.recibidoPor.nombre)}</div>` : ''}
-      ${r.observaciones ? `<div class="rem-obs">${escHtml(r.observaciones)}</div>` : ''}
-      <div class="adj-oc-bottom">
-        <span class="hist-obra">${nItems} ítem${nItems !== 1 ? 's' : ''} · ${r.entrega === 'total' ? 'completó la OC' : 'entrega parcial'}</span>
-        <div class="hist-actions">
-          <button class="foc-btn foc-btn--edit btn-ver-remito" data-key="${escHtml(r.key)}" title="Ver el remito">${icSvg('eye')}Ver</button>
-          ${r.drive?.url
-            ? `<a class="foc-btn foc-btn--drive" href="${escHtml(r.drive.url)}" target="_blank" rel="noopener">${icSvg('folder')}Drive</a>`
-            : ''}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
+  box.innerHTML = `<div class="rv-panel">${pager.take('remlist', list).map(r => filaRemito(r, terms)).join('')}</div>`;
   box.querySelectorAll('.btn-ver-remito').forEach(btn =>
     btn.addEventListener('click', () => verRemito(btn.dataset.key)));
 
   pager.footer('remlist', box, list, renderRemitosList);
+}
+
+// ---- Cabecera, pestañas y columna del costado ----
+
+function renderResumen() {
+  const ocs   = listaOCs('todas');
+  const pend  = ocs.filter(({ e }) => e.estado !== 'completa');
+  const sin   = pend.filter(({ e }) => e.estado === 'sin').length;
+  const rems  = remitosParaListar();
+
+  const cuenta = { pendientes: pend.length, entregadas: ocs.length - pend.length, todas: ocs.length, remitos: rems.length };
+  $('rem-filtro').querySelectorAll('.rv-tab').forEach(b => { b.querySelector('b').textContent = cuenta[b.dataset.filtro] ?? ''; });
+
+  const pill = $('rv-pend');
+  pill.textContent = `${pend.length} por recibir`;
+  pill.classList.toggle('hidden', !pend.length);
+
+  $('rv-hero-n').textContent = plural(pend.length, 'OC', 'OC');
+  $('rv-hero-s').textContent = pend.length
+    ? `${sin} sin ninguna entrega · ${pend.length - sin} con entrega parcial`
+    : 'Todo lo comprado está recibido.';
+  const mes = hoyISO().slice(0, 7);
+  $('rv-hero-mes').textContent  = rems.filter(r => (r.fecha || '').startsWith(mes)).length;
+  $('rv-hero-mes-l').textContent = `remitos en ${new Date().toLocaleDateString('es-AR', { month: 'long' })}`;
+  $('rv-hero-cola').textContent = colaRemitos.length;
+
+  const ult = rems.slice(0, 5);
+  $('rv-ult').innerHTML = ult.length ? ult.map(r => `
+    <button type="button" class="rv-mini"${r.key ? ` data-key="${escHtml(r.key)}"` : ' disabled'}>
+      <span class="rv-sq rv-sq--${r._cola ? 'cola' : 'rem'}">${icSvg(r._cola ? 'wifi0' : 'file')}</span>
+      <span><b>${escHtml(r.proveedor?.nombre || '—')}</b><small>Remito ${escHtml(r.nro || '—')} · ${r._cola ? 'esperando señal' : escHtml(isoToDisplay(r.fecha))}</small></span>
+    </button>`).join('') : '<div class="rv-vacio-s">Todavía no hay remitos cargados.</div>';
+  $('rv-ult').querySelectorAll('.rv-mini[data-key]').forEach(b =>
+    b.addEventListener('click', () => verRemito(b.dataset.key)));
+}
+
+function setFiltro(filtro) {
+  filtroOC = filtro;
+  $('rem-filtro').querySelectorAll('.rv-tab').forEach(b => b.classList.toggle('active', b.dataset.filtro === filtro));
+  $('rem-search').placeholder = filtro === 'remitos'
+    ? 'Buscar por N° de remito, proveedor, obra, artículo u OC…'
+    : 'Buscar por artículo, proveedor, obra, responsable o N° OC…';
+  pager.reset('remoc');
+  pager.reset('remlist');
+  renderLista();
+}
+
+function renderLista() {
+  if (filtroOC === 'remitos') renderRemitosList();
+  else renderOCList();
+}
+
+function renderTodo() {
+  renderResumen();
+  renderLista();
 }
 
 // ---- Ficha del remito (js/fichaRemito.js) ----
@@ -236,53 +369,55 @@ async function borrarRemito(key) {
   toast(`Remito ${rem.nro} borrado.`, 'success');
 }
 
-function renderTodo() {
-  renderOCList();
-  renderRemitosList();
-}
-
-// ---- Modal de carga ----
+// ---- Formulario de carga ----
 
 function abrirModal(oc) {
   modalOC = oc;
 
-  const e = entregasDeOC(oc);
+  const e = entregasDeOC(oc, true);
 
-  $('rem-oc-ref').innerHTML = `
-    <div class="rem-oc-ref-nro">${escHtml(oc.nroOC)} · ${escHtml(oc.fecha || '')}</div>
-    <div class="rem-oc-ref-prov">${escHtml(oc.proveedor?.nombre || '—')}</div>
-    <div class="rem-oc-ref-obra">${escHtml(oc.obra || 'Sin obra')}</div>`;
+  $('rem-oc-ref').innerHTML = `<div class="rv-ocref">
+    <span class="rv-sq rv-sq--${e.estado}">${icSvg('truck')}</span>
+    <div><div class="rv-prov">${escHtml(oc.proveedor?.nombre || '—')}</div>
+      <div class="rv-sub">OC ${escHtml(oc.nroOC)} · ${escHtml(oc.obra || 'Sin obra')}</div></div>
+    ${pillEstado(e)}</div>`;
 
   const items = oc.items || [];
   $('rem-items').innerHTML = items.length
     ? items.map((it, i) => {
         const completo = e.pendiente[i] <= 0;
-        return `<div class="rem-item${completo ? ' is-completo' : ''}" data-idx="${i}">
-          <div class="rem-item-desc">${escHtml(it.desc || '—')}</div>
-          <div class="rem-item-row">
-            <div class="rem-item-meta">
-              <span>Pedido <b>${fmtQty(e.pedido[i])}</b> ${escHtml(it.unidad || '')}</span>
-              ${e.recibido[i] > 0 ? `<span>Entregado <b>${fmtQty(e.recibido[i])}</b></span>` : ''}
-              <span class="rem-item-pend">${completo ? 'Completo' : `Falta <b>${fmtQty(e.pendiente[i])}</b>`}</span>
-            </div>
-            <input type="text" class="rem-item-input" inputmode="decimal"
+        const stp = (d, n) => `<button type="button" class="rv-stp" data-step="${d}" data-idx="${i}" aria-label="${n}">${icSvg(d > 0 ? 'plus' : 'minus')}</button>`;
+        return `<div class="rv-it${completo ? ' is-completo' : ''}" data-idx="${i}">
+          <div class="rv-it-d">${escHtml(it.desc || '—')}</div>
+          <div class="rv-it-q">
+            ${completo ? '' : stp(-1, 'Uno menos')}
+            <input type="text" class="rem-item-input rv-qv" inputmode="decimal" aria-label="Cantidad recibida de ${escHtml(it.desc || 'este renglón')}"
                    data-idx="${i}" data-pend="${e.pendiente[i]}"
                    value="${completo ? '0' : fmtInput(e.pendiente[i])}">
+            ${completo ? '' : stp(1, 'Uno más')}
+          </div>
+          <div class="rv-it-m">
+            <span>Pedido <b>${fmtQty(e.pedido[i])}</b> ${escHtml(it.unidad || '')}</span>
+            ${e.recibido[i] > 0 ? `<span>Recibido <b>${fmtQty(e.recibido[i])}</b></span>` : ''}
+            <span class="rv-mk"></span>
           </div>
         </div>`;
       }).join('')
-    : '<div class="hist-empty" style="padding:1.25rem;">Esta OC no tiene ítems cargados.</div>';
+    : '<div class="rv-vacio-s">Esta OC no tiene ítems cargados: el remito se guarda sin cantidades.</div>';
 
   $('rem-nro').value   = '';
   $('rem-fecha').value = hoyISO();
   $('rem-obs').value   = '';
   limpiarFoto();
-  $('rem-error').classList.add('hidden');
+  document.querySelectorAll('#modal-remito .rv-sec.is-falta').forEach(s => s.classList.remove('is-falta'));
   $('btn-rem-guardar').disabled = false;
+  $('rv-sh-body').scrollTop = 0;
+  refrescarForm();
 
-  // Sin foco en el N° de remito: ahora lo primero es la foto, y en el celular
-  // el teclado tapaba el formulario apenas se abría el modal.
+  // Sin foco en el N° de remito: lo primero es la foto, y en el celular el
+  // teclado tapaba el formulario apenas se abría.
   $('modal-remito').classList.remove('hidden');
+  $('modal-remito').querySelector('.rv-sheet').focus();
 }
 
 function cerrarModal() {
@@ -291,30 +426,156 @@ function cerrarModal() {
   modalOC = null;
 }
 
+// ---- Estado del formulario: pasos, marcas por renglón y pie ----
+
+const FALTA_SEC = { foto: 'rv-sec-foto', nro: 'rv-sec-datos', fecha: 'rv-sec-datos', items: 'rv-sec-items' };
+
+function faltantesRemito() {
+  const f = [];
+  if (!modalFile)                  f.push({ id: 'foto',  txt: 'La foto del remito', sub: 'Paso 1 · es el comprobante que queda en Drive', corto: 'la foto' });
+  if (!$('rem-nro').value.trim())  f.push({ id: 'nro',   txt: 'El N° de remito',    sub: 'Paso 2 · datos del remito', corto: 'el N° de remito' });
+  if (!$('rem-fecha').value)       f.push({ id: 'fecha', txt: 'La fecha',            sub: 'Paso 2 · datos del remito', corto: 'la fecha' });
+  // Una OC sin ítems cargados no tiene cantidades que pedir: se admite el
+  // remito vacío (si no, el formulario no se puede guardar nunca).
+  if ((modalOC?.items || []).length && !leerItemsDelModal().length)
+    f.push({ id: 'items', txt: 'Al menos una cantidad recibida', sub: 'Paso 3 · qué llegó', corto: 'las cantidades' });
+  return f;
+}
+
+function marcaRenglon(q, pend) {
+  if (pend <= 0) return q > 0 ? ['mas', 'De más'] : ['done', 'Ya completo'];
+  if (q <= 0)    return ['no', 'No llegó'];
+  if (q === pend) return ['ok', 'Completa'];
+  if (q > pend)  return ['mas', `${fmtQty(q - pend)} de más`];
+  return ['par', `Quedan ${fmtQty(pend - q)}`];
+}
+
+function refrescarForm() {
+  if (!modalOC) return;
+  const inputs = [...document.querySelectorAll('.rem-item-input')];
+  let todo = inputs.length > 0, nada = inputs.length > 0, quedan = 0;
+  inputs.forEach(inp => {
+    const q = parseQty(inp.value), pend = parseFloat(inp.dataset.pend) || 0;
+    const [cls, txt] = marcaRenglon(q, pend);
+    const mk = inp.closest('.rv-it').querySelector('.rv-mk');
+    mk.className = `rv-mk rv-mk--${cls}`;
+    mk.textContent = txt;
+    inp.classList.toggle('is-cero', q <= 0);
+    if (q !== pend) todo = false;
+    if (q !== 0) nada = false;
+    if (q < pend) quedan++;
+  });
+  $('btn-rem-todo').classList.toggle('on', todo);
+  $('btn-rem-vaciar').classList.toggle('on', nada && !todo);
+
+  const faltan = faltantesRemito();
+  const tilde = (id, ok, n) => { const el = $(id); el.classList.toggle('ok', ok); el.innerHTML = ok ? icSvg('check') : n; };
+  tilde('rv-n-foto',  !!modalFile, '1');
+  tilde('rv-n-datos', !faltan.some(f => f.id === 'nro' || f.id === 'fecha'), '2');
+  tilde('rv-n-items', !faltan.some(f => f.id === 'items') && inputs.length > 0, '3');
+  $('rv-req-foto').classList.toggle('hidden', !!modalFile);
+  // Lo que se completó deja de estar marcado en rojo.
+  Object.values(FALTA_SEC).forEach(sec => {
+    if (!faltan.some(f => FALTA_SEC[f.id] === sec)) $(sec).classList.remove('is-falta');
+  });
+
+  const st = $('rv-estado');
+  if (faltan.length) {
+    const partes = faltan.map(f => f.corto);
+    st.className = 'rv-st rv-st--falta';
+    st.textContent = 'Falta ' + (partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes.at(-1) : partes[0]);
+    st.title = 'Ver lo que falta';
+  } else if (!inputs.length) {
+    st.className = 'rv-st rv-st--ok'; st.textContent = 'Listo para guardar'; st.title = '';
+  } else if (!quedan) {
+    st.className = 'rv-st rv-st--ok'; st.textContent = 'Con este remito se completa la OC'; st.title = '';
+  } else {
+    st.className = 'rv-st rv-st--parcial';
+    st.textContent = `Entrega parcial: ${quedan === 1 ? 'queda 1 renglón' : `quedan ${quedan} renglones`}`;
+    st.title = '';
+  }
+  $('btn-rem-guardar').classList.toggle('is-incompleto', faltan.length > 0);
+}
+
+// "Faltan N datos" con todo junto, como en la OC: tocar uno lleva a completarlo.
+function mostrarFaltantes(faltan) {
+  let modal = $('modal-faltan');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay hidden';
+    modal.id = 'modal-faltan';
+    modal.innerHTML =
+      '<div class="confirm-box confirm-box--warn confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="faltan-title" tabindex="-1">' +
+        `<span class="confirm-ic">${icSvg('alert')}</span>` +
+        '<div class="confirm-title" id="faltan-title"></div>' +
+        '<p class="confirm-msg">Tocá uno para ir a completarlo.</p>' +
+        '<div class="faltan-lista"></div>' +
+        '<button type="button" class="foc-btn foc-btn--clear confirm-cancel faltan-cerrar">Seguir cargando</button>' +
+      '</div>';
+    document.body.appendChild(modal);
+  }
+  const close = () => {
+    modal.classList.add('hidden');
+    modal.onclick = null;
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  modal.querySelector('#faltan-title').textContent = faltan.length === 1 ? 'Falta un dato' : `Faltan ${faltan.length} datos`;
+  modal.querySelector('.faltan-lista').innerHTML = faltan.map((f, i) => `
+    <button type="button" class="faltan-item" data-i="${i}">
+      <span class="faltan-dot"></span>
+      <span class="faltan-t"><b>${escHtml(f.txt)}</b><small>${escHtml(f.sub)}</small></span>
+      ${icSvg('chevR')}
+    </button>`).join('');
+  modal.onclick = e => {
+    const it = e.target.closest('.faltan-item');
+    if (it) { close(); irAFaltante(faltan[+it.dataset.i].id); }
+    else if (e.target === modal || e.target.closest('.faltan-cerrar')) close();
+  };
+  document.addEventListener('keydown', onKey, true);
+  modal.classList.remove('hidden');
+  modal.querySelector('.confirm-box').focus();
+}
+
+function irAFaltante(id) {
+  const sec = $(FALTA_SEC[id]);
+  sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const foco = id === 'nro' ? $('rem-nro') : id === 'fecha' ? $('rem-fecha')
+             : id === 'items' ? document.querySelector('.rem-item-input') : null;
+  if (foco) setTimeout(() => foco.focus({ preventScroll: true }), 350);
+}
+
 // ---- Foto del remito ----
 
 // La foto es el primer paso del formulario: es el comprobante que se archiva en
 // Drive y, con "Leer con IA", de ella salen el número, la fecha y las cantidades.
-function setFoto(file, conPreview) {
+function setFoto(file) {
   modalFile = file;
   if (modalPrevUrl) { URL.revokeObjectURL(modalPrevUrl); modalPrevUrl = null; }
 
-  const nameEl = $('rem-file-name');
-  const prevEl = $('rem-preview');
-  if (conPreview && file.type.startsWith('image/')) {
+  const img   = $('rem-preview-img');
+  const thumb = $('rv-thumb');
+  thumb.querySelector('.rv-pdf')?.remove();
+  if (file.type.startsWith('image/')) {
     modalPrevUrl = URL.createObjectURL(file);
-    $('rem-preview-img').src = modalPrevUrl;
-    prevEl.classList.remove('hidden');
-    nameEl.classList.add('hidden');
+    img.src = modalPrevUrl;
+    img.classList.remove('hidden');
   } else {
-    nameEl.innerHTML = `${icSvg('checkSm')} ${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB)`;
-    nameEl.classList.remove('hidden');
-    prevEl.classList.add('hidden');
+    img.removeAttribute('src');
+    img.classList.add('hidden');
+    thumb.insertAdjacentHTML('beforeend', `<span class="rv-pdf">${icSvg('file')}</span>`);
   }
+  $('rem-file-name').textContent = file.name;
+  $('rem-file-size').textContent = `${(file.size / 1024).toFixed(0)} KB`;
+  $('rv-drop').classList.add('hidden');
+  $('rv-foto').classList.remove('hidden');
 
-  $('btn-rem-rescan').style.display = modalRawFile ? '' : 'none';
+  $('btn-rem-rescan').classList.toggle('hidden', !modalRawFile);
+  $('btn-rem-ia').classList.toggle('hidden', typeof extractFromRemito !== 'function');
   $('btn-rem-ia').disabled = false;
+  $('btn-rem-ia-t').textContent = 'Leer con IA';
   ocultarIA();
+  refrescarForm();
 }
 
 function limpiarFoto() {
@@ -322,47 +583,53 @@ function limpiarFoto() {
   if (modalPrevUrl) { URL.revokeObjectURL(modalPrevUrl); modalPrevUrl = null; }
   $('rem-file').value   = '';
   $('rem-camera').value = '';
-  $('rem-file-name').classList.add('hidden');
-  $('rem-preview').classList.add('hidden');
   $('rem-preview-img').removeAttribute('src');
-  $('btn-rem-ia').disabled = true;
+  $('rv-thumb').querySelector('.rv-pdf')?.remove();
+  $('rv-foto').classList.add('hidden');
+  $('rv-drop').classList.remove('hidden');
+  $('btn-rem-ia').classList.add('hidden');
   ocultarIA();
+  refrescarForm();
 }
 
 // Foto de cámara: pasa por el escáner (recorte de perspectiva + filtro) antes
 // de adjuntarse. Un remito enderezado se lee mucho mejor, en Drive y por la IA.
 async function escanear(file) {
-  if (!file || typeof openScanner !== 'function') { if (file) setFoto(file, true); return; }
+  if (!file || typeof openScanner !== 'function') { if (file) setFoto(file); return; }
   modalRawFile = file;
   try {
     const scan = await openScanner(file);
-    if (scan) setFoto(scan, true);   // null = canceló: no cambia nada
+    if (scan) setFoto(scan);   // null = canceló: no cambia nada
   } catch (_) {
     // Escáner no disponible (p. ej. sin conexión la primera vez): va la original.
-    setFoto(file, true);
+    setFoto(file);
     toast('Escáner no disponible; se adjuntó la foto original.', 'warning');
   }
 }
 
-// Archivo elegido a mano: se adjunta tal cual (puede ser un PDF). Si es imagen
-// queda disponible para escanearla desde el preview.
+// Archivo elegido a mano (o soltado en la bandeja): se adjunta tal cual (puede
+// ser un PDF). Si es imagen queda disponible para escanearla.
 function adjuntarArchivo(file) {
   if (!file) return;
+  if (!/^image\/|application\/pdf/.test(file.type)) {
+    toast('Elegí una foto o un PDF del remito.', 'warning');
+    return;
+  }
   modalRawFile = file.type.startsWith('image/') ? file : null;
-  setFoto(file, true);
+  setFoto(file);
 }
 
 // ---- Lectura con IA ----
 
 function setIA(tipo, icono, html) {
   const box = $('rem-ia-status');
-  box.className = `extract-status ${tipo}`;
+  box.className = `rv-ia-st rv-ia-st--${tipo}`;
   box.innerHTML = `${icono}<span>${html}</span>`;
 }
 
 function ocultarIA() {
   const box = $('rem-ia-status');
-  box.className = 'extract-status hidden';
+  box.className = 'rv-ia-st hidden';
   box.innerHTML = '';
 }
 
@@ -371,7 +638,7 @@ function ocultarIA() {
 async function leerConIA() {
   if (!modalFile || !modalOC || typeof extractFromRemito !== 'function') return;
 
-  const e     = entregasDeOC(modalOC);
+  const e     = entregasDeOC(modalOC, true);
   const items = (modalOC.items || []).map((it, i) => ({
     desc:      it.desc   || '',
     unidad:    it.unidad || '',
@@ -409,29 +676,48 @@ async function leerConIA() {
       if (inp) inp.value = fmtInput(cantidad);
     });
   }
+  refrescarForm();
 
   if (!r.nro && !r.items.length) {
     setIA('error', icSvg('alert'),
       'No se pudo leer el remito. Probá con otra foto o cargalo a mano.');
     return;
   }
+  $('btn-rem-ia-t').textContent = 'Leer de nuevo';
 
-  const partes = [];
-  if (r.nro) partes.push(`N° ${escHtml(r.nro)}`);
-  if (r.items.length) partes.push(`${r.items.length} ítem${r.items.length !== 1 ? 's' : ''}`);
   const aviso = r.sinMatch.length
     ? `<br>Figura(n) en el remito pero no en la OC: ${escHtml(r.sinMatch.join(', '))}.`
     : '';
-  setIA('success', icSvg('checkSm'),
-    `Leído: ${partes.join(' · ')}. Revisá los datos antes de guardar.${aviso}`);
+  // Leyó el número pero ninguna cantidad: los renglones siguen en "lo que
+  // falta", y guardar así declararía recibido todo sin que nadie lo mire.
+  if (!r.items.length && (modalOC.items || []).length) {
+    setIA('warn', icSvg('alert'),
+      `Leído: N° ${escHtml(r.nro)}. No pude leer las cantidades: quedaron en lo que falta de cada renglón. Revisalas antes de guardar.${aviso}`);
+    return;
+  }
+
+  const partes = [];
+  if (r.nro) partes.push(`N° ${escHtml(r.nro)}`);
+  if (r.fecha) partes.push(`fecha ${escHtml(isoToDisplay(r.fecha))}`);
+  if (r.items.length) partes.push(plural(r.items.length, 'renglón', 'renglones'));
+  setIA('success', icSvg('sparkles'),
+    `Leído con IA: ${partes.join(', ')}. Revisá las cantidades antes de guardar.${aviso}`);
 }
 
-// "Llegó todo" / "Vaciar": el input arranca en lo que falta, así guardar sin
+// "Llegó todo" / "Nada": el input arranca en lo que falta, así guardar sin
 // tocar nada equivale a la entrega completa (el caso normal).
 function setCantidades(modo) {
   document.querySelectorAll('.rem-item-input').forEach(inp => {
     inp.value = modo === 'todo' ? fmtInput(inp.dataset.pend) : '0';
   });
+  refrescarForm();
+}
+
+function pasoCantidad(idx, d) {
+  const inp = document.querySelector(`.rem-item-input[data-idx="${idx}"]`);
+  if (!inp) return;
+  inp.value = fmtInput(Math.max(0, parseQty(inp.value) + d));
+  refrescarForm();
 }
 
 function leerItemsDelModal() {
@@ -450,12 +736,6 @@ function leerItemsDelModal() {
     }
   });
   return items;
-}
-
-function mostrarError(msg) {
-  const box = $('rem-error');
-  box.textContent = msg;
-  box.classList.remove('hidden');
 }
 
 // ---- Guardar ----
@@ -562,20 +842,19 @@ async function guardarRemito() {
   if (!modalOC) return;
   $('rem-error').classList.add('hidden');
 
-  const nro   = $('rem-nro').value.trim();
-  const fecha = $('rem-fecha').value;
-
-  if (!nro)   { mostrarError('Cargá el número de remito.'); return; }
-  if (!fecha) { mostrarError('Cargá la fecha del remito.'); return; }
+  // Todo lo que falta de una vez, como en la OC (antes avisaba de a un dato).
   // La foto es el comprobante: sin ella el remito queda sin respaldo en Drive y
   // no hay con qué verificar lo que se declaró recibido.
-  if (!modalFile) { mostrarError('Sacá o adjuntá la foto del remito.'); return; }
+  const faltan = faltantesRemito();
+  if (faltan.length) {
+    faltan.forEach(f => $(FALTA_SEC[f.id]).classList.add('is-falta'));
+    mostrarFaltantes(faltan);
+    return;
+  }
 
-  // Una OC sin ítems cargados no tiene cantidades que pedir: se admite el
-  // remito vacío (si no, el formulario no se puede guardar nunca).
-  const sinItems = !(modalOC.items || []).length;
-  const items    = leerItemsDelModal();
-  if (!items.length && !sinItems) { mostrarError('Cargá al menos una cantidad recibida.'); return; }
+  const nro   = $('rem-nro').value.trim();
+  const fecha = $('rem-fecha').value;
+  const items = leerItemsDelModal();
 
   // Sobre-entrega: se avisa, no se bloquea (pasa, y hay que poder registrarlo).
   const excedidos = items.filter(it => {
@@ -588,8 +867,9 @@ async function guardarRemito() {
     { boton: 'Guardar igual', tono: 'warn', icono: 'alert' })) return;
 
   // Mismo número y mismo proveedor = casi seguro el mismo remito cargado dos
-  // veces, y eso duplicaría las cantidades recibidas.
-  const dup = allRemitos.find(r =>
+  // veces, y eso duplicaría las cantidades recibidas. Cuentan también los que
+  // esperan señal en este dispositivo.
+  const dup = [...allRemitos, ...colaSinGuardar().map(p => p.record)].find(r =>
     (r.nro || '').trim().toLowerCase() === nro.toLowerCase() &&
     (r.proveedor?.nombre || '') === (modalOC.proveedor?.nombre || ''));
   if (dup && !await showConfirm(
@@ -597,7 +877,7 @@ async function guardarRemito() {
     `Ya hay un remito ${nro} de ${modalOC.proveedor?.nombre || 'este proveedor'} (OC ${dup.nroOC}).\n\n¿Cargarlo igual?`,
     { boton: 'Cargar igual', tono: 'warn', icono: 'alert' })) return;
 
-  const e        = entregasDeOC(modalOC);
+  const e        = entregasDeOC(modalOC, true);
   const completa = (modalOC.items || []).every((_, i) => {
     const cargado = items.find(it => it.idx === i);
     return e.recibido[i] + (cargado?.cantidad || 0) >= e.pedido[i];
@@ -625,9 +905,7 @@ async function guardarRemito() {
   btn.innerHTML = '<span class="spinner"></span> Guardando…';
 
   const oc     = modalOC;
-  const upFile = modalFile
-    ? new File([modalFile], nombreArchivoDrive('Remito', modalFile.name, nro), { type: modalFile.type })
-    : null;
+  const upFile = new File([modalFile], nombreArchivoDrive('Remito', modalFile.name, nro), { type: modalFile.type });
 
   try {
     await persistirRemito(record, upFile, oc);
@@ -636,6 +914,8 @@ async function guardarRemito() {
     btn.innerHTML = `${icSvg('checkSm')} Guardar remito`;
   }
 
+  recientes.add(oc.nroOC);
+  await refrescarCola();
   cerrarModal();
   renderTodo();
 }
@@ -755,7 +1035,10 @@ async function retryRemitoQueue() {
       actualizarEntregaOC(oc);
       await sincronizarPlanillas(oc);
     }
-  } catch (_) {}
+  } catch (_) {
+    await refrescarCola();
+    renderTodo();
+  }
 }
 
 // ---- Carga de datos ----
@@ -765,7 +1048,8 @@ async function cargarDatos() {
   // casi nunca es quien emitió la orden.
   const [ocs, rems] = await Promise.all([
     getHistorial(viewerCode, true),
-    getRemitos()
+    getRemitos(),
+    refrescarCola()
   ]);
   allOCs     = ocs;
   allRemitos = rems;
@@ -790,29 +1074,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { const u = await getUsuario(code); viewerIsAdmin = !!(u && u.admin); } catch (_) {}
   }
 
-  // Filtro Pendientes / Todas
+  // Pestañas: Pendientes / Entregadas / Todas / Remitos cargados
   $('rem-filtro').addEventListener('click', ev => {
-    const btn = ev.target.closest('.rem-tab');
-    if (!btn) return;
-    filtroOC = btn.dataset.filtro;
-    $('rem-filtro').querySelectorAll('.rem-tab').forEach(b => b.classList.toggle('active', b === btn));
-    pager.reset('remoc');
-    renderOCList();
+    const btn = ev.target.closest('.rv-tab');
+    if (btn) setFiltro(btn.dataset.filtro);
   });
+  $('rv-ver-todos').addEventListener('click', () => setFiltro('remitos'));
 
-  $('rem-search').addEventListener('input', () => { pager.reset('remoc'); renderOCList(); });
+  $('rem-search').addEventListener('input', () => { pager.reset('remoc'); pager.reset('remlist'); renderLista(); });
 
-  // Modal
+  // Formulario
   $('modal-remito-close').addEventListener('click', cerrarModal);
   $('btn-rem-cancelar').addEventListener('click', cerrarModal);
   $('btn-rem-guardar').addEventListener('click', guardarRemito);
   $('btn-rem-todo').addEventListener('click',   () => setCantidades('todo'));
   $('btn-rem-vaciar').addEventListener('click', () => setCantidades('vaciar'));
-
+  $('rem-items').addEventListener('click', ev => {
+    const b = ev.target.closest('.rv-stp');
+    if (b) pasoCantidad(b.dataset.idx, Number(b.dataset.step));
+  });
+  $('rem-items').addEventListener('input', refrescarForm);
+  $('rem-nro').addEventListener('input', refrescarForm);
+  $('rem-fecha').addEventListener('input', refrescarForm);
+  $('rv-estado').addEventListener('click', () => {
+    const faltan = faltantesRemito();
+    if (faltan.length) mostrarFaltantes(faltan);
+  });
 
   // Foto del remito
   if ('ontouchstart' in window || window.innerWidth <= 768)
-    $('btn-rem-camera').style.display = '';
+    $('btn-rem-camera').classList.remove('hidden');
   $('btn-rem-archivo').addEventListener('click', () => $('rem-file').click());
   $('btn-rem-camera').addEventListener('click',  () => $('rem-camera').click());
   $('rem-file').addEventListener('change',   e => adjuntarArchivo(e.target.files[0]));
@@ -820,6 +1111,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const f = e.target.files[0];
     e.target.value = '';   // sacar dos veces la misma foto vuelve a disparar change
     if (f) escanear(f);
+  });
+  const drop = $('rv-drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault();
+    drop.classList.remove('drag-over');
+    adjuntarArchivo(e.dataTransfer.files[0]);
   });
   $('btn-rem-rescan').addEventListener('click', () => { if (modalRawFile) escanear(modalRawFile); });
   $('btn-rem-quitar').addEventListener('click', limpiarFoto);
@@ -830,8 +1129,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderTodo();
   } catch (e) {
     console.error('cargarDatos:', e);
-    $('rem-oc-list').innerHTML = '<div class="hist-empty">Sin conexión. Abrí Remitos con red al menos una vez.</div>';
-    $('rem-list').innerHTML    = '<div class="hist-empty">—</div>';
+    $('rem-oc-list').innerHTML = '<div class="rv-panel"><div class="rv-vacio">Sin conexión. Abrí Remitos con red al menos una vez.</div></div>';
+    $('rv-ult').innerHTML = '<div class="rv-vacio-s">—</div>';
   }
 
   retryRemitoQueue();

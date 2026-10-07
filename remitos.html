@@ -11,6 +11,241 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    .rv-page { max-width: 1120px; margin: 0 auto; padding: 1rem; }
+
+    /* ---- Dos columnas en escritorio: lista + resumen al costado (como la OC) ---- */
+    .rv-lay { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; align-items: start; }
+    .rv-side { display: none; }
+    @media (min-width: 1000px) {
+      .rv-lay { grid-template-columns: minmax(0, 1fr) 300px; }
+      .rv-side { display: flex; flex-direction: column; gap: .8rem; position: sticky; top: 1rem; }
+      .rv-head--ph { display: none !important; }
+    }
+
+    /* ---- Cabecera: título + pastilla de lo que falta recibir ---- */
+    .rv-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .9rem; flex-wrap: wrap; }
+    .rv-head h1 { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; white-space: nowrap; }
+    .rv-side .rv-head { margin-bottom: 0; }
+    .rv-pend { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 999px;
+      background: #fde6e6; color: #b02a2a; font-size: .76rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .rv-pend::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+
+    /* ---- Resumen (escritorio) ---- */
+    .rv-hero { background: linear-gradient(135deg, #fdf3e4, #fff); border-radius: 16px; padding: .95rem; box-shadow: var(--shadow-sm); }
+    .rv-hero-k { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #8a4f0d; font-weight: 700; }
+    .rv-hero-n { font-size: 1.6rem; font-weight: 800; color: var(--primary-dark); line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .rv-hero-s { font-size: .78rem; color: var(--gray-500); }
+    .rv-hero-row { display: flex; gap: .5rem; margin-top: .7rem; }
+    .rv-hero-row > div { flex: 1; background: var(--white); border-radius: 10px; padding: .45rem .6rem; }
+    .rv-hero-row b { display: block; font-size: 1.05rem; color: var(--gray-700); font-variant-numeric: tabular-nums; }
+    .rv-hero-row span { font-size: .72rem; color: var(--gray-500); }
+    .rv-box { background: var(--white); border-radius: 14px; box-shadow: var(--shadow-sm); padding: .8rem .85rem; }
+    .rv-side-t { display: flex; justify-content: space-between; align-items: baseline; font-size: .74rem; font-weight: 700; color: var(--gray-500);
+      text-transform: uppercase; letter-spacing: .06em; margin: 0 0 .35rem .1rem; }
+    .rv-side-t button { border: none; background: none; padding: 0; font: inherit; font-size: .78rem; font-weight: 600; color: var(--primary);
+      text-transform: none; letter-spacing: 0; cursor: pointer; }
+    .rv-mini { display: flex; gap: .55rem; align-items: center; padding: .5rem 0; border: none; border-bottom: 1px solid var(--gray-200);
+      background: none; width: 100%; text-align: left; font: inherit; cursor: pointer; }
+    .rv-mini:last-child { border-bottom: none; }
+    .rv-mini > span:last-child { min-width: 0; flex: 1; }
+    .rv-mini b { display: block; font-size: .82rem; color: var(--primary-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rv-mini small { font-size: .72rem; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+    .rv-mini .rv-sq { width: 30px; height: 30px; border-radius: 9px; }
+    .rv-vacio-s { font-size: .8rem; color: var(--gray-500); padding: .3rem 0; }
+
+    /* ---- Buscador y pestañas con contador ---- */
+    .rv-search { width: 100%; border-radius: 12px; margin-bottom: .6rem; }
+    .rv-tabs { display: flex; gap: .35rem; margin-bottom: .8rem; flex-wrap: wrap; align-items: center; }
+    .rv-tab { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600);
+      border-radius: 999px; padding: .34rem .8rem; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .rv-tab .icon { width: 13px; height: 13px; }
+    .rv-tab b { font-size: .7rem; padding: 0 .4rem; border-radius: 999px; background: var(--gray-100); color: var(--gray-500); font-variant-numeric: tabular-nums; }
+    .rv-tab b:empty { display: none; }
+    .rv-tab[data-filtro="pendientes"]:not(.active) b { background: #fde6e6; color: #b02a2a; }
+    .rv-tab.active { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+    .rv-tab.active b { background: rgba(255,255,255,.17); color: #fff; }
+    .rv-tsep { width: 1px; height: 20px; background: var(--gray-300); margin: 0 .15rem; }
+
+    /* ---- Lista compacta: un renglón por OC (o por remito) ---- */
+    .rv-panel { background: var(--white); border-radius: 14px; box-shadow: var(--shadow-sm); overflow: hidden; }
+    .rv-row { display: grid; grid-template-columns: 34px minmax(0, 1.25fr) minmax(0, 1fr) 150px 140px; gap: .65rem; align-items: center;
+      padding: .7rem .75rem; border-bottom: 1px solid var(--gray-200); }
+    .rv-row:last-child { border-bottom: none; }
+    .rv-row--ok { background: #f3fbf5; }
+    .rv-row .hist-doc-list { grid-column: 1 / -1; margin: 0; }
+    .rv-row .rv-hits { grid-column: 2 / -1; margin-top: -.35rem; }
+    .rv-sq { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; border: none; padding: 0; }
+    .rv-sq .icon { width: 16px; height: 16px; }
+    .rv-sq--sin      { background: #fde6e6; color: #b02a2a; }
+    .rv-sq--parcial  { background: #fbeedd; color: #8a4f0d; }
+    .rv-sq--completa { background: #dff3e5; color: #1a7f3c; }
+    .rv-sq--cola     { background: #eceef1; color: #5b6573; }
+    .rv-sq--rem      { background: #e8eef7; color: var(--primary); }
+    .rv-sq--amb      { background: #fbeedd; color: #8a4f0d; }
+    .rv-prov { font-weight: 700; color: var(--primary-dark); font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rv-sub { font-size: .76rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+    .rv-mid { font-size: .8rem; color: var(--gray-600); min-width: 0; }
+    .rv-mid div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rv-mid small { display: block; color: var(--gray-500); font-size: .74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rv-est { display: flex; flex-direction: column; gap: .3rem; align-items: flex-start; }
+    .rv-acts { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; }
+    .rv-ph, .rv-corto { display: none; }
+
+    .rv-pill { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .58rem; border-radius: 999px; border: none; font: inherit;
+      font-size: .72rem; font-weight: 700; white-space: nowrap; }
+    .rv-pill .icon { width: 12px; height: 12px; }
+    .rv-pill--sin      { background: #fde6e6; color: #b02a2a; }
+    .rv-pill--parcial  { background: #fbeedd; color: #8a4f0d; }
+    .rv-pill--completa { background: #dff3e5; color: #1a7f3c; }
+    .rv-pill--cola     { background: #eceef1; color: #5b6573; }
+    button.rv-pill { background: #e8eef7; color: var(--primary); cursor: pointer; }
+    .rv-n-items { font-size: .7rem; font-weight: 700; color: var(--gray-500); }
+
+    .rv-prog { display: flex; align-items: center; gap: .5rem; margin-top: .3rem; }
+    .rv-bar { flex: 1; height: 6px; border-radius: 999px; background: var(--gray-200); overflow: hidden; min-width: 50px; }
+    .rv-bar i { display: block; height: 100%; border-radius: 999px; }
+    .rv-bar .f-sin { background: var(--gray-300); } .rv-bar .f-parcial { background: #d9902f; } .rv-bar .f-completa { background: #2e9d57; }
+    .rv-prog b { font-size: .72rem; color: var(--gray-600); min-width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Botones del renglón */
+    .foc-btn--amb { background: #b86a14; color: #fff; }
+    .rv-ib { width: 34px; height: 34px; padding: 0; justify-content: center; flex: none; }
+    .rv-ib .icon { width: 16px; height: 16px; }
+    .rv-ib.foc-btn--clear { background: var(--gray-100); color: var(--gray-600); }
+    .rv-cola { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 700; color: #5b6573; white-space: nowrap; }
+    .rv-cola .icon { width: 14px; height: 14px; }
+    .rv-ok { display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .7rem; border-radius: 999px; background: #dff3e5; color: #1a7f3c;
+      font-size: .78rem; font-weight: 700; white-space: nowrap; }
+    .rv-ok .icon { width: 13px; height: 13px; }
+    .rv-vacio { padding: 1.2rem; text-align: center; color: var(--gray-500); font-size: .88rem; }
+    .rv-list .pager-more { margin-top: .6rem; width: 100%; }
+
+    @media (max-width: 700px) {
+      .rv-head h1 { font-size: 1.2rem; }
+      .rv-row { grid-template-columns: 34px minmax(0, 1fr) auto; }
+      .rv-mid, .rv-est, .rv-desk { display: none; }
+      .rv-ph { display: block; }
+      span.rv-ph { display: inline; }
+      .rv-prog.rv-ph { display: flex; }
+      .rv-largo { display: none; }
+      .rv-corto { display: inline; }
+      .rv-tabs { flex-wrap: nowrap; overflow-x: auto; gap: .3rem; scrollbar-width: none; }
+      .rv-tabs::-webkit-scrollbar { display: none; }
+      .rv-tab { padding: .3rem .6rem; font-size: .76rem; gap: .3rem; flex: none; }
+      .rv-add { width: 34px; height: 34px; padding: 0; justify-content: center; }
+    }
+
+    /* ===== Formulario de carga: hoja desde abajo en el teléfono, diálogo ancho en escritorio ===== */
+    .rv-ov { padding: 1.5rem; }
+    .rv-sheet { background: #f7f8fa; width: 100%; max-width: 920px; max-height: calc(100dvh - 3rem); border-radius: 18px; display: flex; flex-direction: column;
+      overflow: hidden; box-shadow: var(--shadow-lg); animation: popIn .28s var(--ease-spring) both; }
+    .rv-sheet:focus { outline: none; }
+    .rv-sh-hd { display: flex; align-items: center; gap: .6rem; padding: .8rem .9rem; background: var(--white); border-bottom: 1px solid var(--gray-200); flex: none; }
+    .rv-sh-hd .rv-sq { width: 32px; height: 32px; border-radius: 9px; }
+    .rv-sh-t { font-weight: 700; color: var(--primary-dark); font-size: 1.02rem; }
+    .rv-sh-hd .rv-ib { margin-left: auto; }
+    .rv-sh-body { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: .9rem; align-items: start; }
+    .rv-col { display: flex; flex-direction: column; gap: .7rem; min-width: 0; }
+    .rv-col--foto { position: sticky; top: 0; }
+    .rv-sh-ft { display: flex; align-items: center; gap: .6rem; padding: .7rem .9rem; background: var(--white); border-top: 1px solid var(--gray-200); flex: none; }
+    .rv-st { display: flex; align-items: center; gap: .45rem; font-size: .82rem; font-weight: 700; flex: 1; min-width: 0; line-height: 1.3; }
+    .rv-st::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+    .rv-st:empty { visibility: hidden; }
+    .rv-st--ok { color: #1a7f3c; } .rv-st--parcial { color: #8a4f0d; } .rv-st--falta { color: #b02a2a; }
+    .rv-st--falta { cursor: pointer; }
+    .rv-ft-btns { display: flex; gap: .45rem; margin-left: auto; }
+    .rv-guardar { background: #1f8a45; color: #fff; }
+    .rv-guardar.is-incompleto { background: #dff3e5; color: #1a7f3c; }
+
+    .rv-sec { background: var(--white); border-radius: 14px; padding: .75rem .8rem; box-shadow: 0 1px 2px rgba(26,58,92,.05); transition: box-shadow .15s; }
+    .rv-sec.is-falta { box-shadow: 0 0 0 2px #e5a3a3, 0 0 0 5px #fde6e6; }
+    .rv-sec-h { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; flex-wrap: wrap; }
+    .rv-sec-h > b { color: var(--primary-dark); font-size: .9rem; }
+    .rv-n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: .72rem; font-weight: 800; background: #fbeedd; color: #8a4f0d; flex: none; }
+    .rv-n .icon { width: 12px; height: 12px; stroke-width: 3; }
+    .rv-n.ok { background: #dff3e5; color: #1a7f3c; }
+    .rv-req { font-size: .7rem; font-weight: 700; color: #b02a2a; background: #fde6e6; border-radius: 999px; padding: .05rem .45rem; }
+    .rv-sec-h .rv-r { margin-left: auto; }
+    .rv-ocref { display: flex; gap: .65rem; align-items: center; }
+    .rv-ocref > div { min-width: 0; flex: 1; }
+
+    .rv-drop { border: 2px dashed #efd3ad; background: #fffaf3; border-radius: 14px; padding: .9rem .8rem; text-align: center; transition: background .15s, border-color .15s; }
+    .rv-drop.drag-over { background: #fbeedd; border-color: #d9902f; }
+    .rv-drop .rv-sq { width: 40px; height: 40px; border-radius: 11px; margin: 0 auto .45rem; }
+    .rv-drop .rv-sq .icon { width: 19px; height: 19px; }
+    .rv-drop-t { font-weight: 700; color: var(--primary-dark); font-size: .88rem; }
+    .rv-drop-s { font-size: .74rem; color: var(--gray-500); line-height: 1.35; }
+    .rv-drop-btns { display: flex; gap: .4rem; margin-top: .7rem; }
+    .rv-drop-btns .foc-btn { flex: 1; justify-content: center; padding: .55rem; }
+    .foc-btn--ambl { background: #fbeedd; color: #8a4f0d; }
+    .rv-foto { display: flex; flex-direction: column; gap: .6rem; }
+    .rv-thumb { border-radius: 10px; border: 1px solid var(--gray-200); background: var(--gray-100); overflow: hidden; display: grid; place-items: center; }
+    .rv-thumb img { display: block; width: 100%; max-height: 380px; object-fit: contain; background: #fff; }
+    .rv-thumb .rv-pdf { padding: 1.4rem; color: var(--gray-500); }
+    .rv-thumb .rv-pdf .icon { width: 34px; height: 34px; }
+    .rv-foto-n { min-width: 0; flex: 1; }
+    .rv-foto-n b { display: block; font-size: .84rem; color: var(--primary-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rv-foto-n small { font-size: .72rem; color: var(--gray-500); }
+    .rv-foto-acts { display: flex; gap: .35rem; margin-top: .4rem; flex-wrap: wrap; }
+    .rv-ia-st { display: flex; gap: .45rem; align-items: flex-start; border-radius: 10px; padding: .5rem .6rem; font-size: .78rem; font-weight: 600; margin-top: .6rem; line-height: 1.35; }
+    .rv-ia-st .icon { width: 14px; height: 14px; margin-top: 1px; flex: none; }
+    .rv-ia-st .spinner { width: 14px; height: 14px; border-width: 2px; margin-top: 1px; }
+    .rv-ia-st--loading, .rv-ia-st--success { background: #f1e8fb; color: #6b3fa0; }
+    .rv-ia-st--warn  { background: #fbeedd; color: #8a4f0d; }
+    .rv-ia-st--error { background: #fde6e6; color: #b02a2a; }
+
+    .rv-f2 { display: grid; grid-template-columns: 1.35fr 1fr; gap: .5rem; }
+    .rv-f2 label { display: block; font-size: .72rem; font-weight: 700; color: var(--gray-500); margin-bottom: .2rem; }
+    .rv-f2 .form-control, .rv-obs .form-control { border-radius: 10px; }
+    .rv-obs label { display: block; font-size: .72rem; font-weight: 700; color: var(--gray-500); margin-bottom: .2rem; }
+
+    .rv-seg { display: inline-flex; background: var(--gray-100); border-radius: 999px; padding: 3px; gap: 2px; }
+    .rv-seg button { border: none; background: transparent; border-radius: 999px; padding: .25rem .7rem; font: inherit; font-size: .76rem; font-weight: 600; color: var(--gray-500); cursor: pointer; }
+    .rv-seg button.on { background: var(--white); color: var(--primary-dark); box-shadow: 0 1px 3px rgba(26,58,92,.18); }
+    .rv-it { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .6rem; align-items: center; padding: .55rem 0; border-bottom: 1px solid var(--gray-200); }
+    .rv-it:first-child { padding-top: 0; }
+    .rv-it:last-child { border-bottom: none; padding-bottom: .1rem; }
+    .rv-it-d { font-size: .84rem; font-weight: 600; color: var(--gray-700); line-height: 1.3; }
+    .rv-it-m { font-size: .72rem; color: var(--gray-500); display: flex; gap: .45rem; flex-wrap: wrap; align-items: center; font-variant-numeric: tabular-nums; }
+    .rv-it-m b { color: var(--gray-700); }
+    .rv-it-q { grid-row: 1 / span 2; grid-column: 2; display: flex; align-items: center; gap: .25rem; }
+    .rv-stp { width: 30px; height: 30px; border-radius: 8px; border: none; background: var(--gray-100); color: var(--gray-600); display: grid; place-items: center; cursor: pointer; padding: 0; }
+    .rv-stp .icon { width: 14px; height: 14px; }
+    .rv-stp:hover { background: var(--gray-200); }
+    .rv-qv { width: 64px; text-align: right; background: var(--white); border: 1.5px solid var(--gray-200); border-radius: 8px; padding: .32rem .45rem;
+      font: inherit; font-size: .9rem; font-weight: 700; color: var(--gray-700); font-variant-numeric: tabular-nums; }
+    .rv-qv:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
+    .rv-qv.is-cero { color: var(--gray-400); font-weight: 600; }
+    .rv-it.is-completo .rv-it-d { color: var(--gray-400); }
+    .rv-mk { font-size: .68rem; font-weight: 700; border-radius: 999px; padding: .02rem .45rem; }
+    .rv-mk--ok   { background: #dff3e5; color: #1a7f3c; }
+    .rv-mk--par  { background: #fbeedd; color: #8a4f0d; }
+    .rv-mk--no   { background: #eceef1; color: #5b6573; }
+    .rv-mk--done { background: var(--gray-100); color: var(--gray-500); }
+    .rv-mk--mas  { background: #fde6e6; color: #b02a2a; }
+
+    @media (max-width: 760px) {
+      .rv-ov { padding: 0; align-items: flex-end; }
+      .rv-sheet { max-height: 96dvh; border-radius: 20px 20px 0 0; animation: rvUp .25s ease-out both; }
+      .rv-sh-body { display: flex; flex-direction: column; align-items: stretch; gap: .7rem; padding: .75rem; }
+      .rv-col { display: contents; }
+      .rv-col--foto .rv-sec { order: 1; }
+      #rem-oc-ref { order: 0; }
+      #rv-sec-datos { order: 2; } #rv-sec-items { order: 3; } #rv-sec-obs { order: 4; }
+      .rv-foto { flex-direction: row; align-items: center; }
+      .rv-thumb { width: 64px; height: 84px; flex: none; }
+      .rv-thumb img { height: 100%; max-height: none; object-fit: cover; }
+      .rv-thumb .rv-pdf { padding: 0; }
+      .rv-thumb .rv-pdf .icon { width: 24px; height: 24px; }
+      .rv-sh-ft { flex-wrap: wrap; padding-bottom: calc(.7rem + env(safe-area-inset-bottom, 0px)); }
+      .rv-st { flex-basis: 100%; }
+      .rv-ft-btns { width: 100%; }
+      .rv-ft-btns .foc-btn { flex: 1; justify-content: center; padding: .65rem; }
+    }
+    @keyframes rvUp { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .rv-sheet { animation: none; } }
+  </style>
 </head>
 <body>
 
@@ -30,124 +265,138 @@
 </header>
 
 <main class="app-main">
-  <div class="adj-page">
+  <div class="rv-page">
+    <div class="rv-lay">
 
-    <!-- Entregas: OC contra las que cargar un remito -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Entregas</span>
-      </div>
-      <div class="card-body">
-        <div class="hist-offline-notice hidden" id="rem-sync-warn"></div>
-        <div class="rem-tabs" id="rem-filtro">
-          <button class="rem-tab active" data-filtro="pendientes">Pendientes</button>
-          <button class="rem-tab" data-filtro="todas">Todas</button>
+      <div class="rv-main">
+        <!-- Teléfono y pantallas medianas: título + pastilla. En escritorio el título va en la columna del costado. -->
+        <div class="rv-head rv-head--ph">
+          <h1>Remitos</h1>
+          <span class="rv-pend hidden" id="rv-pend"></span>
         </div>
-        <input type="search" id="rem-search" class="form-control" placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…" style="margin-bottom:.85rem;">
-        <div id="rem-oc-list"><div class="hist-empty">Cargando OC…</div></div>
-      </div>
-    </div>
 
-    <!-- Remitos ya cargados -->
-    <div class="card" style="margin-top:1rem;">
-      <div class="card-header">
-        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Remitos cargados</span>
-        <span class="hist-count" id="rem-count"></span>
-      </div>
-      <div class="card-body">
-        <div id="rem-list"><div class="hist-empty">Cargando remitos…</div></div>
-      </div>
-    </div>
+        <div class="hist-offline-notice hidden" id="rem-sync-warn"></div>
 
+        <input type="search" id="rem-search" class="hist-search rv-search" placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…">
+        <div class="rv-tabs" id="rem-filtro">
+          <button type="button" class="rv-tab active" data-filtro="pendientes">Pendientes <b></b></button>
+          <button type="button" class="rv-tab" data-filtro="entregadas">Entregadas <b></b></button>
+          <button type="button" class="rv-tab" data-filtro="todas">Todas <b></b></button>
+          <span class="rv-tsep"></span>
+          <button type="button" class="rv-tab" data-filtro="remitos"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Remitos cargados <b></b></button>
+        </div>
+        <div class="rv-list" id="rem-oc-list"><div class="rv-panel"><div class="rv-vacio">Cargando OC…</div></div></div>
+      </div>
+
+      <!-- Escritorio: resumen y últimos remitos -->
+      <aside class="rv-side">
+        <div class="rv-head"><h1>Remitos</h1></div>
+        <div class="rv-hero">
+          <div class="rv-hero-k">Por recibir</div>
+          <div class="rv-hero-n" id="rv-hero-n">—</div>
+          <div class="rv-hero-s" id="rv-hero-s"></div>
+          <div class="rv-hero-row">
+            <div><b id="rv-hero-mes">—</b><span id="rv-hero-mes-l">remitos este mes</span></div>
+            <div><b id="rv-hero-cola">—</b><span>esperando señal</span></div>
+          </div>
+        </div>
+        <div class="rv-box">
+          <div class="rv-side-t">Últimos remitos <button type="button" id="rv-ver-todos">Ver todos</button></div>
+          <div id="rv-ult"><div class="rv-vacio-s">Cargando…</div></div>
+        </div>
+      </aside>
+
+    </div>
   </div>
 </main>
 
-<!-- ===== MODAL: Cargar remito ===== -->
-<div class="modal-overlay hidden" id="modal-remito">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Cargar remito</span>
-      <button class="modal-close" id="modal-remito-close">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+<!-- ===== Cargar remito ===== -->
+<div class="modal-overlay rv-ov hidden" id="modal-remito">
+  <div class="rv-sheet" role="dialog" aria-modal="true" aria-labelledby="rv-sheet-t" tabindex="-1">
+    <div class="rv-sh-hd">
+      <span class="rv-sq rv-sq--amb"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+      <span class="rv-sh-t" id="rv-sheet-t">Cargar remito</span>
+      <button type="button" class="foc-btn foc-btn--clear rv-ib" id="modal-remito-close" aria-label="Cerrar" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="modal-body">
 
-      <div class="rem-oc-ref" id="rem-oc-ref"></div>
-
-      <!-- Paso 1: la foto. Es el comprobante y, además, de ella sale el resto
-           del formulario cuando se usa "Leer con IA". -->
-      <div style="margin-bottom:1.2rem;">
-        <label class="rem-section-lbl">Foto del remito <span style="font-weight:400;text-transform:none;color:var(--danger);">(obligatoria)</span></label>
-        <input type="file" id="rem-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
-        <input type="file" id="rem-camera" accept="image/*" capture="environment" style="display:none">
-        <div class="import-buttons" style="margin-bottom:.5rem;">
-          <button type="button" class="btn import-btn" id="btn-rem-archivo">
-            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
-            <span class="import-btn-label">Subir archivo</span>
-          </button>
-          <button type="button" class="btn import-btn" id="btn-rem-camera" style="display:none">
-            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-            <span class="import-btn-label">Sacar foto</span>
-          </button>
-        </div>
-        <div id="rem-file-name" class="upload-filename hidden"></div>
-        <!-- Preview de la foto escaneada -->
-        <div id="rem-preview" class="scan-preview hidden">
-          <img id="rem-preview-img" alt="Remito">
-          <div class="scan-preview-actions">
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-rem-rescan">
-              <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-              Escanear
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-rem-quitar">
-              <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Quitar
-            </button>
+    <div class="rv-sh-body" id="rv-sh-body">
+      <!-- Columna de la foto: en escritorio queda grande al costado para leerla mientras se cargan las cantidades -->
+      <div class="rv-col rv-col--foto">
+        <section class="rv-sec" id="rv-sec-foto">
+          <div class="rv-sec-h">
+            <span class="rv-n" id="rv-n-foto">1</span><b>Foto del remito</b><span class="rv-req" id="rv-req-foto">Obligatoria</span>
+            <button type="button" class="foc-btn foc-btn--vio rv-r hidden" id="btn-rem-ia"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M18 13l.7 1.9L21 16l-2.3.9L18 19l-.9-2.1L15 16l2.1-.7L18 13z"/></svg><span id="btn-rem-ia-t">Leer con IA</span></button>
           </div>
-        </div>
-        <div class="extract-bar">
-          <button type="button" class="btn btn-primary" id="btn-rem-ia" disabled>
-            <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            Leer con IA
-          </button>
-        </div>
-        <div id="rem-ia-status" class="extract-status hidden" style="margin-top:.6rem;"></div>
+          <input type="file" id="rem-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
+          <input type="file" id="rem-camera" accept="image/*" capture="environment" style="display:none">
+
+          <div class="rv-drop" id="rv-drop">
+            <span class="rv-sq rv-sq--amb"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+            <div class="rv-drop-t"><span class="rv-largo">Arrastrá la foto o el PDF del remito</span><span class="rv-corto">Sacale una foto al remito</span></div>
+            <div class="rv-drop-s">Es el comprobante: queda archivado en Drive con la OC.</div>
+            <div class="rv-drop-btns">
+              <button type="button" class="foc-btn foc-btn--amb hidden" id="btn-rem-camera"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Sacar foto</button>
+              <button type="button" class="foc-btn foc-btn--ambl" id="btn-rem-archivo"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Elegir archivo</button>
+            </div>
+          </div>
+
+          <div class="rv-foto hidden" id="rv-foto">
+            <div class="rv-thumb" id="rv-thumb"><img id="rem-preview-img" alt="Foto del remito"></div>
+            <div class="rv-foto-n">
+              <b id="rem-file-name"></b><small id="rem-file-size"></small>
+              <div class="rv-foto-acts">
+                <button type="button" class="foc-btn foc-btn--clear" id="btn-rem-rescan"><svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Escanear</button>
+                <button type="button" class="foc-btn foc-btn--clear" id="btn-rem-quitar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Quitar</button>
+              </div>
+            </div>
+          </div>
+          <div id="rem-ia-status" class="rv-ia-st hidden"></div>
+        </section>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="rem-nro">N° de remito *</label>
-          <input type="text" id="rem-nro" class="form-control" placeholder="Ej: 0001-00012345" inputmode="text">
-        </div>
-        <div class="form-group">
-          <label for="rem-fecha">Fecha *</label>
-          <input type="date" id="rem-fecha" class="form-control">
-        </div>
+      <div class="rv-col">
+        <div class="rv-sec" id="rem-oc-ref"></div>
+
+        <section class="rv-sec" id="rv-sec-datos">
+          <div class="rv-sec-h"><span class="rv-n" id="rv-n-datos">2</span><b>Datos del remito</b></div>
+          <div class="rv-f2">
+            <div>
+              <label for="rem-nro">N° de remito</label>
+              <input type="text" id="rem-nro" class="form-control" placeholder="Ej: 0001-00012345" inputmode="text" autocomplete="off">
+            </div>
+            <div>
+              <label for="rem-fecha">Fecha</label>
+              <input type="date" id="rem-fecha" class="form-control">
+            </div>
+          </div>
+        </section>
+
+        <section class="rv-sec" id="rv-sec-items">
+          <div class="rv-sec-h">
+            <span class="rv-n" id="rv-n-items">3</span><b>Qué llegó</b>
+            <div class="rv-seg rv-r" role="group" aria-label="Cargar todas las cantidades">
+              <button type="button" id="btn-rem-todo">Llegó todo</button>
+              <button type="button" id="btn-rem-vaciar">Nada</button>
+            </div>
+          </div>
+          <div id="rem-items"></div>
+        </section>
+
+        <section class="rv-sec rv-obs" id="rv-sec-obs">
+          <label for="rem-obs">Observaciones (opcional)</label>
+          <input type="text" id="rem-obs" class="form-control" placeholder="Ej: bulto dañado, faltó descarga…">
+        </section>
+
+        <div id="rem-error" class="alert alert-error hidden"></div>
       </div>
-
-      <label class="rem-section-lbl">
-        Cantidades recibidas
-        <span class="rem-quick">
-          <button type="button" class="btn btn-sm btn-outline" id="btn-rem-todo">Llegó todo</button>
-          <button type="button" class="btn btn-sm btn-secondary" id="btn-rem-vaciar">Vaciar</button>
-        </span>
-      </label>
-      <div id="rem-items"></div>
-
-      <div class="form-group" style="margin-top:1.1rem;">
-        <label for="rem-obs">Observaciones <span style="font-weight:400;text-transform:none;color:var(--gray-400);">(opcional)</span></label>
-        <input type="text" id="rem-obs" class="form-control" placeholder="Ej: bulto dañado, faltó descarga…">
-      </div>
-
-      <div id="rem-error" class="alert alert-error hidden"></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="btn-rem-cancelar">Cancelar</button>
-      <button class="btn btn-success" id="btn-rem-guardar">
-        <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        Guardar remito
-      </button>
+
+    <div class="rv-sh-ft">
+      <span class="rv-st" id="rv-estado"></span>
+      <div class="rv-ft-btns">
+        <button type="button" class="foc-btn foc-btn--clear" id="btn-rem-cancelar">Cancelar</button>
+        <button type="button" class="foc-btn foc-btn--gen rv-guardar" id="btn-rem-guardar"><svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Guardar remito</button>
+      </div>
     </div>
   </div>
 </div>
