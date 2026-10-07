@@ -763,7 +763,7 @@ function renderBars(containerId, rows, opts = {}) {
         <div class="rep-bar-body">
           <div class="rep-bar-head">
             ${opts.drill ? `<span class="rep-caret">${icSvg('chevR')}</span>` : ''}
-            <span class="rep-bar-label" title="${esc(r.label)}">${esc(r.label)}</span>${opts.filtro ? `
+            <span class="rep-bar-label" title="${esc(r.label)}">${resaltarTxt(r.label, q ? [q] : [], esc)}</span>${opts.filtro ? `
             <button class="rep-filt${filtroActivo(opts.filtro, r.key) ? ' on' : ''}" data-filt="${esc(r.key)}" data-label="${esc(r.label)}"
                     title="${filtroActivo(opts.filtro, r.key) ? 'Quitar el filtro' : `Ver sólo ${opts.filtro === 'equipo' ? 'este equipo' : 'esta obra'} en todo el reporte`}"><svg class="icon" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></button>` : ''}
             <span class="rep-bar-val" title="${esc(fmtFull(r.total, state.moneda))}">${fmtCompact(r.total, state.moneda)}</span>
@@ -1111,13 +1111,13 @@ function tipoTexto(oc) {
 // con el precio unitario terminando bajo Importe (usa también el ancho de
 // Responsable para no cortarse). Hasta 3, y "y N más".
 const HITS_MAX = 3;
-function hitRows(oc, hits, alt) {
+function hitRows(oc, hits, alt, terms) {
   if (!hits.length) return '';
   const k = esc(histKeyOf(oc));
   const filas = hits.slice(0, HITS_MAX).map(it => `
           <tr class="rr-row rr-row-hit${alt}" data-k="${k}">
             <td class="rr-hit-pad" colspan="2"></td>
-            <td class="rr-hit-desc" colspan="2" title="${esc(it.desc)}"><span>${esc(it.desc)}</span></td>
+            <td class="rr-hit-desc" colspan="2" title="${esc(it.desc)}"><span>${resaltarTxt(it.desc, terms, esc)}</span></td>
             <td class="rr-n rr-hit-precio" colspan="2">${esc(_precioItem(it, oc.moneda))}</td>
             <td class="rr-hit-pad"></td>
           </tr>`);
@@ -1214,7 +1214,7 @@ function renderResumen() {
             <td class="rr-c-resp">${esc(oc.responsable?.nombre || '—')}</td>
             <td class="rr-n">${fmtFull(oc.total, oc.moneda === 'USD' ? 'USD' : 'ARS')}</td>
             <td class="rr-c-eq">${tipoTag(oc)}</td>
-          </tr>${hitRows(oc, hits, alt)}`;
+          </tr>${hitRows(oc, hits, alt, terms)}`;
         }).join('')}
       </tbody>
     </table>`;

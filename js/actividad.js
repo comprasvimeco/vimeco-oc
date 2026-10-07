@@ -366,7 +366,7 @@ function render() {
             <div class="act-detalle">${esc(e.detalle)}</div>
             ${dupTag ? `<div style="margin-top:.3rem;">${dupTag}</div>` : ''}
             ${docsHtml(e, ocEv)}
-            ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc)}
+            ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc, terms)}
             <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
             <div class="act-actions">${ver}${verOC}${drive}${accion}${borrar}</div>
           </div>

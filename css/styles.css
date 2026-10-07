@@ -1075,6 +1075,8 @@ body.scan-open { overflow: hidden; }
 }
 .rem-hits .rem-hit-desc   { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rem-hits .rem-hit-precio { flex-shrink: 0; color: var(--gray-600); font-weight: 600; }
+/* Lo buscado, marcado en el texto (resaltarTxt en js/buscarOC.js) */
+mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1px; }
 
 /* Referencia de la OC arriba del formulario */
 .rem-oc-ref {

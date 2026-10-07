@@ -117,7 +117,7 @@ function renderOCList() {
       </div>
       <div class="hist-proveedor">${escHtml(oc.proveedor?.nombre || '—')}</div>
       <div class="hist-obra">${escHtml(oc.obra || '—')}</div>
-      ${hitsHtml(oc, hits, escHtml)}
+      ${hitsHtml(oc, hits, escHtml, terms)}
       <div class="rem-prog-wrap">
         <div class="rem-prog"><div class="rem-prog-fill rem-prog-fill--${e.estado}" style="width:${Math.min(100, e.pct)}%"></div></div>
         <span class="rem-prog-pct">${e.pct}%</span>

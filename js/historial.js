@@ -139,7 +139,7 @@ function renderCards(ocs) {
       <div class="hc-obra">${esc(oc.obra || '—')}</div>
       ${motivo ? `<div class="hc-motivo">Motivo: ${esc(motivo)}</div>` : ''}
       ${docsHtml(oc, reemplazaBadge(oc) + entregaBadge(oc))}
-      ${hitsHtml(oc, itemsCoincidentes(oc, searchTerms), esc)}
+      ${hitsHtml(oc, itemsCoincidentes(oc, searchTerms), esc, searchTerms)}
       <div class="hc-bottom">
         <span class="hc-total">${moneyOC(oc)}</span>
         ${verResp(oc) ? `<span class="hc-resp">${esc(oc.responsable.nombre)}</span>` : ''}

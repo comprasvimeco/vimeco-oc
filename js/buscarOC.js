@@ -51,13 +51,42 @@ function _precioItem(it, moneda) {
   return partes.join(' · ');
 }
 
-// HTML de los renglones coincidentes de `oc` (clase .rem-hits). `escFn` escapa texto.
-function hitsHtml(oc, hits, escFn) {
+// `txt` escapado con lo buscado marcado (<mark>). Se compara sin acentos ni
+// mayúsculas, como la búsqueda, pero se marca sobre el texto original: buscar
+// "caneria" marca "Cañería". Por eso se normaliza letra por letra, guardando de
+// qué letra del original sale cada una.
+function resaltarTxt(txt, terms, escFn) {
+  const s = String(txt || '');
+  if (!terms || !terms.length) return escFn(s);
+  let norm = '';
+  const origen = [];
+  for (let i = 0; i < s.length; i++) {
+    for (const c of normTxt(s[i])) { norm += c; origen.push(i); }
+  }
+  const marca = new Array(s.length).fill(false);
+  terms.forEach(t => {
+    for (let k = norm.indexOf(t); k >= 0; k = norm.indexOf(t, k + 1))
+      for (let j = k; j < k + t.length; j++) marca[origen[j]] = true;
+  });
+  let out = '';
+  for (let i = 0; i < s.length;) {
+    let j = i;
+    while (j < s.length && marca[j] === marca[i]) j++;
+    const trozo = escFn(s.slice(i, j));
+    out += marca[i] ? `<mark class="hl">${trozo}</mark>` : trozo;
+    i = j;
+  }
+  return out;
+}
+
+// HTML de los renglones coincidentes de `oc` (clase .rem-hits). `escFn` escapa
+// texto; con `terms`, lo buscado queda marcado en cada renglón.
+function hitsHtml(oc, hits, escFn, terms) {
   if (!hits.length) return '';
   return `<div class="rem-hits">${
     hits.slice(0, 3).map(it => {
       const precio = _precioItem(it, oc.moneda);
-      return `<span class="rem-hit"><span class="rem-hit-desc">${escFn(it.desc)}</span>${
+      return `<span class="rem-hit"><span class="rem-hit-desc">${resaltarTxt(it.desc, terms, escFn)}</span>${
         precio ? `<span class="rem-hit-precio">${escFn(precio)}</span>` : ''}</span>`;
     }).join('')
   }${hits.length > 3 ? `<span>y ${hits.length - 3} ítem(s) más</span>` : ''}</div>`;
