@@ -4,7 +4,7 @@ let currentFile = null;
 let allOCs      = [];
 let pendingOC   = null;   // OC elegida para cargar manualmente (vista principal)
 let viewerIsAdmin = false; // 0000 o usuario con permiso admin
-let tipoCarga   = 'factura';  // 'factura' | 'otro'
+let tipoCarga   = null;   // 'factura' | 'otro' — arranca sin elegir (ver elegirTipo)
 let rawFile     = null;   // imagen original (sin escanear), para volver a pasarla por el escáner
 let filePrevUrl = null;   // objectURL del preview actual
 let filtroOC    = 'sin';  // 'sin' | 'con' | 'todas' — arranca en lo que falta cargar
@@ -121,6 +121,45 @@ async function registrarAdjunto(oc, file, res) {
   oc.adjuntos['local_' + registro.ts] = registro;
   try { await registrarAdjuntoOC(oc.nroOC, registro); }
   catch (e) { console.warn('registrarAdjunto:', e); }
+}
+
+// ---- Qué se carga ----
+
+// Con "Factura" elegida de entrada se subían remitos y fotos como factura sin
+// mirar: la pantalla arranca sin elegir y se elige una vez por visita.
+function elegirTipo(tipo) {
+  tipoCarga = tipo;
+  $('adj-tipo').querySelectorAll('.fac-tipo-opt').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tipo === tipo)));
+  $('adj-tipo').classList.remove('is-falta');
+  $('adj-tipo-falta').classList.add('hidden');
+  renderPrimaryList($('adj-search-main').value);   // el botón de cargar dice qué carga
+}
+
+// Se tocó cargar sin haber elegido: se pregunta en el momento, y la respuesta
+// queda elegida para el resto de la visita. Devuelve false si se canceló.
+function asegurarTipo(oc) {
+  if (tipoCarga) return Promise.resolve(true);
+  $('adj-tipo').classList.add('is-falta');
+  const modal = $('modal-tipo');
+  $('modal-tipo-oc').textContent = oc ? `OC ${oc.nroOC} · ${oc.proveedor?.nombre || ''}` : '';
+  return new Promise(resolve => {
+    const close = tipo => {
+      modal.classList.add('hidden');
+      modal.onclick = null;
+      document.removeEventListener('keydown', onKey, true);
+      if (tipo) elegirTipo(tipo);
+      resolve(!!tipo);
+    };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
+    modal.onclick = e => {
+      const opt = e.target.closest('[data-tipo]');
+      if (opt) close(opt.dataset.tipo);
+      else if (e.target === modal || e.target.closest('#modal-tipo-cancel')) close(null);
+    };
+    document.addEventListener('keydown', onKey, true);
+    modal.classList.remove('hidden');
+    modal.querySelector('.confirm-box').focus();
+  });
 }
 
 // ---- Archivo ----
@@ -265,7 +304,7 @@ function accionesHtml(oc, modo) {
   if (modo === 'archivo') {
     return `<button type="button" class="foc-btn foc-btn--vios btn-adj-attach" data-nro="${nro}" title="Cargar acá">${icSvg('clip')}<span class="fac-largo">Cargar acá</span></button>`;
   }
-  const que = tipoCarga === 'factura' ? 'Cargar factura' : 'Cargar archivo';
+  const que = { factura: 'Cargar factura', otro: 'Cargar archivo' }[tipoCarga] || 'Cargar';
   return (ES_MOBILE ? `<button type="button" class="foc-btn foc-btn--clear fac-ib btn-attach-cam" data-nro="${nro}" title="Sacar foto" aria-label="Sacar foto">${icSvg('camera')}</button>` : '') +
     `<button type="button" class="foc-btn foc-btn--vio fac-ib btn-attach-pick" data-nro="${nro}" title="${que}" aria-label="${que}">${icSvg('clip')}</button>`;
 }
@@ -512,10 +551,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // lista y para la bandeja.
   $('adj-tipo').addEventListener('click', ev => {
     const btn = ev.target.closest('button[data-tipo]');
-    if (!btn) return;
-    tipoCarga = btn.dataset.tipo;
-    $('adj-tipo').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
-    renderPrimaryList($('adj-search-main').value);   // el botón de cargar dice qué carga
+    if (btn) elegirTipo(btn.dataset.tipo);
   });
 
   // Filtro por estado de factura
@@ -539,7 +575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = ev.target.closest('.btn-attach-pick, .btn-attach-cam, .btn-adj-attach');
     if (!btn) return;
     const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
-    if (!oc || !await confirmarDuplicado(oc)) return;
+    if (!oc || !await asegurarTipo(oc) || !await confirmarDuplicado(oc)) return;
     if (btn.classList.contains('btn-adj-attach')) { await doAttach(currentFile, oc); return; }
     pendingOC = oc;
     // Sacar foto: la factura pasa por el escáner y se sube apenas se toca "Listo".
