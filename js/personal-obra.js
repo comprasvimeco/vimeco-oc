@@ -26,6 +26,7 @@ let fotoDorso   = null; // archivo DNI dorso elegido en el modal
 
 let feriados        = {};   // { "YYYY-MM-DD": "Nombre" }
 let partesMeta      = {};   // { "YYYY-MM-DD": { validado, ... } }
+let partesAll       = {};   // { "YYYY-MM-DD": { items, _meta } } de toda la obra
 let currentQuincena = null; // { year, month(1-12), half(1|2) }
 let cierres         = {};   // cache { quincenaId: cierreObj|null }
 let constantes      = { jornadaHoras: 8, valorComida: 0 };
@@ -39,6 +40,8 @@ let parteAdjuntos = {};     // { personalId: [{ name, url }] } del día abierto
 let parteViaticos = {};     // { personalId: [{ monto, motivo, adjunto:{name,url}|null }] }
 let viaticoTarget = null;   // personalId al que se le está agregando un viático (modal)
 let viaticoFile   = null;   // archivo elegido en el modal de viático
+let genCond       = '';     // tipo de día elegido arriba: '' | 'CC' | 'F' | 'AU'
+let parteSnapshot = '';     // lo cargado al abrir el día, para avisar si se cierra sin guardar
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DOW   = ['L','M','M','J','V','S','D'];
@@ -67,13 +70,15 @@ function fmtHoras(n) {
 // ───────── Cuadrilla ─────────
 function dniFrente(p) { return p.fotoDniFrente || p.fotoDniUrl || ''; }
 
-function avatar(p) {
-  const ini = ((p.apellido || '')[0] || '') + ((p.nombre || '')[0] || '');
-  const front = dniFrente(p);
-  if (front) {
-    return `<div class="crew-avatar"><a href="${esc(front)}" target="_blank" rel="noopener" title="Ver DNI (frente)"><img src="${esc(front)}" alt="DNI" onerror="this.parentNode.textContent='${esc(ini)}'"></a></div>`;
-  }
-  return `<div class="crew-avatar">${esc(ini.toUpperCase()) || icSvg('user')}</div>`;
+function iniciales(p) {
+  return (((p.apellido || '')[0] || '') + ((p.nombre || '')[0] || '')).toUpperCase() || '?';
+}
+
+// Color de las iniciales: estable por persona (mismo tono en la cuadrilla y en el parte)
+function avatarTono(p) {
+  let h = 0;
+  for (const ch of String(p.id || p.apellido || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return 'a' + (h % 5);
 }
 
 // Obras (activas) donde está una persona. `excluir` saca una obra del listado:
@@ -89,47 +94,55 @@ function obraChips(p, excluir) {
   return `<span class="obra-chips">${nombres.map(n => `<span class="obra-chip">${esc(n)}</span>`).join('')}</span>`;
 }
 
-// Links a frente/dorso del DNI para la fila
-function dniLinks(p) {
+function otrasObras(p) {
+  return Object.keys(p.obras || {})
+    .filter(k => p.obras[k] && k !== obraKey)
+    .map(k => obrasMap[k] || k)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+// Fotos del DNI como pastillas (la foto de Drive no se puede mostrar como imagen)
+function dniPills(p) {
   const front = dniFrente(p);
   const back  = p.fotoDniDorso || '';
-  const parts = [];
-  if (front) parts.push(`<a href="${esc(front)}" target="_blank" rel="noopener">frente</a>`);
-  if (back)  parts.push(`<a href="${esc(back)}"  target="_blank" rel="noopener">dorso</a>`);
-  return parts.length ? ` · DNI: ${parts.join(' / ')}` : '';
+  if (!front && !back) return '<span class="po-mini po-mini--warn">Sin foto del DNI</span>';
+  return [
+    front ? `<a class="po-mini po-mini--dni" href="${esc(front)}" target="_blank" rel="noopener">DNI frente</a>` : '',
+    back  ? `<a class="po-mini po-mini--dni" href="${esc(back)}" target="_blank" rel="noopener">dorso</a>` : '',
+  ].join('');
 }
 
 function renderCuadrilla() {
-  $('crew-count').textContent = cuadrilla.length ? `(${cuadrilla.length})` : '';
+  $('crew-count').textContent = cuadrilla.length ? `· ${cuadrilla.length}` : '';
   const cont = $('crew-list');
   if (!cuadrilla.length) {
-    cont.innerHTML = '<div class="hist-empty">Sin personal en esta obra. Agregá o traé del padrón.</div>';
+    cont.innerHTML = '<div class="po-vacio">Todavía no hay personal en esta obra. Tocá Agregar para traer gente del padrón o incorporar a alguien nuevo.</div>';
     return;
   }
   cont.innerHTML = cuadrilla.map(p => {
-    const otras = obraChips(p, obraKey);
+    const otras = otrasObras(p);
+    const cat   = categoriaLabel(p);
     return `
-    <div class="crew-item" data-id="${esc(p.id)}">
-      ${avatar(p)}
-      <div class="crew-info">
-        <div class="crew-name">${esc(p.apellido)}, ${esc(p.nombre)}
-          ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">${icSvg('folder')}</a>` : ''}
-        </div>
-        <div class="crew-meta">
-          ${categoriaLabel(p) ? `<span class="crew-cat">${esc(categoriaLabel(p))}</span> ` : ''}
-          ${p.dni ? `DNI ${esc(p.dni)}` : '<span style="color:var(--gray-400)">sin DNI</span>'}
-          ${dniLinks(p)}
-          ${otras ? ` · También en: ${otras}` : ''}
+    <div class="po-crew" data-id="${esc(p.id)}">
+      <span class="po-av ${avatarTono(p)}">${esc(iniciales(p))}</span>
+      <div class="po-tx">
+        <div class="po-nm">${esc(p.apellido)}, ${esc(p.nombre)}</div>
+        <div class="po-sb">
+          ${cat ? `<span class="po-mini">${esc(cat)}</span>` : ''}
+          ${p.dni ? `<span>DNI ${esc(p.dni)}</span>` : ''}
+          ${dniPills(p)}
+          ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" title="Carpeta del DNI en Drive" aria-label="Carpeta del DNI en Drive">${icSvg('folder')}</a>` : ''}
+          ${otras.length ? `<span>También en ${esc(otras.join(', '))}</span>` : ''}
         </div>
       </div>
-      <div class="crew-actions">
-        <button class="btn btn-sm btn-outline btn-edit-p">Editar</button>
-        <button class="btn btn-sm btn-danger btn-quitar-p">Quitar</button>
+      <div class="po-crew-x">
+        <button type="button" class="po-ib btn-edit-p" title="Editar" aria-label="Editar a ${esc(p.apellido)}, ${esc(p.nombre)}">${icSvg('edit')}</button>
+        <button type="button" class="po-ib po-ib--del btn-quitar-p" title="Quitar de la obra" aria-label="Quitar a ${esc(p.apellido)}, ${esc(p.nombre)} de la obra">${icSvg('userX')}</button>
       </div>
     </div>`;
   }).join('');
 
-  cont.querySelectorAll('.crew-item').forEach(item => {
+  cont.querySelectorAll('.po-crew').forEach(item => {
     const id = item.dataset.id;
     item.querySelector('.btn-edit-p').addEventListener('click',   () => openEditPersonal(id));
     item.querySelector('.btn-quitar-p').addEventListener('click', () => quitarDeObra(id));
@@ -162,8 +175,9 @@ async function loadCuadrilla() {
     const [personal] = await Promise.all([getPersonalDeObra(obraKey), ensureObrasMap()]);
     cuadrilla = ordenJerarquia(personal);
     renderCuadrilla();
+    if (currentQuincena) renderQuincena();
   } catch (_) {
-    $('crew-list').innerHTML = '<div class="hist-empty">Error al cargar la cuadrilla.</div>';
+    $('crew-list').innerHTML = '<div class="po-vacio">Error al cargar la cuadrilla.</div>';
   }
 }
 
@@ -438,108 +452,206 @@ function nextQuincena(q) {
   return { year: y, month: m, half: 1 };
 }
 
-function renderCalendar() {
-  const q     = currentQuincena;
-  const range = quincenaRange(q);
-  const hoyIso = (() => { const d = new Date(); return isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate()); })();
+function hoyIso() {
+  const d = new Date();
+  return isoDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+const esPresenteE = e => e === '' || e === 'F' || e === 'CC';
+const fmtPesos = n => '$ ' + Math.round(Number(n) || 0).toLocaleString('es-AR');
+const DIAS_LARGO = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+function quincenaCerrada(q) {
+  const c = cierres[quincenaId(q || currentQuincena)];
+  return !!(c && c.cerrado);
+}
+function diasDeQuincena(q) {
+  const r = quincenaRange(q);
+  const out = [];
+  for (let d = r.startDay; d <= r.endDay; d++) out.push(isoDate(q.year, q.month, d));
+  return out;
+}
+function estaValidado(iso) { return !!(partesMeta[iso] && partesMeta[iso].validado); }
+
+// Viáticos de un ítem guardado (compat: el dato viejo era un único número)
+function viaticosDe(it) {
+  if (Array.isArray(it.viaticos)) return it.viaticos;
+  return (Number(it.viatico) || 0) > 0 ? [{ monto: Number(it.viatico) }] : [];
+}
+
+// Resumen de un parte guardado: presentes, ausencias, horas, comidas, viáticos
+function resumenDia(iso) {
+  const items = Object.values((partesAll[iso] && partesAll[iso].items) || {});
+  if (!items.length) return null;
+  const r = { total: items.length, pres: 0, aus: 0, horas: 0, comidas: 0, via: 0, cc: false };
+  items.forEach(it => {
+    const e = it.estado || '';
+    if (esPresenteE(e)) r.pres++; else r.aus++;
+    if (e === 'CC') r.cc = true;
+    r.horas += Number(it.horas) || 0;
+    if (it.comida) r.comidas++;
+    r.via += viaticosDe(it).reduce((s, v) => s + (Number(v.monto) || 0), 0);
+  });
+  return r;
+}
+
+// Estado de un día para pintarlo:
+//   ok (validado) · carg (cargado sin validar) · pend (sin parte) · fut · nolab · fer
+function estadoDia(iso) {
+  const ferNom = feriados[iso];
+  const lab    = !esFinde(iso) && !ferNom;
+  const r      = resumenDia(iso);
+  const val    = estaValidado(iso);
+  if (!lab && !(r && r.horas > 0)) return { k: ferNom ? 'fer' : 'nolab', r, val };
+  if (val) return { k: 'ok', r, val };
+  if (iso > hoyIso()) return { k: 'fut', r, val };
+  return { k: r ? 'carg' : 'pend', r, val };
+}
+
+// Laborables de la quincena hasta hoy sin validar
+function pendientesQuincena(q) {
+  const hoy = hoyIso();
+  return diasLaborables(q).filter(iso => iso <= hoy && !estaValidado(iso));
+}
+
+function renderEstadoTitulo() {
+  const q = currentQuincena;
+  const el = $('po-estado');
+  if (quincenaCerrada(q)) { el.innerHTML = `<span class="po-closed">${icSvg('lock')}Cerrada</span>`; return; }
+  const pend = pendientesQuincena(q);
+  const hoy  = hoyIso();
+  if (!pend.length) {
+    const empezo = diasLaborables(q).some(iso => iso <= hoy);
+    el.innerHTML = empezo && cuadrilla.length ? `<span class="po-okp">${icSvg('checkSm')}Al día</span>` : '';
+    return;
+  }
+  const soloHoy = pend.length === 1 && pend[0] === hoy && !partesAll[hoy];
+  el.innerHTML = `<span class="po-pend">${soloHoy ? 'Hoy sin parte' : `${pend.length} ${pend.length === 1 ? 'día' : 'días'} sin validar`}</span>`;
+}
+
+function renderHoy() {
+  const el  = $('po-hoy');
+  const iso = hoyIso();
+  const r   = quincenaRange(currentQuincena);
+  const [y, m, d] = iso.split('-').map(Number);
+  const enQuincena = y === currentQuincena.year && m === currentQuincena.month && d >= r.startDay && d <= r.endDay;
+  const st = enQuincena ? estadoDia(iso) : null;
+  if (!st || !cuadrilla.length || st.k === 'nolab' || (st.k === 'fer' && !st.r)) { el.classList.add('hidden'); return; }
+  const k = `Hoy · ${DIAS_LARGO[new Date(y, m - 1, d).getDay()].toLowerCase()} ${d}`;
+  let t, s, btn, ok = false;
+  if (st.val) {
+    ok = true; t = 'Parte validado';
+    s = st.r ? `${st.r.pres} de ${st.r.total} presentes · ${fmtHoras(st.r.horas)} h` : '';
+    btn = `<button type="button" class="foc-btn foc-btn--clear" id="hoy-abrir">${icSvg('eye')}Ver</button>`;
+  } else if (st.r) {
+    t = 'Parte cargado, falta validar';
+    s = `${st.r.pres} de ${st.r.total} presentes · ${fmtHoras(st.r.horas)} h`;
+    btn = `<button type="button" class="foc-btn foc-btn--amb" id="hoy-abrir">${icSvg('edit')}Abrir</button>`;
+  } else {
+    t = 'Parte sin cargar';
+    s = `${cuadrilla.length} en la cuadrilla · jornada de ${fmtHoras(constantes.jornadaHoras ?? 8)} h`;
+    btn = `<button type="button" class="foc-btn foc-btn--amb" id="hoy-abrir">${icSvg('edit')}Cargar</button>`;
+  }
+  el.className = 'po-hoy' + (ok ? ' ok' : '');
+  el.innerHTML = `<span class="po-sq">${icSvg(ok ? 'checkSm' : 'calendar')}</span>
+    <div><div class="po-hoy-k">${k}</div><div class="po-hoy-t">${t}</div>${s ? `<div class="po-hoy-s">${s}</div>` : ''}</div>${btn}`;
+  $('hoy-abrir').addEventListener('click', () => onDayClick(iso));
+}
+
+function renderCalendar() {
+  const q      = currentQuincena;
+  const range  = quincenaRange(q);
+  const hoy    = hoyIso();
   // Alineación: lunes primero (getDay: 0=Dom..6=Sáb → (getDay+6)%7 → 0=Lun)
   const primerDow = (new Date(q.year, q.month - 1, range.startDay).getDay() + 6) % 7;
 
-  let celdas = '';
-  for (let i = 0; i < primerDow; i++) celdas += '<div class="cal-day empty"></div>';
-
-  for (let d = range.startDay; d <= range.endDay; d++) {
-    const iso   = isoDate(q.year, q.month, d);
-    const dow   = (new Date(q.year, q.month - 1, d).getDay() + 6) % 7; // 5=Sáb,6=Dom
-    const finde = dow >= 5;
-    const ferNombre = feriados[iso];
-    const validado  = partesMeta[iso] && partesMeta[iso].validado;
-
-    const clases = ['cal-day'];
-    if (finde || ferNombre) clases.push('nolab');
-    if (ferNombre)          clases.push('feriado');
-    if (validado)           clases.push('validado');
-    if (iso === hoyIso)     clases.push('today');
-
-    const badge = validado
-      ? '<span class="cal-badge ok">✓</span>'
-      : (finde || ferNombre ? '' : '<span class="cal-badge pend">•</span>');
-    const fmark = ferNombre ? `<span class="cal-fmark" title="${esc(ferNombre)}">F</span>` : '';
-
-    celdas += `<div class="${clases.join(' ')}" data-iso="${iso}" title="${ferNombre ? esc(ferNombre) : ''}">
-      ${fmark}<span class="cal-daynum">${d}</span>${badge}
-    </div>`;
-  }
-
-  // Estado de cierre y días laborables pendientes de validar
-  const qid     = quincenaId(q);
-  const cerrada = !!(cierres[qid] && cierres[qid].cerrado);
-  const laborables = diasLaborables(q);
-  const faltantes  = laborables.filter(iso => !(partesMeta[iso] && partesMeta[iso].validado)).length;
-
-  // "Ver planilla" (preview) siempre disponible; "Excel RRHH" solo con la quincena cerrada.
-  const btnPreview = `<button class="btn btn-sm btn-outline" id="btn-excel-preview">${icSvg('eye')} Ver planilla</button>`;
-  const btnExcel   = `<button class="btn btn-sm btn-outline" id="btn-excel-rrhh">${icSvg('sheet')} Excel RRHH</button>`;
-  let cierreHtml;
-  if (cerrada) {
-    cierreHtml = `
-      <span class="cierre-msg">${icSvg('checkSm')} Quincena cerrada. Solo lectura.</span>
-      ${btnPreview}${btnExcel}
-      ${esAdmin ? '<button class="btn btn-sm btn-warning" id="btn-reabrir">Reabrir quincena</button>' : ''}`;
-  } else if (faltantes > 0) {
-    cierreHtml = `
-      <span class="cierre-msg">Faltan validar ${faltantes} día(s) laborable(s) para poder cerrar.</span>
-      ${btnPreview}
-      <button class="btn btn-sm btn-primary" id="btn-cerrar" disabled>Cerrar quincena</button>`;
-  } else {
-    cierreHtml = `
-      <span class="cierre-msg">Todos los días laborables están validados. Cerrá la quincena para enviar el Excel a RRHH.</span>
-      ${btnPreview}
-      <button class="btn btn-sm btn-primary" id="btn-cerrar">Cerrar quincena</button>`;
-  }
-
-  $('cal-container').innerHTML = `
-    <div class="cal-nav">
-      <button class="btn btn-sm btn-outline" id="cal-prev"><svg class="icon" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <span class="cal-label">${quincenaLabel(q)}</span>
-      <button class="btn btn-sm btn-outline" id="cal-next"><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
-    </div>
-    <div class="cal-grid">
-      ${DOW.map(d => `<div class="cal-dow">${d}</div>`).join('')}
-      ${celdas}
-    </div>
-    <div class="cal-legend">
-      <span><span class="cal-swatch" style="background:#fff"></span> Laborable</span>
-      <span><span class="cal-swatch" style="background:var(--gray-100)"></span> No laborable</span>
-      <span><span class="cal-swatch" style="background:#fdf1e7"></span> Feriado (F)</span>
-      <span><span class="cal-badge ok">✓</span> Validado</span>
-      <span><span class="cal-badge pend">•</span> Pendiente</span>
-    </div>
-    <div class="cierre-bar">${cierreHtml}</div>
-  `;
-
-  $('cal-prev').addEventListener('click', () => { currentQuincena = prevQuincena(q); showQuincena(); });
-  $('cal-next').addEventListener('click', () => { currentQuincena = nextQuincena(q); showQuincena(); });
-  $('cal-container').querySelectorAll('.cal-day[data-iso]').forEach(cell => {
-    cell.addEventListener('click', () => onDayClick(cell.dataset.iso));
+  let celdas = DOW.map(d => `<div class="po-dow">${d}</div>`).join('');
+  for (let i = 0; i < primerDow; i++) celdas += '<div class="po-cd e"></div>';
+  diasDeQuincena(q).forEach(iso => {
+    const d = Number(iso.slice(8));
+    const { k, r } = estadoDia(iso);
+    const ferNom = feriados[iso];
+    let m = '', c = '', tip = ferNom || '';   // c: versión corta para el teléfono
+    if (k === 'ok')   { m = r ? (r.cc ? 'Lluvia' : `${r.pres}/${r.total}`) : 'Validado'; c = r ? (r.cc ? 'CC' : m) : '✓'; tip = tip || (r ? `Validado · ${r.pres} de ${r.total} presentes · ${fmtHoras(r.horas)} h` : 'Validado'); }
+    if (k === 'carg') { m = 'Sin validar'; c = '•'; tip = 'Cargado, falta validar'; }
+    if (k === 'pend') { m = 'Cargar'; c = '•'; tip = 'Sin parte'; }
+    if (k === 'fer')  { m = 'Feriado'; c = 'F'; }
+    if (k === 'fut' && r) { m = 'Cargado'; c = '•'; }
+    const dot = r && (r.via > 0 || r.aus > 0) ? '<span class="x" aria-hidden="true"></span>' : '';
+    celdas += `<button type="button" class="po-cd ${k} ${iso === hoy ? 'today' : ''}" data-iso="${iso}" title="${esc(tip)}" aria-label="${d} ${esc(tip)}">
+      ${dot}<span class="n">${d}</span>${m ? `<span class="m"><span class="ml">${m}</span><span class="mc">${c || m}</span></span>` : ''}</button>`;
   });
+
+  $('cal-container').className = '';
+  $('cal-container').innerHTML = `
+    <div class="po-cal">${celdas}</div>
+    <div class="po-legend">
+      <span><i style="background:#dff3e5"></i>Validado (presentes)</span>
+      <span><i style="background:#fde6e6"></i>Sin parte</span>
+      <span><i style="background:#fbeedd"></i>Feriado o sin validar</span>
+      <span><i style="background:#6b3fa0;border-radius:50%;width:7px;height:7px"></i>Con viático o ausencia</span>
+    </div>`;
+  $('cal-container').querySelectorAll('.po-cd[data-iso]').forEach(cell =>
+    cell.addEventListener('click', () => onDayClick(cell.dataset.iso)));
+}
+
+function renderCierre() {
+  const q       = currentQuincena;
+  const cerrada = quincenaCerrada(q);
+  const labs    = diasLaborables(q);
+  const val     = labs.filter(estaValidado).length;
+  const faltan  = labs.length - val;
+  const pct     = labs.length ? Math.round(val / labs.length * 100) : 0;
+
+  let msg;
+  if (cerrada)        msg = 'Quincena cerrada: solo lectura. El Excel quedó en Drive para RRHH.';
+  else if (faltan > 0) { const hasta = pendientesQuincena(q).length; msg = `Faltan validar <b>${faltan} ${faltan === 1 ? 'día' : 'días'}</b>${hasta && hasta < faltan ? ` (${hasta} hasta hoy)` : ''}. Con todos validados se puede cerrar y se envía el Excel a RRHH.`; }
+  else                msg = 'Todos los días laborables están validados. Cerrá la quincena para enviar el Excel a RRHH.';
+
+  $('po-cierre').innerHTML = `
+    <div class="po-side-t"><span>Cierre de la quincena</span><span>${val} de ${labs.length} días</span></div>
+    <div class="po-prog" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Días validados"><i style="width:${pct}%"></i></div>
+    <div class="po-prog-t">${msg}</div>
+    <div class="po-acts">
+      <button type="button" class="foc-btn foc-btn--clear" id="btn-excel-preview">${icSvg('eye')} Ver planilla</button>
+      ${cerrada ? `<button type="button" class="foc-btn foc-btn--drive" id="btn-excel-rrhh">${icSvg('sheet')} Excel RRHH</button>` : ''}
+      ${cerrada && esAdmin ? `<button type="button" class="foc-btn foc-btn--warn" id="btn-reabrir">${icSvg('unlock')} Reabrir</button>` : ''}
+      ${!cerrada ? `<button type="button" class="foc-btn foc-btn--edit" id="btn-cerrar" ${faltan > 0 ? 'disabled title="Primero hay que validar todos los días laborables"' : ''}>${icSvg('lock')} Cerrar quincena</button>` : ''}
+    </div>`;
   $('btn-cerrar')?.addEventListener('click', cerrarQuincenaActual);
   $('btn-reabrir')?.addEventListener('click', reabrirQuincenaActual);
   $('btn-excel-rrhh')?.addEventListener('click', onExcelRRHH);
   $('btn-excel-preview')?.addEventListener('click', onExcelPreview);
 }
 
+function renderTotales() {
+  let horas = 0, comidas = 0, via = 0;
+  diasDeQuincena(currentQuincena).forEach(iso => {
+    const r = resumenDia(iso);
+    if (r) { horas += r.horas; comidas += r.comidas; via += r.via; }
+  });
+  $('po-totales').innerHTML = `
+    <div class="po-side-t"><span>En la quincena</span></div>
+    <div class="po-t3">
+      <div><span>Horas</span><b>${fmtHoras(horas)}</b></div>
+      <div><span>Comidas</span><b title="${fmtPesos(comidas * (constantes.valorComida || 0))}">${comidas}</b></div>
+      <div><span>Viáticos</span><b title="${fmtPesos(via)}">${fmtPesos(via)}</b></div>
+    </div>`;
+}
+
+function renderQuincena() {
+  const q = currentQuincena;
+  const r = quincenaRange(q);
+  $('q-label').textContent = `${r.startDay}–${r.endDay} ${MESES[q.month - 1].slice(0, 3).toLowerCase()} ${q.year}`;
+  renderEstadoTitulo();
+  renderHoy();
+  renderCalendar();
+  renderCierre();
+  renderTotales();
+}
+
 // Días laborables (lun-vie no feriados) de la quincena
 function diasLaborables(q) {
-  const range = quincenaRange(q);
-  const out = [];
-  for (let d = range.startDay; d <= range.endDay; d++) {
-    const iso = isoDate(q.year, q.month, d);
-    const dow = (new Date(q.year, q.month - 1, d).getDay() + 6) % 7;
-    if (dow < 5 && !feriados[iso]) out.push(iso);
-  }
-  return out;
+  return diasDeQuincena(q).filter(iso => !esFinde(iso) && !feriados[iso]);
 }
 
 // Carga (cacheada) el cierre de la quincena actual y re-renderiza
@@ -549,7 +661,7 @@ async function showQuincena() {
     try { cierres[qid] = await getCierre(obraKey, qid); }
     catch (_) { cierres[qid] = null; }
   }
-  renderCalendar();
+  renderQuincena();
 }
 
 async function cerrarQuincenaActual() {
@@ -565,7 +677,7 @@ async function cerrarQuincenaActual() {
     await cerrarQuincena(obraKey, qid, sessionCodigo);
     cierres[qid] = { cerrado: true, cerradoPor: sessionCodigo, cerradoEn: Date.now() };
     showToast('Quincena cerrada. Generando Excel de RRHH…');
-    renderCalendar();
+    renderQuincena();
     // Generar y subir el reporte a Drive en segundo plano (no bloquea el cierre)
     generarReporte(q, { silencioso: false }).catch(() => {});
   } catch (_) {
@@ -583,18 +695,23 @@ async function reabrirQuincenaActual() {
     await reabrirQuincena(obraKey, qid);
     cierres[qid] = null;
     showToast('Quincena reabierta.');
-    renderCalendar();
+    renderQuincena();
   } catch (_) {
     showToast('Error al reabrir la quincena.', 'error');
   }
 }
 
+// Todos los partes de la obra en una lectura: el calendario, el estado y los totales salen de acá.
 async function loadCalendarData() {
   try {
-    [feriados, partesMeta] = await Promise.all([getFeriados(), getPartesMeta(obraKey)]);
+    const [fer, todos] = await Promise.all([getFeriados(), getPartesRango(obraKey, '0000-00-00', '9999-12-31')]);
+    feriados  = fer || {};
+    partesAll = todos || {};
   } catch (_) {
-    feriados = {}; partesMeta = {};
+    feriados = {}; partesAll = {};
   }
+  partesMeta = {};
+  Object.entries(partesAll).forEach(([f, p]) => { partesMeta[f] = (p && p._meta) || { validado: false }; });
   currentQuincena = getQuincena(new Date());
   await showQuincena();
 }
@@ -602,9 +719,7 @@ async function loadCalendarData() {
 // ───────── Parte del día ─────────
 function fmtFechaLarga(iso) {
   const [y, m, d] = iso.split('-').map(Number);
-  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const dow  = new Date(y, m - 1, d).getDay();
-  return `${dias[dow]} ${d}/${pad2(m)}/${y}`;
+  return `${DIAS_LARGO[new Date(y, m - 1, d).getDay()]} ${d} de ${MESES[m - 1].toLowerCase()}`;
 }
 
 function esFinde(iso) {
@@ -613,32 +728,53 @@ function esFinde(iso) {
 }
 
 async function onDayClick(iso) {
-  parteFecha = iso;
-  const q       = currentQuincena;
-  const cerrada = !!(cierres[quincenaId(q)] && cierres[quincenaId(q)].cerrado);
-  parteReadonly = cerrada;
-  const finde   = esFinde(iso);
-  const ferNom  = feriados[iso];
-  const noLab   = finde || !!ferNom;
-
   if (!cuadrilla.length) {
     showToast('Primero agregá personal a la cuadrilla.', 'warning');
     return;
   }
+  await abrirParte(iso);
+  $('modal-parte').classList.remove('hidden');
+  $('modal-parte').querySelector('.po-sheet').focus({ preventScroll: true });
+}
 
-  // Nota informativa
-  let nota = `Jornada de la obra: <strong>${constantes.jornadaHoras} h</strong>.`;
-  if (ferNom)      nota += ` Feriado: <strong>${esc(ferNom)}</strong> (no laborable salvo que se carguen horas).`;
-  else if (finde)  nota += ' Fin de semana (no laborable salvo que se carguen horas).';
-  if (cerrada)     nota += ' <span class="parte-cerrada">Quincena cerrada — solo lectura.</span>';
-  $('parte-info').innerHTML = nota;
-  $('parte-title').textContent = 'Parte — ' + fmtFechaLarga(iso);
+const ESTADOS = [
+  { e: 'presente', label: 'Presente' },
+  { e: 'AU', label: 'Ausente' },
+  { e: 'AC', label: 'Accidente' },
+  { e: 'CM', label: 'C. médica', title: 'Carpeta médica' },
+];
+const ESTADO_LARGO = { AU: 'Ausente', AC: 'Accidente', CM: 'Carpeta médica' };
+
+function stepHtml(cls, valor, label) {
+  return `<span class="po-step"><button type="button" data-d="-1" aria-label="Menos horas">−</button><input type="number" class="${cls}" min="0" max="24" step="0.5" inputmode="decimal" value="${valor}" aria-label="${esc(label)}"><button type="button" data-d="1" aria-label="Más horas">+</button></span>`;
+}
+
+async function abrirParte(iso) {
+  parteFecha = iso;
+  const cerrada = quincenaCerrada();
+  parteReadonly = cerrada;
+  const ferNom  = feriados[iso];
+  const noLab   = esFinde(iso) || !!ferNom;
+
+  $('parte-title').textContent = fmtFechaLarga(iso);
+  $('parte-info').textContent  = 'Cargando…';
+  $('parte-list').innerHTML = '';
 
   // Cargar parte existente o precargar por defecto
   let parte;
   try { parte = await getParte(obraKey, iso); }
-  catch (_) { parte = { items: {}, _meta: { validado: false } }; }
+  catch (_) { parte = partesAll[iso] || { items: {}, _meta: { validado: false } }; }
+  if (parte && parte.items) partesAll[iso] = { ...(partesAll[iso] || {}), items: parte.items };
+  if (parteFecha !== iso) return;   // se pidió otro día mientras cargaba
   const items = parte.items || {};
+
+  // Encabezado: obra, jornada y avisos del día
+  const avisos = [];
+  if (ferNom)         avisos.push(`<span class="po-mini" style="background:#fbeedd;color:#8a4f0d">Feriado: ${esc(ferNom)}</span>`);
+  else if (noLab)     avisos.push('<span class="po-mini">Fin de semana</span>');
+  if (cerrada)        avisos.push(`<span class="po-mini">${icSvg('lock')} Quincena cerrada</span>`);
+  else if (estaValidado(iso)) avisos.push(`<span class="po-mini po-mini--ok">${icSvg('checkSm')} Validado</span>`);
+  $('parte-info').innerHTML = `${esc(obraNombre)} · jornada ${fmtHoras(constantes.jornadaHoras ?? 8)} h ${avisos.join('')}`;
 
   // Reiniciar adjuntos y viáticos del día con lo guardado
   parteAdjuntos = {};
@@ -662,42 +798,26 @@ async function onDayClick(iso) {
     const g = items[p.id];
     if (g && (g.estado === 'CC' || g.estado === 'F')) parteDiaCond = g.estado;
   });
-  // El selector general puede mostrar "Ausente (todos)" si toda la cuadrilla está ausente.
+  // El tipo de día puede quedar en "Nadie" si toda la cuadrilla está ausente.
   const savedAll      = cuadrilla.length > 0 && cuadrilla.every(p => items[p.id]);
   const todosAusentes = savedAll && cuadrilla.every(p => (items[p.id].estado || '') === 'AU');
-  const initCond      = todosAusentes ? 'AU' : parteDiaCond;
+  genCond = todosAusentes ? 'AU' : parteDiaCond;
 
-  const genHorasInit  = initCond === 'CC' ? CC_HORAS : (initCond === '' && !noLab ? constantes.jornadaHoras : 0);
-  const genComidaInit = initCond === '' && !noLab;
+  const genHorasInit  = genCond === 'CC' ? CC_HORAS : (genCond === '' && !noLab ? constantes.jornadaHoras : 0);
+  const genComidaInit = genCond === '' && !noLab;
 
-  // Sección general (aplica a toda la cuadrilla)
+  // Lo que vale para toda la cuadrilla
+  const COND = [['', 'Día normal'], ['CC', 'Lluvia (CC)'], ['F', 'Feriado'], ['AU', 'Nadie']];
   $('parte-general').innerHTML = `
-    <div class="pg-title">${icSvg('settings')} General · toda la cuadrilla</div>
-    <div class="pg-fields">
-      <div class="pf">
-        <label>Condición del día</label>
-        <select class="form-control" id="pg-cond">
-          <option value="">Normal</option>
-          <option value="F">Feriado</option>
-          <option value="CC">CC · Causas climáticas</option>
-          <option value="AU">Ausente (todos)</option>
-        </select>
-      </div>
-      <div class="pf">
-        <label>Horas (todos)</label>
-        <input type="number" class="form-control" id="pg-horas" min="0" max="24" step="0.5" value="${genHorasInit}">
-      </div>
-      <div class="pf pf-comida">
-        <input type="checkbox" id="pg-comida" ${genComidaInit ? 'checked' : ''}>
-        <label style="margin:0">Comida (todos)</label>
-      </div>
+    <div class="po-side-t" style="margin-bottom:.5rem"><span>Toda la cuadrilla</span></div>
+    <div class="po-seg" role="group" aria-label="Tipo de día">
+      ${COND.map(([c, l]) => `<button type="button" data-c="${c}" aria-pressed="${genCond === c}">${l}</button>`).join('')}
     </div>
-    <div class="pg-note">Un cambio acá se aplica a toda la cuadrilla. Abajo marcá las excepciones por persona.</div>`;
-  $('pg-cond').value = initCond;
-
-  // Estado por persona → botón activo:
-  //   Presente = '', 'F' o 'CC' (según la condición del día) · Ausente 'AU' · Accidente 'AC' · Carpeta Médica 'CM'
-  const esPresente = e => e === '' || e === 'F' || e === 'CC';
+    <div class="po-gen-row">
+      ${stepHtml('', genHorasInit, 'Horas para toda la cuadrilla').replace('class=""', 'id="pg-horas"')}
+      <label class="po-tog"><input type="checkbox" id="pg-comida" ${genComidaInit ? 'checked' : ''}><i></i>Comida para todos</label>
+    </div>
+    <div class="po-gen-note">Lo de acá se aplica a toda la cuadrilla; abajo marcá lo distinto de cada persona.</div>`;
 
   $('parte-list').innerHTML = cuadrilla.map(p => {
     const guardado = items[p.id];
@@ -705,43 +825,33 @@ async function onDayClick(iso) {
     const horas   = guardado ? (guardado.horas ?? 0) : genHorasInit;
     const comida  = guardado ? !!guardado.comida  : genComidaInit;
     const catTxt  = categoriaLabel(p);
-    const act = e => (e === 'presente' ? (esPresente(estado) ? 'active' : '') : (estado === e ? 'active' : ''));
+    const nom     = `${p.apellido}, ${p.nombre}`;
     return `
-      <div class="parte-row" data-id="${esc(p.id)}" data-estado="${esc(estado)}">
-        <div class="parte-row-head">${esc(p.apellido)}, ${esc(p.nombre)}
-          ${catTxt ? `<span class="crew-cat">${esc(catTxt)}</span>` : ''}</div>
-        <div class="estado-btns">
-          <button type="button" class="eb ${act('presente')}" data-e="presente">Presente</button>
-          <button type="button" class="eb ${act('AU')}" data-e="AU">Ausente</button>
-          <button type="button" class="eb ${act('AC')}" data-e="AC">Accidente</button>
-          <button type="button" class="eb ${act('CM')}" data-e="CM">Carpeta Médica</button>
+      <div class="po-pp" data-id="${esc(p.id)}" data-estado="${esc(estado)}">
+        <span class="po-av ${avatarTono(p)}">${esc(iniciales(p))}</span>
+        <div class="po-tx"><div class="po-nm">${esc(nom)}</div>
+          <div class="po-sb">${catTxt ? `<span>${esc(catTxt)}</span>` : ''}<span class="po-badges"></span></div></div>
+        <button type="button" class="po-st-tap" aria-expanded="false" aria-label="Estado de ${esc(nom)}"></button>
+        <div class="po-ctl">
+          <div class="po-est" role="group" aria-label="Estado de ${esc(nom)}">
+            ${ESTADOS.map(s => `<button type="button" data-e="${s.e}" ${s.title ? `title="${s.title}"` : ''}>${s.label}</button>`).join('')}
+          </div>
+          ${stepHtml('pf-horas', horas, `Horas de ${nom}`)}
+          <button type="button" class="po-food ${comida ? 'on' : ''}" aria-pressed="${comida}" title="Comida" aria-label="Comida de ${esc(nom)}">${icSvg('coffee')}</button>
         </div>
-        <div class="parte-fields">
-          <div class="pf">
-            <label>Horas</label>
-            <input type="number" class="form-control pf-horas" min="0" max="24" step="0.5" value="${horas}">
-          </div>
-          <div class="pf pf-comida">
-            <input type="checkbox" class="pf-comidachk" ${comida ? 'checked' : ''}>
-            <label style="margin:0">Comida</label>
-          </div>
-          <div class="pf pf-viaticos">
-            <label>Viáticos</label>
-            <div class="viat-list" data-id="${esc(p.id)}"></div>
-            <button type="button" class="btn btn-sm btn-outline viat-add" style="align-self:flex-start">+ Viático</button>
-          </div>
-          <div class="pf pf-adjuntos">
-            <label>Adjuntos (certificados médicos, pasajes…)</label>
-            <div class="adj-list" data-id="${esc(p.id)}"></div>
-            <input type="file" class="adj-input" accept="image/*,application/pdf" style="display:none">
-            <button type="button" class="btn btn-sm btn-outline adj-btn" style="align-self:flex-start">${icSvg('clip')} Adjuntar</button>
-          </div>
+        <button type="button" class="po-ib po-ib--fill po-more-btn" aria-expanded="false" title="Viáticos y adjuntos" aria-label="Viáticos y adjuntos de ${esc(nom)}">${icSvg('plus')}</button>
+        <div class="po-more">
+          <div class="po-more-r"><span class="po-more-k">Viáticos</span><div class="viat-list" data-id="${esc(p.id)}"></div>
+            <button type="button" class="foc-btn foc-btn--clear viat-add">${icSvg('plus')}Viático</button></div>
+          <div class="po-more-r"><span class="po-more-k">Adjuntos</span><div class="adj-list" data-id="${esc(p.id)}"></div>
+            <input type="file" class="adj-input" accept="image/*,application/pdf" hidden>
+            <button type="button" class="foc-btn foc-btn--clear adj-btn">${icSvg('clip')}Adjuntar</button></div>
         </div>
       </div>`;
   }).join('');
 
-  // Adjuntos + viáticos: render inicial + wiring por fila
-  $('parte-list').querySelectorAll('.parte-row').forEach(row => {
+  // Wiring por fila: estado, horas, comida, desplegar, viáticos y adjuntos
+  $('parte-list').querySelectorAll('.po-pp').forEach(row => {
     const id    = row.dataset.id;
     const input = row.querySelector('.adj-input');
     const btn   = row.querySelector('.adj-btn');
@@ -752,78 +862,132 @@ async function onDayClick(iso) {
       input.value = '';
     });
     row.querySelector('.viat-add').addEventListener('click', () => openViatico(id));
+    row.querySelectorAll('.po-est button').forEach(b => b.addEventListener('click', () => { setRowEstado(row, b.dataset.e); actualizarResumen(); }));
+    row.querySelector('.pf-horas').addEventListener('input', () => { syncRow(row); actualizarResumen(); });
+    row.querySelector('.po-food').addEventListener('click', () => {
+      const f = row.querySelector('.po-food');
+      setFood(f, !f.classList.contains('on'));
+      syncRow(row); actualizarResumen();
+    });
+    const toggle = () => {
+      const open = row.classList.toggle('open');
+      row.querySelector('.po-st-tap').setAttribute('aria-expanded', open);
+      row.querySelector('.po-more-btn').setAttribute('aria-expanded', open);
+    };
+    row.querySelector('.po-st-tap').addEventListener('click', toggle);
+    row.querySelector('.po-more-btn').addEventListener('click', toggle);
     renderAdjuntos(id);
     renderViaticos(id);
-  });
-
-  // Botones de estado por persona
-  $('parte-list').querySelectorAll('.parte-row').forEach(row => {
-    row.querySelectorAll('.eb').forEach(btn => {
-      btn.addEventListener('click', () => setRowEstado(row, btn.dataset.e));
-    });
+    syncRow(row);
   });
 
   // Controles generales.
-  // Cambiar la CONDICIÓN del día es una acción masiva (aplica a toda la cuadrilla);
+  // Cambiar el TIPO de día es una acción masiva (aplica a toda la cuadrilla);
   // tocar solo horas/comida afecta únicamente a los presentes.
-  $('pg-cond').addEventListener('change', () => {
-    const c = $('pg-cond').value;
+  $('parte-general').querySelectorAll('.po-seg button').forEach(b => b.addEventListener('click', () => {
+    const c = b.dataset.c;
     if (c === 'CC')      { $('pg-horas').value = CC_HORAS; $('pg-comida').checked = false; }
     else if (c === 'F')  { $('pg-horas').value = 0;        $('pg-comida').checked = false; }
     else if (c === 'AU') { $('pg-horas').value = 0;        $('pg-comida').checked = false; }
     else                 { $('pg-horas').value = constantes.jornadaHoras ?? 8; $('pg-comida').checked = true; }
-    applyCondToAll();
-  });
-  $('pg-horas').addEventListener('input', applyHorasComidaPresentes);
-  $('pg-comida').addEventListener('change', applyHorasComidaPresentes);
+    applyCondToAll(c);
+    actualizarResumen();
+  }));
+  $('pg-horas').addEventListener('input', () => { applyHorasComidaPresentes(); actualizarResumen(); });
+  $('pg-comida').addEventListener('change', () => { applyHorasComidaPresentes(); actualizarResumen(); });
 
   // Modo lectura si la quincena está cerrada
-  const inputs = $('parte-list').querySelectorAll('input, select, .eb');
-  inputs.forEach(el => { el.disabled = cerrada; });
-  $('parte-general').querySelectorAll('input, select').forEach(el => { el.disabled = cerrada; });
+  $('modal-parte').querySelectorAll('#parte-general button, #parte-general input, .po-est button, .po-step button, .po-step input, .po-food')
+    .forEach(el => { el.disabled = cerrada; });
   $('parte-list').querySelectorAll('.adj-btn, .viat-add').forEach(b => { b.style.display = cerrada ? 'none' : ''; });
   $('parte-footer').style.display = cerrada ? 'none' : '';
 
-  // Botón validar: refleja estado actual del día
-  const validado = partesMeta[iso] && partesMeta[iso].validado;
-  const btnVal = $('parte-validar');
-  btnVal.innerHTML   = validado ? `${icSvg('undo')} Quitar validación` : `${icSvg('checkSm')} Validar día`;
-  btnVal.className   = validado ? 'btn btn-warning' : 'btn btn-success';
+  // Navegación entre días de la quincena
+  const dias = diasDeQuincena(currentQuincena);
+  $('parte-prev').disabled = dias.indexOf(iso) <= 0;
+  $('parte-next').disabled = dias.indexOf(iso) >= dias.length - 1;
 
-  $('modal-parte').classList.remove('hidden');
+  pintarBotonValidar();
+  actualizarResumen();
+  parteSnapshot = JSON.stringify(recolectarItems());
+}
+
+// Próximo día para "Validar y seguir": laborable hasta hoy sin validar, primero los siguientes.
+function proximoPendiente(iso) {
+  const pend = pendientesQuincena(currentQuincena).filter(d => d !== iso);
+  return pend.find(d => d > iso) || pend[0] || null;
+}
+
+function pintarBotonValidar() {
+  const iso = parteFecha;
+  const btn = $('parte-validar');
+  btn.disabled = false;
+  btn.removeAttribute('title');
+  if (estaValidado(iso)) {
+    btn.className = 'foc-btn foc-btn--warn';
+    btn.innerHTML = `${icSvg('undo')} Quitar validación`;
+  } else if (iso > hoyIso()) {
+    btn.className = 'foc-btn foc-btn--grn-solid';
+    btn.innerHTML = `${icSvg('checkSm')} Validar día`;
+    btn.disabled = true;
+    btn.title = 'Un día se puede validar desde ese mismo día';
+  } else {
+    btn.className = 'foc-btn foc-btn--grn-solid';
+    btn.innerHTML = `${icSvg('checkSm')} ${proximoPendiente(iso) ? 'Validar y seguir' : 'Validar día'}`;
+  }
+}
+
+function setFood(btn, on) {
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-pressed', on);
+}
+
+// Refleja el estado de la fila: botón activo, pastilla del teléfono y fondo de ausente.
+function syncRow(row) {
+  const estado   = row.dataset.estado || '';
+  const presente = esPresenteE(estado);
+  const k        = presente ? 'presente' : estado;
+  row.querySelectorAll('.po-est button').forEach(b => {
+    const on = b.dataset.e === k;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on);
+  });
+  row.classList.toggle('aus', !presente);
+  const horas  = parseFloat(row.querySelector('.pf-horas').value) || 0;
+  const comida = row.querySelector('.po-food').classList.contains('on');
+  const tap    = row.querySelector('.po-st-tap');
+  tap.dataset.k = k;
+  tap.innerHTML = `${presente ? `${fmtHoras(horas)} h · ${comida ? 'comida' : 'sin comida'}` : ESTADO_LARGO[estado]} ${icSvg('chevron')}`;
 }
 
 // Cambia el estado de una fila (persona) desde los botones.
 //   'presente' → toma la condición del día ('', F o CC) + horas/comida generales
 //   'AU' | 'AC' | 'CM' → pone horas en 0 y saca la comida
 function setRowEstado(row, kind) {
-  const horasInp  = row.querySelector('.pf-horas');
-  const comidaChk = row.querySelector('.pf-comidachk');
+  const horasInp = row.querySelector('.pf-horas');
+  const food     = row.querySelector('.po-food');
   let estado;
   if (kind === 'presente') {
     estado = parteDiaCond;                       // '', F o CC
-    horasInp.value    = parseFloat($('pg-horas').value) || 0;
-    comidaChk.checked = $('pg-comida').checked;
+    horasInp.value = parseFloat($('pg-horas').value) || 0;
+    setFood(food, $('pg-comida').checked);
   } else {
     estado = kind;                               // AU, AC o CM
-    horasInp.value    = 0;
-    comidaChk.checked = false;
+    horasInp.value = 0;
+    setFood(food, false);
   }
   row.dataset.estado = estado;
-  const presente = estado === '' || estado === 'F' || estado === 'CC';
-  row.querySelectorAll('.eb').forEach(b => {
-    const active = (b.dataset.e === 'presente') ? presente : (b.dataset.e === estado);
-    b.classList.toggle('active', active);
-  });
+  syncRow(row);
 }
 
-// Cambio de CONDICIÓN del día (acción masiva sobre toda la cuadrilla).
-//   Ausente (todos): marca AU a todos (incluye accidente/carpeta médica).
+// Cambio del TIPO de día (acción masiva sobre toda la cuadrilla).
+//   Nadie: marca AU a todos (incluye accidente/carpeta médica).
 //   Normal/Feriado/CC: pone a todos como Presente con esa condición,
 //   preservando Accidente y Carpeta Médica (excepciones médicas reales).
-function applyCondToAll() {
-  const cond = $('pg-cond').value;
-  const rows = $('parte-list').querySelectorAll('.parte-row');
+function applyCondToAll(cond) {
+  genCond = cond;
+  $('parte-general').querySelectorAll('.po-seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.c === cond));
+  const rows = $('parte-list').querySelectorAll('.po-pp');
   if (cond === 'AU') {
     parteDiaCond = '';   // si luego marcan Presente a alguien, queda normal
     rows.forEach(row => setRowEstado(row, 'AU'));
@@ -841,34 +1005,99 @@ function applyCondToAll() {
 function applyHorasComidaPresentes() {
   const genHoras  = parseFloat($('pg-horas').value) || 0;
   const genComida = $('pg-comida').checked;
-  $('parte-list').querySelectorAll('.parte-row').forEach(row => {
+  $('parte-list').querySelectorAll('.po-pp').forEach(row => {
     const e = row.dataset.estado;
     if (e === 'AU' || e === 'AC' || e === 'CM') return;   // excepción por persona
-    row.querySelector('.pf-horas').value       = genHoras;
-    row.querySelector('.pf-comidachk').checked = genComida;
+    row.querySelector('.pf-horas').value = genHoras;
+    setFood(row.querySelector('.po-food'), genComida);
+    syncRow(row);
   });
+}
+
+// Pie de la hoja: presentes, ausencias, horas, comidas y viáticos del día
+function actualizarResumen() {
+  const items = Object.values(recolectarItems());
+  let pres = 0, aus = 0, med = 0, horas = 0, com = 0, via = 0;
+  items.forEach(it => {
+    if (esPresenteE(it.estado)) pres++; else if (it.estado === 'AU') aus++; else med++;
+    horas += it.horas; if (it.comida) com++;
+    via += (it.viaticos || []).reduce((s, v) => s + (Number(v.monto) || 0), 0);
+  });
+  $('parte-sum').innerHTML = [
+    `<span class="po-mini po-mini--ok">${pres} ${pres === 1 ? 'presente' : 'presentes'}</span>`,
+    aus ? `<span class="po-mini po-mini--warn">${aus} ${aus === 1 ? 'ausente' : 'ausentes'}</span>` : '',
+    med ? `<span class="po-mini po-mini--vio">${med} con accidente o carpeta</span>` : '',
+    `<span class="po-mini">${fmtHoras(horas)} h</span>`,
+    `<span class="po-mini">${com} ${com === 1 ? 'comida' : 'comidas'}</span>`,
+    via ? `<span class="po-mini po-mini--vio">Viáticos ${fmtPesos(via)}</span>` : '',
+  ].join('');
+}
+
+// Pastillas de viáticos y adjuntos al lado del nombre
+function pintarBadges(id) {
+  const row = $('parte-list').querySelector(`.po-pp[data-id="${id}"]`);
+  if (!row) return;
+  const v = parteViaticos[id] || [];
+  const a = parteAdjuntos[id] || [];
+  const tot = v.reduce((s, x) => s + (Number(x.monto) || 0), 0);
+  row.querySelector('.po-badges').innerHTML =
+    (v.length ? `<span class="po-mini po-mini--vio">Viático ${fmtPesos(tot)}</span>` : '') +
+    (a.length ? `<span class="po-mini">${icSvg('clip')} ${a.length}</span>` : '');
+  row.querySelector('.po-more-btn').classList.toggle('on', !!(v.length || a.length));
 }
 
 function recolectarItems() {
   const items = {};
-  $('parte-list').querySelectorAll('.parte-row').forEach(row => {
+  $('parte-list').querySelectorAll('.po-pp').forEach(row => {
     const id = row.dataset.id;
-    const adjuntos = parteAdjuntos[id] || [];
     items[id] = {
       horas:    parseFloat(row.querySelector('.pf-horas').value) || 0,
-      comida:   row.querySelector('.pf-comidachk').checked,
+      comida:   row.querySelector('.po-food').classList.contains('on'),
       estado:   row.dataset.estado || '',
       viaticos: parteViaticos[id] || [],
-      adjuntos
+      adjuntos: parteAdjuntos[id] || []
     };
   });
   return items;
 }
 
+function hayCambios() {
+  return !parteReadonly && JSON.stringify(recolectarItems()) !== parteSnapshot;
+}
+
 async function guardarParte(silencioso) {
   const items = recolectarItems();
   await saveParteDia(obraKey, parteFecha, items);
+  partesAll[parteFecha] = { ...(partesAll[parteFecha] || {}), items };
+  parteSnapshot = JSON.stringify(items);
   if (!silencioso) showToast('Parte guardado.');
+}
+
+function cerrarHojaParte() {
+  $('modal-parte').classList.add('hidden');
+  renderQuincena();
+}
+
+async function cerrarParte() {
+  if (hayCambios()) {
+    const ok = await showConfirm('Cambios sin guardar',
+      'Hay cambios en el parte que todavía no se guardaron. Si cerrás, se pierden.',
+      { boton: 'Descartar cambios', tono: 'del', icono: 'trash', cancelar: 'Seguir editando' });
+    if (!ok) return;
+  }
+  cerrarHojaParte();
+}
+
+// Ir al día anterior o siguiente sin cerrar: lo cargado se guarda antes de cambiar.
+async function irDia(delta) {
+  const dias = diasDeQuincena(currentQuincena);
+  const destino = dias[dias.indexOf(parteFecha) + delta];
+  if (!destino) return;
+  if (hayCambios()) {
+    try { await guardarParte(false); }
+    catch (_) { showToast('No se pudo guardar el parte. Probá de nuevo.', 'error'); return; }
+  }
+  await abrirParte(destino);
 }
 
 async function onGuardarParte() {
@@ -876,7 +1105,7 @@ async function onGuardarParte() {
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
     await guardarParte(false);
-    $('modal-parte').classList.add('hidden');
+    cerrarHojaParte();
   } catch (_) {
     showToast('Error al guardar el parte.', 'error');
   } finally {
@@ -886,7 +1115,7 @@ async function onGuardarParte() {
 
 async function onValidarDia() {
   const iso = parteFecha;
-  const yaValidado = partesMeta[iso] && partesMeta[iso].validado;
+  const yaValidado = estaValidado(iso);
   const btn = $('parte-validar');
   btn.disabled = true;
   try {
@@ -894,25 +1123,27 @@ async function onValidarDia() {
       await setValidadoDia(obraKey, iso, false, sessionCodigo);
       partesMeta[iso] = { validado: false };
       showToast('Validación quitada.');
+      await abrirParte(iso);
     } else {
+      const sig = proximoPendiente(iso);
       await guardarParte(true);                       // persistir lo cargado
       await setValidadoDia(obraKey, iso, true, sessionCodigo);
       partesMeta[iso] = { validado: true, validadoPor: sessionCodigo, validadoEn: Date.now() };
       showToast('Día validado.');
+      if (sig) await abrirParte(sig);
+      else cerrarHojaParte();
     }
-    $('modal-parte').classList.add('hidden');
-    renderCalendar();
+    renderQuincena();
   } catch (_) {
     showToast('Error al actualizar la validación.', 'error');
-  } finally {
-    btn.disabled = false;
+    pintarBotonValidar();
   }
 }
 
 // ───────── Configuración de la obra ─────────
 function updateCfgBar() {
-  $('cfg-jornada').textContent = constantes.jornadaHoras ?? 0;
-  $('cfg-comida').textContent  = constantes.valorComida ?? 0;
+  $('cfg-jornada').textContent = `${fmtHoras(constantes.jornadaHoras ?? 0)} h`;
+  $('cfg-comida').textContent  = fmtPesos(constantes.valorComida ?? 0);
 }
 
 function openConfigObra() {
@@ -937,6 +1168,7 @@ async function saveConfigObra() {
     await patchConstantesObra(obraKey, { jornadaHoras, valorComida });
     constantes = { ...constantes, jornadaHoras, valorComida };
     updateCfgBar();
+    if (currentQuincena) renderQuincena();
     $('modal-config-obra').classList.add('hidden');
     showToast('Configuración guardada.');
   } catch (_) {
@@ -962,10 +1194,11 @@ function renderAdjuntos(id) {
       (parteAdjuntos[id] || []).splice(parseInt(b.dataset.i, 10), 1);
       renderAdjuntos(id);
     }));
+  pintarBadges(id);
 }
 
 async function subirAdjunto(id, file, btn) {
-  const orig = btn.textContent;
+  const orig = btn.innerHTML;
   btn.disabled = true; btn.textContent = 'Subiendo…';
   try {
     const p = cuadrilla.find(x => x.id === id);
@@ -978,7 +1211,7 @@ async function subirAdjunto(id, file, btn) {
   } catch (_) {
     showToast('No se pudo subir el archivo.', 'error');
   } finally {
-    btn.disabled = false; btn.textContent = orig;
+    btn.disabled = false; btn.innerHTML = orig;
   }
 }
 
@@ -987,6 +1220,8 @@ function renderViaticos(id) {
   const cont = $('parte-list').querySelector(`.viat-list[data-id="${id}"]`);
   if (!cont) return;
   const list = parteViaticos[id] || [];
+  pintarBadges(id);
+  actualizarResumen();
   if (!list.length) { cont.innerHTML = '<span class="viat-empty">Sin viáticos.</span>'; return; }
   cont.innerHTML = list.map((v, i) => `
     <span class="viat-chip">
@@ -1685,11 +1920,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = _s.nombre;
   $('hdr-obra').textContent = obraNombre;
-  $('btn-back').addEventListener('click', () => { window.location.href = 'personal.html'; });
-  // Acordeón de secciones
-  document.querySelectorAll('.sec-head').forEach(head => {
-    head.addEventListener('click', () => head.closest('.sec-card').classList.toggle('collapsed'));
-  });
+  $('po-obra').textContent  = obraNombre;
+  // Un jefe con una sola obra entra directo: volver lo lleva al menú
+  $('btn-back').addEventListener('click', () => { window.location.href = params.get('unica') ? 'menu.html' : 'personal.html'; });
+  $('cal-prev').addEventListener('click', () => { currentQuincena = prevQuincena(currentQuincena); showQuincena(); });
+  $('cal-next').addEventListener('click', () => { currentQuincena = nextQuincena(currentQuincena); showQuincena(); });
 
   // Modal personal
   $('btn-add-personal').addEventListener('click', openPadron);
@@ -1716,7 +1951,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Modal parte del día
-  $('modal-parte-close').addEventListener('click', () => $('modal-parte').classList.add('hidden'));
+  $('modal-parte-close').addEventListener('click', cerrarParte);
+  $('parte-prev').addEventListener('click', () => irDia(-1));
+  $('parte-next').addEventListener('click', () => irDia(1));
+  // Botones − / + de las horas (generales y por persona)
+  $('modal-parte').addEventListener('click', e => {
+    const b = e.target.closest('.po-step button');
+    if (!b || b.disabled) return;
+    const inp = b.parentNode.querySelector('input');
+    inp.value = Math.min(24, Math.max(0, (parseFloat(inp.value) || 0) + 0.5 * Number(b.dataset.d)));
+    inp.dispatchEvent(new Event('input'));
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || $('modal-parte').classList.contains('hidden')) return;
+    if (!$('modal-viatico').classList.contains('hidden') || !$('modal-excel-preview').classList.contains('hidden')) return;
+    cerrarParte();
+  });
   $('parte-guardar').addEventListener('click', onGuardarParte);
   $('parte-validar').addEventListener('click', onValidarDia);
 
@@ -1739,7 +1989,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-excel-print').addEventListener('click', onExcelPrint);
 
   // Config de la obra (jornada + valor comida)
-  $('btn-config-obra').addEventListener('click', openConfigObra);
+  $('btn-cfg-jornada').addEventListener('click', openConfigObra);
+  $('btn-cfg-comida').addEventListener('click', openConfigObra);
   $('modal-config-close').addEventListener('click',  () => $('modal-config-obra').classList.add('hidden'));
   $('modal-config-cancel').addEventListener('click', () => $('modal-config-obra').classList.add('hidden'));
   $('modal-config-save').addEventListener('click', saveConfigObra);

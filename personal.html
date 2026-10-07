@@ -11,6 +11,52 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    /* ===== Personal: elegir obra (ámbar de Personal) ===== */
+    .pe-main { max-width: 1120px; }
+    .pe-ttl { display: flex; align-items: center; gap: .45rem; margin-bottom: .9rem; flex-wrap: wrap; }
+    .pe-t { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; }
+    .pe-pill { display: inline-flex; align-items: center; gap: .35rem; background: #fbeedd; color: #8a4f0d; font-size: .78rem; font-weight: 700; padding: .26rem .7rem; border-radius: 999px; white-space: nowrap; }
+    .pe-pill .icon { width: 13px; height: 13px; }
+    .pe-pend, .pe-pendp { display: inline-flex; align-items: center; gap: .35rem; background: #fde6e6; color: #b02a2a; font-size: .76rem; font-weight: 700; padding: .2rem .65rem; border-radius: 999px; white-space: nowrap; }
+    .pe-pend::before, .pe-pendp::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+    .pe-ok { display: inline-flex; align-items: center; gap: .3rem; background: #dff3e5; color: #1a7f3c; font-size: .74rem; font-weight: 700; padding: .18rem .6rem; border-radius: 999px; white-space: nowrap; }
+    .pe-ok .icon { width: 12px; height: 12px; }
+    .hidden { display: none !important; }
+
+    .pe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .75rem; }
+    .pe-card { background: var(--white); border: none; border-radius: 14px; padding: .8rem .85rem; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25);
+      display: flex; flex-direction: column; gap: .55rem; cursor: pointer; font: inherit; color: inherit; text-align: left; transition: transform .12s, box-shadow .12s; }
+    .pe-card:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(26,58,92,.08), 0 10px 22px -12px rgba(26,58,92,.35); }
+    .pe-card:focus-visible, .pe-chip:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+    .pe-top { display: flex; gap: .65rem; align-items: center; min-width: 0; }
+    .pe-tx { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+    .pe-n { font-weight: 700; color: var(--primary-dark); font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pe-s { font-size: .74rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pe-chev { color: var(--gray-400); display: flex; }
+    .pe-sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+    .pe-sq .icon { width: 18px; height: 18px; }
+    .pe-sq--arquitectura { background: #fdf0dc; color: #8a5a0b; }
+    .pe-sq--vial         { background: #e8eefc; color: #2c4fa8; }
+    .pe-sq--oficina      { background: #efebfd; color: #5a45a8; }
+    .pe-sq--none         { background: #fbeedd; color: #8a4f0d; }
+    .pe-bot { display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; }
+    .pe-mini { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .12rem .55rem; background: var(--gray-100); color: var(--gray-600); white-space: nowrap; }
+    .pe-sin { margin-top: 1.1rem; }
+    .pe-sin-h { display: flex; align-items: center; gap: .4rem; font-size: .72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .5rem; }
+    .pe-sin-h .icon { width: 13px; height: 13px; }
+    .pe-sin-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .pe-chip { display: inline-flex; align-items: center; gap: .35rem; background: var(--white); border: 1px solid var(--gray-200); color: var(--gray-600); border-radius: 999px;
+      padding: .3rem .75rem; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+    .pe-chip .icon { width: 13px; height: 13px; color: var(--gray-400); }
+    .pe-chip:hover { border-color: #f0d4ae; color: #8a4f0d; }
+    .pe-vacio { grid-column: 1 / -1; text-align: center; padding: 1.5rem 1rem; color: var(--gray-500); font-size: .9rem; background: var(--white); border-radius: 14px; }
+    @media (max-width: 760px) {
+      .pe-t { font-size: 1.2rem; }
+      .pe-grid { grid-template-columns: minmax(0, 1fr); gap: .55rem; }
+    }
+    @media (prefers-reduced-motion: reduce) { .pe-card { transition: none; } }
+  </style>
 </head>
 <body>
 
@@ -27,14 +73,18 @@
   </div>
 </header>
 
-<main class="app-main">
-  <div class="hist-page">
-    <div class="hist-toolbar">
-      <span style="font-weight:600;color:var(--gray-700);">Elegí una obra</span>
-    </div>
-    <div id="obras-list" class="obra-grid">
-      <div class="hist-loading">Cargando obras…</div>
-    </div>
+<main class="app-main pe-main">
+  <div class="pe-ttl">
+    <h1 class="pe-t">Personal</h1>
+    <span class="pe-pill hidden" id="pe-personas"></span>
+    <span class="pe-pend hidden" id="pe-pend"></span>
+  </div>
+  <div id="obras-list" class="pe-grid">
+    <div class="hist-loading">Cargando obras…</div>
+  </div>
+  <div class="pe-sin hidden" id="pe-sin">
+    <div class="pe-sin-h"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Sin personal todavía · <span id="pe-sin-n"></span></div>
+    <div class="pe-sin-list" id="pe-sin-list"></div>
   </div>
 </main>
 

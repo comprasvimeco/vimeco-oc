@@ -381,6 +381,7 @@ window._fetchConTope = function (url, opts, ms = 20000) {
         key,
         nombre:         o.nombre,
         lugar_entrega:  o.lugar_entrega || '',
+        categoria:      o.categoria || null,
         rubros:         window.rubrosList(o.rubros),
         rubrosCerrados: !!o.rubrosCerrados
       }))
@@ -1073,7 +1074,7 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     if (!data) return [];
     return Object.entries(data)
       .filter(([, o]) => o && o.nombre && o.activa && o.jefes && o.jefes[codigo])
-      .map(([key, o]) => ({ key, nombre: o.nombre, lugar_entrega: o.lugar_entrega || '' }))
+      .map(([key, o]) => ({ key, nombre: o.nombre, lugar_entrega: o.lugar_entrega || '', categoria: o.categoria || null }))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
   };
 

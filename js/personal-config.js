@@ -85,7 +85,11 @@ async function removeCategoria(i) {
 // ───────────── Valores por categoría ($/hora, por mes) ─────────────
 let valoresMes = {};   // { catKey: valorHora } del mes seleccionado
 
-function mesIsoActual() { return new Date().toISOString().substring(0, 7); }
+// Mes local (toISOString pasa a UTC: después de las 21 h del último día proponía el mes siguiente)
+function mesIsoActual() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
 function mesIsoAnterior(mes) {
   const [y, m] = mes.split('-').map(Number);
