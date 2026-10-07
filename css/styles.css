@@ -1505,3 +1505,43 @@ body.scan-open { overflow: hidden; }
   background: #fde6e6; color: #b02a2a; font-size: .66rem; font-weight: 700; text-decoration: none; vertical-align: 1px; }
 #modal-dup .dup-oc-nro { white-space: nowrap; }
 #modal-dup .dup-nota { margin: .6rem 0 0; text-align: center; font-size: .76rem; }
+
+
+/* ---- Desplegables-pastilla de filtros (Novedades, Historial): ícono + color del elegido + cantidades.
+   En el teléfono la pastilla usa el nombre corto, para que entren en un renglón. ---- */
+.act-dd { position: relative; z-index: 20; }
+.act-pick { display: inline-flex; align-items: center; gap: .4rem; padding: .34rem .7rem; border-radius: 999px;
+  background: var(--white); border: 1px solid var(--gray-200); color: var(--primary-dark);
+  font: inherit; font-size: .82rem; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.act-pick:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37,87,167,.18); }
+.act-pick .icon { width: 14px; height: 14px; flex-shrink: 0; }
+.act-pick .act-chev { width: 13px; height: 13px; opacity: .55; transition: transform .15s; }
+.act-pick[aria-expanded="true"] .act-chev { transform: rotate(180deg); }
+.act-pick .act-corto { display: none; }
+.act-pick-n { font-variant-numeric: tabular-nums; }
+.act-menu { position: absolute; top: calc(100% + 6px); left: 0; min-width: 230px; padding: .35rem;
+  background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px;
+  box-shadow: 0 14px 34px -12px rgba(26,58,92,.45); display: flex; flex-direction: column; gap: 1px; }
+.act-opt { display: flex; align-items: center; gap: .55rem; width: 100%; padding: .45rem .6rem; border: 0; border-radius: 8px;
+  background: transparent; font: inherit; font-size: .84rem; font-weight: 600; color: var(--gray-700); cursor: pointer; text-align: left; }
+.act-opt:hover, .act-opt:focus-visible { background: var(--gray-100); outline: none; }
+.act-opt[aria-selected="true"] { background: #eef2f8; color: var(--primary-dark); }
+.act-opt-ic { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; flex-shrink: 0; }
+.act-opt-ic .icon { width: 13px; height: 13px; }
+.act-opt-n { margin-left: auto; font-size: .74rem; color: var(--gray-400); font-variant-numeric: tabular-nums; }
+.act-t-all { background: #eef0f3; color: #4b5563; }
+/* Fechas a medida, sólo con "Elegir fechas…" */
+.act-custom { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin-top: .6rem; }
+.act-custom label {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--gray-500); font-weight: 700;
+}
+.act-custom input[type=date] {
+  padding: .3rem .45rem; border: 1px solid var(--gray-300);
+  border-radius: var(--radius); font: inherit; font-size: .8rem;
+  color: var(--gray-700); background: #fff;
+}
+@media (max-width: 560px) {
+  .act-pick .act-largo { display: none; }
+  .act-pick .act-corto { display: inline; }
+}

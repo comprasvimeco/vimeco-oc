@@ -8,6 +8,68 @@
   <link rel="icon" type="image/png" href="icono_app.png">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
+  <style>
+    /* ---- Cabecera: título + cantidad de OC + duplicadas por resolver, como Autorizaciones ---- */
+    .hist-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .9rem; flex-wrap: wrap; }
+    .hist-head h1 { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; white-space: nowrap; }
+    .hist-n { display: inline-flex; align-items: center; padding: .2rem .65rem; border-radius: 999px;
+      background: #e0f0fb; color: #0e6a96; font-size: .76rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .hist-dupn { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 999px; border: none; cursor: pointer;
+      background: #fde6e6; color: #b02a2a; font: inherit; font-size: .76rem; font-weight: 700; white-space: nowrap; }
+    .hist-dupn::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+    .hist-search { width: 100%; border-radius: 12px; margin-bottom: .6rem; }
+    .hist-bar { display: flex; align-items: center; gap: .5rem; }
+    .hist-filtros { margin-bottom: .9rem; }
+    .act-pick.hist-tono { border-color: transparent; }
+
+    /* ---- Tarjeta: número y fecha chicos arriba con el estado, proveedor destacado, acciones bajo una línea ---- */
+    .hc-top { display: flex; justify-content: space-between; align-items: center; gap: .2rem .5rem; flex-wrap: wrap; }
+    .hc-nro { font-size: .78rem; color: var(--gray-500); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .hc-prov { font-weight: 700; color: var(--primary-dark); font-size: .98rem; margin-top: .1rem; overflow-wrap: anywhere; }
+    .hc-obra { color: var(--gray-500); font-size: .84rem; }
+    .hc-bottom { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; margin-top: .3rem; }
+    .hc-total { font-weight: 800; color: var(--gray-700); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    .hc-resp { color: var(--gray-500); font-size: .8rem; text-align: right; }
+    .hc-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .45rem; padding-top: .65rem; border-top: 1px solid var(--gray-200); }
+    .hc-actions .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
+    .hist-card--anulada { opacity: .72; }
+    .hist-card--anulada .hc-nro-n, .hist-card--anulada .hc-total { text-decoration: line-through; }
+    .hist-docs { margin-top: .15rem; }
+
+    /* Estado con ícono (los mismos tonos que Autorizaciones) */
+    .hc-est { display: inline-flex; align-items: center; gap: .3rem; padding: .14rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+    .hc-est .icon { width: 12px; height: 12px; flex-shrink: 0; }
+    .hc-est-espera { background: #fbeedd; color: #8a4f0d; }
+    .hc-est-aprob  { background: #dff3e5; color: #1a7f3c; }
+    .hc-est-rech   { background: #fde6e6; color: #b02a2a; }
+    .hc-est-canc   { background: #eceef1; color: #5b6573; }
+    .hc-est-emit   { background: #e0f0fb; color: #0e6a96; }
+    .hc-est-reemp  { background: #e8eef7; color: var(--primary); }
+    .hc-est-ent    { background: #dff3e5; color: #1a7f3c; }
+    .hc-est-par    { background: #fbeedd; color: #8a4f0d; }
+    .hc-motivo { color: #b02a2a; background: #fdf3f3; border-radius: 8px; padding: .35rem .55rem; font-size: .82rem; margin-top: .3rem; overflow-wrap: anywhere; }
+
+    /* ---- OC duplicadas por resolver: tarjeta con ícono ámbar, como el diálogo "¿Repite otra?" ---- */
+    .dup-panel { background: var(--white); border: 1px solid var(--gray-200); border-left: 4px solid #e8b46a; border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm); padding: .85rem .95rem; }
+    .dup-panel-h { display: flex; gap: .65rem; align-items: flex-start; }
+    .dup-panel-ic { width: 36px; height: 36px; border-radius: 11px; background: #fbeedd; color: #8a4f0d; display: grid; place-items: center; flex: none; }
+    .dup-panel-ic .icon { width: 18px; height: 18px; }
+    .dup-panel-t { color: var(--primary-dark); font-size: .92rem; }
+    .dup-panel-sub { color: var(--gray-500); font-size: .78rem; margin: .1rem 0 0; }
+    .dup-grupo { margin-top: .75rem; }
+    .dup-grupo + .dup-grupo { border-top-color: var(--gray-200); }
+    .dup-oc { border: none; border-radius: 12px; cursor: pointer; }
+    .dup-oc.dup-oc--anular { background: #fdf3f3; }
+    .dup-oc-nro { white-space: nowrap; }
+    .dup-oc--anular .dup-oc-nro::after { content: 'se anula'; display: inline-block; margin-left: .35rem; padding: 0 .45rem; border-radius: 999px;
+      background: #fde6e6; color: #b02a2a; font-size: .66rem; font-weight: 700; text-decoration: none; vertical-align: 1px; }
+    .dup-grupo-foot .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
+
+    @media (max-width: 560px) {
+      .hist-head h1 { font-size: 1.2rem; }
+    }
+  </style>
 </head>
 <body>
 
@@ -22,7 +84,6 @@
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <button class="btn btn-sm btn-outline" id="btn-facturas"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Facturas</button>
     <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
 </header>
@@ -30,17 +91,33 @@
 <main class="app-main">
   <div class="hist-page">
 
-    <div class="hist-toolbar">
-      <input type="search" id="hist-search" class="hist-search" placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…">
-      <div class="hist-date-filter">
-        <label class="hist-date-label" for="hist-desde">Desde</label>
-        <input type="date" id="hist-desde" class="hist-date-input">
-        <label class="hist-date-label" for="hist-hasta">Hasta</label>
-        <input type="date" id="hist-hasta" class="hist-date-input">
-        <button class="btn btn-sm btn-outline hidden" id="btn-clear-dates" title="Limpiar fechas"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-      </div>
-      <span class="hist-count" id="hist-count"></span>
+    <div class="hist-head">
+      <h1>Historial</h1>
+      <span class="hist-n hidden" id="hist-count"></span>
+      <button type="button" class="hist-dupn hidden" id="hist-dupn" title="Ir a las OC duplicadas"></button>
     </div>
+
+    <input type="search" id="hist-search" class="hist-search" placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…">
+
+    <div class="hist-filtros">
+      <div class="hist-bar">
+        <div class="act-dd">
+          <button type="button" class="act-pick" id="hist-estado-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Estado"></button>
+          <div class="act-menu hidden" id="hist-estado-menu" role="listbox"></div>
+        </div>
+        <div class="act-dd">
+          <button type="button" class="act-pick" id="hist-periodo-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Período"></button>
+          <div class="act-menu hidden" id="hist-periodo-menu" role="listbox"></div>
+        </div>
+      </div>
+      <div class="act-custom hidden" id="hist-custom">
+        <label for="hist-desde">Desde</label>
+        <input type="date" id="hist-desde">
+        <label for="hist-hasta">Hasta</label>
+        <input type="date" id="hist-hasta">
+      </div>
+    </div>
+
     <div id="hist-dup" class="dup-panel hidden"></div>
     <div id="hist-list" class="hist-list">
       <div class="hist-loading">Cargando historial…</div>

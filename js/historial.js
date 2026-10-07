@@ -13,33 +13,40 @@ function fmtMoney(n) {
   return (parseFloat(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Badge de estado de autorización. Las OC viejas (sin `estado`) se consideran emitidas.
-function estadoBadge(oc) {
-  const e = oc.estado || 'emitida';
-  const base = 'display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;';
-  if (e === 'pendiente') {
-    const quien = oc.autorizacion?.solicitadoA?.nombre;
-    return `<span style="${base}background:#fff4e0;color:#9a6a00;">Pendiente${quien ? ' — ' + esc(quien) : ''}</span>`;
+// ---- Estado de la OC ----
+// Las OC viejas (sin `estado`) se consideran emitidas. Las categorías son las
+// del desplegable de Estado; anuladas (duplicadas) y canceladas van juntas.
+function categoriaEstado(oc) {
+  switch (oc.estado) {
+    case 'autorizada': return 'aprob';
+    case 'pendiente':  return 'espera';
+    case 'rechazada':  return 'rech';
+    case 'anulada': case 'cancelada': return 'anul';
+    default: return 'emit';
   }
-  if (e === 'autorizada') {
-    const quien = oc.autorizacion?.firmante;
-    return `<span style="${base}background:#e3f5e8;color:#1e7d3a;">Autorizada${quien ? ' — ' + esc(quien) : ''}</span>`;
+}
+
+const estPill = (cls, icono, txt) =>
+  `<span class="hc-est hc-est-${cls}" title="${esc(txt)}">${icSvg(icono)}${esc(txt)}</span>`;
+
+// Pastilla con ícono a la derecha del número, como en Autorizaciones. Las
+// emitidas sin autorización no la llevan: es el caso común.
+function estadoHtml(oc) {
+  const a = oc.autorizacion || {};
+  switch (oc.estado) {
+    case 'pendiente':  return estPill('espera', 'clock', 'Pendiente' + (a.solicitadoA?.nombre ? ' · ' + a.solicitadoA.nombre : ''));
+    case 'autorizada': return estPill('aprob', 'checkSm', 'Autorizada' + (a.firmante ? ' · ' + a.firmante : ''));
+    case 'rechazada':  return estPill('rech', 'x', 'Rechazada');
+    case 'cancelada':  return estPill('canc', 'slash', 'Cancelada');
+    case 'anulada':    return estPill('canc', 'copy', textoDuplicada(oc));
+    default: return '';
   }
-  if (e === 'rechazada') {
-    const motivo = oc.autorizacion?.motivoRechazo;
-    return `<span style="${base}background:#fde6e6;color:#b02a2a;" title="${esc(motivo || '')}">Rechazada</span>`;
-  }
-  if (e === 'cancelada') {
-    return `<span style="${base}background:#eceef1;color:#5b6573;">Cancelada</span>`;
-  }
-  if (e === 'anulada') return `<span class="dup-tag">${esc(textoDuplicada(oc))}</span>`;
-  return '';
 }
 
 // La OC que corrigió a otra lo dice (la otra quedó anulada como duplicada).
 function reemplazaBadge(oc) {
   const nros = oc.reemplazaA || [];
-  return nros.length ? `<span class="dup-tag dup-tag--nueva">Reemplaza a OC ${esc(nros.join(', '))}</span>` : '';
+  return nros.length ? `<span class="hc-est hc-est-reemp">Reemplaza a OC ${esc(nros.join(', '))}</span>` : '';
 }
 
 // Estado de entrega, espejado en la OC por Remitos (`entrega.estado`). Las OC
@@ -47,10 +54,7 @@ function reemplazaBadge(oc) {
 function entregaBadge(oc) {
   const e = oc.entrega?.estado;
   if (!e || e === 'sin') return '';
-  const base = 'display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;';
-  if (e === 'parcial')
-    return `<span style="${base}background:#fff4e0;color:#9a6a00;">Entrega parcial</span>`;
-  return `<span style="${base}background:#e3f5e8;color:#1e7d3a;">Entregada</span>`;
+  return e === 'parcial' ? estPill('par', 'clock', 'Entrega parcial') : estPill('ent', 'checkSm', 'Entregada');
 }
 
 // ---- Factura y remitos de la OC ----
@@ -97,11 +101,16 @@ async function cargarRemitos() {
 const verResp = oc => !!oc.responsable?.nombre &&
   (viewerIsAdmin || oc.responsable.codigo !== viewerCode);
 
+const moneyOC = oc => oc.total != null ? (oc.moneda === 'USD' ? 'US$ ' : '$ ') + fmtMoney(oc.total) : '—';
+
 function renderCards(ocs) {
   ultimaLista = ocs;
   const list = $('hist-list');
 
-  $('hist-count').textContent = ocs.length === 0 ? '' : `${ocs.length} orden${ocs.length !== 1 ? 'es' : ''}`;
+  // La pastilla de la cabecera cuenta lo filtrado; con filtro, "N de M".
+  const cnt = $('hist-count');
+  cnt.textContent = ocs.length === allOCs.length ? `${ocs.length} OC` : `${ocs.length} de ${allOCs.length} OC`;
+  cnt.classList.toggle('hidden', !allOCs.length);
 
   if (ocs.length === 0) {
     list.innerHTML = '<div class="hist-empty">No se encontraron órdenes de compra.</div>';
@@ -111,39 +120,34 @@ function renderCards(ocs) {
   const canRegen = typeof generateOCBlob === 'function';
 
   list.innerHTML = '';
-  // `hist-count` sigue mostrando el total del filtro; acá se pinta sólo la página.
+  // La pastilla de la cabecera sigue mostrando el total del filtro; acá se pinta sólo la página.
   pager.take('hist', ocs).forEach(oc => {
     const card = document.createElement('div');
     card.className = 'hist-card' + (oc.estado === 'anulada' ? ' hist-card--anulada' : '');
 
-    const provNombre = oc.proveedor?.nombre || '—';
-    const obra       = oc.obra || '—';
-    const total      = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
-    const resp       = oc.responsable?.nombre || '';
-    const badge      = estadoBadge(oc) + reemplazaBadge(oc);
-    const entrega    = entregaBadge(oc);
+    const motivo = oc.estado === 'rechazada' ? oc.autorizacion?.motivoRechazo : '';
     // Las OC pendientes todavía no tienen PDF definitivo, y las canceladas no lo
     // van a tener → no se descarga.
     const showRegen  = canRegen && oc.estado !== 'pendiente' && oc.estado !== 'cancelada';
 
     card.innerHTML = `
-      <div class="hist-card-top">
-        <span class="hist-nro">${esc(oc.nroOC)}</span>
-        <span class="hist-fecha">${esc(oc.fecha || '')}</span>
+      <div class="hc-top">
+        <span class="hc-nro"><span class="hc-nro-n">${esc(oc.nroOC)}</span>${oc.fecha ? ' · ' + esc(oc.fecha) : ''}</span>
+        ${estadoHtml(oc)}
       </div>
-      <div class="hist-proveedor">${esc(provNombre)}</div>
-      <div class="hist-obra">${esc(obra)}</div>
-      ${badge ? `<div style="margin-top:.35rem;display:flex;gap:.35rem;flex-wrap:wrap;">${badge}</div>` : ''}
-      ${docsHtml(oc, entrega)}
+      <div class="hc-prov">${esc(oc.proveedor?.nombre || '—')}</div>
+      <div class="hc-obra">${esc(oc.obra || '—')}</div>
+      ${motivo ? `<div class="hc-motivo">Motivo: ${esc(motivo)}</div>` : ''}
+      ${docsHtml(oc, reemplazaBadge(oc) + entregaBadge(oc))}
       ${hitsHtml(oc, itemsCoincidentes(oc, searchTerms), esc)}
-      <div class="hist-card-bottom">
-        <span class="hist-total">${total}</span>
-        ${verResp(oc) ? `<span class="hist-responsable">${esc(resp)}</span>` : ''}
-        <div class="hist-actions">
-          <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista</button>
-          ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('share')}PDF</button>` : ''}
-          <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en formulario">${icSvg('undo')}Usar como base</button>
-        </div>
+      <div class="hc-bottom">
+        <span class="hc-total">${moneyOC(oc)}</span>
+        ${verResp(oc) ? `<span class="hc-resp">${esc(oc.responsable.nombre)}</span>` : ''}
+      </div>
+      <div class="hc-actions">
+        <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Ver OC</button>
+        ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('share')}PDF</button>` : ''}
+        <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en el formulario">${icSvg('undo')}Usar como base</button>
       </div>`;
 
     card.querySelector('.btn-usar-base').addEventListener('click', () => usarComoBase(oc));
@@ -172,32 +176,97 @@ function esc(str) {
     .replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ---- Filtros ----
+// ---- Filtros: Estado y Período, desplegables-pastilla como los de Novedades ----
+// En el teléfono la pastilla usa el nombre corto, para que las dos entren en un renglón.
+const ESTADOS = [
+  { v: 'all',    nombre: 'Todos los estados',     corto: 'Todas',       icon: 'layers',  tono: 'act-t-all'     },
+  { v: 'emit',   nombre: 'Emitidas',              corto: 'Emitidas',    icon: 'print',   tono: 'hc-est-emit'   },
+  { v: 'aprob',  nombre: 'Autorizadas',           corto: 'Autorizadas', icon: 'checkSm', tono: 'hc-est-aprob'  },
+  { v: 'espera', nombre: 'Pendientes de firma',   corto: 'Pendientes',  icon: 'clock',   tono: 'hc-est-espera' },
+  { v: 'rech',   nombre: 'Rechazadas',            corto: 'Rechazadas',  icon: 'x',       tono: 'hc-est-rech'   },
+  { v: 'anul',   nombre: 'Anuladas y canceladas', corto: 'Anuladas',    icon: 'slash',   tono: 'hc-est-canc'   }
+];
+const PERIODOS = [
+  { v: '30',     nombre: 'Últimos 30 días', corto: '30 días' },
+  { v: '90',     nombre: 'Últimos 90 días', corto: '90 días' },
+  { v: 'all',    nombre: 'Todo',            corto: 'Todo'    },
+  { v: 'custom', nombre: 'Elegir fechas…',  corto: 'Fechas'  }
+];
+let filtroEstado = 'all', filtroPeriodo = 'all';
+
+const etiqueta = (x, extra = '') =>
+  `<span class="act-largo">${esc(x.nombre)}</span><span class="act-corto">${esc(x.corto)}</span>${extra}`;
+const CHEV = () => icSvg('chevron', 'act-chev');
+
+// Búsqueda y período, sin el estado: sobre eso se cuentan las opciones de Estado.
+function filtrarSinEstado() {
+  let result = allOCs;
+  // Como en Remitos: también por la descripción de los ítems comprados.
+  if (searchTerms.length) result = result.filter(oc => coincideOC(oc, searchTerms));
+
+  let desdeTs = 0, hastaTs = Infinity;
+  if (filtroPeriodo === 'custom') {
+    const desde = $('hist-desde').value, hasta = $('hist-hasta').value;   // YYYY-MM-DD
+    if (desde) desdeTs = new Date(desde + 'T00:00:00').getTime();
+    if (hasta) hastaTs = new Date(hasta + 'T23:59:59').getTime();
+  } else if (filtroPeriodo !== 'all') {
+    desdeTs = Date.now() - Number(filtroPeriodo) * 86400000;
+  }
+  if (desdeTs || hastaTs !== Infinity)
+    result = result.filter(oc => { const ts = oc.timestamp || 0; return ts >= desdeTs && ts <= hastaTs; });
+  return result;
+}
+
+function pintarFiltros(base) {
+  const n = { all: base.length };
+  base.forEach(oc => { const c = categoriaEstado(oc); n[c] = (n[c] || 0) + 1; });
+  const sel = ESTADOS.find(e => e.v === filtroEstado);
+  const btn = $('hist-estado-btn');
+  btn.className = 'act-pick' + (sel.v === 'all' ? '' : ' hist-tono ' + sel.tono);
+  btn.innerHTML = icSvg(sel.icon) + etiqueta(sel, ` <span class="act-pick-n">· ${n[sel.v] || 0}</span>`) + CHEV();
+  $('hist-estado-menu').innerHTML = ESTADOS.map(e => `
+    <button type="button" class="act-opt" role="option" data-v="${e.v}" aria-selected="${e.v === sel.v}">
+      <span class="act-opt-ic ${e.tono}">${icSvg(e.icon)}</span>${esc(e.nombre)}
+      <span class="act-opt-n">${n[e.v] || 0}</span>
+    </button>`).join('');
+
+  const per = PERIODOS.find(p => p.v === filtroPeriodo);
+  $('hist-periodo-btn').innerHTML = icSvg('calendar') + etiqueta(per) + CHEV();
+  $('hist-periodo-menu').innerHTML = PERIODOS.map(p => `
+    <button type="button" class="act-opt" role="option" data-v="${p.v}" aria-selected="${p.v === per.v}">${esc(p.nombre)}</button>`).join('');
+  $('hist-custom').classList.toggle('hidden', filtroPeriodo !== 'custom');
+}
+
+function cerrarMenus() {
+  ['estado', 'periodo'].forEach(k => {
+    $(`hist-${k}-menu`).classList.add('hidden');
+    $(`hist-${k}-btn`).setAttribute('aria-expanded', 'false');
+  });
+}
+
+function bindDesplegable(k, alElegir) {
+  const btn = $(`hist-${k}-btn`), menu = $(`hist-${k}-menu`);
+  btn.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const abrir = menu.classList.contains('hidden');
+    cerrarMenus();
+    if (abrir) { menu.classList.remove('hidden'); btn.setAttribute('aria-expanded', 'true'); }
+  });
+  menu.addEventListener('click', ev => {
+    const opt = ev.target.closest('.act-opt');
+    if (!opt) return;
+    cerrarMenus();
+    alElegir(opt.dataset.v);
+  });
+}
+
 function applyFilters() {
   // Filtro nuevo → la lista es otra, se vuelve a la primera página.
   pager.reset('hist');
   searchTerms = terminosBusqueda($('hist-search').value);
-  const desde = $('hist-desde').value; // YYYY-MM-DD
-  const hasta = $('hist-hasta').value;
-
-  let result = allOCs;
-
-  // Como en Remitos: también por la descripción de los ítems comprados.
-  if (searchTerms.length) result = result.filter(oc => coincideOC(oc, searchTerms));
-
-  if (desde || hasta) {
-    const desdeTs = desde ? new Date(desde + 'T00:00:00').getTime() : 0;
-    const hastaTs = hasta ? new Date(hasta + 'T23:59:59').getTime() : Infinity;
-    result = result.filter(oc => {
-      const ts = oc.timestamp || 0;
-      return ts >= desdeTs && ts <= hastaTs;
-    });
-    $('btn-clear-dates').classList.remove('hidden');
-  } else {
-    $('btn-clear-dates').classList.add('hidden');
-  }
-
-  renderCards(result);
+  const base = filtrarSinEstado();
+  pintarFiltros(base);
+  renderCards(filtroEstado === 'all' ? base : base.filter(oc => categoriaEstado(oc) === filtroEstado));
 }
 
 // ---- OC duplicadas por resolver ----
@@ -210,14 +279,22 @@ let gruposDup = [];
 function renderDuplicadas() {
   const box = $('hist-dup');
   gruposDup = typeof duplicadosPorRevisar === 'function' ? duplicadosPorRevisar(allOCs, viewerCode) : [];
+  const pill = $('hist-dupn');
+  pill.classList.toggle('hidden', !gruposDup.length);
   if (!gruposDup.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
 
   const n = gruposDup.length;
+  pill.textContent = n > 1 ? `${n} duplicadas` : '1 duplicada';
   const money = oc => (oc.moneda === 'USD' ? 'USD ' : '$ ') + fmtMoney(oc.total);
   box.innerHTML = `
-    <div class="dup-panel-t">${icSvg('alert')} ${n > 1 ? n + ' posibles OC duplicadas' : 'Posible OC duplicada'}</div>
-    <div class="dup-panel-sub">Le emitiste más de una OC al mismo proveedor, en menos de una hora, por un monto parecido.
-      Marcá la que quedó sin validez: sigue en el historial como "Duplicada", pero deja de contar en Reportes.</div>
+    <div class="dup-panel-h">
+      <span class="dup-panel-ic">${icSvg('alert')}</span>
+      <div>
+        <div class="dup-panel-t">${n > 1 ? n + ' posibles OC duplicadas' : 'Posible OC duplicada'}</div>
+        <div class="dup-panel-sub">Le emitiste más de una OC al mismo proveedor, en menos de una hora, por un monto parecido.
+          Marcá la que quedó sin validez: sigue en el historial como "Duplicada", pero deja de contar en Reportes.</div>
+      </div>
+    </div>
     ${gruposDup.map((g, gi) => `
       <div class="dup-grupo" data-g="${gi}">
         <div class="dup-grupo-head"><b>${esc(g[0].proveedor?.nombre || 'Sin proveedor')}</b> · ${esc(g[0].fecha || '')}</div>
@@ -294,7 +371,7 @@ async function resolverDup(grupo, accion, btn) {
     toast('No se pudo guardar. ' + e.message, 'error');
   }
   renderDuplicadas();
-  renderCards(ultimaLista);
+  applyFilters();   // cambió el estado de las OC: también los contadores de Estado
 }
 
 // ---- Ficha de la OC ----
@@ -365,18 +442,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = name;
 
-  $('btn-facturas').addEventListener('click', () => { window.location.href = 'facturas.html'; });
   $('btn-back').addEventListener('click',    () => { window.location.href = 'compras.html'; });
   $('hist-search').addEventListener('input',  applyFilters);
   $('modal-preview-close').addEventListener('click', cerrarFicha);
   $('preview-base').addEventListener('click', () => { if (fichaOC) usarComoBase(fichaOC); });
   $('hist-desde').addEventListener('change',  applyFilters);
   $('hist-hasta').addEventListener('change',  applyFilters);
-  $('btn-clear-dates').addEventListener('click', () => {
-    $('hist-desde').value = '';
-    $('hist-hasta').value = '';
-    applyFilters();
-  });
+  bindDesplegable('estado',  v => { filtroEstado = v; applyFilters(); });
+  bindDesplegable('periodo', v => { filtroPeriodo = v; applyFilters(); });
+  document.addEventListener('click', ev => { if (!ev.target.closest('.act-dd')) cerrarMenus(); });
+  $('hist-dupn').addEventListener('click', () => $('hist-dup').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  pintarFiltros([]);
 
   // Indicador de pendientes Drive
   if (typeof driveQueue !== 'undefined') {
@@ -396,14 +472,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     allOCs = await getHistorial(code, isAdmin, true);
-    renderCards(allOCs);
+    applyFilters();
     renderDuplicadas();
     cargarRemitos();
   } catch (e) {
     const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;
     if (cached && cached.length) {
       allOCs = cached;
-      renderCards(allOCs);
+      applyFilters();
       $('hist-list').insertAdjacentHTML('afterbegin',
         `<div class="hist-offline-notice">${icSvg('wifi0')} Sin conexión — mostrando últimas 5 OC guardadas</div>`);
     } else {
