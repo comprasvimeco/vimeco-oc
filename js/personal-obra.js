@@ -4,17 +4,6 @@ const $ = id => document.getElementById(id);
 
 
 
-function showConfirm(title, msg) {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
-    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
-  });
-}
-
 function esc(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -313,7 +302,8 @@ async function quitarDeObra(id) {
   if (!p) return;
   const ok = await showConfirm(
     'Quitar de la obra',
-    `¿Quitar a ${p.apellido}, ${p.nombre} de esta obra? Seguirá en el padrón y podés volver a traerlo.`
+    `¿Quitar a ${p.apellido}, ${p.nombre} de esta obra? Seguirá en el padrón y podés volver a traerlo.`,
+    { boton: 'Quitar', tono: 'del', icono: 'userX' }
   );
   if (!ok) return;
   const nuevasObras = { ...(p.obras || {}) };
@@ -567,7 +557,8 @@ async function cerrarQuincenaActual() {
   const qid = quincenaId(q);
   const ok  = await showConfirm(
     'Cerrar quincena',
-    `¿Cerrar la quincena ${quincenaLabel(q)}? Quedará en solo lectura. ${esAdmin ? 'Podés reabrirla luego.' : 'Solo un administrador podrá reabrirla.'}`
+    `¿Cerrar la quincena ${quincenaLabel(q)}? Quedará en solo lectura. ${esAdmin ? 'Podés reabrirla luego.' : 'Solo un administrador podrá reabrirla.'}`,
+    { boton: 'Cerrar', tono: 'info', icono: 'lock' }
   );
   if (!ok) return;
   try {
@@ -585,7 +576,8 @@ async function cerrarQuincenaActual() {
 async function reabrirQuincenaActual() {
   const q   = currentQuincena;
   const qid = quincenaId(q);
-  const ok  = await showConfirm('Reabrir quincena', `¿Reabrir la quincena ${quincenaLabel(q)} para poder editarla?`);
+  const ok  = await showConfirm('Reabrir quincena', `¿Reabrir la quincena ${quincenaLabel(q)} para poder editarla?`,
+    { boton: 'Reabrir', tono: 'info', icono: 'unlock' });
   if (!ok) return;
   try {
     await reabrirQuincena(obraKey, qid);

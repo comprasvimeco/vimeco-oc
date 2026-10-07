@@ -416,7 +416,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function confirmDelete(key) {
-    if (!confirm('¿Eliminar este movimiento?')) return;
+    if (!await showConfirm('Eliminar movimiento', '¿Eliminar este movimiento? También se borra su comprobante en Drive.',
+      { boton: 'Eliminar', tono: 'del', icono: 'trash' })) return;
     const mov    = movimientos.find(m => m.key === key);
     const mesMov = mov?.fecha?.substring(0, 7);
     try {

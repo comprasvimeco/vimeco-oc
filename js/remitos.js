@@ -215,7 +215,7 @@ async function borrarRemito(key) {
     'Borrar remito',
     `Se va a borrar el remito ${rem.nro} de la OC ${rem.nroOC}.\n\n` +
     'Las cantidades vuelven a figurar como pendientes. La foto queda archivada en Drive.',
-    'Borrar')) return;
+    { boton: 'Borrar', tono: 'del', icono: 'trash' })) return;
 
   try {
     await deleteRemito(key);
@@ -458,19 +458,6 @@ function mostrarError(msg) {
   box.classList.remove('hidden');
 }
 
-function showConfirm(title, msg, okLabel = 'Aceptar') {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const yes = $('modal-confirm-yes'), no = $('modal-confirm-no'), modal = $('modal-confirm');
-    yes.textContent = okLabel;
-    modal.classList.remove('hidden');
-    const close = val => { modal.classList.add('hidden'); yes.onclick = no.onclick = null; resolve(val); };
-    no.onclick  = () => close(false);
-    yes.onclick = () => close(true);
-  });
-}
-
 // ---- Guardar ----
 
 function ocMetaDe(oc) {
@@ -598,7 +585,7 @@ async function guardarRemito() {
   if (excedidos.length && !await showConfirm(
     'Más de lo pendiente',
     `${excedidos.length} renglón(es) supera(n) lo que falta entregar en esta OC.\n\n¿Guardar igual?`,
-    'Guardar')) return;
+    { boton: 'Guardar igual', tono: 'warn', icono: 'alert' })) return;
 
   // Mismo número y mismo proveedor = casi seguro el mismo remito cargado dos
   // veces, y eso duplicaría las cantidades recibidas.
@@ -608,7 +595,7 @@ async function guardarRemito() {
   if (dup && !await showConfirm(
     'Remito repetido',
     `Ya hay un remito ${nro} de ${modalOC.proveedor?.nombre || 'este proveedor'} (OC ${dup.nroOC}).\n\n¿Cargarlo igual?`,
-    'Cargar igual')) return;
+    { boton: 'Cargar igual', tono: 'warn', icono: 'alert' })) return;
 
   const e        = entregasDeOC(modalOC);
   const completa = (modalOC.items || []).every((_, i) => {

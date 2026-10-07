@@ -26,23 +26,6 @@ function esc(str) {
 
 
 
-// `accion`: { boton, tono: 'ok' | 'del', icono }. Sin ella, es la de borrar.
-function showConfirm(title, msg, accion = { boton: 'Borrar', tono: 'del', icono: 'trash' }) {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    $('modal-confirm-ic').innerHTML      = icSvg(accion.icono);
-    const yes = $('modal-confirm-yes');
-    yes.className = 'foc-btn ' + (accion.tono === 'ok' ? 'foc-btn--gen' : 'foc-btn--del');
-    yes.innerHTML = icSvg(accion.icono) + esc(accion.boton);
-    document.querySelector('#modal-confirm .act-confirm').className = 'act-confirm act-confirm--' + accion.tono;
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
-    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
-  });
-}
-
 function tipoMeta(tipo) {
   switch (tipo) {
     case 'oc':      return { label: 'OC',      icon: 'print',  cls: 'act-t-oc' };
@@ -428,7 +411,8 @@ async function borrarNovedad(key) {
   const ev = allEvents.find(e => e.key === key);
   const ok = await showConfirm(
     'Borrar novedad',
-    `¿Borrar esta novedad para todos? "${ev?.titulo || ''}". Esta acción no se puede deshacer.`
+    `¿Borrar esta novedad para todos? "${ev?.titulo || ''}". Esta acción no se puede deshacer.`,
+    { boton: 'Borrar', tono: 'del', icono: 'trash' }
   );
   if (!ok) return;
   try {

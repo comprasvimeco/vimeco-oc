@@ -67,13 +67,15 @@ function badgeFactura(f) {
 
 // Cargar una factura sobre una OC que ya la tiene suele ser el mismo archivo
 // subido dos veces. Cargar "otro archivo" es legítimo y no se pregunta nada.
-function confirmarDuplicado(oc) {
+async function confirmarDuplicado(oc) {
   if (tipoCarga !== 'factura') return true;
   const f = estadoFactura(oc);
   if (f.estado !== 'con') return true;
   const cuando = f.ts ? ' el ' + new Date(f.ts).toLocaleDateString('es-AR') : '';
   const quien  = f.por ? ' por ' + f.por : '';
-  return confirm(`La OC ${oc.nroOC} ya tiene una factura cargada${cuando}${quien}.\n\n¿Cargar otra igual?`);
+  return showConfirm('Ya tiene factura',
+    `La OC ${oc.nroOC} ya tiene una factura cargada${cuando}${quien}.\n\n¿Cargar otra igual?`,
+    { boton: 'Cargar igual', tono: 'warn', icono: 'alert' });
 }
 
 // Deja registrado el archivo en el historial para que la lista pueda mostrar el
@@ -334,9 +336,9 @@ function renderPrimaryList(filter = '') {
 
 function bindPickButtons() {
   document.querySelectorAll('.btn-attach-pick').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
-      if (!oc || !confirmarDuplicado(oc)) return;
+      if (!oc || !await confirmarDuplicado(oc)) return;
       pendingOC = oc;
       const mf = $('manual-file');
       mf.value = '';
@@ -346,9 +348,9 @@ function bindPickButtons() {
 
   // Sacar foto: la factura pasa por el escáner y se sube apenas se toca "Listo".
   document.querySelectorAll('.btn-attach-cam').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
-      if (!oc || !confirmarDuplicado(oc)) return;
+      if (!oc || !await confirmarDuplicado(oc)) return;
       pendingOC = oc;
       const ci = $('manual-camera');
       ci.value = '';
@@ -410,7 +412,7 @@ function bindButtons() {
   document.querySelectorAll('.btn-adj-attach').forEach(btn => {
     btn.addEventListener('click', async () => {
       const oc = allOCs.find(o => o.nroOC === btn.dataset.nro);
-      if (oc && confirmarDuplicado(oc)) await doAttach(currentFile, oc, btn);
+      if (oc && await confirmarDuplicado(oc)) await doAttach(currentFile, oc, btn);
     });
   });
 

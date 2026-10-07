@@ -158,17 +158,6 @@ const SEED_PATENTES = {
 
 
 
-function showConfirm(title, msg) {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
-    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
-  });
-}
-
 function esc(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -332,7 +321,8 @@ async function saveEquipoModal() {
 async function seedEquipos() {
   const ok = await showConfirm(
     'Importar lista inicial',
-    `Se cargarán ${SEED_EQUIPOS.length} equipos. Los equipos con el mismo código se sobrescribirán.`
+    `Se cargarán ${SEED_EQUIPOS.length} equipos. Los equipos con el mismo código se sobrescribirán.`,
+    { boton: 'Importar', tono: 'warn', icono: 'layers' }
   );
   if (!ok) return;
 

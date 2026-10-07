@@ -4,17 +4,6 @@ const $ = id => document.getElementById(id);
 
 
 
-function showConfirm(title, msg) {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
-    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
-  });
-}
-
 function esc(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -86,7 +75,8 @@ async function quitarRubro(i) {
   const r = editingRubros[i];
   if (!r) return;
   const ok = await showConfirm('Quitar rubro',
-    `¿Quitar "${r.nombre}"? Las OC ya emitidas con ese rubro lo conservan, pero deja de ofrecerse en las OC nuevas.`);
+    `¿Quitar "${r.nombre}"? Las OC ya emitidas con ese rubro lo conservan, pero deja de ofrecerse en las OC nuevas.`,
+    { boton: 'Quitar', tono: 'del', icono: 'trash' });
   if (!ok) return;
   editingRubros.splice(i, 1);
   editingRubros.forEach((x, n) => { x.orden = n; });
@@ -111,12 +101,14 @@ async function toggleCierreRubros() {
     const vacios = editingRubros.some(r => !r.nombre.trim());
     if (vacios) { showToast('Hay rubros sin nombre.', 'error'); return; }
     const ok = await showConfirm('Cerrar lista de rubros',
-      'A partir de ahora, toda OC nueva de esta obra va a tener que elegir un rubro. Podés reabrir la lista cuando quieras.');
+      'A partir de ahora, toda OC nueva de esta obra va a tener que elegir un rubro. Podés reabrir la lista cuando quieras.',
+      { boton: 'Cerrar lista', tono: 'info', icono: 'lock' });
     if (!ok) return;
     rubrosCerrados = true;
   } else {
     const ok = await showConfirm('Reabrir lista de rubros',
-      'Mientras esté abierta, las OC nuevas de esta obra se emiten sin rubro.');
+      'Mientras esté abierta, las OC nuevas de esta obra se emiten sin rubro.',
+      { boton: 'Reabrir', tono: 'info', icono: 'unlock' });
     if (!ok) return;
     rubrosCerrados = false;
   }
@@ -306,7 +298,8 @@ window.toggleActiva = async function (key, activa, nombre) {
     activa ? 'Desactivar obra' : 'Activar obra',
     activa
       ? `¿Desactivar "${nombre}"? No aparecerá en el desplegable de nuevas OC.`
-      : `¿Activar "${nombre}"?`
+      : `¿Activar "${nombre}"?`,
+    activa ? { boton: 'Desactivar', tono: 'warn', icono: 'power' } : { boton: 'Activar', tono: 'ok', icono: 'power' }
   );
   if (!ok) return;
   try {

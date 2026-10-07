@@ -176,8 +176,10 @@ function rehacerOC(oc) {
 // autorizador. Se relee el estado del servidor por si justo la resolvieron.
 async function cancelarPedido(oc, btn) {
   const quien = oc.autorizacion?.solicitadoA?.nombre || 'El autorizador';
-  if (!confirm(`¿Cancelar el pedido de autorización de la OC ${oc.nroOC}?\n\n` +
-               `${quien} ya no la va a ver para firmar y el número de OC queda anulado.`)) return;
+  if (!await showConfirm('Cancelar pedido',
+      `¿Cancelar el pedido de autorización de la OC ${oc.nroOC}?\n\n` +
+      `${quien} ya no la va a ver para firmar y el número de OC queda anulado.`,
+      { boton: 'Cancelar pedido', tono: 'del', icono: 'x', cancelar: 'Volver' })) return;
   const histKey = oc.nroOC.replace(/-/g, '');
   btn.disabled = true;
   try {

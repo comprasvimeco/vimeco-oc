@@ -1173,22 +1173,6 @@ function hideSaveProvBtn() {
   if (b) b.classList.add('hidden');
 }
 
-// Modal de confirmación genérico (promesa). `okLabel` personaliza el botón de acción.
-function showConfirm(title, msg, okLabel = 'Aceptar') {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const yes   = $('modal-confirm-yes');
-    const no    = $('modal-confirm-no');
-    const modal = $('modal-confirm');
-    yes.textContent = okLabel;
-    modal.classList.remove('hidden');
-    const close = val => { modal.classList.add('hidden'); yes.onclick = no.onclick = null; resolve(val); };
-    no.onclick  = () => close(false);
-    yes.onclick = () => close(true);
-  });
-}
-
 // Formatea 11 dígitos como XX-XXXXXXXX-X (para mostrar en el aviso).
 function _fmtCuit(dig) {
   const d = (dig || '').replace(/\D/g, '');
@@ -1240,7 +1224,7 @@ async function saveProveedorToBase() {
   else if (existing) msg = `Vas a actualizar los datos de "${nombre}" (CUIT ${cuitRaw}) en la base de proveedores.`;
   else               msg = `Vas a agregar "${nombre}" (CUIT ${cuitRaw}) a la base de proveedores.`;
 
-  if (!await showConfirm('Guardar proveedor en la base', msg, 'Guardar')) return;
+  if (!await showConfirm('Guardar proveedor en la base', msg, { boton: 'Guardar', tono: 'ok', icono: 'checkSm' })) return;
 
   try {
     await saveProveedorBase(newKey, record);

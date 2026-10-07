@@ -4,17 +4,6 @@ const $ = id => document.getElementById(id);
 
 
 
-function showConfirm(title, msg) {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
-    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
-  });
-}
-
 function esc(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -84,7 +73,7 @@ async function addCategoria() {
 
 async function removeCategoria(i) {
   const nombre = categorias[i];
-  const ok = await showConfirm('Quitar categoría', `¿Quitar la categoría "${nombre}"?`);
+  const ok = await showConfirm('Quitar categoría', `¿Quitar la categoría "${nombre}"?`, { boton: 'Quitar', tono: 'del', icono: 'trash' });
   if (!ok) return;
   categorias.splice(i, 1);
   renderCategorias();
@@ -206,7 +195,7 @@ async function addFeriado() {
 }
 
 async function removeFeriado(fecha) {
-  const ok = await showConfirm('Quitar feriado', `¿Quitar el feriado del ${fmtFecha(fecha)}?`);
+  const ok = await showConfirm('Quitar feriado', `¿Quitar el feriado del ${fmtFecha(fecha)}?`, { boton: 'Quitar', tono: 'del', icono: 'trash' });
   if (!ok) return;
   delete feriados[fecha];
   renderFeriados();
@@ -403,7 +392,8 @@ async function toggleActivo(id) {
   const ok = await showConfirm(
     activar ? 'Activar personal' : 'Desactivar personal',
     activar ? `¿Activar a ${p.apellido}, ${p.nombre}?`
-            : `¿Desactivar a ${p.apellido}, ${p.nombre}? Quedará en el padrón pero marcado como inactivo.`
+            : `¿Desactivar a ${p.apellido}, ${p.nombre}? Quedará en el padrón pero marcado como inactivo.`,
+    !activar ? { boton: 'Desactivar', tono: 'warn', icono: 'power' } : { boton: 'Activar', tono: 'ok', icono: 'power' }
   );
   if (!ok) return;
   try {

@@ -1465,7 +1465,7 @@ async function marcarNoDuplicadas(btn) {
   const ok = await showConfirm('No son duplicadas',
     `¿Marcar las OC ${nros} como compras distintas? El grupo sale de la lista para todos ` +
     `y no se puede deshacer desde acá. Vuelve a aparecer sólo si se le suma una OC nueva.`,
-    { si: 'Confirmar', peligro: false });
+    { boton: 'Son distintas', tono: 'ok', icono: 'check' });
   if (!ok) return;
 
   const marca = { ts: Date.now(), por: sessionStorage.getItem('responsable_name') || '' };
@@ -1497,7 +1497,8 @@ async function borrarOC(key, titulo) {
   const ok = await showConfirm(titulo,
     `¿Borrar la OC ${oc.nroOC} (${fmtFull(oc.total, oc.moneda || 'ARS')}) del historial? ` +
     `No se puede deshacer. El PDF en Drive no se toca: si esta OC ya se le mandó al proveedor, ` +
-    `borrarla acá no la da de baja.`);
+    `borrarla acá no la da de baja.`,
+    { boton: 'Borrar', tono: 'del', icono: 'trash' });
   if (!ok) return false;
 
   try {
@@ -1692,22 +1693,6 @@ async function verPDF() {
   } finally {
     btn.disabled = false;
   }
-}
-
-// Por defecto confirma un borrado (botón rojo "Borrar"); `si` y `peligro`
-// lo adaptan a otras acciones.
-function showConfirm(title, msg, { si = 'Borrar', peligro = true } = {}) {
-  return new Promise(resolve => {
-    $('mcf-title').textContent = title;
-    $('mcf-msg').textContent   = msg;
-    $('mcf-yes').textContent   = si;
-    $('mcf-yes').className     = 'btn ' + (peligro ? 'btn-danger' : 'btn-primary');
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    const done = v => { modal.classList.add('hidden'); resolve(v); };
-    $('mcf-no').onclick  = () => done(false);
-    $('mcf-yes').onclick = () => done(true);
-  });
 }
 
 // ===================================================

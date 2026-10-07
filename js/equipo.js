@@ -16,17 +16,6 @@ function equipoKey(codigo) {
     .replace(/^_|_$/g, '');
 }
 
-function showConfirm(title, msg) {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
-    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
-  });
-}
-
 // Redimensiona y comprime la imagen en el cliente antes de guardarla como
 // dataURL. Una foto de celular pesa 3-5 MB; así queda en ~80-150 KB.
 // Helper genérico: reutilizable a futuro para la foto de rostro en Personal.
@@ -119,7 +108,8 @@ async function toggleActivo() {
     activo ? 'Desactivar equipo' : 'Activar equipo',
     activo
       ? `¿Desactivar "${equipo.codigo}"? No aparecerá al asignar equipos en nuevas OC.`
-      : `¿Activar "${equipo.codigo}"?`
+      : `¿Activar "${equipo.codigo}"?`,
+    activo ? { boton: 'Desactivar', tono: 'warn', icono: 'power' } : { boton: 'Activar', tono: 'ok', icono: 'power' }
   );
   if (!ok) return;
   const btn = $('btn-toggle-activo');
@@ -152,7 +142,8 @@ async function habilitarEdicionDatos() {
   if (editandoDatos) return;
   const ok = await showConfirm(
     'Editar datos del equipo',
-    'Vas a habilitar la edición del código y la descripción. Cambiar el código renombra el equipo. ¿Continuar?'
+    'Vas a habilitar la edición del código y la descripción. Cambiar el código renombra el equipo. ¿Continuar?',
+    { boton: 'Editar', tono: 'info', icono: 'edit' }
   );
   if (ok) setDatosEditables(true);
 }
@@ -421,7 +412,8 @@ async function renombrarDoc(doc, texto) {
 async function quitarDoc(doc) {
   const ok = await showConfirm(
     'Quitar documento',
-    `¿Quitar "${doc.texto || doc.nombre}"? El archivo va a la papelera de Drive (se puede recuperar durante 30 días).`
+    `¿Quitar "${doc.texto || doc.nombre}"? El archivo va a la papelera de Drive (se puede recuperar durante 30 días).`,
+    { boton: 'Quitar', tono: 'del', icono: 'trash' }
   );
   if (!ok) return;
   try {

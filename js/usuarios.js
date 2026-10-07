@@ -4,17 +4,6 @@ const $ = id => document.getElementById(id);
 
 
 
-function showConfirm(title, msg) {
-  return new Promise(resolve => {
-    $('modal-confirm-title').textContent = title;
-    $('modal-confirm-msg').textContent   = msg;
-    const modal = $('modal-confirm');
-    modal.classList.remove('hidden');
-    $('modal-confirm-no').onclick  = () => { modal.classList.add('hidden'); resolve(false); };
-    $('modal-confirm-yes').onclick = () => { modal.classList.add('hidden'); resolve(true); };
-  });
-}
-
 function esc(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -177,7 +166,8 @@ async function saveUser() {
 window.resetPwd = async function (codigo, nombre) {
   const ok = await showConfirm(
     'Resetear contraseña',
-    `¿Resetear la contraseña de ${nombre}? El usuario deberá crear una nueva al próximo ingreso.`
+    `¿Resetear la contraseña de ${nombre}? El usuario deberá crear una nueva al próximo ingreso.`,
+    { boton: 'Resetear', tono: 'warn', icono: 'key' }
   );
   if (!ok) return;
   try {
@@ -255,7 +245,8 @@ window.toggleActivo = async function (codigo, activo, nombre) {
     activo ? 'Desactivar usuario' : 'Activar usuario',
     activo
       ? `¿Desactivar a ${nombre}? No podrá ingresar al sistema.`
-      : `¿Activar a ${nombre}?`
+      : `¿Activar a ${nombre}?`,
+    activo ? { boton: 'Desactivar', tono: 'warn', icono: 'power' } : { boton: 'Activar', tono: 'ok', icono: 'power' }
   );
   if (!ok) return;
   try {
