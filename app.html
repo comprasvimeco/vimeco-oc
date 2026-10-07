@@ -386,115 +386,90 @@
   </div>
 </div>
 
-<!-- ===== MODAL: Firma ===== -->
+<!-- ===== MODAL: Firma (mismo lienzo que en Autorizaciones) ===== -->
 <div class="modal-overlay hidden" id="modal-firma">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Mi Firma</span>
-      <button class="modal-close" id="modal-firma-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div class="confirm-box confirm-box--ok confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="firma-title">
+    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+    <div class="confirm-title" id="firma-title">Tu firma</div>
+    <p class="confirm-msg">Dibujala una vez: queda guardada para que puedas firmar las próximas OC.</p>
+    <div class="firma-pad">
+      <canvas id="firma-canvas"></canvas>
     </div>
-    <div class="modal-body">
-      <p class="firma-hint-top">Dibujá tu firma. Se guardará y podrás incluirla en futuras OC.</p>
-      <div class="firma-canvas-wrap">
-        <canvas id="firma-canvas"></canvas>
-      </div>
-      <p class="firma-hint-bot">Usá el dedo o el mouse para dibujar</p>
+    <div class="firma-pie">
+      <span>Con el dedo o el mouse</span>
+      <button type="button" class="foc-btn foc-btn--clear" id="btn-firma-limpiar"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Borrar</button>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="btn-firma-limpiar">Limpiar</button>
-      <button class="btn btn-primary" id="btn-firma-guardar">Guardar firma</button>
+    <div class="confirm-btns">
+      <button type="button" class="foc-btn foc-btn--clear" id="modal-firma-close">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--gen" id="btn-firma-guardar"></button>
     </div>
   </div>
 </div>
 
 <!-- ===== MODAL: Autorización de la OC ===== -->
 <div class="modal-overlay hidden" id="modal-firma-confirm">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title">Generar Orden de Compra</span>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="firma-confirm-title">
+    <span class="confirm-ic" style="background:#e8eef7;color:var(--primary)"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span>
+    <div class="confirm-title" id="firma-confirm-title">Generar orden de compra</div>
+    <p class="confirm-msg" id="firma-confirm-pregunta">¿Cómo la autorizás?</p>
+    <p class="confirm-aviso hidden" id="firma-monto-aviso"><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span id="firma-monto-texto"></span></p>
+    <div class="confirm-opts">
+      <button type="button" class="confirm-opt confirm-opt--main" id="btn-firma-con"><span class="confirm-opt-ic confirm-opt-ic--ok"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span><span><b>Firmar yo y generar</b><small>Sale con tu firma guardada</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button type="button" class="confirm-opt" id="btn-firma-pedir"><span class="confirm-opt-ic confirm-opt-ic--vio"><svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg></span><span><b>Pedir autorización</b><small id="firma-pedir-sub">Le llega a otro usuario para que la firme</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button type="button" class="confirm-opt" id="btn-firma-sin"><span class="confirm-opt-ic confirm-opt-ic--gray"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span><span><b>Generar sin firma</b><small>El PDF sale sin firma</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
-    <div class="modal-body" style="padding:1.35rem 1.25rem;">
-      <p id="firma-confirm-pregunta" style="color:var(--gray-600);text-align:center;margin-bottom:1.1rem;">¿Cómo querés autorizar esta OC?</p>
-      <p id="firma-monto-aviso" class="hidden" style="color:var(--gray-700);background:var(--gray-100);border:1px solid var(--gray-200);border-radius:var(--radius);padding:.6rem .75rem;font-size:.86rem;line-height:1.4;margin-bottom:1rem;"></p>
-      <div class="firma-opciones">
-        <button class="foc-btn foc-btn--gen" id="btn-firma-con"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Firmar yo y generar</button>
-        <button class="foc-btn foc-btn--edit" id="btn-firma-pedir"><svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg>Pedir autorización a otro usuario</button>
-        <button class="foc-btn foc-btn--clear" id="btn-firma-sin"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Generar sin firma</button>
-      </div>
-      <div style="text-align:center;">
-        <button id="btn-firma-cancel" style="background:none;border:none;color:var(--gray-500);cursor:pointer;font-size:.85rem;text-decoration:underline;margin-top:.9rem;">Cancelar</button>
-      </div>
-    </div>
+    <button type="button" class="foc-btn foc-btn--clear confirm-cancel" id="btn-firma-cancel">Cancelar</button>
   </div>
 </div>
 
 <!-- ===== MODAL: OC que repite otra reciente ===== -->
 <div class="modal-overlay hidden" id="modal-dup">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title">¿Esta OC repite otra?</span>
-      <button class="modal-close" id="modal-dup-close" aria-label="Volver al formulario" title="Volver al formulario"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div class="confirm-box confirm-box--warn" role="dialog" aria-modal="true" aria-labelledby="dup-title">
+    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+    <div class="confirm-title" id="dup-title">¿Esta OC repite otra?</div>
+    <p id="dup-texto" class="confirm-msg"></p>
+    <div id="dup-lista" class="dup-lista"></div>
+    <p id="dup-nota" class="dup-nota"></p>
+    <div class="confirm-btns">
+      <button type="button" class="foc-btn foc-btn--edit" id="btn-dup-otra"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Es otra compra</button>
+      <button type="button" class="foc-btn foc-btn--gen" id="btn-dup-correccion"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Es corrección</button>
     </div>
-    <div class="modal-body" style="padding:1.35rem 1.25rem;">
-      <p id="dup-texto" class="dup-texto"></p>
-      <div id="dup-lista" class="dup-lista"></div>
-      <p id="dup-nota" class="dup-nota"></p>
-      <div class="firma-opciones">
-        <button class="foc-btn foc-btn--gen" id="btn-dup-correccion"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Es una corrección</button>
-        <button class="foc-btn foc-btn--edit" id="btn-dup-otra"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Es otra compra</button>
-      </div>
-    </div>
+    <button type="button" class="foc-btn foc-btn--clear confirm-cancel" id="modal-dup-close">Volver al formulario</button>
   </div>
 </div>
 
 <!-- ===== MODAL: Pedir autorización (elegir usuario) ===== -->
 <div class="modal-overlay hidden" id="modal-pedir-autorizacion">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title">Pedir autorización</span>
-      <button class="modal-close" id="modal-pedir-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body" style="padding:1.35rem 1.25rem;">
-      <p id="pedir-texto" style="color:var(--gray-600);font-size:.9rem;margin-bottom:.7rem;">Elegí a quién le pedís que firme esta OC. Le va a aparecer en su bandeja de autorizaciones.</p>
-      <p id="pedir-comunicate" class="pedir-comunicate hidden"><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Por favor, comunicate con la persona para avisarle.</p>
-      <select id="select-autorizador" class="form-control" style="width:100%;">
-        <option value="">Cargando usuarios…</option>
-      </select>
-      <p id="pedir-empty" class="hidden" style="color:var(--gray-500);font-size:.82rem;margin-top:.6rem;">No hay otros usuarios activos disponibles.</p>
-    </div>
-    <div class="modal-footer pedir-footer">
-      <button class="foc-btn foc-btn--clear" id="btn-pedir-cancel">Cancelar</button>
-      <button class="foc-btn foc-btn--edit" id="btn-pedir-confirm"><svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg>Enviar solicitud</button>
+  <div class="confirm-box confirm-box--vio" role="dialog" aria-modal="true" aria-labelledby="pedir-title">
+    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg></span>
+    <div class="confirm-title" id="pedir-title">Pedir autorización</div>
+    <p id="pedir-texto" class="confirm-msg">Elegí a quién le pedís que firme esta OC. Le va a aparecer en su bandeja de Autorizaciones.</p>
+    <p id="pedir-comunicate" class="confirm-aviso hidden"><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Avisale a la persona que le pediste la firma.</span></p>
+    <div id="pedir-lista" class="pedir-lista" role="radiogroup" aria-label="A quién le pedís la firma"></div>
+    <div class="confirm-btns">
+      <button type="button" class="foc-btn foc-btn--clear" id="btn-pedir-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--vio" id="btn-pedir-confirm"><svg class="icon" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Enviar pedido</button>
     </div>
   </div>
 </div>
 
 <!-- ===== MODAL: Archivo compartido ===== -->
 <div class="modal-overlay hidden" id="modal-share-choice">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title">Archivo recibido</span>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="share-title">
+    <span class="confirm-ic" style="background:#e8eef7;color:var(--primary)"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></span>
+    <div class="confirm-title" id="share-title">Archivo recibido</div>
+    <span class="confirm-chip" id="share-choice-file"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span id="share-choice-filename"></span></span>
+    <div class="confirm-aviso hidden" id="share-choice-aviso"><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>
+      Compartir archivos no está funcionando por el momento, por una falla de la última actualización de Chrome.
+      Elegí qué querés hacer y después seleccioná el archivo desde Descargas.
+      <span class="hidden" id="share-choice-buscar" style="display:block;margin-top:.4rem;">Buscá: <strong id="share-choice-buscar-nombre" style="word-break:break-all;"></strong></span>
+    </span></div>
+    <p class="confirm-msg" style="margin-top:.7rem">¿Qué querés hacer con este archivo?</p>
+    <div class="confirm-opts">
+      <button type="button" class="confirm-opt confirm-opt--main" id="btn-share-generar"><span class="confirm-opt-ic confirm-opt-ic--ok"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span><span><b>Generar OC</b><small>Cargarlo en el formulario para extraer los datos con IA</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button type="button" class="confirm-opt" id="btn-share-facturas"><span class="confirm-opt-ic confirm-opt-ic--blue"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></span><span><b>Cargar en una OC</b><small>Guardarlo como factura u otro archivo de una OC emitida</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
-    <div class="modal-body" style="padding:1.5rem 1.25rem;">
-      <div class="share-aviso hidden" id="share-choice-aviso">
-        Compartir archivos no está funcionando por el momento, por una falla de la última actualización de Chrome.
-        Elegí qué querés hacer y después seleccioná el archivo desde Descargas.
-        <span class="hidden" id="share-choice-buscar" style="display:block;margin-top:.5rem;">
-          Buscá: <strong id="share-choice-buscar-nombre" style="word-break:break-all;"></strong>
-        </span>
-      </div>
-      <p id="share-choice-file" style="color:var(--gray-600);margin-bottom:.35rem;font-size:.82rem;word-break:break-all;">
-        <strong id="share-choice-filename"></strong>
-      </p>
-      <p style="color:var(--gray-600);text-align:center;margin-bottom:1.1rem;">¿Qué querés hacer con este archivo?</p>
-      <div class="firma-opciones">
-        <button class="foc-btn foc-btn--gen" id="btn-share-generar"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Generar OC</button>
-        <button class="foc-btn foc-btn--edit" id="btn-share-facturas"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>Cargar en una OC</button>
-      </div>
-      <div style="text-align:center;">
-        <button id="btn-share-cancelar" style="background:none;border:none;color:var(--gray-500);cursor:pointer;font-size:.85rem;text-decoration:underline;margin-top:.9rem;">Cancelar</button>
-      </div>
-    </div>
+    <button type="button" class="foc-btn foc-btn--clear confirm-cancel" id="btn-share-cancelar">Cancelar</button>
   </div>
 </div>
 

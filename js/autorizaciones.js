@@ -461,13 +461,20 @@ async function firmarOC(oc) {
 
 // ---- Rechazar ----
 function abrirRechazo() {
+  const oc    = currentOC;
+  const quien = oc?.autorizacion?.solicitadoPor?.nombre || oc?.responsable?.nombre || '';
+  $('rechazo-title').textContent = oc ? `Rechazar OC ${oc.nroOC}` : 'Rechazar OC';
+  $('rechazo-msg').textContent   = `Contale ${quien ? 'a ' + quien : 'al solicitante'} por qué la rechazás (opcional).`;
   $('rechazo-motivo').value = '';
+  $('btn-rechazo-confirm').disabled = false;
   $('modal-rechazo').classList.remove('hidden');
+  $('rechazo-motivo').focus();
 }
 function cerrarRechazo() { $('modal-rechazo').classList.add('hidden'); }
 
 async function rechazarOC(oc, motivo) {
   if (!(await siguePendiente(oc))) return;
+  $('btn-rechazo-confirm').disabled = true;   // evita el doble rechazo con la conexión lenta
   const nuevaAut = {
     ...(oc.autorizacion || {}),
     resueltoEn:    Date.now(),
@@ -478,6 +485,7 @@ async function rechazarOC(oc, motivo) {
   } catch (e) {
     toast('No se pudo rechazar la OC.', 'error');
     console.error('rechazarOC:', e);
+    $('btn-rechazo-confirm').disabled = false;
     return;
   }
   quitarDeLista(oc);
@@ -540,11 +548,17 @@ function openFirmaModal() {
     img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     img.src = myFirma;
   }
+  $('firma-msg').textContent = (pendingSign ? `Dibujala para autorizar la OC ${pendingSign.nroOC}.` : 'Dibujala para autorizar.')
+    + ' Queda guardada para las próximas OC.';
   $('modal-firma').classList.remove('hidden');
 }
 
+const BTN_FIRMA = () => icSvg('edit') + 'Guardar y firmar';
+function cerrarFirma() { $('modal-firma').classList.add('hidden'); pendingSign = null; }
+
 function setupFirmaModal() {
-  $('modal-firma-close').addEventListener('click', () => { $('modal-firma').classList.add('hidden'); pendingSign = null; });
+  $('btn-firma-guardar').innerHTML = BTN_FIRMA();
+  $('modal-firma-close').addEventListener('click', cerrarFirma);
   $('btn-firma-limpiar').addEventListener('click', () => {
     const canvas = $('firma-canvas');
     const ctx = canvas.getContext('2d');
@@ -565,7 +579,7 @@ function setupFirmaModal() {
     } catch {
       toast('Error al guardar la firma.', 'error');
     } finally {
-      btn.disabled = false; btn.textContent = 'Guardar y autorizar';
+      btn.disabled = false; btn.innerHTML = BTN_FIRMA();
     }
   });
 }
@@ -586,8 +600,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-preview-close').addEventListener('click', cerrarPreview);
   $('preview-firmar').addEventListener('click', () => firmarOC(currentOC));
   $('preview-rechazar').addEventListener('click', abrirRechazo);
-  $('modal-rechazo-close').addEventListener('click', cerrarRechazo);
   $('btn-rechazo-cancel').addEventListener('click', cerrarRechazo);
+  // Firma y Rechazar se cierran como la confirmación común: tocando afuera o con Escape.
+  $('modal-rechazo').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarRechazo(); });
+  $('modal-firma').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarFirma(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!$('modal-rechazo').classList.contains('hidden')) cerrarRechazo();
+    else if (!$('modal-firma').classList.contains('hidden')) cerrarFirma();
+  });
   $('btn-rechazo-confirm').addEventListener('click', () => {
     if (currentOC) rechazarOC(currentOC, $('rechazo-motivo').value.trim());
   });

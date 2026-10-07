@@ -46,6 +46,10 @@
     .aut-empty { text-align: center; color: var(--gray-500); padding: 2.5rem 1rem; font-size: .92rem; }
     .aut-empty-ic { width: 52px; height: 52px; border-radius: 15px; background: #f1e8fb; color: #6b3fa0; display: grid; place-items: center; margin: 0 auto .7rem; }
     .aut-empty-ic .icon { width: 24px; height: 24px; }
+    /* ---- Modales Firma y Rechazar: sobre la confirmación común (.confirm-box en styles.css) ---- */
+    .aut-motivo-input { width: 100%; margin-top: .9rem; border: 1.5px solid var(--gray-200); border-radius: 12px; padding: .6rem .75rem;
+      font: inherit; font-size: .9rem; color: var(--gray-700); resize: vertical; min-height: 80px; text-align: left; background: var(--gray-100); }
+    .aut-motivo-input:focus { outline: none; border-color: #f0b4b4; background: #fff; box-shadow: 0 0 0 3px #fde6e6; }
     /* Pie de la ficha: con cuatro pastillas, en el celular pasa a dos renglones. */
     #modal-preview .foc-foot { flex-wrap: wrap; }
   </style>
@@ -130,41 +134,36 @@
   </div>
 </div>
 
-<!-- ===== MODAL: Firma ===== -->
+<!-- ===== MODAL: Firma (mismo formato que la confirmación común, más ancho por el lienzo) ===== -->
 <div class="modal-overlay hidden" id="modal-firma">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Tu Firma</span>
-      <button class="modal-close" id="modal-firma-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div class="confirm-box confirm-box--ok confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="firma-title">
+    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+    <div class="confirm-title" id="firma-title">Tu firma</div>
+    <p class="confirm-msg" id="firma-msg">Dibujala para autorizar. Queda guardada para las próximas OC.</p>
+    <div class="firma-pad">
+      <canvas id="firma-canvas"></canvas>
     </div>
-    <div class="modal-body">
-      <p class="firma-hint-top">Dibujá tu firma para autorizar. Se guardará para próximas OC.</p>
-      <div class="firma-canvas-wrap">
-        <canvas id="firma-canvas"></canvas>
-      </div>
-      <p class="firma-hint-bot">Usá el dedo o el mouse para dibujar</p>
+    <div class="firma-pie">
+      <span>Con el dedo o el mouse</span>
+      <button type="button" class="foc-btn foc-btn--clear" id="btn-firma-limpiar"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Borrar</button>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="btn-firma-limpiar">Limpiar</button>
-      <button class="btn btn-primary" id="btn-firma-guardar">Guardar y autorizar</button>
+    <div class="confirm-btns">
+      <button type="button" class="foc-btn foc-btn--clear" id="modal-firma-close">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--gen" id="btn-firma-guardar"></button>
     </div>
   </div>
 </div>
 
 <!-- ===== MODAL: Rechazar ===== -->
 <div class="modal-overlay hidden" id="modal-rechazo">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title">Rechazar OC</span>
-      <button class="modal-close" id="modal-rechazo-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body" style="padding:1.25rem;">
-      <p style="color:var(--gray-600);font-size:.9rem;margin-bottom:.6rem;">Contale al solicitante por qué la rechazás (opcional):</p>
-      <textarea id="rechazo-motivo" class="form-control" rows="3" style="width:100%;resize:vertical;" placeholder="Motivo del rechazo…"></textarea>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="btn-rechazo-cancel">Cancelar</button>
-      <button class="btn btn-danger" id="btn-rechazo-confirm">Confirmar rechazo</button>
+  <div class="confirm-box confirm-box--del" role="dialog" aria-modal="true" aria-labelledby="rechazo-title">
+    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+    <div class="confirm-title" id="rechazo-title">Rechazar OC</div>
+    <p class="confirm-msg" id="rechazo-msg">Contale al solicitante por qué la rechazás (opcional).</p>
+    <textarea id="rechazo-motivo" class="aut-motivo-input" rows="3" placeholder="Motivo del rechazo…" aria-label="Motivo del rechazo"></textarea>
+    <div class="confirm-btns">
+      <button type="button" class="foc-btn foc-btn--clear" id="btn-rechazo-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--del" id="btn-rechazo-confirm"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Rechazar</button>
     </div>
   </div>
 </div>

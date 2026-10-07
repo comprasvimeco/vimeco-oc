@@ -451,15 +451,6 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .hdr-drop-version { padding: .35rem 1rem .45rem; font-size: .68rem; color: var(--gray-400); text-align: right; letter-spacing: .04em; }
 
 
-/* ===== FIRMA CANVAS ===== */
-.firma-canvas-wrap {
-  border: 2px solid var(--gray-300); border-radius: var(--radius);
-  overflow: hidden; touch-action: none; cursor: crosshair; background: #fff;
-}
-#firma-canvas { display: block; width: 100%; height: 180px; }
-.firma-hint-top { font-size: .83rem; color: var(--gray-600); margin-bottom: .65rem; }
-.firma-hint-bot { font-size: .75rem; color: var(--gray-400); margin-top: .45rem; text-align: center; }
-
 /* ===== HISTORIAL ===== */
 .hist-page { max-width: 860px; margin: 0 auto; padding: 1rem; }
 .hist-toolbar { display: flex; gap: .6rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
@@ -1228,14 +1219,6 @@ body.scan-open { overflow: hidden; }
 .foc-btn--edit { background: #e8eef7; color: var(--primary); }
 .foc-btn--gen  { background: #dff3e5; color: #1a7f3c; }
 .foc-btn--clear { background: var(--gray-100); color: var(--gray-600); }
-/* Modales de opciones ("¿Cómo querés autorizar esta OC?", archivo compartido): pastillas a lo ancho. */
-.firma-opciones { display: flex; flex-direction: column; gap: .55rem; }
-.firma-opciones .foc-btn { justify-content: center; font-size: .9rem; padding: .65rem 1.2rem; }
-.pedir-comunicate { display: flex; align-items: center; gap: .45rem; margin-bottom: .8rem;
-  padding: .5rem .75rem; border-radius: var(--radius); background: #fef9c3; border: 1px solid #fde68a;
-  color: #854d0e; font-size: .85rem; font-weight: 600; line-height: 1.35; }
-.pedir-comunicate .icon { width: 16px; height: 16px; flex-shrink: 0; }
-.pedir-footer .foc-btn { font-size: .88rem; padding: .55rem 1.1rem; }
 /* OC duplicadas: aviso al emitir (app.html) y panel del responsable (historial.html). */
 .dup-texto { color: var(--gray-700); font-size: .9rem; line-height: 1.4; margin-bottom: .7rem; }
 .dup-nota  { color: var(--gray-500); font-size: .8rem; line-height: 1.35; margin: .7rem 0 1rem; }
@@ -1392,9 +1375,6 @@ body.scan-open { overflow: hidden; }
   .oc-section.collapsed > .card-header > .btn { display: none; }
 }
 
-/* Aviso en el cartel de archivo compartido cuando Chrome no entrega el archivo. */
-.share-aviso { background: #fde6e6; color: #b02a2a; border: 1px solid #f5c2c2; border-radius: var(--radius-lg);
-  padding: .65rem .8rem; margin-bottom: .9rem; font-size: .84rem; font-weight: 600; line-height: 1.4; }
 
 /* ===== MENÚ PRINCIPAL: mosaico con ícono en pastilla pastel (menu.html) =====
    Cada módulo tiene su tono (data-tone), los mismos de las pastillas (.foc-btn, .hist-doc, .cat-tag).
@@ -1470,3 +1450,58 @@ body.scan-open { overflow: hidden; }
 .confirm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; width: 100%; margin-top: 1.25rem; }
 .confirm-btns .foc-btn { justify-content: center; padding: .6rem .8rem; font-size: .86rem; }
 .foc-btn--warn { background: #fbeedd; color: #8a4f0d; }
+
+/* ---- Piezas de los diálogos sobre .confirm-box (OC y Autorizaciones) ---- */
+.confirm-box--wide { max-width: 460px; }
+.confirm-box--vio .confirm-ic { background: #f1e8fb; color: #6b3fa0; }
+.foc-btn--vio { background: #f1e8fb; color: #6b3fa0; }
+.confirm-btns .foc-btn { white-space: nowrap; }
+.confirm-cancel { width: 100%; justify-content: center; margin-top: .5rem; padding: .6rem .8rem; font-size: .86rem; }
+/* Opciones con ícono y una línea que explica qué hace cada una */
+.confirm-opts { display: flex; flex-direction: column; gap: .45rem; width: 100%; margin-top: 1rem; }
+.confirm-opt { display: grid; grid-template-columns: 38px minmax(0, 1fr) 14px; gap: .65rem; align-items: center; width: 100%; text-align: left;
+  border: 1.5px solid var(--gray-200); background: var(--white); border-radius: 14px; padding: .55rem .7rem; font: inherit; color: inherit; cursor: pointer; }
+.confirm-opt:hover { border-color: #c9d3e1; background: #fafbfd; }
+.confirm-opt--main { border-color: #bfe3c9; background: #f6fbf7; }
+.confirm-opt-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; }
+.confirm-opt-ic .icon { width: 18px; height: 18px; }
+.confirm-opt-ic--ok   { background: #dff3e5; color: #1a7f3c; }
+.confirm-opt-ic--vio  { background: #f1e8fb; color: #6b3fa0; }
+.confirm-opt-ic--blue { background: #e8eef7; color: var(--primary); }
+.confirm-opt-ic--gray { background: var(--gray-100); color: var(--gray-600); }
+.confirm-opt b { display: block; font-size: .88rem; color: var(--primary-dark); }
+.confirm-opt small { display: block; font-size: .75rem; color: var(--gray-500); line-height: 1.3; }
+.confirm-opt > .icon { width: 14px; height: 14px; color: var(--gray-400); }
+/* Aviso ámbar y pastilla de archivo */
+.confirm-aviso { display: flex; gap: .5rem; width: 100%; margin-top: .85rem; background: #fbeedd; color: #8a4f0d; border-radius: 12px;
+  padding: .55rem .7rem; font-size: .8rem; font-weight: 600; line-height: 1.4; text-align: left; }
+.confirm-aviso .icon { width: 16px; height: 16px; margin-top: .1rem; }
+.confirm-chip { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; background: var(--gray-100); color: var(--gray-700);
+  border-radius: 999px; padding: .25rem .7rem; font-size: .78rem; font-weight: 600; margin-top: .6rem; }
+.confirm-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Lienzo de firma: "Borrar" va debajo, nunca encima de lo que se dibuja */
+.firma-pad { position: relative; width: 100%; margin-top: 1rem; border-radius: 14px; overflow: hidden; background: #fff; border: 1.5px solid #cfe0d3; }
+.firma-pad::after { content: ''; position: absolute; left: 8%; right: 8%; bottom: 26%; border-bottom: 1.5px dashed #c9d6cc; pointer-events: none; }
+.firma-pad canvas { display: block; width: 100%; height: 180px; touch-action: none; }
+.firma-pie { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; margin-top: .4rem; }
+.firma-pie span { font-size: .74rem; color: var(--gray-400); }
+.firma-pie .foc-btn { font-size: .74rem; padding: .28rem .7rem; }
+.firma-pie .foc-btn .icon { width: 12px; height: 12px; }
+/* Pedir autorización: lista de personas en vez de desplegable */
+.pedir-lista { display: flex; flex-direction: column; gap: .4rem; width: 100%; margin-top: .85rem; max-height: 236px; overflow-y: auto; padding: 2px; }
+.pedir-who { display: flex; align-items: center; gap: .6rem; width: 100%; border: 1.5px solid var(--gray-200); background: var(--white); border-radius: 12px;
+  padding: .45rem .6rem; font: inherit; color: var(--gray-700); cursor: pointer; text-align: left; }
+.pedir-who-av { width: 32px; height: 32px; border-radius: 50%; background: #f1e8fb; color: #6b3fa0; display: grid; place-items: center; font-size: .72rem; font-weight: 800; flex: none; }
+.pedir-who b { flex: 1; min-width: 0; font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pedir-who-rad { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--gray-400); flex: none; }
+.pedir-who[aria-checked="true"] { border-color: #cdb6ea; background: #faf6fe; }
+.pedir-who[aria-checked="true"] .pedir-who-rad { border: 5px solid #6b3fa0; }
+.pedir-estado { font-size: .84rem; color: var(--gray-500); padding: .6rem 0; text-align: center; }
+/* OC repetida dentro del diálogo (Historial usa las mismas .dup-oc con su propio estilo) */
+#modal-dup .dup-lista { width: 100%; margin-top: .85rem; }
+#modal-dup .dup-oc { border: none; border-radius: 12px; background: var(--gray-100); text-align: left; cursor: pointer; }
+#modal-dup .dup-oc.dup-oc--anular { background: #fdf3f3; }
+#modal-dup .dup-oc--anular .dup-oc-nro::after { content: 'se anula'; display: inline-block; margin-left: .35rem; padding: 0 .45rem; border-radius: 999px;
+  background: #fde6e6; color: #b02a2a; font-size: .66rem; font-weight: 700; text-decoration: none; vertical-align: 1px; }
+#modal-dup .dup-oc-nro { white-space: nowrap; }
+#modal-dup .dup-nota { margin: .6rem 0 0; text-align: center; font-size: .76rem; }

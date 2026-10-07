@@ -382,7 +382,10 @@ function openFirmaModal() {
   $('modal-firma').classList.remove('hidden');
 }
 
+const BTN_GUARDAR_FIRMA = () => icSvg('checkSm') + 'Guardar firma';
+
 function setupFirmaModalButtons() {
+  $('btn-firma-guardar').innerHTML = BTN_GUARDAR_FIRMA();
   $('modal-firma-close').addEventListener('click', () => $('modal-firma').classList.add('hidden'));
   $('btn-firma-limpiar').addEventListener('click', () => {
     const canvas = $('firma-canvas');
@@ -404,7 +407,7 @@ function setupFirmaModalButtons() {
     } catch {
       toast('Error al guardar la firma.', 'error');
     } finally {
-      btn.disabled = false; btn.textContent = 'Guardar firma';
+      btn.disabled = false; btn.innerHTML = BTN_GUARDAR_FIRMA();
     }
   });
 }
@@ -2078,9 +2081,12 @@ function elegirAutorizacion(regla) {
     const soloPedir = !!regla && !regla.autorizadores.some(u => u.codigo === myCode);
     const aviso  = $('firma-monto-aviso');
     if (soloPedir) {
-      aviso.textContent = `Esta OC supera $ ${Math.round(regla.escalon).toLocaleString('es-AR')}: ` +
+      $('firma-monto-texto').textContent = `Esta OC supera $ ${Math.round(regla.escalon).toLocaleString('es-AR')}: ` +
         `la tiene que autorizar ${nombresEnLista(regla.autorizadores)}.`;
     }
+    $('firma-pedir-sub').textContent = !soloPedir ? 'Le llega a otro usuario para que la firme'
+      : regla.autorizadores.length > 1 ? 'Elegís a cuál de ellos se la mandás'
+      : `Se la mandás a ${regla.autorizadores[0]?.nombre || 'quien la autoriza'}`;
     aviso.classList.toggle('hidden', !soloPedir);
     $('firma-confirm-pregunta').classList.toggle('hidden', soloPedir);
     // "Firmar yo" solo tiene sentido si el usuario tiene firma guardada.
@@ -2100,17 +2106,15 @@ function elegirAutorizacion(regla) {
 function elegirAutorizador(regla) {
   return new Promise(resolve => {
     const modal  = $('modal-pedir-autorizacion');
-    const select = $('select-autorizador');
-    const empty  = $('pedir-empty');
+    const lista  = $('pedir-lista');
     const btnOk  = $('btn-pedir-confirm');
-    const nombres = {};
+    let elegido  = null;
 
-    empty.classList.add('hidden');
     btnOk.disabled = true;
-    select.innerHTML = '<option value="">Cargando usuarios…</option>';
+    lista.innerHTML = '<div class="pedir-estado">Cargando usuarios…</div>';
     $('pedir-texto').textContent = regla
-      ? `Por el monto, esta OC sólo la puede firmar ${nombresEnLista(regla.autorizadores)}. Le va a aparecer en su bandeja de autorizaciones.`
-      : 'Elegí a quién le pedís que firme esta OC. Le va a aparecer en su bandeja de autorizaciones.';
+      ? `Por el monto, esta OC sólo la puede firmar ${nombresEnLista(regla.autorizadores)}. Le va a aparecer en su bandeja de Autorizaciones.`
+      : 'Elegí a quién le pedís que firme esta OC. Le va a aparecer en su bandeja de Autorizaciones.';
     // Por monto, la OC queda frenada hasta que la firmen: que no dependa de
     // que el autorizador abra la bandeja por su cuenta.
     $('pedir-comunicate').classList.toggle('hidden', !regla);
@@ -2119,27 +2123,38 @@ function elegirAutorizador(regla) {
     const myCode = sessionStorage.getItem('responsable_code');
     const loader = regla ? Promise.resolve(regla.autorizadores)
       : typeof getUsuariosActivos === 'function' ? getUsuariosActivos() : Promise.resolve([]);
+    // Iniciales para el circulito: primera letra del primer y último nombre,
+    // salteando el título ("Ing.", "Arq.").
+    const iniciales = nombre => {
+      const p = String(nombre || '').split(/\s+/).filter(w => w && !/\.$/.test(w));
+      return ((p[0]?.[0] || '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() || '?';
+    };
+    const elegir = u => {
+      elegido = u;
+      lista.querySelectorAll('.pedir-who').forEach(b => b.setAttribute('aria-checked', b.dataset.codigo === u.codigo));
+      btnOk.disabled = false;
+    };
     loader.then(list => {
       const opts = (list || []).filter(u => u.codigo !== myCode);
-      select.innerHTML = '';
       if (!opts.length) {
-        select.add(new Option('—', ''));
-        empty.classList.remove('hidden');
+        lista.innerHTML = '<div class="pedir-estado">No hay otros usuarios activos disponibles.</div>';
         return;
       }
-      select.add(new Option('Elegí un usuario…', ''));
-      opts.forEach(u => { nombres[u.codigo] = u.nombre; select.add(new Option(u.nombre, u.codigo)); });
+      lista.innerHTML = opts.map(u => `
+        <button type="button" class="pedir-who" role="radio" aria-checked="false" data-codigo="${esc(u.codigo)}">
+          <span class="pedir-who-av">${esc(iniciales(u.nombre))}</span><b>${esc(u.nombre)}</b><span class="pedir-who-rad"></span>
+        </button>`).join('');
+      lista.querySelectorAll('.pedir-who').forEach((b, i) => b.addEventListener('click', () => elegir(opts[i])));
+      if (opts.length === 1) elegir(opts[0]);   // una sola persona posible: ya queda elegida
     }).catch(() => {
-      select.innerHTML = '<option value="">Error al cargar usuarios</option>';
+      lista.innerHTML = '<div class="pedir-estado">No se pudieron cargar los usuarios. Revisá tu conexión.</div>';
     });
 
-    select.onchange = () => { btnOk.disabled = !select.value; };
-    const close = val => { modal.classList.add('hidden'); select.onchange = null; resolve(val); };
-    $('btn-pedir-cancel').onclick  = () => close(null);
-    $('modal-pedir-close').onclick = () => close(null);
+    const close = val => { modal.classList.add('hidden'); resolve(val); };
+    $('btn-pedir-cancel').onclick = () => close(null);
     btnOk.onclick = () => {
-      if (!select.value) return;
-      close({ codigo: select.value, nombre: nombres[select.value] || '' });
+      if (!elegido) return;
+      close({ codigo: elegido.codigo, nombre: elegido.nombre || '' });
     };
   });
 }
