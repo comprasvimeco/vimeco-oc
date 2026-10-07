@@ -1,8 +1,12 @@
 /* global getCajaMovimientos, saveCajaMovimiento, deleteCajaMovimiento,
           patchCajaMovimiento, getCategoriasCaja, saveCategoriasCaja,
-          getAllUsuarios, getUsuario, getObrasActivas, uploadToCajaDrive */
+          getAllUsuarios, getUsuario, getObrasActivas, uploadToCajaDrive,
+          getTodasLasCajas, extractFromTicket */
 
 document.addEventListener('DOMContentLoaded', async () => {
+
+  const $ = id => document.getElementById(id);
+  const esc = s => escHtml(s == null ? '' : String(s));
 
   // ─── Auth ────────────────────────────────────────────
   const session = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch(_) { return null; } })();
@@ -27,8 +31,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   let movimientos  = [];
   let categorias   = [];
   let obras        = [];   // nombres de /obras activas, para imputar cada egreso
+  let personas     = [];   // administración: quienes tienen caja { codigo, nombre }
+  let cajasTodas   = {};   // administración: { codigo: [movimientos] }
+  let vista        = isAdmin ? 'todas' : 'caja';
+  let mesSel       = '';
+  let tab          = 'todos';
+  let busqueda     = [];
+  let empujado     = false;   // se abrió una caja desde el tablero con pushState
 
   // showToast: provisto globalmente por js/ui.js
+
+  // ─── Formatos ────────────────────────────────────────
+  // Fecha LOCAL en ISO: con toISOString (UTC) después de las 21 h ya era "mañana"
+  // y el último día del mes a esa hora la pantalla abría en el mes siguiente.
+  function isoLocal(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  const hoyISO = () => isoLocal(new Date());
+  const mesHoy = () => hoyISO().substring(0, 7);
+
+  const MESES_LBL = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const DIAS      = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const nombreMes = mes => { const [y, m] = mes.split('-'); return `${MESES_LBL[parseInt(m, 10)]} ${y}`; };
 
   // Magnitud, sin signo: quien muestra +/- según el tipo de movimiento lo antepone.
   function fmtMonto(n) {
@@ -51,6 +75,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${d}/${m}/${y}`;
   }
 
+  function fechaLarga(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso + 'T12:00:00');
+    return `${DIAS[d.getDay()]} ${fmtFecha(iso)}`;
+  }
+
+  function etiquetaDia(iso) {
+    if (!iso) return 'Sin fecha';
+    const d = new Date(iso + 'T12:00:00');
+    const base = `${DIAS[d.getDay()]} ${d.getDate()}`;
+    if (iso === hoyISO()) return `Hoy · ${base}`;
+    if (iso === isoLocal(new Date(Date.now() - 86400000))) return `Ayer · ${base}`;
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  }
+
+  function parseMonto(str) {
+    if (!str) return 0;
+    const n = parseFloat(String(str).replace(/\./g, '').replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+  }
+  const montoInput = n => n ? String(n).replace('.', ',') : '';
+  const sinTildes  = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const neto       = m => m.tipo === 'ingreso' ? (m.monto || 0) : -(m.monto || 0);
+  const esEgreso   = m => m.tipo === 'gasto';
+
+  // Ícono por categoría (las que no están en la lista usan la etiqueta)
+  const CAT_IC = { viaticos: 'coffee', peajes: 'road', combustibles: 'fuel', repuestos: 'settings', oficina: 'briefcase',
+                   herramientas: 'tool', pasajes: 'truck', inspeccion: 'eye', equipos: 'box' };
+  const icCat = c => CAT_IC[sinTildes(c)] || 'tag';
+
   // Registra un movimiento de caja en el feed de Novedades (best-effort).
   function logCajaActivity(mov, fileId) {
     if (typeof logActivity !== 'function') return;
@@ -68,7 +122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Anima un número desde su valor actual hasta `to` (con formato de monto firmado:
   // los tableros de arriba son los únicos que muestran totales que pueden dar negativo)
   const _countTimers = new WeakMap();
-  // Achica la fuente del saldo hero si el número (con separadores) no entra en una sola línea.
+  // Achica la fuente del saldo si el número (con separadores) no entra en una sola línea.
   function fitSaldoFont(el) {
     el.style.fontSize = '';
     const avail = el.clientWidth;
@@ -103,18 +157,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ─── Header ──────────────────────────────────────────
-  document.getElementById('hdr-name').textContent = userNombre;
+  $('hdr-name').textContent = userNombre;
 
-  document.getElementById('btn-menu').addEventListener('click', e => {
+  $('btn-menu').addEventListener('click', e => {
     e.stopPropagation();
-    document.getElementById('hdr-dropdown').classList.toggle('hidden');
+    $('hdr-dropdown').classList.toggle('hidden');
   });
-  document.addEventListener('click', () => document.getElementById('hdr-dropdown').classList.add('hidden'));
+  document.addEventListener('click', () => $('hdr-dropdown').classList.add('hidden'));
 
   if (isAdmin) {
-    document.getElementById('btn-categorias').classList.remove('hidden');
-    document.getElementById('btn-categorias').addEventListener('click', openCategoriasModal);
+    $('btn-categorias').classList.remove('hidden');
+    $('btn-categorias').addEventListener('click', openCategoriasModal);
   }
+
+  // Volver: desde la caja de alguien, quien administra vuelve al tablero de cajas.
+  $('btn-volver').addEventListener('click', () => {
+    if (isAdmin && vista === 'caja') {
+      if (empujado) history.back();
+      else { history.replaceState(null, '', location.pathname); mostrarTodas(); }
+      return;
+    }
+    window.location.href = 'menu.html';
+  });
+  window.addEventListener('popstate', ev => {
+    if (!isAdmin) return;
+    const cod = ev.state?.cj;
+    if (cod) abrirCaja(cod);
+    else { empujado = false; mostrarTodas(); }
+  });
 
   // ─── Load categories ─────────────────────────────────
   async function loadCategorias() {
@@ -126,14 +196,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       categorias = ['Viaticos', 'Peajes', 'Combustibles', 'Repuestos', 'Oficina', 'Herramientas', 'Pasajes', 'Inspección', 'Equipos', 'Otras'];
       try { await saveCategoriasCaja(categorias); } catch (_) {}
     }
-
-    const sel = document.getElementById('gasto-categoria');
-    sel.innerHTML = '<option value="">— Seleccioná —</option>';
-    categorias.forEach(c => {
-      const o = document.createElement('option');
-      o.value = o.textContent = c;
-      sel.appendChild(o);
-    });
   }
 
   // ─── Load obras ──────────────────────────────────────
@@ -145,274 +207,435 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       obras = (await getObrasActivas()).map(o => o.nombre);
     } catch (_) { obras = []; }
-    fillObraSelect();
   }
 
   function fillObraSelect(extra) {
-    const sel = document.getElementById('gasto-obra');
+    const sel = $('gasto-obra');
     const lista = extra && !obras.includes(extra) ? [...obras, extra] : obras;
-    sel.innerHTML = '<option value="">— Seleccioná —</option>';
-    lista.forEach(n => {
-      const o = document.createElement('option');
-      o.value = o.textContent = n;
-      sel.appendChild(o);
-    });
+    sel.innerHTML = '<option value="">Elegí la obra</option>' +
+      lista.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   }
 
-  // ─── Admin: selector de usuario ──────────────────────
-  if (isAdmin) {
-    document.getElementById('admin-selector-card').classList.remove('hidden');
+  // ─── Desplegables-pastilla (mes y caja) ──────────────
+  const CHEV = () => icSvg('chevron', 'act-chev');
 
-    try {
-      const usuarios = await getAllUsuarios();
-      const sel = document.getElementById('select-usuario');
-      usuarios.forEach(u => {
-        const o = document.createElement('option');
-        o.value = u.codigo;
-        o.textContent = `${u.nombre} (${u.codigo})`;
-        sel.appendChild(o);
-      });
-      sel.value = userCodigo;
-    } catch (_) {}
-
-    document.getElementById('select-usuario').addEventListener('change', () => {
-      const sel = document.getElementById('select-usuario');
-      if (!sel.value) return;
-      targetCodigo = sel.value;
-      targetNombre = sel.options[sel.selectedIndex].textContent.replace(/ \(\w+\)$/, '');
-      loadMovimientos();
+  function cerrarMenus() {
+    ['mes', 'quien'].forEach(k => {
+      $(`cj-${k}-menu`).classList.add('hidden');
+      $(`cj-${k}-btn`).setAttribute('aria-expanded', 'false');
     });
   }
-
-  // ─── Ingreso (recarga): disponible para admin y usuarios habilitados ─
-  {
-    document.getElementById('btn-nuevo-ingreso').addEventListener('click', () => openRecargaModal());
-    document.getElementById('modal-recarga-close').addEventListener('click', closeRecargaModal);
-    document.getElementById('btn-recarga-cancelar').addEventListener('click', closeRecargaModal);
-    document.getElementById('modal-recarga').addEventListener('click', e => { if (e.target === e.currentTarget) closeRecargaModal(); });
-
-    document.getElementById('btn-recarga-guardar').addEventListener('click', async () => {
-      const errorEl     = document.getElementById('recarga-error');
-      const fechaRec    = document.getElementById('recarga-fecha').value;
-      const comentario  = document.getElementById('recarga-comentario').value.trim();
-      const monto       = parseMonto(document.getElementById('recarga-monto').value);
-      errorEl.classList.add('hidden');
-
-      if (!fechaRec) {
-        errorEl.textContent = 'Ingresá la fecha.';
-        errorEl.classList.remove('hidden');
-        return;
-      }
-      if (!monto || monto <= 0) {
-        errorEl.textContent = 'Ingresá un monto válido.';
-        errorEl.classList.remove('hidden');
-        return;
-      }
-
-      // El mes sale de la fecha elegida: es el que manda para el arrastre del saldo
-      // y para saber qué planilla resincronizar.
-      const mesRecarga  = fechaRec.substring(0, 7);
-      const [ry, rm]    = mesRecarga.split('-');
-      const labelMes    = `Recarga ${MESES_LBL[parseInt(rm, 10)]} ${ry}`;
-      const descripcion = comentario ? `${labelMes} — ${comentario}` : labelMes;
-
-      const btn = document.getElementById('btn-recarga-guardar');
-      btn.disabled = true;
-      const mov = { tipo: 'ingreso', descripcion, fecha: fechaRec, monto };
-      try {
-        if (editIngreso) {
-          const prevMes = editIngreso.fecha?.substring(0, 7);
-          await patchCajaMovimiento(targetCodigo, editIngreso.key, mov);
-          closeRecargaModal();
-          showToast('Ingreso actualizado', 'success');
-          await loadMovimientos();
-          sincronizarExcel(mesRecarga);
-          if (prevMes && prevMes !== mesRecarga) sincronizarExcel(prevMes);
-        } else {
-          await saveCajaMovimiento(targetCodigo, mov);
-          logCajaActivity(mov);
-          closeRecargaModal();
-          showToast('Ingreso registrado', 'success');
-          await loadMovimientos();
-          sincronizarExcel(mesRecarga);
-        }
-      } catch (err) {
-        errorEl.textContent = 'Error al guardar: ' + (err.message || err);
-        errorEl.classList.remove('hidden');
-      }
-      btn.disabled = false;
+  function bindDesplegable(k, alElegir) {
+    const btn = $(`cj-${k}-btn`), menu = $(`cj-${k}-menu`);
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const abrir = menu.classList.contains('hidden');
+      cerrarMenus();
+      if (abrir) { menu.classList.remove('hidden'); btn.setAttribute('aria-expanded', 'true'); }
     });
+    menu.addEventListener('click', ev => {
+      const opt = ev.target.closest('.act-opt');
+      if (!opt) return;
+      cerrarMenus();
+      alElegir(opt.dataset.v);
+    });
+  }
+  document.addEventListener('click', ev => { if (!ev.target.closest('.act-dd')) cerrarMenus(); });
+
+  function pintarMeses(movs) {
+    const meses = new Set(movs.map(m => m.fecha?.substring(0, 7)).filter(Boolean));
+    meses.add(mesHoy());
+    if (!mesSel) mesSel = mesHoy();
+    meses.add(mesSel);
+    const lista = [...meses].sort().reverse();
+    $('cj-mes-btn').innerHTML = icSvg('calendar') + esc(nombreMes(mesSel)) + CHEV();
+    $('cj-mes-menu').innerHTML = lista.map(m =>
+      `<button type="button" class="act-opt" role="option" data-v="${m}" aria-selected="${m === mesSel}">${esc(nombreMes(m))}</button>`).join('');
+  }
+
+  function pintarQuien() {
+    $('cj-quien-dd').classList.toggle('hidden', !(isAdmin && vista === 'caja'));
+    if (!isAdmin) return;
+    $('cj-quien-btn').innerHTML = icSvg('user') + esc(targetNombre) + CHEV();
+    $('cj-quien-menu').innerHTML =
+      `<button type="button" class="act-opt" role="option" data-v="" aria-selected="false"><span class="act-opt-ic act-t-all">${icSvg('users')}</span>Todas las cajas</button>` +
+      personas.map(p => `<button type="button" class="act-opt" role="option" data-v="${esc(p.codigo)}" aria-selected="${p.codigo === targetCodigo}">
+        <span class="act-opt-ic" style="background:#dff3e5;color:#1a7f3c">${icSvg('user')}</span>${esc(p.nombre)}</button>`).join('');
+  }
+
+  bindDesplegable('mes', v => {
+    mesSel = v;
+    if (vista === 'todas') renderTodas(); else renderMovimientos();
+  });
+  bindDesplegable('quien', v => {
+    if (!v) {
+      if (empujado) history.back();
+      else { history.replaceState(null, '', location.pathname); mostrarTodas(); }
+      return;
+    }
+    history.replaceState({ cj: v }, '', '?caja=' + encodeURIComponent(v));
+    abrirCaja(v);
+  });
+
+  // ─── Administración: todas las cajas ─────────────────
+  async function cargarPersonas() {
+    let usuarios = [];
+    try { usuarios = await getAllUsuarios(); } catch (_) {}
+    try { cajasTodas = await getTodasLasCajas(); } catch (err) {
+      cajasTodas = {};
+      showToast('Error al cargar las cajas: ' + (err.message || err), 'error');
+    }
+    const porCod = {};
+    usuarios.forEach(u => {
+      const tieneMovs = (cajasTodas[u.codigo] || []).length > 0;
+      if (tieneMovs || (u.caja && u.activo !== false) || u.codigo === userCodigo)
+        porCod[u.codigo] = { codigo: u.codigo, nombre: u.nombre };
+    });
+    // Cajas con movimientos de alguien que ya no está en /usuarios
+    Object.keys(cajasTodas).forEach(c => {
+      if (!porCod[c] && cajasTodas[c].length) porCod[c] = { codigo: c, nombre: c };
+    });
+    personas = Object.values(porCod).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }
+
+  function mostrarVista() {
+    $('cj-cargando').classList.add('hidden');
+    $('cj-vista-todas').classList.toggle('hidden', vista !== 'todas');
+    $('cj-vista-caja').classList.toggle('hidden', vista !== 'caja');
+    $('cj-fab').classList.toggle('on', vista === 'caja');
+    $('cj-titulo').textContent = vista === 'todas' ? 'Cajas chicas' : 'Caja chica';
+    pintarQuien();
+  }
+
+  async function mostrarTodas() {
+    vista = 'todas';
+    mostrarVista();
+    $('cj-grid').innerHTML = '<div class="cj-vacio"><div class="spinner" style="width:24px;height:24px;margin:0 auto .5rem;"></div>Cargando…</div>';
+    await cargarPersonas();
+    if (vista !== 'todas') return;
+    renderTodas();
+  }
+
+  function renderTodas() {
+    const todos = Object.values(cajasTodas).flat();
+    pintarMeses(todos);
+    const filas = personas.map(p => {
+      const movs  = cajasTodas[p.codigo] || [];
+      const delMes = movs.filter(m => m.fecha?.startsWith(mesSel));
+      const saldo = movs.filter(m => m.fecha && m.fecha.substring(0, 7) <= mesSel).reduce((s, m) => s + neto(m), 0);
+      const ing   = delMes.filter(m => !esEgreso(m)).reduce((s, m) => s + (m.monto || 0), 0);
+      const egr   = delMes.filter(esEgreso).reduce((s, m) => s + (m.monto || 0), 0);
+      const sin   = delMes.filter(m => esEgreso(m) && !m.driveFileId).length;
+      const ult   = delMes.map(m => m.fecha).sort().pop();
+      return { ...p, saldo, ing, egr, sin, n: delMes.length, ult };
+    });
+    const neg   = filas.filter(f => Math.round(f.saldo * 100) < 0);
+    const tSal  = filas.reduce((s, f) => s + f.saldo, 0);
+    const tEgr  = filas.reduce((s, f) => s + f.egr, 0);
+    const tSin  = filas.reduce((s, f) => s + f.sin, 0);
+
+    const pend = $('cj-pend');
+    pend.classList.toggle('hidden', !neg.length);
+    pend.textContent = neg.length === 1 ? '1 en negativo' : `${neg.length} en negativo`;
+    pend.dataset.accion = 'negativo';
+
+    $('cj-tot').innerHTML =
+      `<div><span>Saldo de todas</span><b class="${tSal < 0 ? 'neg' : ''}">${fmtSaldo(tSal)}</b></div>
+       <div><span>Egresos de ${esc(nombreMes(mesSel).split(' ')[0].toLowerCase())}</span><b>${fmtMonto(tEgr)}</b></div>
+       <div class="cj-tot-sin"><span>Egresos sin comprobante</span><b>${tSin}</b></div>`;
+
+    const cuando = iso => iso === hoyISO() ? 'hoy' : iso === isoLocal(new Date(Date.now() - 86400000)) ? 'ayer' : fmtFecha(iso).substring(0, 5);
+    const ini = n => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    $('cj-grid').innerHTML = filas.length ? filas.map(f => {
+      const esNeg = Math.round(f.saldo * 100) < 0;
+      return `<button type="button" class="cj-box" data-cod="${esc(f.codigo)}">
+        <div class="cj-box-top"><span class="cj-av${esNeg ? ' neg' : ''}">${esc(ini(f.nombre))}</span>
+          <div><div class="cj-box-n">${esc(f.nombre)}</div>
+          <div class="cj-box-s">${f.n ? `${f.n} ${f.n === 1 ? 'movimiento' : 'movimientos'} · último ${cuando(f.ult)}` : 'Sin movimientos en el mes'}</div></div></div>
+        <div class="cj-box-sal${esNeg ? ' neg' : ''}"><small>Saldo</small>${fmtSaldo(f.saldo)}</div>
+        <div class="cj-box-bot"><span class="cj-mini cj-mini--ing">+${fmtMonto(f.ing)}</span><span class="cj-mini cj-mini--egr">−${fmtMonto(f.egr)}</span>
+          ${f.sin ? `<span class="cj-mini cj-mini--sin">${f.sin} sin comprobante</span>` : ''}</div>
+      </button>`;
+    }).join('') : '<div class="cj-vacio">' + icSvg('briefcase') + 'No hay cajas para mostrar.</div>';
+  }
+
+  $('cj-grid').addEventListener('click', e => {
+    const box = e.target.closest('.cj-box');
+    if (!box) return;
+    history.pushState({ cj: box.dataset.cod }, '', '?caja=' + encodeURIComponent(box.dataset.cod));
+    empujado = true;
+    abrirCaja(box.dataset.cod);
+  });
+
+  $('cj-pend').addEventListener('click', () => {
+    if (vista === 'todas') {
+      const b = document.querySelector('.cj-box .cj-av.neg');
+      if (b) { const box = b.closest('.cj-box'); box.scrollIntoView({ behavior: 'smooth', block: 'center' }); box.focus({ preventScroll: true }); }
+    } else {
+      tab = 'sin';
+      renderMovimientos();
+    }
+  });
+
+  async function abrirCaja(codigo) {
+    const p = personas.find(x => x.codigo === codigo);
+    targetCodigo = codigo;
+    targetNombre = p ? p.nombre : (codigo === userCodigo ? userNombre : codigo);
+    vista = 'caja';
+    tab = 'todos';
+    busqueda = [];
+    $('cj-search').value = '';
+    mostrarVista();
+    await loadMovimientos();
   }
 
   // ─── Load movements ──────────────────────────────────
   async function loadMovimientos() {
-    const elLoad  = document.getElementById('movimientos-loading');
-    const elEmpty = document.getElementById('movimientos-empty');
-    const elTable = document.getElementById('movimientos-table-wrap');
-    const elCards = document.getElementById('movimientos-cards');
-
-    elLoad.style.display  = 'block';
-    elEmpty.style.display = 'none';
-    elTable.style.display = 'none';
-    elCards.style.display = 'none';
-
+    $('cj-lista').innerHTML = '<div class="cj-vacio"><div class="spinner" style="width:24px;height:24px;margin:0 auto .5rem;"></div>Cargando…</div>';
+    const pedido = targetCodigo;
+    let movs;
     try {
-      movimientos = await getCajaMovimientos(targetCodigo);
+      movs = await getCajaMovimientos(pedido);
     } catch (err) {
-      movimientos = [];
+      movs = [];
       showToast('Error al cargar movimientos: ' + (err.message || err), 'error');
     }
-
-    elLoad.style.display = 'none';
-
-    // Rebuild month filter (always month-based, no "todos")
-    const mesActualDefault = new Date().toISOString().substring(0, 7);
-    const mesesData = [...new Set(movimientos.map(m => m.fecha?.substring(0, 7)).filter(Boolean))];
-    if (!mesesData.includes(mesActualDefault)) mesesData.push(mesActualDefault);
-    const meses = mesesData.sort().reverse();
-    const prevFilter = document.getElementById('filter-mes').value;
-    const filterSel  = document.getElementById('filter-mes');
-    filterSel.innerHTML = '';
-    const MESES = ['', 'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    meses.forEach(mes => {
-      const [y, m] = mes.split('-');
-      const o = document.createElement('option');
-      o.value = mes;
-      o.textContent = `${MESES[parseInt(m, 10)]} ${y}`;
-      filterSel.appendChild(o);
-    });
-    filterSel.value = prevFilter && meses.includes(prevFilter) ? prevFilter : mesActualDefault;
-
+    if (pedido !== targetCodigo) return;   // se cambió de caja mientras cargaba
+    movimientos = movs;
+    if (isAdmin) cajasTodas[targetCodigo] = movs;
     renderMovimientos();
   }
 
+  function delMes() {
+    return movimientos.filter(m => m.fecha?.startsWith(mesSel));
+  }
+
   function renderMovimientos() {
-    const mesFilter = document.getElementById('filter-mes').value;
-    const filtered  = mesFilter ? movimientos.filter(m => m.fecha?.startsWith(mesFilter)) : movimientos;
+    if (vista !== 'caja') return;
+    pintarMeses(movimientos);
+    pintarQuien();
+    const filtered = delMes();
 
     // Balance del mes seleccionado (con arrastre acumulado)
     const totalIngresos = filtered.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
     const totalGastos   = filtered.filter(m => m.tipo === 'gasto').reduce((s, m)  => s + (m.monto || 0), 0);
     // Excedente anterior = neto de TODOS los movimientos de meses previos al seleccionado
-    const excedente = mesFilter
-      ? movimientos
-          .filter(m => m.fecha && m.fecha.substring(0, 7) < mesFilter)
-          .reduce((s, m) => s + (m.tipo === 'ingreso' ? (m.monto || 0) : -(m.monto || 0)), 0)
-      : 0;
+    const excedente = movimientos
+      .filter(m => m.fecha && m.fecha.substring(0, 7) < mesSel)
+      .reduce((s, m) => s + neto(m), 0);
     const saldo = excedente + totalIngresos - totalGastos;
 
-    countUp(document.getElementById('val-excedente'), excedente);
-    countUp(document.getElementById('val-ingresos'), totalIngresos);
-    countUp(document.getElementById('val-gastos'),   totalGastos);
-    const valSaldoEl = document.getElementById('val-saldo');
+    $('cj-saldo-k').textContent = 'Saldo de ' + nombreMes(mesSel).split(' ')[0].toLowerCase();
+    countUp($('val-excedente'), excedente);
+    $('val-excedente').classList.toggle('neg', excedente < 0);
+    countUp($('val-ingresos'), totalIngresos);
+    countUp($('val-gastos'),   totalGastos);
+    const valSaldoEl = $('val-saldo');
     countUp(valSaldoEl, saldo, true);
-    valSaldoEl.classList.toggle('neg', saldo < 0);
+    valSaldoEl.classList.toggle('neg', Math.round(saldo * 100) < 0);
 
-    const elEmpty = document.getElementById('movimientos-empty');
-    const elTable = document.getElementById('movimientos-table-wrap');
-    const elCards = document.getElementById('movimientos-cards');
+    // En qué se gastó (lo mismo que va al Excel)
+    const barras = (agrupar) => {
+      const o = {};
+      filtered.filter(esEgreso).forEach(m => { const k = agrupar(m); o[k] = (o[k] || 0) + (m.monto || 0); });
+      const filas = Object.entries(o).sort((a, b) => b[1] - a[1]);
+      if (!filas.length) return '<div class="cj-vacio-s">Sin egresos en el mes.</div>';
+      const max = filas[0][1] || 1;
+      return filas.map(([k, v]) => `<div class="cj-bar"><div class="cj-bar-t"><span>${esc(k)}</span><b>${fmtMonto(v)}</b></div>
+        <div class="cj-bar-b"><i style="width:${Math.max(2, v / max * 100)}%"></i></div></div>`).join('');
+    };
+    $('cj-por-obra').innerHTML = barras(m => m.obra || 'Sin obra');
+    $('cj-por-cat').innerHTML  = barras(m => m.categoria || 'Sin categoría');
 
-    if (!filtered.length) {
-      elEmpty.style.display = 'block';
-      elTable.style.display = 'none';
-      elCards.style.display = 'none';
-      return;
-    }
+    const nEgr = filtered.filter(esEgreso).length;
+    const nSin = filtered.filter(m => esEgreso(m) && !m.driveFileId).length;
+    const pend = $('cj-pend');
+    pend.classList.toggle('hidden', !nSin);
+    pend.textContent = nSin === 1 ? '1 sin comprobante' : `${nSin} sin comprobante`;
 
-    elEmpty.style.display = 'none';
-    const isMobile = window.innerWidth < 700;
-    elTable.style.display = isMobile ? 'none' : 'block';
-    elCards.style.display = isMobile ? 'block' : 'none';
+    $('cj-tabs').innerHTML = [['todos', 'Todos', filtered.length], ['egr', 'Egresos', nEgr],
+      ['ing', 'Ingresos', filtered.length - nEgr], ['sin', 'Sin comprobante', nSin, nSin ? 'red' : '']]
+      .map(([v, t, n, c]) => `<button type="button" class="cj-tab ${c || ''} ${tab === v ? 'on' : ''}" data-tab="${v}" role="tab" aria-selected="${tab === v}">${t} <b>${n}</b></button>`).join('');
 
-    if (isMobile) {
-      renderCards(filtered);
-    } else {
-      renderTable(filtered);
-    }
+    renderLista(filtered);
+  }
+
+  function coincide(m) {
+    if (!busqueda.length) return true;
+    const txt = sinTildes([m.descripcion, m.proveedor, m.obra, m.categoria, fmtMonto(m.monto || 0)].join(' '));
+    return busqueda.every(t => txt.includes(t));
   }
 
   function canDelete() {
     return isAdmin || targetCodigo === userCodigo;
   }
 
-  function driveLink(m) {
-    if (!m.driveFileId) return '';
-    return `<a href="https://drive.google.com/file/d/${m.driveFileId}/view" target="_blank" rel="noopener" class="btn btn-xs btn-outline" title="Ver comprobante"><svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></a>`;
+  const driveUrl = id => `https://drive.google.com/file/d/${encodeURIComponent(id)}/view`;
+
+  function renderLista(filtered) {
+    const data = filtered.filter(m =>
+      (tab === 'todos' || (tab === 'egr' && esEgreso(m)) || (tab === 'ing' && !esEgreso(m)) || (tab === 'sin' && esEgreso(m) && !m.driveFileId))
+      && coincide(m));
+    const cont = $('cj-lista');
+    if (!data.length) {
+      const msg = busqueda.length ? 'No hay movimientos que coincidan con la búsqueda.'
+        : tab === 'sin' ? 'Todos los egresos del mes tienen comprobante.'
+        : `No hay movimientos en ${nombreMes(mesSel).toLowerCase()}.`;
+      cont.innerHTML = `<div class="cj-vacio">${icSvg('briefcase')}${esc(msg)}</div>`;
+      return;
+    }
+    let html = '<div class="cj-lh"><span></span><span>Movimiento</span><span>Obra</span><span class="r">Monto</span><span></span></div>';
+    let dia = null;
+    data.forEach(m => {
+      if (m.fecha !== dia) {
+        dia = m.fecha;
+        const tot = data.filter(x => x.fecha === dia && esEgreso(x)).reduce((s, x) => s + (x.monto || 0), 0);
+        html += `<div class="cj-day"><span>${esc(etiquetaDia(dia))}</span>${tot ? `<b>−${fmtMonto(tot)}</b>` : ''}</div>`;
+      }
+      const ing = !esEgreso(m);
+      const marca = ing ? '' : (m.driveFileId ? `<span title="Con comprobante">${icSvg('clip')}</span>` : '<span class="cj-nocomp">sin comprobante</span>');
+      const tel  = ing ? ['Ingreso'] : [m.obra || 'Sin obra', m.proveedor].filter(Boolean);
+      const desk = ing ? ['Ingreso'] : [m.categoria, m.proveedor].filter(Boolean);
+      const sub  = `<span class="cj-solo-tel">${esc(tel.join(' · '))}</span><span class="cj-solo-desk">${esc(desk.join(' · '))}</span>${marca ? ' · ' + marca : ''}`;
+      html += `<div class="cj-mv" role="button" tabindex="0" data-key="${esc(m.key)}">
+        <span class="cj-sq ${ing ? 'cj-sq--grn' : 'cj-sq--del'}">${icSvg(ing ? 'plus' : icCat(m.categoria))}</span>
+        <div style="min-width:0"><div class="cj-mv-d">${esc(m.descripcion || '—')}</div><div class="cj-mv-s">${sub}</div></div>
+        <div class="cj-mv-c">${ing ? '—' : esc(m.obra || '—')}</div>
+        <div class="cj-mv-m${ing ? ' ing' : ''}">${ing ? '+' : '−'}${fmtMonto(m.monto || 0)}${!ing && m.categoria ? `<small>${esc(m.categoria)}</small>` : ''}</div>
+        <div class="cj-mv-x">
+          ${m.driveFileId ? `<a class="foc-btn foc-btn--clear cj-ib" href="${driveUrl(m.driveFileId)}" target="_blank" rel="noopener" title="Ver comprobante" aria-label="Ver comprobante">${icSvg('eye')}</a>` : ''}
+          ${canDelete() ? `<button type="button" class="foc-btn foc-btn--clear cj-ib cj-mv-edit" title="Editar" aria-label="Editar">${icSvg('edit')}</button>` : ''}
+        </div>
+      </div>`;
+    });
+    cont.innerHTML = html;
   }
 
-  function deleteBtn(key) {
-    if (!canDelete()) return '';
-    return `<button class="btn btn-xs btn-secondary btn-del" data-key="${key}" title="Eliminar"><svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`;
+  $('cj-tabs').addEventListener('click', e => {
+    const b = e.target.closest('.cj-tab');
+    if (!b) return;
+    tab = b.dataset.tab;
+    renderMovimientos();
+  });
+  $('cj-search').addEventListener('input', e => {
+    busqueda = sinTildes(e.target.value).split(/\s+/).filter(Boolean);
+    renderLista(delMes());
+  });
+  $('cj-lista').addEventListener('click', e => {
+    const row = e.target.closest('.cj-mv');
+    if (!row || e.target.closest('a')) return;
+    if (e.target.closest('.cj-mv-edit')) { openEdit(row.dataset.key); return; }
+    abrirFicha(row.dataset.key);
+  });
+  $('cj-lista').addEventListener('keydown', e => {
+    const row = e.target.closest('.cj-mv');
+    if (row && e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); abrirFicha(row.dataset.key); }
+  });
+  window.addEventListener('resize', () => fitSaldoFont($('val-saldo')));
+
+  // ─── Hojas: abrir / cerrar ───────────────────────────
+  function abrirHoja(id) {
+    $(id).classList.remove('hidden');
+    $(id).querySelector('.cj-sheet').focus({ preventScroll: true });
+  }
+  const HOJAS = ['modal-gasto', 'modal-recarga', 'modal-ficha'];
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !$('scan-editor').classList.contains('hidden')) return;
+    if (!$('img-lightbox').classList.contains('hidden')) { closeLightbox(); return; }
+    const abierta = HOJAS.find(h => !$(h).classList.contains('hidden'));
+    if (abierta === 'modal-gasto') closeGastoModal();
+    else if (abierta === 'modal-recarga') closeRecargaModal();
+    else if (abierta === 'modal-ficha') cerrarFicha();
+  });
+
+  // "Faltan N datos" con todo junto, como en la OC: tocar uno lleva a completarlo.
+  function mostrarFaltantes(faltan, irA) {
+    let modal = $('modal-faltan');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.className = 'modal-overlay hidden';
+      modal.id = 'modal-faltan';
+      modal.style.zIndex = '1200';
+      modal.innerHTML =
+        '<div class="confirm-box confirm-box--warn confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="faltan-title" tabindex="-1">' +
+          `<span class="confirm-ic">${icSvg('alert')}</span>` +
+          '<div class="confirm-title" id="faltan-title"></div>' +
+          '<p class="confirm-msg">Tocá uno para ir a completarlo.</p>' +
+          '<div class="faltan-lista"></div>' +
+          '<button type="button" class="foc-btn foc-btn--clear confirm-cancel faltan-cerrar">Seguir cargando</button>' +
+        '</div>';
+      document.body.appendChild(modal);
+    }
+    const close = () => {
+      modal.classList.add('hidden');
+      modal.onclick = null;
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    modal.querySelector('#faltan-title').textContent = faltan.length === 1 ? 'Falta un dato' : `Faltan ${faltan.length} datos`;
+    modal.querySelector('.faltan-lista').innerHTML = faltan.map((f, i) => `
+      <button type="button" class="faltan-item" data-i="${i}">
+        <span class="faltan-dot"></span>
+        <span class="faltan-t"><b>${esc(f.txt)}</b><small>${esc(f.sub)}</small></span>
+        ${icSvg('chevR')}
+      </button>`).join('');
+    modal.onclick = e => {
+      const it = e.target.closest('.faltan-item');
+      if (it) { close(); irA(faltan[+it.dataset.i].id); }
+      else if (e.target === modal || e.target.closest('.faltan-cerrar')) close();
+    };
+    document.addEventListener('keydown', onKey, true);
+    modal.classList.remove('hidden');
+    modal.querySelector('.confirm-box').focus();
   }
 
-  function editBtn(key) {
-    if (!canDelete()) return '';
-    return `<button class="btn btn-xs btn-secondary btn-edit" data-key="${key}" title="Editar"><svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`;
+  const unirFaltan = partes => partes.length > 1 ? partes.slice(0, -1).join(', ') + ' y ' + partes.at(-1) : partes[0];
+
+  // ─── Ficha del movimiento ────────────────────────────
+  let fichaKey = null;
+
+  function abrirFicha(key) {
+    const m = movimientos.find(x => x.key === key);
+    if (!m) return;
+    fichaKey = key;
+    const ing = !esEgreso(m);
+    $('ficha-ic').className = 'cj-sq ' + (ing ? 'cj-sq--grn' : 'cj-sq--del');
+    $('ficha-ic').innerHTML = icSvg(ing ? 'plus' : icCat(m.categoria));
+    $('ficha-title').textContent = ing ? 'Ingreso' : 'Egreso';
+    let html = `<section class="cj-sec"><div class="cj-fi-d">${esc(m.descripcion || '—')}</div>
+      <div class="cj-fi-s">${esc(fechaLarga(m.fecha))} · caja de ${esc(targetNombre)}</div>
+      <div class="cj-fi-m${ing ? ' ing' : ''}">${ing ? '+' : '−'}${fmtMonto(m.monto || 0)}</div></section>`;
+    if (!ing) {
+      html += `<section class="cj-sec"><dl class="cj-fi-dl">
+        <dt>Obra</dt><dd>${esc(m.obra || 'Sin obra')}</dd>
+        <dt>Categoría</dt><dd>${esc(m.categoria || '—')}</dd>
+        ${m.proveedor ? `<dt>Proveedor</dt><dd>${esc(m.proveedor)}</dd>` : ''}</dl></section>`;
+      html += m.driveFileId
+        ? `<section class="cj-sec cj-fi-comp"><span class="cj-sq cj-sq--grn">${icSvg('clip')}</span>
+            <div><b>Comprobante</b><small>Guardado en Drive</small></div>
+            <a class="foc-btn foc-btn--edit" href="${driveUrl(m.driveFileId)}" target="_blank" rel="noopener">${icSvg('eye')}Ver</a></section>`
+        : `<section class="cj-sec cj-fi-comp"><span class="cj-sq cj-sq--del">${icSvg('clip')}</span>
+            <div><b>Sin comprobante</b><small>${canDelete() ? 'Se puede agregar con Editar.' : 'No se cargó la foto del ticket.'}</small></div></section>`;
+    }
+    $('ficha-body').innerHTML = html;
+    $('ficha-ft').classList.toggle('hidden', !canDelete());
+    abrirHoja('modal-ficha');
   }
+  function cerrarFicha() { $('modal-ficha').classList.add('hidden'); fichaKey = null; }
+  $('ficha-close').addEventListener('click', cerrarFicha);
+  $('modal-ficha').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarFicha(); });
+  $('ficha-edit').addEventListener('click', () => { const k = fichaKey; cerrarFicha(); openEdit(k); });
+  $('ficha-del').addEventListener('click', async () => {
+    const k = fichaKey;
+    cerrarFicha();
+    await confirmDelete(k);
+  });
 
   function openEdit(key) {
     const m = movimientos.find(x => x.key === key);
     if (!m) return;
     if (m.tipo === 'ingreso') openRecargaModal(m);
     else openGastoModal(m);
-  }
-
-  function attachRowListeners(container) {
-    container.querySelectorAll('.btn-del').forEach(btn => {
-      btn.addEventListener('click', () => confirmDelete(btn.dataset.key));
-    });
-    container.querySelectorAll('.btn-edit').forEach(btn => {
-      btn.addEventListener('click', () => openEdit(btn.dataset.key));
-    });
-  }
-
-  function renderTable(data) {
-    const tbody = document.getElementById('movimientos-tbody');
-    tbody.innerHTML = '';
-    data.forEach(m => {
-      const isIngreso = m.tipo === 'ingreso';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${fmtFecha(m.fecha)}</td>
-        <td><span class="caja-badge ${isIngreso ? 'caja-badge-ingreso' : 'caja-badge-gasto'}">${isIngreso ? 'Ingreso' : 'Gasto'}</span></td>
-        <td>${m.categoria || '—'}</td>
-        <td>${m.obra || '—'}</td>
-        <td>${m.proveedor || '—'}</td>
-        <td>${m.descripcion || '—'}</td>
-        <td class="text-right" style="font-weight:700;color:${isIngreso ? 'var(--success)' : 'var(--danger)'};">${isIngreso ? '+' : '-'}${fmtMonto(m.monto || 0)}</td>
-        <td style="text-align:center;white-space:nowrap;">${driveLink(m)} ${editBtn(m.key)} ${deleteBtn(m.key)}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-    attachRowListeners(tbody);
-  }
-
-  function renderCards(data) {
-    const container = document.getElementById('movimientos-cards');
-    container.innerHTML = '';
-    data.forEach(m => {
-      const isIngreso = m.tipo === 'ingreso';
-      const div = document.createElement('div');
-      div.className = 'caja-mov-card';
-      div.innerHTML = `
-        <div class="caja-mov-card-top">
-          <div>
-            <span class="caja-badge ${isIngreso ? 'caja-badge-ingreso' : 'caja-badge-gasto'}">${isIngreso ? 'Ingreso' : 'Gasto'}</span>
-            ${m.categoria ? `<span class="caja-cat-tag">${m.categoria}</span>` : ''}
-          </div>
-          <span class="caja-mov-monto" style="color:${isIngreso ? 'var(--success)' : 'var(--danger)'};">${isIngreso ? '+' : '-'}${fmtMonto(m.monto || 0)}</span>
-        </div>
-        <div class="caja-mov-desc">${m.descripcion || '—'}</div>
-        ${m.obra ? `<div class="caja-mov-obra">${m.obra}</div>` : ''}
-        ${m.proveedor ? `<div class="caja-mov-prov">${m.proveedor}</div>` : ''}
-        <div class="caja-mov-foot">
-          <span class="caja-mov-fecha">${fmtFecha(m.fecha)}</span>
-          <div style="display:flex;gap:4px;">${driveLink(m)} ${editBtn(m.key)} ${deleteBtn(m.key)}</div>
-        </div>
-      `;
-      container.appendChild(div);
-    });
-    attachRowListeners(container);
   }
 
   async function confirmDelete(key) {
@@ -434,152 +657,308 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  document.getElementById('filter-mes').addEventListener('change', renderMovimientos);
-  window.addEventListener('resize', renderMovimientos);
-
-  // ─── Gasto (Egreso) modal ────────────────────────────
+  // ─── Egreso ──────────────────────────────────────────
   let gastoFile       = null;
   let editGasto       = null;   // movimiento en edición (o null al crear)
-  let lastCameraFile  = null;   // última foto cruda de cámara (para re-escanear)
+  let rawImage        = null;   // imagen original (para volver a escanear)
   let gastoPreviewUrl = null;   // objectURL del preview actual
+  let catSel          = '';
+  let fechaTocada     = false;
+  const esMovil = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
+  function renderCats(extra) {
+    const lista = extra && !categorias.includes(extra) ? [...categorias, extra] : categorias;
+    $('gasto-cats').innerHTML = lista.map(c =>
+      `<button type="button" class="cj-chip" data-v="${esc(c)}" aria-pressed="${c === catSel}">${esc(c)}</button>`).join('');
+  }
+
+  // Las últimas obras a las que se imputó en esta caja, como atajo.
+  function renderObrasRecientes() {
+    const rec = [];
+    movimientos.filter(esEgreso).forEach(m => {
+      if (m.obra && obras.includes(m.obra) && !rec.includes(m.obra) && rec.length < 3) rec.push(m.obra);
+    });
+    const cont = $('gasto-obras-rec');
+    cont.classList.toggle('hidden', !rec.length);
+    const sel = $('gasto-obra').value;
+    cont.innerHTML = '<span class="cj-chips-hint">Últimas:</span>' + rec.map(o =>
+      `<button type="button" class="cj-chip" data-v="${esc(o)}" aria-pressed="${o === sel}">${esc(o)}</button>`).join('');
+  }
 
   function openGastoModal(mov) {
     editGasto = mov || null;
     clearGastoFile();
-    document.getElementById('gasto-categoria').value   = mov?.categoria   || '';
+    catSel = mov?.categoria || '';
+    renderCats(catSel);
     // Un egreso viejo puede apuntar a una obra que después se desactivó: se la agrega
     // a la lista para no perder el dato al editar por otra razón.
     fillObraSelect(mov?.obra);
-    document.getElementById('gasto-obra').value        = mov?.obra        || '';
-    document.getElementById('gasto-fecha').value       = mov?.fecha       || new Date().toISOString().split('T')[0];
-    document.getElementById('gasto-proveedor').value   = mov?.proveedor   || '';
-    document.getElementById('gasto-descripcion').value = mov?.descripcion || '';
-    document.getElementById('gasto-monto').value       = mov ? String(mov.monto ?? '').replace('.', ',') : '';
-    document.getElementById('gasto-error').classList.add('hidden');
-    document.getElementById('modal-gasto-title').textContent = mov ? 'Editar Egreso' : 'Registrar Egreso';
-    if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-      document.getElementById('btn-gasto-camera').style.display = '';
-    }
-    document.getElementById('modal-gasto').classList.remove('hidden');
+    $('gasto-obra').value        = mov?.obra        || '';
+    $('gasto-fecha').value       = mov?.fecha       || hoyISO();
+    $('gasto-proveedor').value   = mov?.proveedor   || '';
+    $('gasto-descripcion').value = mov?.descripcion || '';
+    $('gasto-monto').value       = mov ? montoInput(mov.monto) : '';
+    fechaTocada = !!mov;
+    renderObrasRecientes();
+    $('gasto-error').classList.add('hidden');
+    $('gasto-ia-st').classList.add('hidden');
+    document.querySelectorAll('#modal-gasto .cj-sec').forEach(s => s.classList.remove('is-falta'));
+    $('gasto-ya').classList.toggle('hidden', !mov?.driveFileId);
+    if (mov?.driveFileId) $('gasto-ya-link').href = driveUrl(mov.driveFileId);
+    $('modal-gasto-title').textContent = mov ? 'Editar egreso' : 'Registrar egreso';
+    $('btn-gasto-guardar').querySelector('span').textContent = mov ? 'Guardar cambios' : 'Guardar egreso';
+    $('btn-gasto-camera').classList.toggle('hidden', !esMovil);
+    $('gasto-body').scrollTop = 0;
+    refrescarGasto();
+    abrirHoja('modal-gasto');
   }
 
   function closeGastoModal() {
-    document.getElementById('modal-gasto').classList.add('hidden');
+    $('modal-gasto').classList.add('hidden');
     clearGastoFile();
     editGasto = null;
   }
 
-  document.getElementById('btn-nuevo-gasto').addEventListener('click', () => openGastoModal());
-  document.getElementById('modal-gasto-close').addEventListener('click', closeGastoModal);
-  document.getElementById('btn-gasto-cancelar').addEventListener('click', closeGastoModal);
-  document.getElementById('modal-gasto').addEventListener('click', e => { if (e.target === e.currentTarget) closeGastoModal(); });
+  const FALTA_SEC = { monto: 'cj-sec-monto', fecha: 'cj-sec-monto', obra: 'cj-sec-obra', cat: 'cj-sec-cat', desc: 'cj-sec-det' };
 
-  document.getElementById('btn-gasto-archivo').addEventListener('click', () => document.getElementById('gasto-file').click());
-  document.getElementById('btn-gasto-camera').addEventListener('click', () => document.getElementById('gasto-camera').click());
+  function faltantesGasto() {
+    const f = [];
+    if (!(parseMonto($('gasto-monto').value) > 0)) f.push({ id: 'monto', txt: 'El monto', sub: 'Paso 2 · monto y fecha', corto: 'monto' });
+    if (!$('gasto-fecha').value)            f.push({ id: 'fecha', txt: 'La fecha',     sub: 'Paso 2 · monto y fecha', corto: 'fecha' });
+    if (!$('gasto-obra').value)             f.push({ id: 'obra',  txt: 'La obra',      sub: 'Paso 3 · a qué obra va', corto: 'obra' });
+    if (!catSel)                            f.push({ id: 'cat',   txt: 'La categoría', sub: 'Paso 4 · categoría', corto: 'categoría' });
+    if (!$('gasto-descripcion').value.trim()) f.push({ id: 'desc', txt: 'La descripción', sub: 'Paso 5 · qué se compró o pagó', corto: 'descripción' });
+    return f;
+  }
 
-  function setGastoFile(file, withPreview) {
-    gastoFile = file;
-    const nameEl = document.getElementById('gasto-file-name');
-    const prevEl = document.getElementById('gasto-preview');
-    const imgEl  = document.getElementById('gasto-preview-img');
-    if (gastoPreviewUrl) { URL.revokeObjectURL(gastoPreviewUrl); gastoPreviewUrl = null; }
-    if (withPreview && file.type.startsWith('image/')) {
-      gastoPreviewUrl = URL.createObjectURL(file);
-      imgEl.src = gastoPreviewUrl;
-      prevEl.classList.remove('hidden');
-      nameEl.classList.add('hidden');
+  function refrescarGasto() {
+    const faltan = faltantesGasto();
+    const tiene  = id => !faltan.some(f => f.id === id);
+    const tilde  = (id, ok, n) => { const el = $(id); el.classList.toggle('ok', ok); el.innerHTML = ok ? icSvg('checkSm') : n; };
+    const conComp = !!gastoFile || !!editGasto?.driveFileId;
+    tilde('cj-n-comp',  conComp, '1');
+    tilde('cj-n-monto', tiene('monto') && tiene('fecha'), '2');
+    tilde('cj-n-obra',  tiene('obra'), '3');
+    tilde('cj-n-cat',   tiene('cat'), '4');
+    tilde('cj-n-det',   tiene('desc'), '5');
+    $('cj-opt-comp').classList.toggle('hidden', conComp);
+    Object.values(FALTA_SEC).forEach(sec => {
+      if (!faltan.some(f => FALTA_SEC[f.id] === sec)) $(sec).classList.remove('is-falta');
+    });
+    $('gasto-obras-rec').querySelectorAll('.cj-chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.v === $('gasto-obra').value));
+    const st = $('gasto-estado');
+    if (faltan.length) {
+      st.className = 'cj-st cj-st--falta';
+      st.textContent = (faltan.length > 1 ? 'Faltan ' : 'Falta ') + unirFaltan(faltan.map(f => f.corto));
     } else {
-      nameEl.textContent = file.name;
-      nameEl.classList.remove('hidden');
-      prevEl.classList.add('hidden');
+      st.className = 'cj-st cj-st--ok';
+      st.textContent = 'Listo para guardar';
     }
+    $('btn-gasto-guardar').classList.toggle('is-incompleto', faltan.length > 0);
+  }
+
+  function irAFaltanteGasto(id) {
+    const sec = $(FALTA_SEC[id]);
+    sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const foco = { monto: 'gasto-monto', fecha: 'gasto-fecha', obra: 'gasto-obra', desc: 'gasto-descripcion' }[id];
+    const el = foco ? $(foco) : sec.querySelector('.cj-chip');
+    if (el) setTimeout(() => el.focus({ preventScroll: true }), 350);
+  }
+
+  $('gasto-estado').addEventListener('click', () => {
+    const f = faltantesGasto();
+    if (f.length) mostrarFaltantes(f, irAFaltanteGasto);
+  });
+
+  ['gasto-monto', 'gasto-descripcion', 'gasto-proveedor'].forEach(id => $(id).addEventListener('input', refrescarGasto));
+  $('gasto-fecha').addEventListener('input', () => { fechaTocada = true; refrescarGasto(); });
+  $('gasto-obra').addEventListener('change', refrescarGasto);
+  $('gasto-cats').addEventListener('click', e => {
+    const c = e.target.closest('.cj-chip');
+    if (!c) return;
+    catSel = c.dataset.v;
+    $('gasto-cats').querySelectorAll('.cj-chip').forEach(x => x.setAttribute('aria-pressed', x === c));
+    refrescarGasto();
+  });
+  $('gasto-obras-rec').addEventListener('click', e => {
+    const c = e.target.closest('.cj-chip');
+    if (!c) return;
+    $('gasto-obra').value = c.dataset.v;
+    refrescarGasto();
+  });
+
+  $('btn-nuevo-gasto').addEventListener('click', () => openGastoModal());
+  $('btn-fab-gasto').addEventListener('click', () => openGastoModal());
+  $('modal-gasto-close').addEventListener('click', closeGastoModal);
+  $('btn-gasto-cancelar').addEventListener('click', closeGastoModal);
+  $('modal-gasto').addEventListener('click', e => { if (e.target === e.currentTarget) closeGastoModal(); });
+
+  $('btn-gasto-archivo').addEventListener('click', () => $('gasto-file').click());
+  $('btn-gasto-camera').addEventListener('click', () => $('gasto-camera').click());
+
+  function setGastoFile(file) {
+    gastoFile = file;
+    if (gastoPreviewUrl) { URL.revokeObjectURL(gastoPreviewUrl); gastoPreviewUrl = null; }
+    const img = $('gasto-preview-img');
+    const thumb = $('gasto-thumb');
+    thumb.querySelector('.cj-pdf')?.remove();
+    if (file.type.startsWith('image/')) {
+      gastoPreviewUrl = URL.createObjectURL(file);
+      img.src = gastoPreviewUrl;
+      img.classList.remove('hidden');
+    } else {
+      img.removeAttribute('src');
+      img.classList.add('hidden');
+      thumb.insertAdjacentHTML('beforeend', `<span class="cj-pdf">${icSvg('file')}</span>`);
+    }
+    $('gasto-file-name').textContent = file.name;
+    $('gasto-file-size').textContent = `${Math.max(1, Math.round(file.size / 1024))} KB`;
+    $('gasto-drop').classList.add('hidden');
+    $('gasto-foto').classList.remove('hidden');
+    $('btn-gasto-rescan').classList.toggle('hidden', !(rawImage && typeof openScanner === 'function'));
+    $('btn-gasto-ia').classList.toggle('hidden', typeof extractFromTicket !== 'function');
+    $('btn-gasto-ia-t').textContent = 'Leer con IA';
+    $('gasto-ia-st').classList.add('hidden');
+    refrescarGasto();
   }
 
   function clearGastoFile() {
-    gastoFile      = null;
-    lastCameraFile = null;
+    gastoFile = null;
+    rawImage  = null;
     if (gastoPreviewUrl) { URL.revokeObjectURL(gastoPreviewUrl); gastoPreviewUrl = null; }
-    document.getElementById('gasto-file').value   = '';
-    document.getElementById('gasto-camera').value = '';
-    document.getElementById('gasto-file-name').classList.add('hidden');
-    document.getElementById('gasto-preview').classList.add('hidden');
+    $('gasto-file').value   = '';
+    $('gasto-camera').value = '';
+    $('gasto-drop').classList.remove('hidden');
+    $('gasto-foto').classList.add('hidden');
+    $('btn-gasto-ia').classList.add('hidden');
+    $('gasto-ia-st').classList.add('hidden');
+    if (!$('modal-gasto').classList.contains('hidden')) refrescarGasto();
   }
 
-  // Archivo subido (galería/PDF): se usa tal cual, sin escáner.
+  // Archivo elegido (galería/PDF) o arrastrado: se usa tal cual, sin escáner.
   function handleFileSelected(file) {
     if (!file) return;
-    setGastoFile(file, false);
+    rawImage = file.type.startsWith('image/') ? file : null;
+    setGastoFile(file);
   }
 
   // Foto de cámara: pasa por el escáner antes de adjuntar.
   async function handleCameraSelected(file) {
     if (!file) return;
-    document.getElementById('gasto-camera').value = '';
+    $('gasto-camera').value = '';
     if (file.type.startsWith('image/') && typeof openScanner === 'function') {
-      lastCameraFile = file;
       try {
         const scanned = await openScanner(file);
-        if (scanned) setGastoFile(scanned, true);   // null = cancelado: no cambia nada
+        if (scanned) { rawImage = file; setGastoFile(scanned); }   // null = cancelado: no cambia nada
       } catch (_) {
         // Escáner no disponible (p. ej. sin conexión la 1ª vez): adjuntar foto original.
-        setGastoFile(file, false);
+        rawImage = null;
+        setGastoFile(file);
         showToast('Escáner no disponible; se adjuntó la foto original', 'warning');
       }
     } else {
-      setGastoFile(file, false);
+      handleFileSelected(file);
     }
   }
 
-  document.getElementById('gasto-file').addEventListener('change',   e => handleFileSelected(e.target.files[0]));
-  document.getElementById('gasto-camera').addEventListener('change', e => handleCameraSelected(e.target.files[0]));
+  $('gasto-file').addEventListener('change',   e => handleFileSelected(e.target.files[0]));
+  $('gasto-camera').addEventListener('change', e => handleCameraSelected(e.target.files[0]));
 
-  document.getElementById('btn-gasto-rescan').addEventListener('click', async () => {
-    if (!lastCameraFile || typeof openScanner !== 'function') return;
+  // Arrastrar el ticket a la bandeja (escritorio)
+  const drop = $('gasto-drop');
+  ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('drag-over'); }));
+  ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('drag-over'); }));
+  drop.addEventListener('drop', e => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f && /^(image\/|application\/pdf)/.test(f.type)) handleFileSelected(f);
+    else if (f) showToast('Tiene que ser una foto o un PDF', 'warning');
+  });
+
+  $('btn-gasto-rescan').addEventListener('click', async () => {
+    if (!rawImage || typeof openScanner !== 'function') return;
+    const raw = rawImage;
     try {
-      const scanned = await openScanner(lastCameraFile);
-      if (scanned) setGastoFile(scanned, true);
+      const scanned = await openScanner(raw);
+      if (scanned) { setGastoFile(scanned); rawImage = raw; $('btn-gasto-rescan').classList.remove('hidden'); }
     } catch (_) {
       showToast('Escáner no disponible', 'warning');
     }
   });
-  document.getElementById('btn-gasto-quitar').addEventListener('click', clearGastoFile);
+  $('btn-gasto-quitar').addEventListener('click', clearGastoFile);
 
-  // Lightbox: tocar el preview abre la imagen completa (sin editor)
-  const lightbox = document.getElementById('img-lightbox');
+  // Leer el ticket con IA: completa lo que esté vacío; lo ya cargado no se pisa.
+  $('btn-gasto-ia').addEventListener('click', async () => {
+    if (!gastoFile || typeof extractFromTicket !== 'function') return;
+    const st = $('gasto-ia-st');
+    const btn = $('btn-gasto-ia');
+    btn.disabled = true;
+    st.className = 'cj-ia-st cj-ia-st--loading';
+    st.innerHTML = '<div class="spinner"></div><span>Leyendo el ticket…</span>';
+    try {
+      const r = await extractFromTicket(gastoFile);
+      const leido = [];
+      if (r.monto_total > 0 && !(parseMonto($('gasto-monto').value) > 0)) {
+        $('gasto-monto').value = montoInput(Math.round(r.monto_total * 100) / 100);
+        leido.push(fmtMonto(r.monto_total));
+      }
+      if (r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha) && !fechaTocada) {
+        $('gasto-fecha').value = r.fecha;
+        leido.push(fmtFecha(r.fecha).substring(0, 5));
+      }
+      if (r.proveedor && !$('gasto-proveedor').value.trim()) { $('gasto-proveedor').value = r.proveedor; leido.push(r.proveedor); }
+      if (r.descripcion && !$('gasto-descripcion').value.trim()) $('gasto-descripcion').value = r.descripcion;
+      if (r.categoria_sugerida && !catSel) {
+        const c = categorias.find(x => sinTildes(x) === sinTildes(r.categoria_sugerida));
+        if (c) { catSel = c; renderCats(catSel); }
+      }
+      refrescarGasto();
+      st.className = 'cj-ia-st cj-ia-st--success';
+      st.innerHTML = icSvg('sparkles') + `<span>${leido.length ? 'Leído con IA: ' + esc(unirFaltan(leido)) + '.' : 'Leído con IA.'} Revisalo antes de guardar.</span>`;
+      $('btn-gasto-ia-t').textContent = 'Leer de nuevo';
+    } catch (err) {
+      st.className = 'cj-ia-st cj-ia-st--error';
+      st.innerHTML = icSvg('alert') + `<span>No se pudo leer: ${esc(err.message || err)}</span>`;
+    }
+    btn.disabled = false;
+  });
+
+  // Lightbox: tocar la foto abre la imagen completa (sin editor)
+  const lightbox = $('img-lightbox');
   function openLightbox(src) {
-    document.getElementById('img-lightbox-img').src = src;
+    $('img-lightbox-img').src = src;
     lightbox.classList.remove('hidden');
   }
   function closeLightbox() {
     lightbox.classList.add('hidden');
-    document.getElementById('img-lightbox-img').removeAttribute('src');
+    $('img-lightbox-img').removeAttribute('src');
   }
-  document.getElementById('gasto-preview-img').addEventListener('click', () => {
-    if (gastoPreviewUrl) openLightbox(gastoPreviewUrl);
-  });
+  $('gasto-thumb').addEventListener('click', () => { if (gastoPreviewUrl) openLightbox(gastoPreviewUrl); });
   lightbox.addEventListener('click', closeLightbox);
-  document.getElementById('img-lightbox-close').addEventListener('click', closeLightbox);
+  $('img-lightbox-close').addEventListener('click', closeLightbox);
 
-  document.getElementById('btn-gasto-guardar').addEventListener('click', async () => {
-    const errorEl     = document.getElementById('gasto-error');
+  $('btn-gasto-guardar').addEventListener('click', async () => {
+    const errorEl = $('gasto-error');
     errorEl.classList.add('hidden');
 
-    const categoria   = document.getElementById('gasto-categoria').value;
-    const obra        = document.getElementById('gasto-obra').value;
-    const fecha       = document.getElementById('gasto-fecha').value;
-    const proveedor   = document.getElementById('gasto-proveedor').value.trim();
-    const descripcion = document.getElementById('gasto-descripcion').value.trim();
-    const monto       = parseMonto(document.getElementById('gasto-monto').value);
+    const faltan = faltantesGasto();
+    if (faltan.length) {
+      faltan.forEach(f => $(FALTA_SEC[f.id]).classList.add('is-falta'));
+      mostrarFaltantes(faltan, irAFaltanteGasto);
+      return;
+    }
 
-    if (!categoria)   { errorEl.textContent = 'Seleccioná una categoría.';   errorEl.classList.remove('hidden'); return; }
-    if (!obra)        { errorEl.textContent = 'Seleccioná la obra.';         errorEl.classList.remove('hidden'); return; }
-    if (!fecha)       { errorEl.textContent = 'Ingresá la fecha.';           errorEl.classList.remove('hidden'); return; }
-    if (!descripcion) { errorEl.textContent = 'Ingresá una descripción.';    errorEl.classList.remove('hidden'); return; }
-    if (!monto || monto <= 0) { errorEl.textContent = 'Ingresá un monto válido.'; errorEl.classList.remove('hidden'); return; }
+    const categoria   = catSel;
+    const obra        = $('gasto-obra').value;
+    const fecha       = $('gasto-fecha').value;
+    const proveedor   = $('gasto-proveedor').value.trim();
+    const descripcion = $('gasto-descripcion').value.trim();
+    const monto       = parseMonto($('gasto-monto').value);
 
-    const btn = document.getElementById('btn-gasto-guardar');
+    const btn = $('btn-gasto-guardar');
+    const btnTxt = btn.querySelector('span');
+    const txtAntes = btnTxt.textContent;
     btn.disabled = true;
-    btn.textContent = 'Guardando…';
+    btnTxt.textContent = 'Guardando…';
 
     const mov = { tipo: 'gasto', categoria, obra, proveedor: proveedor || null, descripcion, fecha, monto };
 
@@ -599,7 +978,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         if (res?.fileId) mov.driveFileId = res.fileId;
       } catch (_) {
-        showToast('Comprobante no se pudo subir a Drive', 'warning');
+        showToast('El comprobante no se pudo subir a Drive: el egreso queda "sin comprobante"', 'warning');
       }
     }
 
@@ -628,36 +1007,120 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     btn.disabled = false;
-    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Guardar Egreso';
+    btnTxt.textContent = txtAntes;
   });
 
-  // ─── Recarga (Ingreso) modal ─────────────────────────
+  // ─── Ingreso (recarga): disponible para admin y usuarios habilitados ─
   let editIngreso = null;   // movimiento en edición (o null al crear)
-
-  const MESES_LBL = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
   function openRecargaModal(mov) {
     editIngreso = mov || null;
     // Fecha puntual del ingreso. Antes se elegía el mes y se guardaba el día 1; los
     // ingresos anteriores a este cambio tienen todos fecha `-01` y se editan como tales.
-    document.getElementById('recarga-fecha').value = mov?.fecha || new Date().toISOString().split('T')[0];
+    $('recarga-fecha').value = mov?.fecha || hoyISO();
     // Comentario: lo que sigue al "Recarga {Mes} {Año} — " si existe
     let comentario = '';
     if (mov?.descripcion) {
       const parts = mov.descripcion.split(' — ');
       if (parts.length > 1) comentario = parts.slice(1).join(' — ');
     }
-    document.getElementById('recarga-monto').value      = mov ? String(mov.monto ?? '').replace('.', ',') : '';
-    document.getElementById('recarga-comentario').value = comentario;
-    document.getElementById('recarga-error').classList.add('hidden');
-    document.getElementById('modal-recarga-title').textContent = mov ? 'Editar Ingreso' : 'Registrar Ingreso';
-    document.getElementById('modal-recarga').classList.remove('hidden');
+    $('recarga-monto').value      = mov ? montoInput(mov.monto) : '';
+    $('recarga-comentario').value = comentario;
+    $('recarga-error').classList.add('hidden');
+    $('modal-recarga-title').textContent = mov ? 'Editar ingreso' : 'Registrar ingreso';
+    $('btn-recarga-guardar').querySelector('span').textContent = mov ? 'Guardar cambios' : 'Guardar ingreso';
+    refrescarRecarga();
+    abrirHoja('modal-recarga');
+    if (!mov) setTimeout(() => $('recarga-monto').focus(), 50);
   }
 
   function closeRecargaModal() {
-    document.getElementById('modal-recarga').classList.add('hidden');
+    $('modal-recarga').classList.add('hidden');
     editIngreso = null;
   }
+
+  function faltantesRecarga() {
+    const f = [];
+    if (!(parseMonto($('recarga-monto').value) > 0)) f.push({ id: 'monto', txt: 'El monto', sub: 'Cuánto entra a la caja', corto: 'el monto' });
+    if (!$('recarga-fecha').value) f.push({ id: 'fecha', txt: 'La fecha', sub: 'El día que entró la plata', corto: 'la fecha' });
+    return f;
+  }
+
+  // Dice en qué caja cae y cómo queda, para no cargarle a otro por error.
+  function refrescarRecarga() {
+    const monto  = parseMonto($('recarga-monto').value);
+    const actual = movimientos.reduce((s, m) => s + neto(m), 0) - (editIngreso ? (editIngreso.monto || 0) : 0);
+    const despues = actual + monto;
+    $('recarga-dest').innerHTML = `Va a la caja de <b>${esc(targetNombre)}</b>.` +
+      (monto > 0 ? ` Saldo después: <b class="${despues < 0 ? 'neg' : 'ok'}">${fmtSaldo(despues)}</b>` : '');
+    const faltan = faltantesRecarga();
+    const st = $('recarga-estado');
+    if (faltan.length) {
+      st.className = 'cj-st cj-st--falta';
+      st.textContent = 'Falta ' + unirFaltan(faltan.map(f => f.corto));
+    } else {
+      st.className = 'cj-st cj-st--ok';
+      st.textContent = 'Listo para guardar';
+    }
+    $('btn-recarga-guardar').classList.toggle('is-incompleto', faltan.length > 0);
+  }
+  ['recarga-monto', 'recarga-fecha'].forEach(id => $(id).addEventListener('input', refrescarRecarga));
+  $('recarga-estado').addEventListener('click', () => {
+    const f = faltantesRecarga();
+    if (f.length) mostrarFaltantes(f, id => $(id === 'monto' ? 'recarga-monto' : 'recarga-fecha').focus());
+  });
+
+  $('btn-nuevo-ingreso').addEventListener('click', () => openRecargaModal());
+  $('btn-fab-ingreso').addEventListener('click', () => openRecargaModal());
+  $('modal-recarga-close').addEventListener('click', closeRecargaModal);
+  $('btn-recarga-cancelar').addEventListener('click', closeRecargaModal);
+  $('modal-recarga').addEventListener('click', e => { if (e.target === e.currentTarget) closeRecargaModal(); });
+
+  $('btn-recarga-guardar').addEventListener('click', async () => {
+    const errorEl     = $('recarga-error');
+    const fechaRec    = $('recarga-fecha').value;
+    const comentario  = $('recarga-comentario').value.trim();
+    const monto       = parseMonto($('recarga-monto').value);
+    errorEl.classList.add('hidden');
+
+    const faltan = faltantesRecarga();
+    if (faltan.length) {
+      mostrarFaltantes(faltan, id => $(id === 'monto' ? 'recarga-monto' : 'recarga-fecha').focus());
+      return;
+    }
+
+    // El mes sale de la fecha elegida: es el que manda para el arrastre del saldo
+    // y para saber qué planilla resincronizar.
+    const mesRecarga  = fechaRec.substring(0, 7);
+    const labelMes    = `Recarga ${nombreMes(mesRecarga)}`;
+    const descripcion = comentario ? `${labelMes} — ${comentario}` : labelMes;
+
+    const btn = $('btn-recarga-guardar');
+    btn.disabled = true;
+    const mov = { tipo: 'ingreso', descripcion, fecha: fechaRec, monto };
+    try {
+      if (editIngreso) {
+        const prevMes = editIngreso.fecha?.substring(0, 7);
+        await patchCajaMovimiento(targetCodigo, editIngreso.key, mov);
+        closeRecargaModal();
+        showToast('Ingreso actualizado', 'success');
+        await loadMovimientos();
+        sincronizarExcel(mesRecarga);
+        if (prevMes && prevMes !== mesRecarga) sincronizarExcel(prevMes);
+      } else {
+        await saveCajaMovimiento(targetCodigo, mov);
+        logCajaActivity(mov);
+        closeRecargaModal();
+        showToast('Ingreso registrado', 'success');
+        await loadMovimientos();
+        sincronizarExcel(mesRecarga);
+      }
+    } catch (err) {
+      errorEl.textContent = 'Error al guardar: ' + (err.message || err);
+      errorEl.classList.remove('hidden');
+    }
+    btn.disabled = false;
+  });
 
   // ─── Categorías modal (admin) ─────────────────────────
   let categoriasEdit = [];
@@ -665,22 +1128,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   function openCategoriasModal() {
     categoriasEdit = [...categorias];
     renderCategoriasEdit();
-    document.getElementById('nueva-categoria').value = '';
-    document.getElementById('modal-categorias').classList.remove('hidden');
+    $('nueva-categoria').value = '';
+    $('modal-categorias').classList.remove('hidden');
   }
 
   function closeCategoriasModal() {
-    document.getElementById('modal-categorias').classList.add('hidden');
+    $('modal-categorias').classList.add('hidden');
   }
 
   function renderCategoriasEdit() {
-    const list = document.getElementById('categorias-list');
+    const list = $('categorias-list');
     list.innerHTML = '';
     categoriasEdit.forEach((c, i) => {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:.5rem;';
       row.innerHTML = `
-        <span style="flex:1;padding:.4rem .65rem;background:var(--gray-100);border-radius:var(--radius);font-size:.9rem;">${c}</span>
+        <span style="flex:1;padding:.4rem .65rem;background:var(--gray-100);border-radius:var(--radius);font-size:.9rem;">${esc(c)}</span>
         <button class="btn btn-xs btn-secondary btn-del-cat" data-idx="${i}" title="Eliminar">
           <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
         </button>
@@ -696,8 +1159,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (isAdmin) {
-    document.getElementById('btn-agregar-categoria').addEventListener('click', () => {
-      const input = document.getElementById('nueva-categoria');
+    $('btn-agregar-categoria').addEventListener('click', () => {
+      const input = $('nueva-categoria');
       const val   = input.value.trim();
       if (val && !categoriasEdit.includes(val)) {
         categoriasEdit.push(val);
@@ -705,28 +1168,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       input.value = '';
     });
-    document.getElementById('nueva-categoria').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('btn-agregar-categoria').click();
+    $('nueva-categoria').addEventListener('keydown', e => {
+      if (e.key === 'Enter') $('btn-agregar-categoria').click();
     });
 
-    document.getElementById('modal-categorias-close').addEventListener('click', closeCategoriasModal);
-    document.getElementById('btn-categorias-cancelar').addEventListener('click', closeCategoriasModal);
-    document.getElementById('modal-categorias').addEventListener('click', e => { if (e.target === e.currentTarget) closeCategoriasModal(); });
+    $('modal-categorias-close').addEventListener('click', closeCategoriasModal);
+    $('btn-categorias-cancelar').addEventListener('click', closeCategoriasModal);
+    $('modal-categorias').addEventListener('click', e => { if (e.target === e.currentTarget) closeCategoriasModal(); });
 
-    document.getElementById('btn-categorias-guardar').addEventListener('click', async () => {
-      const btn = document.getElementById('btn-categorias-guardar');
+    $('btn-categorias-guardar').addEventListener('click', async () => {
+      const btn = $('btn-categorias-guardar');
       btn.disabled = true;
       try {
         await saveCategoriasCaja(categoriasEdit);
         categorias = [...categoriasEdit];
-        // Refresh select
-        const sel = document.getElementById('gasto-categoria');
-        sel.innerHTML = '<option value="">— Seleccioná —</option>';
-        categorias.forEach(c => {
-          const o = document.createElement('option');
-          o.value = o.textContent = c;
-          sel.appendChild(o);
-        });
         closeCategoriasModal();
         showToast('Categorías guardadas', 'success');
       } catch (_) {
@@ -757,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const hoy       = new Date();
-    const mesActual = mes || hoy.toISOString().substring(0, 7);
+    const mesActual = mes || mesHoy();
     const [yr, mo]  = mesActual.split('-');
     const periodo   = `${MESES[parseInt(mo, 10)]} ${yr}`;
 
@@ -812,7 +1267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Columnas del detalle: A Fecha · B Tipo · C Categoría · D Obra · E Proveedor ·
     // F Descripción · G Monto. Las fórmulas de arriba apuntan acá, así que mover una
     // columna del detalle obliga a mover su letra en los SUMIF.
-    const dr = (col) => hasData ? `$${col}$${detFirst}:$${col}$${detLast}` : `$${col}$${detFirst}:$${col}$${detFirst}`;
+    const dr = (col) => hasData ? `${col}${detFirst}:${col}${detLast}` : `${col}${detFirst}:${col}${detFirst}`;
     const sumif = (typeVal, col) => hasData
       ? `SUMIF(${dr('B')},"${typeVal}",${dr(col)})`
       : '0';
@@ -992,15 +1447,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (_) {}
   }
 
-  // ─── Helper: parse monto ─────────────────────────────
-  function parseMonto(str) {
-    if (!str) return 0;
-    const n = parseFloat(str.replace(/\./g, '').replace(',', '.'));
-    return isNaN(n) ? 0 : n;
-  }
-
   // ─── Init ────────────────────────────────────────────
+  mesSel = mesHoy();
   await loadCategorias();
   await loadObras();
-  await loadMovimientos();
+  if (isAdmin) {
+    const pedida = new URLSearchParams(location.search).get('caja');
+    if (pedida) {
+      await cargarPersonas();
+      history.replaceState(null, '', location.pathname);
+      await abrirCaja(pedida);
+    } else {
+      await mostrarTodas();
+    }
+  } else {
+    mostrarVista();
+    await loadMovimientos();
+  }
 });

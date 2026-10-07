@@ -760,6 +760,17 @@ window._fetchConTope = function (url, opts, ms = 20000) {
       .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || (b.timestamp || 0) - (a.timestamp || 0));
   };
 
+  // Todas las cajas de una vez, para el tablero de administración: { codigo: [movimientos] }.
+  window.getTodasLasCajas = async function () {
+    const resp = await _fbFetch(_base() + '/cajas.json');
+    const data = await resp.json();
+    const out  = {};
+    Object.entries(data || {}).forEach(([codigo, c]) => {
+      out[codigo] = Object.entries(c?.movimientos || {}).map(([key, m]) => ({ key, ...m }));
+    });
+    return out;
+  };
+
   window.saveCajaMovimiento = async function (userId, movimiento) {
     const key  = _genKey();
     await _fbFetch(_base() + '/cajas/' + userId + '/movimientos/' + key + '.json', {

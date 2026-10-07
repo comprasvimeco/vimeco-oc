@@ -11,6 +11,258 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    /* ===== Caja chica con la estética de pastillas (verde de Caja) ===== */
+    .cj-main { max-width: 1120px; }
+    .cj-ttl { display: flex; align-items: center; gap: .45rem; margin-bottom: .9rem; flex-wrap: wrap; }
+    .cj-t { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; white-space: nowrap; }
+    .act-pick.cj-pick-grn { background: #dff3e5; border-color: transparent; color: #1a7f3c; }
+    .cj-pend { display: inline-flex; align-items: center; gap: .35rem; background: #fde6e6; color: #b02a2a; font: inherit; font-size: .76rem; font-weight: 700;
+      padding: .2rem .65rem; border-radius: 999px; white-space: nowrap; border: none; margin-left: auto; cursor: pointer; }
+    .cj-pend::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+    .cj-pend.hidden { display: none; }
+    .cj-card { background: var(--white); border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); padding: .85rem .9rem; }
+    .cj-sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+    .cj-sq .icon { width: 18px; height: 18px; }
+    .cj-sq--grn { background: #dff3e5; color: #1a7f3c; }
+    .cj-sq--del { background: #fde6e6; color: #b02a2a; }
+    .cj-num { font-variant-numeric: tabular-nums; }
+
+    /* Dos columnas: lista a la izquierda, saldo y en qué se gastó al costado */
+    .cj-lay { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; align-items: start; }
+    .cj-side { order: 2; display: flex; flex-direction: column; gap: .75rem; position: sticky; top: 1rem; }
+    .cj-listcol { min-width: 0; }
+    .cj-saldo { background: linear-gradient(135deg, #e6f6ea, #fff 70%); border-radius: 16px; padding: .95rem 1rem; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); }
+    .cj-saldo-k { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #1a7f3c; font-weight: 700; display: flex; align-items: center; gap: .4rem; }
+    .cj-saldo-k .icon { width: 15px; height: 15px; }
+    .cj-saldo-n { font-size: 2.05rem; font-weight: 800; color: var(--primary-dark); line-height: 1.1; margin: .2rem 0 .15rem; letter-spacing: -.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .cj-saldo-n.neg { color: #b02a2a; }
+    .cj-saldo-s { font-size: .76rem; color: var(--gray-500); line-height: 1.35; }
+    .cj-desg { margin-top: .75rem; background: var(--white); border: 1px solid var(--gray-200); border-radius: 10px; padding: .1rem .65rem; }
+    .cj-desg > div { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--gray-200); font-size: .8rem; color: var(--gray-500); font-weight: 600; }
+    .cj-desg > div:last-child { border-bottom: none; }
+    .cj-desg b { font-size: .88rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .cj-desg .exc b { color: var(--primary-dark); } .cj-desg .exc b.neg { color: #b02a2a; }
+    .cj-desg .ing b { color: #1a7f3c; } .cj-desg .egr b { color: #b02a2a; }
+    .cj-acts { display: flex; gap: .5rem; margin-top: .75rem; }
+    .cj-acts .foc-btn, .cj-fab .foc-btn { flex: 1; justify-content: center; padding: .62rem; font-size: .88rem; }
+    .cj-acts .foc-btn .icon, .cj-fab .foc-btn .icon { width: 17px; height: 17px; }
+    .foc-btn--egr { background: #fde6e6; color: #b02a2a; }
+    .foc-btn--egr-solid { background: #c43c3c; color: #fff; }
+    .cj-side-t { font-size: .72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .55rem; }
+    .cj-bar { margin-bottom: .55rem; }
+    .cj-bar:last-child { margin-bottom: 0; }
+    .cj-bar-t { display: flex; justify-content: space-between; gap: .5rem; font-size: .78rem; color: var(--gray-600); }
+    .cj-bar-t span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cj-bar-t b { color: var(--gray-700); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .cj-bar-b { height: 6px; border-radius: 999px; background: var(--gray-200); margin-top: .2rem; overflow: hidden; }
+    .cj-bar-b i { display: block; height: 100%; border-radius: 999px; background: #d16a6a; }
+    .cj-bars--cat .cj-bar-b i { background: #8fa7c4; }
+    .cj-vacio-s { font-size: .8rem; color: var(--gray-400); }
+
+    /* Buscador, pestañas y lista */
+    .cj-search { display: flex; align-items: center; gap: .5rem; background: var(--white); border: 1.5px solid var(--gray-200); border-radius: 12px; padding: 0 .75rem; margin-bottom: .6rem; color: var(--gray-400); }
+    .cj-search:focus-within { border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
+    .cj-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-size: .9rem; padding: .55rem 0; color: var(--gray-700); }
+    .cj-tabs { display: flex; gap: .35rem; margin-bottom: .7rem; flex-wrap: wrap; }
+    .cj-tab { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600); border-radius: 999px;
+      padding: .34rem .8rem; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .cj-tab b { font-size: .7rem; padding: 0 .4rem; border-radius: 999px; background: var(--gray-100); color: var(--gray-500); }
+    .cj-tab.on { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+    .cj-tab.on b { background: #ffffff2b; color: #fff; }
+    .cj-tab.red:not(.on) b { background: #fde6e6; color: #b02a2a; }
+    .cj-panel { background: var(--white); border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); overflow: hidden; }
+    .cj-lh, .cj-mv { display: grid; grid-template-columns: 34px minmax(0, 1.5fr) minmax(0, 1fr) 132px 72px; gap: .65rem; align-items: center; }
+    .cj-lh { padding: .5rem .75rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-500); border-bottom: 1px solid var(--gray-200); }
+    .cj-lh .r { text-align: right; }
+    .cj-day { display: flex; justify-content: space-between; gap: .5rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); background: var(--gray-100); padding: .35rem .8rem; }
+    .cj-day b { text-transform: none; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+    .cj-mv { padding: .62rem .75rem; border-bottom: 1px solid var(--gray-200); cursor: pointer; transition: background .12s; }
+    .cj-mv:last-child { border-bottom: none; }
+    .cj-mv:hover { background: #f8faf9; }
+    .cj-mv:focus-visible { outline: 2px solid var(--primary-light); outline-offset: -2px; }
+    .cj-mv .cj-sq { width: 34px; height: 34px; border-radius: 10px; }
+    .cj-mv .cj-sq .icon { width: 16px; height: 16px; }
+    .cj-mv-d { font-weight: 700; color: var(--primary-dark); font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cj-mv-s { font-size: .75rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cj-mv-s .icon { width: 12px; height: 12px; vertical-align: -1px; color: #1a7f3c; }
+    .cj-mv-s .cj-nocomp { color: #b02a2a; font-weight: 600; }
+    .cj-mv-c { font-size: .8rem; color: var(--gray-600); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cj-mv-m { font-weight: 800; font-size: .92rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--gray-700); }
+    .cj-mv-m.ing { color: #1a7f3c; }
+    .cj-mv-m small { display: none; font-size: .68rem; font-weight: 600; color: var(--gray-400); }
+    .cj-mv-x { display: flex; gap: .25rem; justify-content: flex-end; }
+    .cj-ib { width: 30px; height: 30px; padding: 0; justify-content: center; }
+    .cj-ib .icon { width: 14px; height: 14px; }
+    .cj-solo-tel { display: none; }
+    .cj-vacio { text-align: center; padding: 2rem 1rem; color: var(--gray-400); font-size: .88rem; }
+    .cj-vacio .icon { width: 30px; height: 30px; display: block; margin: 0 auto .5rem; opacity: .7; }
+    .cj-fab { display: none; }
+
+    /* Todas las cajas (administración) */
+    .cj-tot { display: flex; gap: .55rem; margin-bottom: .85rem; flex-wrap: wrap; }
+    .cj-tot > div { flex: 1; min-width: 130px; background: var(--white); border-radius: 12px; padding: .55rem .75rem; box-shadow: 0 1px 2px rgba(26,58,92,.06); }
+    .cj-tot span { display: block; font-size: .72rem; color: var(--gray-500); font-weight: 600; }
+    .cj-tot b { font-size: 1.08rem; color: var(--primary-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .cj-tot b.neg { color: #b02a2a; }
+    .cj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: .75rem; }
+    .cj-box { background: var(--white); border-radius: 14px; padding: .8rem .85rem; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25);
+      display: flex; flex-direction: column; gap: .45rem; cursor: pointer; border: none; font: inherit; text-align: left; color: inherit; transition: transform .12s, box-shadow .12s; }
+    .cj-box:hover { transform: translateY(-1px); box-shadow: 0 1px 2px rgba(26,58,92,.08), 0 10px 22px -12px rgba(26,58,92,.35); }
+    .cj-box:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+    .cj-box-top { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+    .cj-box-top > div { min-width: 0; flex: 1; }
+    .cj-av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .82rem; background: #dff3e5; color: #1a7f3c; flex: none; }
+    .cj-av.neg { background: #fde6e6; color: #b02a2a; }
+    .cj-box-n { font-weight: 700; color: var(--primary-dark); font-size: .92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cj-box-s { font-size: .74rem; color: var(--gray-500); }
+    .cj-box-sal { font-size: 1.25rem; font-weight: 800; color: var(--primary-dark); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .cj-box-sal.neg { color: #b02a2a; }
+    .cj-box-sal small { display: block; font-size: .66rem; font-weight: 700; color: var(--gray-400); text-transform: uppercase; letter-spacing: .05em; }
+    .cj-box-bot { display: flex; gap: .35rem; flex-wrap: wrap; }
+    .cj-mini { font-size: .7rem; font-weight: 700; border-radius: 999px; padding: .12rem .5rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .cj-mini--ing { background: #dff3e5; color: #1a7f3c; }
+    .cj-mini--egr { background: var(--gray-100); color: var(--gray-600); }
+    .cj-mini--sin { background: #fde6e6; color: #b02a2a; }
+
+    /* Hojas: egreso (ancha), ingreso y ficha (chicas) */
+    .cj-ov { padding: 1.5rem; }
+    .cj-sheet { background: #f7f8fa; width: 100%; max-width: 860px; max-height: calc(100dvh - 3rem); border-radius: 18px; display: flex; flex-direction: column;
+      overflow: hidden; box-shadow: var(--shadow-lg); animation: popIn .28s var(--ease-spring) both; }
+    .cj-sheet--sm { max-width: 460px; }
+    .cj-sheet:focus { outline: none; }
+    .cj-sh-hd { display: flex; align-items: center; gap: .6rem; padding: .8rem .9rem; background: var(--white); border-bottom: 1px solid var(--gray-200); flex: none; }
+    .cj-sh-hd .cj-sq { width: 32px; height: 32px; border-radius: 9px; }
+    .cj-sh-hd .cj-sq .icon { width: 16px; height: 16px; }
+    .cj-sh-t { font-weight: 700; color: var(--primary-dark); font-size: 1.02rem; }
+    .cj-sh-x { margin-left: auto; width: 34px; height: 34px; padding: 0; justify-content: center; }
+    .cj-sh-body { flex: 1; min-height: 0; overflow-y: auto; padding: .9rem; display: flex; flex-direction: column; gap: .7rem; }
+    .cj-sh-body--two { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: .9rem; align-items: start; padding: 1rem; }
+    .cj-col { display: flex; flex-direction: column; gap: .7rem; min-width: 0; }
+    .cj-col--foto { position: sticky; top: 0; }
+    .cj-sh-ft { display: flex; align-items: center; gap: .6rem; padding: .7rem .9rem; background: var(--white); border-top: 1px solid var(--gray-200); flex: none; }
+    .cj-st { display: flex; align-items: center; gap: .45rem; font-size: .82rem; font-weight: 700; flex: 1; min-width: 0; line-height: 1.3; }
+    .cj-st::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+    .cj-st:empty { visibility: hidden; }
+    .cj-st--ok { color: #1a7f3c; } .cj-st--falta { color: #b02a2a; cursor: pointer; }
+    .cj-ft-btns { display: flex; gap: .45rem; margin-left: auto; }
+    .cj-guardar { background: #1f8a45; color: #fff; }
+    .cj-guardar.is-incompleto { background: #dff3e5; color: #1a7f3c; }
+    .cj-sec { background: var(--white); border-radius: 14px; padding: .75rem .8rem; box-shadow: 0 1px 2px rgba(26,58,92,.05); transition: box-shadow .15s; }
+    .cj-sec.is-falta { box-shadow: 0 0 0 2px #e5a3a3, 0 0 0 5px #fde6e6; }
+    .cj-sec-h { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; flex-wrap: wrap; }
+    .cj-sec-h > b { color: var(--primary-dark); font-size: .9rem; }
+    .cj-sec-h .cj-r { margin-left: auto; }
+    .cj-n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: .72rem; font-weight: 800; background: #dff3e5; color: #1a7f3c; flex: none; }
+    .cj-n .icon { width: 12px; height: 12px; stroke-width: 3; }
+    .cj-n.ok { background: #1f8a45; color: #fff; }
+    .cj-opt { font-size: .7rem; font-weight: 700; color: var(--gray-500); background: var(--gray-100); border-radius: 999px; padding: .05rem .45rem; }
+    .cj-drop { border: 2px dashed #b9e2c6; background: #f6fcf8; border-radius: 14px; padding: .9rem .8rem; text-align: center; transition: background .15s, border-color .15s; }
+    .cj-drop.drag-over { background: #dff3e5; border-color: #2e9d57; }
+    .cj-drop .cj-sq { width: 40px; height: 40px; margin: 0 auto .45rem; }
+    .cj-drop-t { font-weight: 700; color: var(--primary-dark); font-size: .88rem; }
+    .cj-drop-s { font-size: .74rem; color: var(--gray-500); line-height: 1.35; }
+    .cj-drop-btns { display: flex; gap: .4rem; margin-top: .7rem; }
+    .cj-drop-btns .foc-btn { flex: 1; justify-content: center; padding: .55rem; }
+    .foc-btn--grn-solid { background: #1f8a45; color: #fff; }
+    .cj-corto { display: none; }
+    .cj-foto { display: flex; flex-direction: column; gap: .6rem; }
+    .cj-thumb { border-radius: 10px; border: 1px solid var(--gray-200); background: var(--gray-100); overflow: hidden; display: grid; place-items: center; cursor: zoom-in; }
+    .cj-thumb img { display: block; width: 100%; max-height: 340px; object-fit: contain; background: #fff; }
+    .cj-thumb .cj-pdf { padding: 1.4rem; color: var(--gray-500); }
+    .cj-thumb .cj-pdf .icon { width: 34px; height: 34px; }
+    .cj-foto-n { min-width: 0; flex: 1; }
+    .cj-foto-n b { display: block; font-size: .84rem; color: var(--primary-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cj-foto-n small { font-size: .72rem; color: var(--gray-500); }
+    .cj-foto-acts { display: flex; gap: .35rem; margin-top: .4rem; flex-wrap: wrap; }
+    .cj-ya { display: flex; align-items: center; gap: .5rem; background: #f3fbf5; color: #1a7f3c; border-radius: 10px; padding: .5rem .6rem; font-size: .8rem; font-weight: 600; margin-bottom: .6rem; }
+    .cj-ya .icon { width: 15px; height: 15px; flex: none; }
+    .cj-ya a { margin-left: auto; color: var(--primary); font-weight: 700; }
+    .cj-ia-st { display: flex; gap: .45rem; align-items: flex-start; border-radius: 10px; padding: .5rem .6rem; font-size: .78rem; font-weight: 600; margin-top: .6rem; line-height: 1.35; }
+    .cj-ia-st .icon { width: 14px; height: 14px; margin-top: 1px; flex: none; }
+    .cj-ia-st .spinner { width: 14px; height: 14px; border-width: 2px; margin-top: 1px; }
+    .cj-ia-st--loading, .cj-ia-st--success { background: #f1e8fb; color: #6b3fa0; }
+    .cj-ia-st--error { background: #fde6e6; color: #b02a2a; }
+    .cj-f2 { display: grid; grid-template-columns: 1.2fr 1fr; gap: .5rem; }
+    .cj-fld + .cj-fld { margin-top: .55rem; }
+    .cj-fld label, .cj-f2 label { display: block; font-size: .72rem; font-weight: 700; color: var(--gray-500); margin-bottom: .2rem; }
+    .cj-sheet .form-control { border-radius: 10px; }
+    .cj-monto { position: relative; }
+    .cj-monto span { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%); color: var(--gray-400); font-weight: 700; pointer-events: none; }
+    .cj-monto input { font-size: 1.3rem; font-weight: 800; color: var(--primary-dark); padding-left: 1.6rem; font-variant-numeric: tabular-nums; }
+    .cj-monto input::placeholder { color: var(--gray-300); }
+    .cj-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+    .cj-chips + .cj-chips, .cj-fld + .cj-chips { margin-top: .45rem; }
+    .cj-chip { font: inherit; font-size: .8rem; font-weight: 600; border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600); border-radius: 999px; padding: .28rem .7rem; cursor: pointer; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .cj-chip:hover { border-color: #b9e2c6; }
+    .cj-chip[aria-pressed="true"] { background: #dff3e5; color: #1a7f3c; border-color: #b9e2c6; font-weight: 700; }
+    .cj-chips-hint { font-size: .72rem; color: var(--gray-400); padding: .3rem .1rem; }
+    .cj-dest { font-size: .78rem; color: var(--gray-500); margin-top: .65rem; line-height: 1.4; }
+    .cj-dest b { color: var(--primary-dark); }
+    .cj-dest .ok { color: #1a7f3c; } .cj-dest .neg { color: #b02a2a; }
+
+    /* Ficha */
+    .cj-fi-d { font-weight: 700; color: var(--primary-dark); font-size: .98rem; line-height: 1.3; overflow-wrap: anywhere; }
+    .cj-fi-s { font-size: .76rem; color: var(--gray-500); margin-top: .1rem; }
+    .cj-fi-m { font-size: 1.6rem; font-weight: 800; color: var(--primary-dark); margin-top: .35rem; font-variant-numeric: tabular-nums; }
+    .cj-fi-m.ing { color: #1a7f3c; }
+    .cj-fi-dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .35rem .9rem; font-size: .84rem; margin: 0; }
+    .cj-fi-dl dt { color: var(--gray-500); font-weight: 600; }
+    .cj-fi-dl dd { margin: 0; color: var(--gray-700); font-weight: 600; overflow-wrap: anywhere; }
+    .cj-fi-comp { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+    .cj-fi-comp > div { flex: 1; min-width: 0; }
+    .cj-fi-comp b { display: block; font-size: .86rem; color: var(--primary-dark); }
+    .cj-fi-comp small { font-size: .74rem; color: var(--gray-500); }
+    .cj-sh-ft .cj-ft-btns:only-child { margin-left: auto; }
+
+    @media (max-width: 900px) {
+      .cj-lay { grid-template-columns: minmax(0, 1fr); }
+      .cj-side { order: 0; position: static; }
+      .cj-solo-desk { display: none !important; }
+      .cj-lh { display: none; }
+      .cj-mv { grid-template-columns: 34px minmax(0, 1fr) auto; }
+      .cj-mv-c, .cj-mv-x { display: none; }
+      .cj-mv-m small { display: block; }
+      .cj-solo-tel { display: inline; }
+    }
+    @media (max-width: 760px) {
+      .cj-main { padding-bottom: 5.5rem; }
+      .cj-t { font-size: 1.2rem; }
+      .cj-ttl .cj-pend { margin-left: 0; }
+      .cj-saldo .cj-acts { display: none; }
+      .cj-fab.on { display: flex; gap: .5rem; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--white); border-top: 1px solid var(--gray-200);
+        padding: .55rem .7rem calc(.55rem + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); }
+      .cj-tabs { flex-wrap: nowrap; overflow-x: auto; gap: .3rem; scrollbar-width: none; }
+      .cj-tab { padding: .3rem .6rem; font-size: .76rem; flex: none; }
+      .cj-tot-sin { display: none; }
+      .cj-grid { grid-template-columns: minmax(0, 1fr); gap: .55rem; }
+      .cj-box { flex-direction: row; align-items: center; }
+      .cj-box-top { flex: 1; }
+      .cj-box-bot { display: none; }
+      .cj-ov { padding: 0; align-items: flex-end; }
+      .cj-sheet { max-height: 96dvh; border-radius: 20px 20px 0 0; animation: cjUp .25s ease-out both; }
+      .cj-sheet--sm { max-width: none; }
+      .cj-sh-body, .cj-sh-body--two { display: flex; flex-direction: column; align-items: stretch; gap: .7rem; padding: .75rem; }
+      .cj-col { display: contents; }
+      .cj-col--foto .cj-sec { order: 0; }
+      .cj-foto { flex-direction: row; align-items: center; }
+      .cj-thumb { width: 60px; height: 80px; flex: none; }
+      .cj-thumb img { height: 100%; max-height: none; object-fit: cover; }
+      .cj-thumb .cj-pdf { padding: 0; }
+      .cj-thumb .cj-pdf .icon { width: 24px; height: 24px; }
+      .cj-largo { display: none; } .cj-corto { display: inline; }
+      .cj-sh-ft { flex-wrap: wrap; padding-bottom: calc(.7rem + env(safe-area-inset-bottom, 0px)); }
+      .cj-st { flex-basis: 100%; }
+      .cj-st:empty { display: none; }
+      .cj-ft-btns { width: 100%; }
+      .cj-ft-btns .foc-btn { flex: 1; justify-content: center; padding: .65rem; }
+    }
+    @media (max-width: 400px) {
+      .cj-saldo-n { font-size: 1.75rem; }
+    }
+    @keyframes cjUp { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .cj-sheet { animation: none; } .cj-box { transition: none; } }
+  </style>
 </head>
 <body>
 
@@ -37,214 +289,194 @@
         <div class="hdr-drop-version">v266</div>
       </div>
     </div>
-    <button class="btn btn-sm btn-outline btn-icon" aria-label="Volver" title="Volver" onclick="window.location.href='menu.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
+    <button class="btn btn-sm btn-outline btn-icon" id="btn-volver" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
 </header>
 
 <!-- ===== MAIN ===== -->
-<main class="app-main">
+<main class="app-main cj-main">
 
-  <!-- Admin: selector de usuario -->
-  <div class="card hidden" id="admin-selector-card">
-    <div class="card-body" style="padding:.75rem 1.25rem;">
-      <div class="form-group" style="margin:0;">
-        <label for="select-usuario" style="margin-bottom:.3rem;">Ver caja de:</label>
-        <select id="select-usuario" class="form-control"></select>
+  <!-- Título con el mes y (para quien administra) la caja que se ve -->
+  <div class="cj-ttl">
+    <h1 class="cj-t" id="cj-titulo">Caja chica</h1>
+    <div class="act-dd">
+      <button type="button" class="act-pick" id="cj-mes-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Mes"></button>
+      <div class="act-menu hidden" id="cj-mes-menu" role="listbox"></div>
+    </div>
+    <div class="act-dd hidden" id="cj-quien-dd">
+      <button type="button" class="act-pick cj-pick-grn" id="cj-quien-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Caja de"></button>
+      <div class="act-menu hidden" id="cj-quien-menu" role="listbox"></div>
+    </div>
+    <button type="button" class="cj-pend hidden" id="cj-pend"></button>
+  </div>
+
+  <!-- Todas las cajas (administración) -->
+  <section class="hidden" id="cj-vista-todas">
+    <div class="cj-tot" id="cj-tot"></div>
+    <div class="cj-grid" id="cj-grid"></div>
+  </section>
+
+  <!-- La caja de una persona -->
+  <section class="cj-lay hidden" id="cj-vista-caja">
+    <aside class="cj-side">
+      <div class="cj-saldo">
+        <div class="cj-saldo-k"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg><span id="cj-saldo-k">Saldo</span></div>
+        <div class="cj-saldo-n" id="val-saldo">$ 0,00</div>
+        <div class="cj-saldo-s">Excedente anterior + ingresos del mes − egresos del mes</div>
+        <div class="cj-desg">
+          <div class="exc"><span>Excedente anterior</span><b id="val-excedente">$ 0,00</b></div>
+          <div class="ing"><span>Ingresos</span><b id="val-ingresos">$ 0,00</b></div>
+          <div class="egr"><span>Egresos</span><b id="val-gastos">$ 0,00</b></div>
+        </div>
+        <div class="cj-acts">
+          <button type="button" class="foc-btn foc-btn--gen" id="btn-nuevo-ingreso"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Ingreso</button>
+          <button type="button" class="foc-btn foc-btn--egr" id="btn-nuevo-gasto"><svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Egreso</button>
+        </div>
       </div>
+      <div class="cj-card cj-solo-desk"><div class="cj-side-t">Egresos por obra</div><div id="cj-por-obra"></div></div>
+      <div class="cj-card cj-solo-desk"><div class="cj-side-t">Por categoría</div><div class="cj-bars--cat" id="cj-por-cat"></div></div>
+    </aside>
+    <div class="cj-listcol">
+      <label class="cj-search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="cj-search" placeholder="Buscar por descripción, comercio u obra…" autocomplete="off" aria-label="Buscar movimientos"></label>
+      <div class="cj-tabs" id="cj-tabs" role="tablist"></div>
+      <div class="cj-panel" id="cj-lista"></div>
     </div>
-  </div>
+  </section>
 
-  <!-- Month chip (top-right) -->
-  <div class="caja-topbar">
-    <select id="filter-mes" class="caja-mes-chip"></select>
-  </div>
-
-  <!-- Hero: saldo grande -->
-  <div class="caja-hero">
-    <div class="caja-hero-saldo" id="val-saldo">$ 0,00</div>
-  </div>
-
-  <!-- Resumen: excedente / ingresos / egresos -->
-  <div class="caja-resumen">
-    <div class="caja-resumen-row is-exc">
-      <span class="caja-resumen-label"><span class="caja-resumen-dot exc"></span> Excedente anterior</span>
-      <span class="caja-resumen-val" id="val-excedente">$ 0,00</span>
-    </div>
-    <div class="caja-resumen-row is-ing">
-      <span class="caja-resumen-label"><span class="caja-resumen-dot ing"></span> Ingresos</span>
-      <span class="caja-resumen-val" id="val-ingresos">$ 0,00</span>
-    </div>
-    <div class="caja-resumen-row is-egr">
-      <span class="caja-resumen-label"><span class="caja-resumen-dot egr"></span> Egresos</span>
-      <span class="caja-resumen-val" id="val-gastos">$ 0,00</span>
-    </div>
-  </div>
-
-  <!-- Botonera: + Ingreso / - Egreso -->
-  <div class="caja-botonera">
-    <button class="btn btn-primary" id="btn-nuevo-ingreso">
-      <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Ingreso
-    </button>
-    <button class="btn btn-danger" id="btn-nuevo-gasto">
-      <svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      Egreso
-    </button>
-  </div>
-
-  <!-- Historial -->
-  <div class="caja-hist-sep">Historial</div>
-  <div class="card">
-    <div class="card-body" style="padding:0;">
-      <div id="movimientos-loading" class="empty-state" style="display:none;">
-        <div class="spinner" style="width:24px;height:24px;margin:0 auto .5rem;"></div>
-        <p>Cargando…</p>
-      </div>
-      <div id="movimientos-empty" class="empty-state" style="display:none;">
-        <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg></div>
-        <p>No hay movimientos registrados.</p>
-      </div>
-      <!-- Tabla desktop -->
-      <div class="caja-table-wrap" id="movimientos-table-wrap" style="display:none;">
-        <table class="caja-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Categoría</th>
-              <th>Obra</th>
-              <th>Proveedor / Detalle</th>
-              <th>Descripción</th>
-              <th class="text-right">Monto</th>
-              <th style="width:60px;"></th>
-            </tr>
-          </thead>
-          <tbody id="movimientos-tbody"></tbody>
-        </table>
-      </div>
-      <!-- Cards mobile -->
-      <div id="movimientos-cards" style="display:none;padding:.75rem;"></div>
-    </div>
-  </div>
-
+  <div class="cj-vacio" id="cj-cargando"><div class="spinner" style="width:24px;height:24px;margin:0 auto .5rem;"></div>Cargando…</div>
 </main>
 
-<!-- ===== MODAL: Nuevo Gasto ===== -->
-<div class="modal-overlay hidden" id="modal-gasto">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-gasto-title">Registrar Egreso</span>
-      <button class="modal-close" id="modal-gasto-close">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
+<!-- Ingreso / Egreso siempre a mano en el teléfono -->
+<div class="cj-fab" id="cj-fab">
+  <button type="button" class="foc-btn foc-btn--gen" id="btn-fab-ingreso"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Ingreso</button>
+  <button type="button" class="foc-btn foc-btn--egr-solid" id="btn-fab-gasto"><svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Egreso</button>
+</div>
 
-      <!-- Comprobante opcional -->
-      <div style="margin-bottom:1.1rem;">
-        <label style="display:block;font-size:.82rem;font-weight:600;color:var(--gray-600);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.04em;">Comprobante <span style="font-weight:400;text-transform:none;color:var(--gray-400);">(opcional)</span></label>
-        <input type="file" id="gasto-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
-        <input type="file" id="gasto-camera" accept="image/*" capture="environment"  style="display:none">
-        <div class="import-buttons" style="margin-bottom:.5rem;">
-          <button type="button" class="btn import-btn" id="btn-gasto-archivo">
-            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
-            <span class="import-btn-label">Subir archivo</span>
-          </button>
-          <button type="button" class="btn import-btn" id="btn-gasto-camera" style="display:none">
-            <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-            <span class="import-btn-label">Sacar foto</span>
-          </button>
-        </div>
-        <div id="gasto-file-name" class="upload-filename hidden"></div>
-        <!-- Preview del comprobante escaneado -->
-        <div id="gasto-preview" class="scan-preview hidden">
-          <img id="gasto-preview-img" alt="Comprobante">
-          <div class="scan-preview-actions">
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-gasto-rescan">
-              <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-              Re-escanear
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-gasto-quitar">
-              <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Quitar
-            </button>
+<!-- ===== Egreso: hoja desde abajo en el teléfono, diálogo ancho en escritorio ===== -->
+<div class="modal-overlay cj-ov hidden" id="modal-gasto">
+  <div class="cj-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-gasto-title" tabindex="-1">
+    <div class="cj-sh-hd">
+      <span class="cj-sq cj-sq--del"><svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+      <span class="cj-sh-t" id="modal-gasto-title">Registrar egreso</span>
+      <button type="button" class="foc-btn foc-btn--clear cj-sh-x" id="modal-gasto-close" aria-label="Cerrar" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <div class="cj-sh-body cj-sh-body--two" id="gasto-body">
+      <div class="cj-col cj-col--foto">
+        <section class="cj-sec" id="cj-sec-comp">
+          <div class="cj-sec-h">
+            <span class="cj-n" id="cj-n-comp">1</span><b>Comprobante</b><span class="cj-opt" id="cj-opt-comp">Opcional</span>
+            <button type="button" class="foc-btn foc-btn--vio cj-r hidden" id="btn-gasto-ia"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M18 13l.7 1.9L21 16l-2.3.9L18 19l-.9-2.1L15 16l2.1-.7L18 13z"/></svg><span id="btn-gasto-ia-t">Leer con IA</span></button>
           </div>
-        </div>
+          <input type="file" id="gasto-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
+          <input type="file" id="gasto-camera" accept="image/*" capture="environment" style="display:none">
+          <div class="cj-ya hidden" id="gasto-ya"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>Ya tiene comprobante en Drive<a id="gasto-ya-link" href="#" target="_blank" rel="noopener">Ver</a></div>
+          <div class="cj-drop" id="gasto-drop">
+            <span class="cj-sq cj-sq--grn"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+            <div class="cj-drop-t"><span class="cj-largo">Soltá acá la foto o el PDF del ticket</span><span class="cj-corto">Sacale una foto al ticket</span></div>
+            <div class="cj-drop-s">Queda en Drive, en la carpeta de la caja.</div>
+            <div class="cj-drop-btns">
+              <button type="button" class="foc-btn foc-btn--grn-solid hidden" id="btn-gasto-camera"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Sacar foto</button>
+              <button type="button" class="foc-btn foc-btn--gen" id="btn-gasto-archivo"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Elegir archivo</button>
+            </div>
+          </div>
+          <div class="cj-foto hidden" id="gasto-foto">
+            <div class="cj-thumb" id="gasto-thumb"><img id="gasto-preview-img" alt="Comprobante"></div>
+            <div class="cj-foto-n">
+              <b id="gasto-file-name"></b><small id="gasto-file-size"></small>
+              <div class="cj-foto-acts">
+                <button type="button" class="foc-btn foc-btn--clear" id="btn-gasto-rescan"><svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Escanear</button>
+                <button type="button" class="foc-btn foc-btn--clear" id="btn-gasto-quitar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Quitar</button>
+              </div>
+            </div>
+          </div>
+          <div class="cj-ia-st hidden" id="gasto-ia-st"></div>
+        </section>
       </div>
 
-      <!-- Campos -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="gasto-categoria">Categoría *</label>
-          <select id="gasto-categoria" class="form-control">
-            <option value="">— Seleccioná —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="gasto-fecha">Fecha *</label>
-          <input type="date" id="gasto-fecha" class="form-control">
-        </div>
+      <div class="cj-col">
+        <section class="cj-sec" id="cj-sec-monto">
+          <div class="cj-sec-h"><span class="cj-n" id="cj-n-monto">2</span><b>Monto y fecha</b></div>
+          <div class="cj-f2">
+            <div><label for="gasto-monto">Monto</label>
+              <div class="cj-monto"><span>$</span><input type="text" id="gasto-monto" class="form-control" placeholder="0,00" inputmode="decimal" autocomplete="off"></div></div>
+            <div><label for="gasto-fecha">Fecha</label><input type="date" id="gasto-fecha" class="form-control"></div>
+          </div>
+        </section>
+        <section class="cj-sec" id="cj-sec-obra">
+          <div class="cj-sec-h"><span class="cj-n" id="cj-n-obra">3</span><b>A qué obra va</b></div>
+          <div class="cj-fld"><select id="gasto-obra" class="form-control" aria-label="Obra"><option value="">Elegí la obra</option></select></div>
+          <div class="cj-chips hidden" id="gasto-obras-rec"></div>
+        </section>
+        <section class="cj-sec" id="cj-sec-cat">
+          <div class="cj-sec-h"><span class="cj-n" id="cj-n-cat">4</span><b>Categoría</b></div>
+          <div class="cj-chips" id="gasto-cats" role="group" aria-label="Categoría"></div>
+        </section>
+        <section class="cj-sec" id="cj-sec-det">
+          <div class="cj-sec-h"><span class="cj-n" id="cj-n-det">5</span><b>Detalle</b></div>
+          <div class="cj-fld"><label for="gasto-descripcion">Descripción</label><input type="text" id="gasto-descripcion" class="form-control" placeholder="¿Qué se compró o pagó?"></div>
+          <div class="cj-fld"><label for="gasto-proveedor">Proveedor (opcional)</label><input type="text" id="gasto-proveedor" class="form-control" placeholder="Nombre del comercio o proveedor"></div>
+        </section>
+        <div id="gasto-error" class="alert alert-error hidden"></div>
       </div>
-      <div class="form-group">
-        <label for="gasto-obra">Obra *</label>
-        <select id="gasto-obra" class="form-control">
-          <option value="">— Seleccioná —</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="gasto-proveedor">Proveedor</label>
-        <input type="text" id="gasto-proveedor" class="form-control" placeholder="Nombre del comercio o proveedor">
-      </div>
-      <div class="form-group">
-        <label for="gasto-descripcion">Descripción *</label>
-        <input type="text" id="gasto-descripcion" class="form-control" placeholder="¿Qué se compró o pagó?">
-      </div>
-      <div class="form-group u-mb-0">
-        <label for="gasto-monto">Monto *</label>
-        <input type="text" id="gasto-monto" class="form-control" placeholder="0,00" inputmode="decimal">
-      </div>
-      <div id="gasto-error" class="alert alert-error hidden" style="margin-top:.75rem;"></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="btn-gasto-cancelar">Cancelar</button>
-      <button class="btn btn-success" id="btn-gasto-guardar">
-        <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        Guardar Egreso
-      </button>
+
+    <div class="cj-sh-ft">
+      <span class="cj-st" id="gasto-estado" title="Ver lo que falta"></span>
+      <div class="cj-ft-btns">
+        <button type="button" class="foc-btn foc-btn--clear" id="btn-gasto-cancelar">Cancelar</button>
+        <button type="button" class="foc-btn cj-guardar" id="btn-gasto-guardar"><svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>Guardar egreso</span></button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ===== MODAL: Recarga (admin) ===== -->
-<div class="modal-overlay hidden" id="modal-recarga">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-recarga-title">Registrar Ingreso</span>
-      <button class="modal-close" id="modal-recarga-close">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+<!-- ===== Ingreso ===== -->
+<div class="modal-overlay cj-ov hidden" id="modal-recarga">
+  <div class="cj-sheet cj-sheet--sm" role="dialog" aria-modal="true" aria-labelledby="modal-recarga-title" tabindex="-1">
+    <div class="cj-sh-hd">
+      <span class="cj-sq cj-sq--grn"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+      <span class="cj-sh-t" id="modal-recarga-title">Registrar ingreso</span>
+      <button type="button" class="foc-btn foc-btn--clear cj-sh-x" id="modal-recarga-close" aria-label="Cerrar" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label for="recarga-fecha">Fecha *</label>
-        <input type="date" id="recarga-fecha" class="form-control">
-      </div>
-      <div class="form-group">
-        <label for="recarga-monto">Monto *</label>
-        <input type="text" id="recarga-monto" class="form-control" placeholder="0,00" inputmode="decimal">
-      </div>
-      <div class="form-group u-mb-0">
-        <label for="recarga-comentario">Comentario <span style="font-weight:400;color:var(--gray-400)">(opcional)</span></label>
-        <input type="text" id="recarga-comentario" class="form-control" placeholder="Ej: Viaje a obra norte">
-      </div>
-      <div id="recarga-error" class="alert alert-error hidden" style="margin-top:.75rem;"></div>
+    <div class="cj-sh-body">
+      <section class="cj-sec">
+        <div class="cj-f2">
+          <div><label for="recarga-monto">Monto</label>
+            <div class="cj-monto"><span>$</span><input type="text" id="recarga-monto" class="form-control" placeholder="0,00" inputmode="decimal" autocomplete="off"></div></div>
+          <div><label for="recarga-fecha">Fecha</label><input type="date" id="recarga-fecha" class="form-control"></div>
+        </div>
+        <div class="cj-fld" style="margin-top:.55rem"><label for="recarga-comentario">Comentario (opcional)</label>
+          <input type="text" id="recarga-comentario" class="form-control" placeholder="Ej: Viaje a obra norte"></div>
+        <div class="cj-dest" id="recarga-dest"></div>
+      </section>
+      <div id="recarga-error" class="alert alert-error hidden"></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="btn-recarga-cancelar">Cancelar</button>
-      <button class="btn btn-primary" id="btn-recarga-guardar">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Confirmar Ingreso
-      </button>
+    <div class="cj-sh-ft">
+      <span class="cj-st" id="recarga-estado"></span>
+      <div class="cj-ft-btns">
+        <button type="button" class="foc-btn foc-btn--clear" id="btn-recarga-cancelar">Cancelar</button>
+        <button type="button" class="foc-btn cj-guardar" id="btn-recarga-guardar"><svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>Guardar ingreso</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Ficha del movimiento ===== -->
+<div class="modal-overlay cj-ov hidden" id="modal-ficha">
+  <div class="cj-sheet cj-sheet--sm" role="dialog" aria-modal="true" aria-labelledby="ficha-title" tabindex="-1">
+    <div class="cj-sh-hd">
+      <span class="cj-sq" id="ficha-ic"></span>
+      <span class="cj-sh-t" id="ficha-title"></span>
+      <button type="button" class="foc-btn foc-btn--clear cj-sh-x" id="ficha-close" aria-label="Cerrar" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="cj-sh-body" id="ficha-body"></div>
+    <div class="cj-sh-ft" id="ficha-ft">
+      <div class="cj-ft-btns">
+        <button type="button" class="foc-btn foc-btn--del" id="ficha-del"><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Eliminar</button>
+        <button type="button" class="foc-btn foc-btn--edit" id="ficha-edit"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Editar</button>
+      </div>
     </div>
   </div>
 </div>
