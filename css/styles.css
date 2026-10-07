@@ -1547,3 +1547,125 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
   .act-pick .act-largo { display: none; }
   .act-pick .act-corto { display: inline; }
 }
+
+/* ---- Orden de Compra: lo que falta para generar (validateOCForm en js/app.js) ---- */
+.faltan-lista { display: flex; flex-direction: column; gap: .4rem; width: 100%; margin-top: .9rem; }
+.faltan-item { display: flex; align-items: center; gap: .6rem; width: 100%; border: 1.5px solid #f3d0d0; background: #fdf6f6; border-radius: 12px;
+  padding: .5rem .7rem; font: inherit; color: var(--gray-700); text-align: left; cursor: pointer; }
+.faltan-item:hover { background: #fcefef; }
+.faltan-dot { width: 8px; height: 8px; border-radius: 50%; background: #d64545; flex: none; }
+.faltan-t { flex: 1; min-width: 0; }
+.faltan-t b { display: block; font-size: .86rem; color: var(--primary-dark); }
+.faltan-t small { display: block; font-size: .74rem; color: var(--gray-500); }
+.faltan-item > .icon { width: 14px; height: 14px; color: var(--gray-400); flex: none; }
+.form-control.is-falta, .items-table input.is-falta, .item-card-desc.is-falta { border-color: #e5a3a3; box-shadow: 0 0 0 3px #fde6e6; }
+.cat-seg.is-falta { border-radius: 10px; box-shadow: 0 0 0 2px #e5a3a3, 0 0 0 5px #fde6e6; }
+
+/* ---- Orden de Compra: aviso de OC retomada del borrador ---- */
+.borrador-aviso { display: flex; align-items: center; gap: .65rem; background: var(--white); border: 1px solid var(--gray-200);
+  border-left: 4px solid #7aa7d9; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: .6rem .7rem .6rem .8rem; margin-bottom: 1rem; }
+.borrador-aviso.hidden { display: none; }
+.borrador-aviso-ic { width: 34px; height: 34px; border-radius: 10px; background: #e8eef7; color: var(--primary); display: grid; place-items: center; flex: none; }
+.borrador-aviso-ic .icon { width: 17px; height: 17px; }
+.borrador-aviso-t { flex: 1; min-width: 0; }
+.borrador-aviso-t b { display: block; font-size: .88rem; color: var(--primary-dark); }
+.borrador-aviso-t small { display: block; font-size: .76rem; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.borrador-aviso .foc-btn { font-size: .76rem; padding: .35rem .75rem; white-space: nowrap; }
+.borrador-aviso-x { border: none; background: none; color: var(--gray-400); cursor: pointer; padding: .25rem; display: grid; place-items: center; }
+.borrador-aviso-x .icon { width: 15px; height: 15px; }
+@media (max-width: 560px) {
+  .borrador-aviso { flex-wrap: wrap; }
+  .borrador-aviso-t { flex-basis: calc(100% - 34px - 2.6rem); }
+  .borrador-aviso .foc-btn { margin-left: calc(34px + .65rem); }
+}
+
+/* ===== Orden de Compra con resumen al costado (v260) =====
+   Escritorio: formulario a la izquierda; total, "Para generar" y los botones
+   fijos a la derecha. Hasta 900px una sola columna, como antes: el hero arriba
+   y los botones al final (.oc-side y .oc-check se "disuelven" con display: contents). */
+.oc-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.1rem; align-items: start; }
+.oc-side { position: sticky; top: calc(60px + 1rem); display: flex; flex-direction: column; gap: .8rem; }
+.oc-side .oc-hero { margin-bottom: 0; }
+.oc-side .oc-hero-val { font-size: 1.75rem; }
+.oc-check { padding: .85rem .9rem .9rem; margin-bottom: 0; }
+.oc-check-t { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); margin-bottom: .35rem; }
+.oc-check-list { display: flex; flex-direction: column; gap: .05rem; margin-bottom: .8rem; }
+.oc-check-r { display: flex; align-items: center; gap: .5rem; width: 100%; border: none; background: none; padding: .28rem .25rem;
+  font: inherit; font-size: .84rem; color: var(--gray-700); text-align: left; border-radius: 8px; }
+.oc-check-r .d { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; flex: none; background: #dff3e5; color: #1a7f3c; }
+.oc-check-r .d .icon { width: 11px; height: 11px; stroke-width: 3; }
+.oc-check-r--no { color: #b02a2a; font-weight: 600; cursor: pointer; }
+.oc-check-r--no .d { background: #fde6e6; color: #b02a2a; }
+.oc-check-r--no:hover { background: #fdf3f3; }
+.oc-side .generate-bar { flex-direction: column; align-items: stretch; gap: .45rem; margin: 0; }
+.oc-side .generate-bar .foc-btn { width: 100%; }
+.oc-side .generate-bar .btn-generate { order: -1; }
+.oc-side .generate-bar .foc-btn.btn-generate { padding: .6rem .7rem; font-size: .86rem; white-space: nowrap; }
+.oc-side .generate-bar #btn-same-provider { order: 1; }
+.oc-side .generate-bar #btn-clear-form { order: 2; margin-top: .3rem; }
+@media (max-width: 900px) {
+  .oc-layout { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+  .oc-side, .oc-check { display: contents; }
+  .oc-side .oc-hero { order: -1; margin-bottom: 1rem; }
+  .oc-check-t, .oc-check-list { display: none; }
+  .oc-side .generate-bar { order: 1; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; margin: .25rem 0 2rem; }
+  .oc-side .generate-bar .foc-btn { width: auto; }
+  .oc-side .generate-bar #btn-clear-form { order: -2; margin: 0 auto 0 0; }
+  .oc-side .generate-bar .btn-generate { order: 3; }
+}
+@media (max-width: 768px) {
+  .oc-side .generate-bar { flex-direction: column; align-items: stretch; }
+  .oc-side .generate-bar .foc-btn { width: 100%; }
+  .oc-side .generate-bar #btn-clear-form { order: 2; margin: 0; }
+  .oc-side .generate-bar .btn-generate { order: -1; }
+}
+
+/* Encabezado de cada paso: ícono en pastilla pastel y su estado (Listo / Falta… / Opcional) */
+.oc-step-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; }
+.oc-step-ic .icon { width: 16px; height: 16px; }
+.oc-step-ic--vio   { background: #f1e8fb; color: #6b3fa0; }
+.oc-step-ic--blue  { background: #e8eef7; color: var(--primary); }
+.oc-step-ic--amber { background: #fbeedd; color: #8a4f0d; }
+.oc-step-ic--sky   { background: #e0f0fb; color: #0e6a96; }
+.oc-step-ic--green { background: #dff3e5; color: #1a7f3c; }
+.oc-section .card-title { color: var(--primary-dark); gap: .6rem; }
+.oc-section > .card-header { gap: .5rem; }
+.oc-section > .card-header > .card-title { margin-right: auto; }
+.oc-st { display: none; align-items: center; gap: .3rem; padding: .12rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
+.oc-st .icon { width: 11px; height: 11px; }
+.oc-st--ok, .oc-st--falta, .oc-st--opc { display: inline-flex; }
+.oc-st--ok    { background: #dff3e5; color: #1a7f3c; }
+.oc-st--falta { background: #fde6e6; color: #b02a2a; }
+.oc-st--opc   { background: var(--gray-100); color: var(--gray-500); }
+.oc-section > .card-header > .oc-chevron { order: 5; }
+.oc-section > .card-header > .oc-sum { order: 10; }
+
+/* Proveedor de la base: ficha compacta en lugar de los campos */
+.prov-ficha { display: none; gap: .75rem; align-items: flex-start; border: 1.5px solid var(--gray-200); border-radius: 12px; padding: .75rem .8rem; margin-bottom: 1rem; }
+.prov-compacto .prov-ficha { display: flex; }
+.prov-compacto .prov-dato { display: none; }
+.prov-ficha-av { width: 42px; height: 42px; border-radius: 12px; background: #fbeedd; color: #8a4f0d; display: grid; place-items: center; font-weight: 800; font-size: .85rem; flex: none; }
+.prov-ficha-m { flex: 1; min-width: 0; }
+.prov-ficha-m b { color: var(--primary-dark); font-size: .98rem; overflow-wrap: anywhere; }
+.prov-ficha-tag { display: inline-block; margin-left: .4rem; font-size: .68rem; font-weight: 700; padding: .05rem .5rem; border-radius: 999px; background: #dcf3ef; color: #16695f; vertical-align: 2px; white-space: nowrap; }
+.prov-ficha-l { font-size: .8rem; color: var(--gray-500); margin-top: .1rem; overflow-wrap: anywhere; }
+.prov-ficha-l:empty { display: none; }
+.prov-ficha-acts { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+.prov-ficha-acts .foc-btn { font-size: .76rem; padding: .35rem .8rem; }
+.prov-ficha-acts .foc-btn .icon { width: 13px; height: 13px; }
+
+/* Atajos de Condición de pago */
+.cp-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .4rem; }
+.cp-chips.hidden { display: none; }
+.cp-chip { border: none; border-radius: 999px; padding: .22rem .65rem; font: inherit; font-size: .76rem; font-weight: 700; background: #e8eef7; color: var(--primary); cursor: pointer; }
+.cp-chip--ult { background: #e0f0fb; color: #0e6a96; }
+.cp-chip small { font-weight: 600; opacity: .75; }
+.cp-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* IVA y moneda: interruptores-pastilla */
+.oc-segs { gap: .5rem 1.25rem; flex-wrap: wrap; }
+.oc-seg-g { display: inline-flex; align-items: center; gap: .45rem; }
+.oc-seg-l { font-size: .72rem; font-weight: 700; color: var(--gray-500); }
+.oc-seg { display: inline-flex; background: #e9edf3; border-radius: 999px; padding: .18rem; gap: .15rem; }
+.oc-seg button { border: none; background: none; border-radius: 999px; padding: .25rem .7rem; font: inherit; font-size: .78rem; font-weight: 700; color: var(--gray-500); cursor: pointer; }
+.oc-seg button[aria-pressed="true"] { background: var(--white); color: var(--primary-dark); box-shadow: 0 1px 2px rgba(26,58,92,.18); }

@@ -179,14 +179,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-preview-close2').addEventListener('click', closePreview);
   $('modal-preview-generate').addEventListener('click', () => { closePreview(); handleGenerate(); });
   $('btn-same-provider').addEventListener('click', resetFormKeepProvider);
+  $('btn-borrador-cero').addEventListener('click', empezarDeCero);
+  $('btn-borrador-ok').addEventListener('click', ocultarAvisoBorrador);
+  $('btn-prov-editar').addEventListener('click', editarProveedor);
+  $('btn-prov-cambiar').addEventListener('click', cambiarProveedor);
+  $('oc-check-list').addEventListener('click', e => {
+    const r = e.target.closest('.oc-check-r--no');
+    if (r) irAFaltante(r.dataset.id);
+  });
 
   setupFirmaModalButtons();
   setupImportButtons();
-  setupObraCombo();
+  const obrasListas = setupObraCombo();
   setupRubroCombo();
   setupEquipoCombo();
   setupProveedorCombo();
   setupOCNumberEdit();
+  setupSegs();
+  setupCondChips();
   setupOCAccordion();
   setupOCDock();
   renderTable();
@@ -201,11 +211,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Si la lectura tarda y el usuario dibujó su firma mientras tanto, no pisarla.
   getFirma(code).then(f => { if (!firmaBase64) firmaBase64 = f || null; }).catch(() => {});
 
-  const ocBaseRaw = sessionStorage.getItem('oc_base');
-  if (ocBaseRaw) {
-    try { loadOCBase(JSON.parse(ocBaseRaw)); } catch (e) { console.warn('loadOCBase:', e); }
-    sessionStorage.removeItem('oc_base');
-  }
+  // Retoma la OC que quedó a medio cargar (o la base pedida desde el Historial).
+  arrancarBorrador(obrasListas);
 });
 
 // ---- IVA Toggle ----
@@ -682,6 +689,8 @@ function aplicarObra(obra) {
     lugarInput.value = obra.lugar_entrega;
     lugarInput.dataset.autoFilled = '1';
   }
+  // Se carga sin eventos (obra recordada): el resumen de la sección no se enteraba.
+  updateOCSummaries();
 }
 
 async function setupObraCombo() {
@@ -1145,6 +1154,9 @@ function snapshotProvider() {
   PROV_FIELDS.forEach(id => { _provSnapshot[id] = ($(id).value || '').trim(); });
   _provDirtyWarned = false;
   hideSaveProvBtn();
+  provFicha = !!_loadedProvCuit;
+  pintarProvFicha();
+  pintarCondChips();
 }
 
 // ¿Cambió algún dato del proveedor respecto del snapshot?
@@ -1258,11 +1270,16 @@ function setupOCAccordion() {
   _ocSections.forEach(sec => {
     const header = sec.querySelector('.card-header');
     const title  = sec.querySelector('.card-title');
-    if (title && !title.querySelector('.oc-chevron')) {
+    if (title && !header.querySelector('.oc-st')) {
+      const st = document.createElement('span');
+      st.className = 'oc-st';
+      title.after(st);
+    }
+    if (title && !header.querySelector('.oc-chevron')) {
       const chev = document.createElement('span');
       chev.className = 'oc-chevron';
       chev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg>';
-      title.insertBefore(chev, title.firstChild);
+      header.appendChild(chev);
     }
     if (!header.querySelector('.oc-sum')) {
       const sum = document.createElement('div');
@@ -1339,12 +1356,27 @@ function updateOCSummaries() {
       const el = sec.querySelector('.oc-sum');
       if (!el) return;
       const { txt, falta } = ocSectionSummary(i);
+      // Con un solo dato faltante lo dice la pastilla; con varios, el detalle va abajo.
       el.innerHTML = (txt ? `<span class="oc-sum-t">${esc(txt)}</span>` : '')
-        + (falta.length ? `<span class="oc-sum-f">Falta: ${esc(falta.join(', '))}</span>` : '');
+        + (falta.length > 1 ? `<span class="oc-sum-f">Falta: ${esc(falta.join(', '))}</span>` : '');
+      const st = sec.querySelector('.oc-st');
+      if (st) {
+        const [cls, t] = i === 0 ? ['opc', 'Opcional']
+          : falta.length === 1 ? ['falta', 'Falta ' + falta[0]]
+          : falta.length ? ['falta', `Faltan ${falta.length}`]
+          : txt ? ['ok', 'Listo'] : ['', ''];
+        st.className = 'oc-st' + (cls ? ' oc-st--' + cls : '');
+        st.innerHTML = cls === 'ok' ? icSvg('checkSm') + t : esc(t);
+      }
       sec.classList.toggle('oc-incompleta', falta.length > 0);
       sec.classList.toggle('oc-completa', !falta.length && !!txt && i > 0);
     });
     updateOCDock();
+    pintarCheck();
+    pintarProvFicha();
+    syncSegs();
+    desmarcarCompletos();
+    programarBorrador();
   });
 }
 
@@ -1361,6 +1393,7 @@ function applyOCViewport() {
 function revealAndFocus(id) {
   const el = $(id);
   if (!el) return;
+  if (el.closest('.prov-dato') && provFichaVisible()) { provFicha = false; pintarProvFicha(); }
   const sec = el.closest('.oc-section');
   if (sec && isMobileViewport() && sec.classList.contains('collapsed')) openOCSection(sec);
   el.focus();
@@ -1410,6 +1443,7 @@ function handleFileSelected(file) {
   nameEl.classList.remove('hidden');
   $('btn-extract').disabled = false;
   clearExtractStatus();
+  borradorArchivo(file);
 }
 
 function clearFile() {
@@ -1419,6 +1453,7 @@ function clearFile() {
   $('upload-filename').classList.add('hidden');
   $('btn-extract').disabled = true;
   clearExtractStatus();
+  borradorArchivo(null);
 }
 
 // ---- Gemini extraction ----
@@ -1947,27 +1982,468 @@ function addImpuestoRow() {
 }
 
 // ---- PDF Generation ----
-function validateOCForm() {
-  const proveedor     = $('proveedor').value.trim();
-  const cuit          = $('cuit-proveedor').value.trim();
-  const condicionPago = $('condicion-pago').value.trim();
-  const obra          = $('obra').value.trim();
-  if (!proveedor)     { toast('Ingresá la razón social del proveedor.', 'error'); revealAndFocus('proveedor'); return false; }
-  if (!cuit)          { toast('Ingresá el CUIT del proveedor.', 'error'); revealAndFocus('cuit-proveedor'); return false; }
-  if (!condicionPago) { toast('Ingresá la condición de pago.', 'error'); revealAndFocus('condicion-pago'); return false; }
-  if (!obra)          { toast('Elegí la obra / motivo de la lista.', 'error'); revealAndFocus('obra'); return false; }
-  if (!buscarObra(obra)) { toast(`"${obra}" no está en el padrón de obras. Elegí una de la lista.`, 'error'); revealAndFocus('obra'); return false; }
-  if (rubrosDeObraActual().length && !selectedRubro) {
-    toast('Elegí el rubro de la obra.', 'error'); revealAndFocus('rubro'); return false;
+// ---- Validación: todo lo que falta, de una vez ----
+// Hasta v259 se avisaba de a un dato por vez (un toast por cada intento de
+// Generar). Ahora se juntan todos en un diálogo; cada renglón lleva a su campo,
+// y los campos quedan marcados en rojo hasta que se completan.
+const SECCION_FALTA = { obra: 'Datos de la Orden', rubro: 'Datos de la Orden', 'condicion-pago': 'Datos de la Orden',
+  'equipo-cat': 'Datos de la Orden', proveedor: 'Datos del Proveedor', 'cuit-proveedor': 'Datos del Proveedor',
+  'btn-add-row': 'Ítems de la Orden', 'item-desc': 'Ítems de la Orden' };
+
+// Lo que falta para generar, en el orden del formulario: [{ id, txt }].
+function faltantesOC() {
+  const v = id => $(id).value.trim();
+  const f = [];
+  const obra = v('obra');
+  if (!obra) f.push({ id: 'obra', txt: 'Obra / motivo' });
+  else if (!buscarObra(obra)) f.push({ id: 'obra', txt: `"${obra}" no está en el padrón de obras` });
+  if (rubrosDeObraActual().length && !selectedRubro) f.push({ id: 'rubro', txt: 'Rubro de la obra' });
+  if (!v('condicion-pago')) f.push({ id: 'condicion-pago', txt: 'Condición de pago' });
+  if (selectedEquipo && !selectedCategoria) f.push({ id: 'equipo-cat', txt: 'Categoría de la compra (Repuestos o Mantenimiento)' });
+  if (!v('proveedor')) f.push({ id: 'proveedor', txt: 'Razón social del proveedor' });
+  if (!v('cuit-proveedor')) f.push({ id: 'cuit-proveedor', txt: 'CUIT del proveedor' });
+  if (!items.length) f.push({ id: 'btn-add-row', txt: 'Al menos un ítem' });
+  else {
+    const n = items.filter(it => !String(it.descripcion || '').trim()).length;
+    if (n) f.push({ id: 'item-desc', txt: n === 1 ? 'Descripción de un ítem' : `Descripción de ${n} ítems` });
   }
-  if (selectedEquipo && !selectedCategoria) {
-    toast('Elegí la categoría de la compra del equipo (Repuestos o Mantenimiento).', 'error');
+  return f;
+}
+
+// Descripciones de ítems vacías, en la vista que se esté usando (tabla o tarjetas).
+const descVacias = () => [...document.querySelectorAll('#items-tbody input[data-field="descripcion"], #items-cards .item-card-desc')]
+  .filter(el => el.offsetParent && !el.value.trim());
+
+function marcarFaltantes(faltan) {
+  document.querySelectorAll('.is-falta').forEach(el => el.classList.remove('is-falta'));
+  faltan.forEach(({ id }) => {
+    if (id === 'item-desc') descVacias().forEach(el => el.classList.add('is-falta'));
+    else if (id !== 'btn-add-row') $(id)?.classList.add('is-falta');
+  });
+}
+
+// La marca roja se va sola cuando el dato aparece (se llama con cada cambio).
+function desmarcarCompletos() {
+  document.querySelectorAll('.is-falta').forEach(el => {
+    const ok = el.id === 'equipo-cat' ? !!selectedCategoria || !selectedEquipo : !!el.value?.trim();
+    if (ok) el.classList.remove('is-falta');
+  });
+}
+
+function irAFaltante(id) {
+  if (id === 'item-desc') {
+    const el = descVacias()[0];
+    if (el) { const sec = el.closest('.oc-section'); if (sec && sec.classList.contains('collapsed')) openOCSection(sec); el.focus(); }
+    return;
+  }
+  if (id === 'equipo-cat') {
+    revealAndFocus('equipo');
     $('equipo-cat-group').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return false;
+    return;
   }
-  if (!items.length)  { toast('Agregá al menos un ítem a la orden.', 'error'); return false; }
-  if (items.some(it => !it.descripcion.trim())) { toast('Completá la descripción de todos los ítems.', 'error'); return false; }
-  return true;
+  revealAndFocus(id);
+}
+
+function mostrarFaltantes(faltan) {
+  let modal = $('modal-faltan');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay hidden';
+    modal.id = 'modal-faltan';
+    modal.innerHTML =
+      '<div class="confirm-box confirm-box--warn confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="faltan-title" tabindex="-1">' +
+        `<span class="confirm-ic">${icSvg('alert')}</span>` +
+        '<div class="confirm-title" id="faltan-title"></div>' +
+        '<p class="confirm-msg">Tocá uno para ir a completarlo.</p>' +
+        '<div class="faltan-lista"></div>' +
+        '<button type="button" class="foc-btn foc-btn--clear confirm-cancel faltan-cerrar">Seguir cargando</button>' +
+      '</div>';
+    document.body.appendChild(modal);
+  }
+  const close = () => {
+    modal.classList.add('hidden');
+    modal.onclick = null;
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  modal.querySelector('#faltan-title').textContent = faltan.length === 1 ? 'Falta un dato' : `Faltan ${faltan.length} datos`;
+  modal.querySelector('.faltan-lista').innerHTML = faltan.map((f, i) => `
+    <button type="button" class="faltan-item" data-i="${i}">
+      <span class="faltan-dot"></span>
+      <span class="faltan-t"><b>${esc(f.txt)}</b><small>${esc(SECCION_FALTA[f.id] || '')}</small></span>
+      ${icSvg('chevR')}
+    </button>`).join('');
+  modal.onclick = e => {
+    const it = e.target.closest('.faltan-item');
+    if (it) { close(); irAFaltante(faltan[+it.dataset.i].id); }
+    else if (e.target === modal || e.target.closest('.faltan-cerrar')) close();
+  };
+  document.addEventListener('keydown', onKey, true);
+  modal.classList.remove('hidden');
+  modal.querySelector('.confirm-box').focus();
+}
+
+function validateOCForm() {
+  const faltan = faltantesOC();
+  marcarFaltantes(faltan);
+  if (!faltan.length) return true;
+  mostrarFaltantes(faltan);
+  return false;
+}
+
+// ---- Panel "Para generar" (al costado, en escritorio) ----
+// Lo mismo que valida Generar, a la vista todo el tiempo: en verde lo que ya
+// está, en rojo lo que falta (tocarlo lleva al campo).
+function pintarCheck() {
+  const box = $('oc-check-list');
+  if (!box) return;
+  const faltan = faltantesOC();
+  const grupos = [
+    [['obra'], 'Obra'],
+    rubrosDeObraActual().length ? [['rubro'], 'Rubro'] : null,
+    [['condicion-pago'], 'Condición de pago'],
+    selectedEquipo ? [['equipo-cat'], 'Categoría del equipo'] : null,
+    [['proveedor', 'cuit-proveedor'], 'Proveedor y CUIT'],
+    [['btn-add-row', 'item-desc'], `${items.length} ${items.length === 1 ? 'ítem' : 'ítems'} con descripción`],
+  ].filter(Boolean);
+  // Lo que falta, dicho como falta (el texto del diálogo es el nombre del dato).
+  const textoFalta = f => {
+    const ids = f.map(x => x.id);
+    if (ids.includes('proveedor')) return ids.includes('cuit-proveedor') ? 'Falta el proveedor' : 'Falta la razón social';
+    const x = f[0];
+    return { 'obra': x.txt === 'Obra / motivo' ? 'Falta la obra' : x.txt, 'rubro': 'Falta el rubro', 'condicion-pago': 'Falta la condición de pago',
+      'equipo-cat': 'Falta la categoría del equipo', 'cuit-proveedor': 'Falta el CUIT del proveedor', 'btn-add-row': 'Falta al menos un ítem',
+      'item-desc': 'Falta la ' + x.txt.charAt(0).toLowerCase() + x.txt.slice(1) }[x.id] || x.txt;
+  };
+  box.innerHTML = grupos.map(([ids, ok]) => {
+    const f = faltan.filter(x => ids.includes(x.id));
+    return f.length
+      ? `<button type="button" class="oc-check-r oc-check-r--no" data-id="${f[0].id}"><span class="d">${icSvg('x')}</span>${esc(textoFalta(f))}</button>`
+      : `<div class="oc-check-r"><span class="d">${icSvg('checkSm')}</span>${esc(ok)}</div>`;
+  }).join('');
+}
+
+// ---- Proveedor de la base: ficha compacta ----
+// Elegido de la base (o reconocido al importar), el proveedor se ve como una
+// ficha; "Editar datos" abre los campos de siempre. Uno nuevo, o uno cuyos datos
+// cambiaron (p. ej. al importar otro presupuesto), se ve con los campos.
+let provFicha = false;
+
+function provFichaVisible() {
+  return provFicha && !provIsDirty() && !!$('proveedor').value.trim() && !!$('cuit-proveedor').value.trim();
+}
+
+function pintarProvFicha() {
+  const ver = provFichaVisible();
+  $('prov-ficha').closest('.oc-section').classList.toggle('prov-compacto', ver);
+  if (!ver) return;
+  const v = id => $(id).value.trim();
+  const nombre = v('proveedor');
+  $('prov-f-av').textContent = nombre.split(/\s+/).filter(w => /[a-z0-9]/i.test(w)).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  $('prov-f-nombre').textContent = nombre;
+  const cod = v('codigo-interno-proveedor');
+  $('prov-f-tag').textContent = cod ? 'En la base · ' + cod : 'En la base';
+  $('prov-f-l1').textContent = ['CUIT ' + v('cuit-proveedor'), v('condicion-iva-proveedor')].filter(Boolean).join(' · ');
+  $('prov-f-l2').textContent = [v('domicilio-proveedor'), v('telefonos-proveedor'), v('nombre-proveedor')].filter(Boolean).join(' · ');
+}
+
+function editarProveedor() {
+  provFicha = false;
+  pintarProvFicha();
+  $('proveedor').focus();
+}
+
+function cambiarProveedor() {
+  PROV_FIELDS.forEach(id => { $(id).value = ''; });
+  $('codigo-interno-proveedor').value = '';
+  $('condicion-iva-proveedor').value  = 'Resp. Inscripto';
+  _loadedProvCuit = null;
+  snapshotProvider();
+  updateOCSummaries();
+  $('proveedor').focus();
+}
+
+// ---- Atajos de Condición de pago ----
+// Primero la última que se usó con este proveedor; después las que más usa
+// quien está cargando. Tocar una la escribe en el campo (se puede seguir
+// escribiendo a mano como siempre).
+async function pintarCondChips() {
+  const box = $('cp-chips');
+  if (!box) return;
+  let hist = [];
+  try { hist = await historialParaComparar(); } catch (_) { return; }
+  const code = sessionStorage.getItem('responsable_code') || '';
+  const cuit = $('cuit-proveedor').value.replace(/\D/g, '');
+  const nom  = normalizeProvName($('proveedor').value);
+  const conPago = hist.filter(h => String(h.condicionPago || '').trim());
+  const ultima = (cuit.length >= 10 || nom) ? conPago.find(h =>
+    (cuit.length >= 10 && String(h.proveedor?.cuit || '').replace(/\D/g, '') === cuit) ||
+    (nom && normalizeProvName(h.proveedor?.nombre) === nom)) : null;
+
+  const cuenta = new Map();
+  conPago.filter(h => h.responsable?.codigo === code).forEach(h => {
+    const t = h.condicionPago.trim(), k = t.toLowerCase();
+    const c = cuenta.get(k) || { t, n: 0 };
+    c.n++;
+    cuenta.set(k, c);
+  });
+  const chips = ultima ? [{ t: ultima.condicionPago.trim(), ult: true }] : [];
+  [...cuenta.values()].sort((a, b) => b.n - a.n).forEach(({ t }) => {
+    if (chips.length < 4 && !chips.some(c => c.t.toLowerCase() === t.toLowerCase())) chips.push({ t });
+  });
+
+  const actual = $('condicion-pago').value.trim().toLowerCase();
+  box.innerHTML = chips.map(c => `<button type="button" class="cp-chip${c.ult ? ' cp-chip--ult' : ''}" data-v="${esc(c.t)}" aria-pressed="${c.t.toLowerCase() === actual}">${esc(c.t)}${
+    c.ult ? '<small> · la última con este proveedor</small>' : ''}</button>`).join('');
+  box.classList.toggle('hidden', !chips.length);
+}
+
+function setupCondChips() {
+  $('cp-chips').addEventListener('click', e => {
+    const b = e.target.closest('.cp-chip');
+    if (!b) return;
+    const input = $('condicion-pago');
+    input.value = b.dataset.v;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  $('condicion-pago').addEventListener('input', pintarCondChips);
+  ['proveedor', 'cuit-proveedor'].forEach(id => $(id).addEventListener('change', pintarCondChips));
+  pintarCondChips();
+}
+
+// ---- IVA y moneda como interruptores-pastilla ----
+// Mueven los checkbox de siempre (ocultos), que tienen la lógica de cada uno.
+function setupSegs() {
+  document.querySelectorAll('.oc-seg button').forEach(b => b.addEventListener('click', () => {
+    const chk = $(b.dataset.chk), on = b.dataset.v === '1';
+    if (chk.checked !== on) {
+      chk.checked = on;
+      chk.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    syncSegs();
+  }));
+  syncSegs();
+}
+
+function syncSegs() {
+  document.querySelectorAll('.oc-seg button').forEach(b =>
+    b.setAttribute('aria-pressed', String($(b.dataset.chk).checked === (b.dataset.v === '1'))));
+}
+
+// ---- Borrador automático ----
+// La OC a medio cargar se guarda en el dispositivo con cada cambio: si Android
+// cierra la app mientras se mira el presupuesto en WhatsApp, o se toca la flecha
+// de volver, al entrar de nuevo sigue ahí. Los datos van en localStorage y el
+// archivo del presupuesto en IndexedDB (en localStorage no entra). Es por usuario:
+// en un teléfono compartido cada uno ve el suyo. Se borra al generar la OC (o
+// pedir su autorización) y al limpiar el formulario.
+const BORRADOR_CAMPOS = ['obra', 'condicion-pago', 'plazo-entrega', 'lugar-entrega', 'observaciones',
+  'proveedor', 'cuit-proveedor', 'nombre-proveedor', 'codigo-interno-proveedor', 'domicilio-proveedor',
+  'telefonos-proveedor', 'condicion-iva-proveedor', 'ref-presupuesto'];
+// Lo que se completa solo (la obra recordada, su lugar de entrega, la condición
+// de IVA por defecto) no cuenta como trabajo: sin nada de esto no hay borrador.
+const BORRADOR_PROPIOS = ['condicion-pago', 'plazo-entrega', 'observaciones', 'proveedor', 'cuit-proveedor',
+  'nombre-proveedor', 'domicilio-proveedor', 'telefonos-proveedor', 'ref-presupuesto'];
+const borradorKey = () => 'vimeco_borrador_oc_' + (sessionStorage.getItem('responsable_code') || '');
+let _borradorListo = false;   // no se guarda nada hasta terminar de arrancar (y restaurar)
+let _borradorPausa = false;   // después de generar, hasta que se vuelva a editar algo
+let _borradorTimer = 0;
+
+function leerBorrador() {
+  try { return JSON.parse(localStorage.getItem(borradorKey())); } catch (_) { return null; }
+}
+
+function borradorTieneAlgo() {
+  return items.length > 0 || !!selectedFile || !!selectedEquipo ||
+    BORRADOR_PROPIOS.some(id => $(id).value.trim());
+}
+
+function guardarBorrador() {
+  clearTimeout(_borradorTimer);
+  if (!_borradorListo || _borradorPausa) return;
+  try {
+    if (!borradorTieneAlgo()) { localStorage.removeItem(borradorKey()); return; }
+    const campos = {};
+    BORRADOR_CAMPOS.forEach(id => { campos[id] = $(id).value; });
+    localStorage.setItem(borradorKey(), JSON.stringify({
+      ts: Date.now(), campos,
+      rubro: selectedRubro, equipo: selectedEquipo, categoria: selectedCategoria,
+      items, descuento, noGravado, impuestos, ivaActive, ivaPct, monedaUSD,
+      provCuit: _loadedProvCuit, provSnapshot: _provSnapshot, provFicha
+    }));
+  } catch (e) {
+    console.warn('guardarBorrador:', e);
+  }
+}
+
+function programarBorrador() {
+  if (!_borradorListo || _borradorPausa) return;
+  clearTimeout(_borradorTimer);
+  _borradorTimer = setTimeout(guardarBorrador, 500);
+}
+
+function borrarBorrador() {
+  clearTimeout(_borradorTimer);
+  try { localStorage.removeItem(borradorKey()); } catch (_) {}
+  borradorArchivo(null);
+  ocultarAvisoBorrador();
+}
+
+// La OC salió: el borrador se borra y no se vuelve a guardar hasta que se edite
+// algo (el formulario queda cargado para "Mismo proveedor").
+function terminarBorrador() {
+  borrarBorrador();
+  _borradorPausa = true;
+}
+
+function _borradorDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('vimeco-borrador-oc', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('archivo');
+    r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+// Guarda el archivo del presupuesto del borrador; con null, lo borra.
+async function borradorArchivo(file) {
+  try {
+    const db = await _borradorDB();
+    const tx = db.transaction('archivo', 'readwrite');
+    if (file) tx.objectStore('archivo').put(file, borradorKey());
+    else      tx.objectStore('archivo').delete(borradorKey());
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    db.close();
+  } catch (e) {
+    console.warn('borradorArchivo:', e);
+  }
+}
+
+async function leerBorradorArchivo() {
+  try {
+    const db  = await _borradorDB();
+    const req = db.transaction('archivo', 'readonly').objectStore('archivo').get(borradorKey());
+    const file = await new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+    db.close();
+    return file || null;
+  } catch (e) {
+    console.warn('leerBorradorArchivo:', e);
+    return null;
+  }
+}
+
+// "XL S.A. · 3 ítems · hoy 10:42"
+function resumenBorrador(b) {
+  const n = (b.items || []).length;
+  const d = new Date(b.ts);
+  const hora = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const dia  = d.toDateString() === new Date().toDateString() ? 'hoy'
+    : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+  return [b.campos?.proveedor?.trim() || 'Sin proveedor',
+          n ? `${n} ${n === 1 ? 'ítem' : 'ítems'}` : 'sin ítems',
+          `${dia} ${hora}`].join(' · ');
+}
+
+async function restaurarBorrador(b) {
+  const c = b.campos || {};
+  BORRADOR_CAMPOS.forEach(id => { if (id !== 'obra' && c[id] != null) $(id).value = c[id]; });
+  // La obra sólo si sigue en el padrón; si el borrador no tenía, queda la recordada.
+  if (c.obra) setObraValue(c.obra);
+  const rubros = rubrosDeObraActual();
+  setRubro(b.rubro ? rubros.find(r => r.id === b.rubro.id) || null : null);
+  setEquipo(b.equipo || null);
+  setCategoria(b.categoria || null);
+  _loadedProvCuit = b.provCuit || null;
+  _provSnapshot   = b.provSnapshot || {};
+  provFicha       = !!b.provFicha;
+  $('btn-save-proveedor-base').classList.toggle('hidden', !provIsDirty());
+
+  items     = Array.isArray(b.items) ? b.items : [];
+  descuento = b.descuento || { pct: null, monto: 0 };
+  noGravado = b.noGravado || { pct: null, monto: 0 };
+  impuestos = Array.isArray(b.impuestos) ? b.impuestos : [];
+  $('pct-descuento').value   = descuento.pct ? String(descuento.pct) : '';
+  $('monto-descuento').value = fmtMoneyDisplay(descuento.monto);
+  $('pct-nogravado').value   = noGravado.pct ? String(noGravado.pct) : '';
+  $('monto-nogravado').value = fmtMoneyDisplay(noGravado.monto);
+
+  // Los precios de los ítems ya vienen netos (con su _precio_original): sólo se
+  // repone el interruptor, sin volver a descontar el IVA.
+  ivaActive = !!b.ivaActive;
+  ivaPct    = b.ivaPct || 21;
+  $('iva-toggle').checked = ivaActive;
+  $('iva-pct').value = String(ivaPct);
+  $('iva-pct-wrap').classList.toggle('hidden', !ivaActive);
+  monedaUSD = !!b.monedaUSD;
+  $('moneda-toggle').checked = monedaUSD;
+  updateMonedaLabels();
+
+  renderTable();
+  renderImpuestos();
+  recalcTotales();
+
+  // Un archivo recién compartido desde otra app gana sobre el del borrador.
+  if (!selectedFile) {
+    const file = await leerBorradorArchivo();
+    if (file) handleFileSelected(file);
+  }
+}
+
+function mostrarAvisoBorrador(b) {
+  $('borrador-aviso-sub').textContent = resumenBorrador(b);
+  $('borrador-aviso').classList.remove('hidden');
+}
+
+function ocultarAvisoBorrador() {
+  $('borrador-aviso')?.classList.add('hidden');
+}
+
+async function empezarDeCero() {
+  const b = leerBorrador();
+  const ok = await showConfirm('Empezar de cero',
+    `Se borra la OC que estabas cargando${b ? ` (${resumenBorrador(b)})` : ''}.`,
+    { boton: 'Borrar y empezar', tono: 'del', icono: 'trash' });
+  if (ok) resetForm();
+}
+
+// Al arrancar: retoma el borrador, salvo que se haya pedido "Usar como base"
+// desde el Historial; en ese caso se pregunta cuál de las dos sigue.
+async function arrancarBorrador(obrasListas) {
+  const b = leerBorrador();
+  const baseRaw = sessionStorage.getItem('oc_base');
+  sessionStorage.removeItem('oc_base');
+  let base = null;
+  try { base = baseRaw ? JSON.parse(baseRaw) : null; } catch (e) { console.warn('oc_base:', e); }
+  await obrasListas;
+
+  if (base) {
+    const usarBase = !b || await showConfirm('Tenés una OC sin terminar',
+      `${resumenBorrador(b)}.\nSi usás la OC ${base.nroOC} como base, la que estabas cargando se borra.`,
+      { boton: 'Usar como base', tono: 'warn', icono: 'undo', cancelar: 'Seguir con la mía' });
+    if (usarBase) {
+      if (b) borrarBorrador();
+      try { loadOCBase(base); } catch (e) { console.warn('loadOCBase:', e); }
+    } else {
+      await restaurarBorrador(b);
+      mostrarAvisoBorrador(b);
+    }
+  } else if (b) {
+    try {
+      await restaurarBorrador(b);
+      mostrarAvisoBorrador(b);
+    } catch (e) {
+      console.warn('restaurarBorrador:', e);
+    }
+  }
+
+  _borradorListo = true;
+  // Con la app en segundo plano Android puede cerrarla sin aviso: se guarda ya.
+  document.addEventListener('visibilitychange', () => { if (document.hidden) guardarBorrador(); });
+  window.addEventListener('pagehide', guardarBorrador);
+  // Después de generar, se vuelve a guardar recién cuando se edita algo.
+  ['input', 'change'].forEach(ev => document.querySelector('.app-main').addEventListener(ev, e => {
+    if (e.isTrusted && _borradorPausa) { _borradorPausa = false; programarBorrador(); }
+  }));
 }
 
 function buildOCData(numero, firma = null) {
@@ -2354,6 +2830,7 @@ async function handleGenerate() {
   }
 
   refreshOCNumberDisplay();
+  terminarBorrador();
   toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada.`, 'success');
   btn.disabled = false;
   btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
@@ -2490,6 +2967,7 @@ async function solicitarAutorizacion(autorizador, regla = null, repetida = null)
   }
 
   refreshOCNumberDisplay();
+  terminarBorrador();
   toast(`OC ${numero} enviada a ${autorizador.nombre} para autorización.` +
     (repetida?.tipo === 'correccion' ? ' La anterior se anula cuando la firme.' : ''), 'success');
   btn.disabled = false;
@@ -2692,6 +3170,7 @@ function resetFormKeepProvider() {
   recalcTotales();
   clearExtractStatus();
   $('btn-same-provider').classList.add('hidden');
+  borrarBorrador();
   toast('Nueva OC — proveedor conservado.', 'info');
   aplicarObraRecordada();
   $('obra').focus();
@@ -2730,6 +3209,7 @@ function resetForm() {
   recalcTotales();
   clearExtractStatus();
   $('btn-same-provider').classList.add('hidden');
+  borrarBorrador();
   toast('Formulario limpiado.', 'info');
   aplicarObraRecordada();
 }

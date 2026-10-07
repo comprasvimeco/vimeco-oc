@@ -42,308 +42,345 @@
 <!-- ===== MAIN ===== -->
 <main class="app-main">
 
-  <!-- Hero de la OC: número, fecha y total en vivo (mismo idioma que el hero de reportes) -->
-  <div class="oc-banner oc-hero">
-    <div class="oc-hero-top">
-      <div class="oc-number-display">
-        <span class="oc-number-label">Próxima OC</span>
-        <span class="oc-number-value" id="oc-number-display">—</span>
-        <input type="text" id="oc-number-input" class="oc-number-input hidden" placeholder="0001-00000001">
-        <button class="btn btn-icon btn-xs" id="btn-edit-oc-number" title="Editar número de OC"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="btn btn-icon btn-xs hidden" id="btn-clear-oc-number" title="Volver a numeración automática"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-      </div>
-      <div class="oc-banner-actions">
-        <span id="date-display" class="oc-hero-date"></span>
-      </div>
-    </div>
-    <div class="oc-hero-lbl">Total de la orden</div>
-    <div class="oc-hero-val" id="oc-hero-total">$ 0,00</div>
-    <div class="oc-hero-sub" id="oc-hero-sub">Sin ítems todavía</div>
-  </div>
+  <div class="oc-layout">
+    <div class="oc-col">
 
-  <!-- STEP 1 — Importar documento -->
-  <div class="card oc-section">
-    <div class="card-header">
-      <span class="card-title">
-        <span class="step-badge">1</span>
-        Importar Documento con IA <span class="step-optional">(opcional)</span>
-      </span>
-    </div>
-    <div class="card-body" id="drop-zone">
-      <input type="file" id="file-input"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
-      <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
-      <div class="import-buttons">
-        <button class="btn import-btn" id="btn-upload-file">
-          <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
-          <span class="import-btn-label">Subir archivo</span>
-        </button>
-        <button class="btn import-btn" id="btn-camera" style="display:none">
-          <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-          <span class="import-btn-label">Sacar foto</span>
-        </button>
+      <!-- OC retomada del borrador automático (js/app.js → arrancarBorrador) -->
+      <div class="borrador-aviso hidden" id="borrador-aviso" role="status">
+        <span class="borrador-aviso-ic"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg></span>
+        <span class="borrador-aviso-t"><b>Seguís con la OC que estabas cargando</b><small id="borrador-aviso-sub"></small></span>
+        <button type="button" class="foc-btn foc-btn--clear" id="btn-borrador-cero">Empezar de cero</button>
+        <button type="button" class="borrador-aviso-x" id="btn-borrador-ok" aria-label="Cerrar aviso" title="Cerrar aviso"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
-      <div class="upload-filename hidden" id="upload-filename">
-        <span class="upload-filename-txt" id="upload-filename-txt"></span>
-        <button class="foc-btn foc-btn--clear upload-file-x" id="btn-clear-file" title="Quitar el archivo"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Quitar</button>
-      </div>
-      <div class="extract-bar">
-        <button class="btn btn-primary" id="btn-extract" disabled>
-          <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          Extraer datos con IA
-        </button>
-        <div id="extract-status" class="extract-status hidden"></div>
-      </div>
-    </div>
-  </div>
 
-  <!-- STEP 2 — Datos de la Orden -->
-  <div class="card oc-section">
-    <div class="card-header">
-      <span class="card-title">
-        <span class="step-badge">2</span>
-        Datos de la Orden
-      </span>
-    </div>
-    <div class="card-body">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="obra">Obra / Motivo*</label>
-          <div class="combo-wrap">
-            <input type="text" id="obra" class="form-control combo-input combo-locked" placeholder="Elegí la obra de la lista" readonly>
-            <button type="button" class="combo-arrow" id="obra-arrow" tabindex="-1" aria-label="Ver obras"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg></button>
-            <div class="combo-dropdown hidden" id="obra-dropdown"></div>
+      <!-- STEP 1 — Importar documento -->
+      <div class="card oc-section">
+        <div class="card-header">
+          <span class="card-title">
+            <span class="oc-step-ic oc-step-ic--vio"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
+            Importar con IA
+          </span>
+        </div>
+        <div class="card-body" id="drop-zone">
+          <input type="file" id="file-input"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
+          <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
+          <div class="import-buttons">
+            <button class="btn import-btn" id="btn-upload-file">
+              <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
+              <span class="import-btn-label">Subir archivo</span>
+            </button>
+            <button class="btn import-btn" id="btn-camera" style="display:none">
+              <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+              <span class="import-btn-label">Sacar foto</span>
+            </button>
+          </div>
+          <div class="upload-filename hidden" id="upload-filename">
+            <span class="upload-filename-txt" id="upload-filename-txt"></span>
+            <button class="foc-btn foc-btn--clear upload-file-x" id="btn-clear-file" title="Quitar el archivo"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Quitar</button>
+          </div>
+          <div class="extract-bar">
+            <button class="btn btn-primary" id="btn-extract" disabled>
+              <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Extraer datos con IA
+            </button>
+            <div id="extract-status" class="extract-status hidden"></div>
           </div>
         </div>
-        <div class="form-group">
-          <label for="condicion-pago">Condición de Pago</label>
-          <input type="text" id="condicion-pago" class="form-control" placeholder="Ej: Contado, 30 días, etc.">
-        </div>
       </div>
-      <!-- Rubro: sólo visible si la obra elegida tiene la lista de rubros cerrada -->
-      <div class="form-group hidden" id="rubro-group">
-        <label for="rubro">Rubro*</label>
-        <div class="combo-wrap">
-          <input type="text" id="rubro" class="form-control combo-input combo-locked" placeholder="Elegí el rubro de la obra" readonly>
-          <button type="button" class="combo-arrow" id="rubro-arrow" tabindex="-1" aria-label="Ver rubros"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg></button>
-          <div class="combo-dropdown hidden" id="rubro-dropdown"></div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="equipo">Equipo (opcional)</label>
-        <div class="combo-wrap">
-          <input type="text" id="equipo" class="form-control combo-input" placeholder="Buscar equipo por código o tipo" autocomplete="off">
-          <button type="button" class="combo-arrow" id="equipo-arrow" tabindex="-1" aria-label="Ver equipos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg></button>
-          <div class="combo-dropdown hidden" id="equipo-dropdown"></div>
-        </div>
-      </div>
-      <!-- Categoría de la compra: sólo visible cuando hay un equipo elegido -->
-      <div class="form-group hidden" id="equipo-cat-group">
-        <label>Categoría de la compra *</label>
-        <div class="cat-seg" id="equipo-cat">
-          <button type="button" class="cat-seg-btn" data-val="Repuestos">Repuestos</button>
-          <button type="button" class="cat-seg-btn" data-val="Mantenimiento">Mantenimiento</button>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="plazo-entrega">Plazo de Entrega</label>
-          <input type="text" id="plazo-entrega" class="form-control" placeholder="Ej: 15 días hábiles">
-        </div>
-        <div class="form-group">
-          <label for="lugar-entrega">Lugar de Entrega</label>
-          <input type="text" id="lugar-entrega" class="form-control" placeholder="Ej: Obra, depósito, etc.">
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="observaciones">Observaciones</label>
-        <input type="text" id="observaciones" class="form-control" placeholder="Notas adicionales (opcional)">
-      </div>
-    </div>
-  </div>
 
-  <!-- STEP 3 — Datos del Proveedor -->
-  <div class="card oc-section">
-    <div class="card-header">
-      <span class="card-title">
-        <span class="step-badge">3</span>
-        Datos del Proveedor
-      </span>
-      <button class="btn btn-sm btn-secondary hidden" id="btn-save-proveedor-base" type="button" title="Guardar o corregir este proveedor en la base maestra">Guardar en base</button>
-    </div>
-    <div class="card-body">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="proveedor">Razón Social *</label>
-          <div class="combo-wrap" id="proveedor-wrap">
-            <input type="text" id="proveedor" class="form-control combo-input" placeholder="Razón social del proveedor">
-            <div class="combo-dropdown hidden" id="proveedor-dropdown"></div>
+      <!-- STEP 2 — Datos de la Orden -->
+      <div class="card oc-section">
+        <div class="card-header">
+          <span class="card-title">
+            <span class="oc-step-ic oc-step-ic--blue"><svg class="icon" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/></svg></span>
+            Datos de la orden
+          </span>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="obra">Obra / Motivo*</label>
+              <div class="combo-wrap">
+                <input type="text" id="obra" class="form-control combo-input combo-locked" placeholder="Elegí la obra de la lista" readonly>
+                <button type="button" class="combo-arrow" id="obra-arrow" tabindex="-1" aria-label="Ver obras"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg></button>
+                <div class="combo-dropdown hidden" id="obra-dropdown"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="condicion-pago">Condición de Pago</label>
+              <input type="text" id="condicion-pago" class="form-control" placeholder="Ej: Contado, 30 días, etc.">
+              <div class="cp-chips hidden" id="cp-chips"></div>
+            </div>
+          </div>
+          <!-- Rubro: sólo visible si la obra elegida tiene la lista de rubros cerrada -->
+          <div class="form-group hidden" id="rubro-group">
+            <label for="rubro">Rubro*</label>
+            <div class="combo-wrap">
+              <input type="text" id="rubro" class="form-control combo-input combo-locked" placeholder="Elegí el rubro de la obra" readonly>
+              <button type="button" class="combo-arrow" id="rubro-arrow" tabindex="-1" aria-label="Ver rubros"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg></button>
+              <div class="combo-dropdown hidden" id="rubro-dropdown"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="equipo">Equipo (opcional)</label>
+            <div class="combo-wrap">
+              <input type="text" id="equipo" class="form-control combo-input" placeholder="Buscar equipo por código o tipo" autocomplete="off">
+              <button type="button" class="combo-arrow" id="equipo-arrow" tabindex="-1" aria-label="Ver equipos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="16"/><polyline points="7 12 12 17 17 12"/></svg></button>
+              <div class="combo-dropdown hidden" id="equipo-dropdown"></div>
+            </div>
+          </div>
+          <!-- Categoría de la compra: sólo visible cuando hay un equipo elegido -->
+          <div class="form-group hidden" id="equipo-cat-group">
+            <label>Categoría de la compra *</label>
+            <div class="cat-seg" id="equipo-cat">
+              <button type="button" class="cat-seg-btn" data-val="Repuestos">Repuestos</button>
+              <button type="button" class="cat-seg-btn" data-val="Mantenimiento">Mantenimiento</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="plazo-entrega">Plazo de Entrega</label>
+              <input type="text" id="plazo-entrega" class="form-control" placeholder="Ej: 15 días hábiles">
+            </div>
+            <div class="form-group">
+              <label for="lugar-entrega">Lugar de Entrega</label>
+              <input type="text" id="lugar-entrega" class="form-control" placeholder="Ej: Obra, depósito, etc.">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="observaciones">Observaciones</label>
+            <input type="text" id="observaciones" class="form-control" placeholder="Notas adicionales (opcional)">
           </div>
         </div>
-        <div class="form-group">
-          <label for="cuit-proveedor">CUIT del Proveedor *</label>
-          <input type="text" id="cuit-proveedor" class="form-control" placeholder="XX-XXXXXXXX-X">
-        </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="nombre-proveedor">Nombre</label>
-          <input type="text" id="nombre-proveedor" class="form-control" placeholder="Nombre de contacto">
-        </div>
-        <div class="form-group">
-          <label for="codigo-interno-proveedor">Código Interno</label>
-          <input type="text" id="codigo-interno-proveedor" class="form-control" placeholder="—" readonly>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="domicilio-proveedor">Domicilio del Proveedor</label>
-          <input type="text" id="domicilio-proveedor" class="form-control" placeholder="Dirección del proveedor">
-        </div>
-        <div class="form-group">
-          <label for="telefonos-proveedor">Teléfonos del Proveedor</label>
-          <input type="text" id="telefonos-proveedor" class="form-control" placeholder="(0351) 000-0000">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label for="condicion-iva-proveedor">Condición IVA Proveedor</label>
-          <input type="text" id="condicion-iva-proveedor" class="form-control" value="Resp. Inscripto">
-        </div>
-        <div class="form-group">
-          <label for="ref-presupuesto">Ref. de Presupuesto</label>
-          <input type="text" id="ref-presupuesto" class="form-control" placeholder="N° de presupuesto">
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- STEP 4 — Tabla de ítems -->
-  <div class="card oc-section">
-    <div class="card-header">
-      <span class="card-title">
-        <span class="step-badge">4</span>
-        Ítems de la Orden
-      </span>
-      <button class="btn btn-sm btn-secondary" id="btn-add-row">+ Agregar ítem</button>
-    </div>
-    <div class="iva-bar">
-      <label class="iva-label">
-        <div class="toggle-switch">
-          <input type="checkbox" id="iva-toggle">
-          <span class="toggle-slider"></span>
+      <!-- STEP 3 — Datos del Proveedor -->
+      <div class="card oc-section">
+        <div class="card-header">
+          <span class="card-title">
+            <span class="oc-step-ic oc-step-ic--amber"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>
+            Proveedor
+          </span>
+          <button class="btn btn-sm btn-secondary hidden" id="btn-save-proveedor-base" type="button" title="Guardar o corregir este proveedor en la base maestra">Guardar en base</button>
         </div>
-        <span>Precios con IVA incluido</span>
-      </label>
-      <div class="iva-pct-wrap hidden" id="iva-pct-wrap">
-        <input type="text" id="iva-pct" class="iva-pct-input" value="21">
-        <span class="iva-pct-label">%  →  precio neto</span>
-      </div>
-      <label class="iva-label">
-        <div class="toggle-switch">
-          <input type="checkbox" id="moneda-toggle">
-          <span class="toggle-slider"></span>
+        <div class="card-body">
+          <div class="prov-ficha" id="prov-ficha">
+            <span class="prov-ficha-av" id="prov-f-av"></span>
+            <div class="prov-ficha-m">
+              <b id="prov-f-nombre"></b><span class="prov-ficha-tag" id="prov-f-tag"></span>
+              <div class="prov-ficha-l" id="prov-f-l1"></div>
+              <div class="prov-ficha-l" id="prov-f-l2"></div>
+              <div class="prov-ficha-acts">
+                <button type="button" class="foc-btn foc-btn--edit" id="btn-prov-editar"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Editar datos</button>
+                <button type="button" class="foc-btn foc-btn--clear" id="btn-prov-cambiar"><svg class="icon" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>Cambiar proveedor</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-row prov-dato">
+            <div class="form-group">
+              <label for="proveedor">Razón Social *</label>
+              <div class="combo-wrap" id="proveedor-wrap">
+                <input type="text" id="proveedor" class="form-control combo-input" placeholder="Razón social del proveedor">
+                <div class="combo-dropdown hidden" id="proveedor-dropdown"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="cuit-proveedor">CUIT del Proveedor *</label>
+              <input type="text" id="cuit-proveedor" class="form-control" placeholder="XX-XXXXXXXX-X">
+            </div>
+          </div>
+          <div class="form-row prov-dato">
+            <div class="form-group">
+              <label for="nombre-proveedor">Nombre</label>
+              <input type="text" id="nombre-proveedor" class="form-control" placeholder="Nombre de contacto">
+            </div>
+            <div class="form-group">
+              <label for="codigo-interno-proveedor">Código Interno</label>
+              <input type="text" id="codigo-interno-proveedor" class="form-control" placeholder="—" readonly>
+            </div>
+          </div>
+          <div class="form-row prov-dato">
+            <div class="form-group">
+              <label for="domicilio-proveedor">Domicilio del Proveedor</label>
+              <input type="text" id="domicilio-proveedor" class="form-control" placeholder="Dirección del proveedor">
+            </div>
+            <div class="form-group">
+              <label for="telefonos-proveedor">Teléfonos del Proveedor</label>
+              <input type="text" id="telefonos-proveedor" class="form-control" placeholder="(0351) 000-0000">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group prov-dato">
+              <label for="condicion-iva-proveedor">Condición IVA Proveedor</label>
+              <input type="text" id="condicion-iva-proveedor" class="form-control" value="Resp. Inscripto">
+            </div>
+            <div class="form-group">
+              <label for="ref-presupuesto">Ref. de Presupuesto</label>
+              <input type="text" id="ref-presupuesto" class="form-control" placeholder="N° de presupuesto">
+            </div>
+          </div>
         </div>
-        <span>Orden en dólares (USD)</span>
-      </label>
-    </div>
-    <div id="verif-banner" class="verif-banner hidden">
-      <div class="verif-banner-header">
-        <span><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>Verificación: hay discrepancias entre el documento y los datos extraídos</strong></span>
-        <button id="verif-banner-close" class="verif-banner-close" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
-      <ul id="verif-banner-list" class="verif-banner-list"></ul>
-    </div>
-    <div class="card-body" style="padding:0;">
-      <div class="items-table-wrapper">
-        <table class="items-table" id="items-table">
-          <thead>
-            <tr>
-              <th class="text-center" style="width:38px;">N°</th>
-              <th style="min-width:200px;">Descripción</th>
-              <th class="text-center" style="width:70px;">Unidad</th>
-              <th class="text-right" style="width:90px;">Cantidad</th>
-              <th class="text-right" style="width:125px;" id="th-precio-unit">Precio Unit. ($)</th>
-              <th class="text-right" style="width:125px;" id="th-importe">Importe ($)</th>
-              <th style="width:40px;"></th>
-            </tr>
-          </thead>
-          <tbody id="items-tbody"></tbody>
-        </table>
-      </div>
-      <div id="items-cards"></div>
-      <div class="empty-state" id="empty-state">
-        <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>
-        <p>Usá <strong>Importar con IA</strong> o hacé clic en <strong>+ Agregar ítem</strong>.</p>
-      </div>
-    </div>
-  </div>
 
-  <!-- STEP 5 — Impuestos y Totales -->
-  <div class="card oc-section">
-    <div class="card-header">
-      <span class="card-title">
-        <span class="step-badge">5</span>
-        Impuestos y Totales
-      </span>
-      <button class="btn btn-sm btn-secondary" id="btn-add-impuesto">+ Agregar impuesto</button>
-    </div>
-    <div class="card-body" style="padding:0;">
-      <table class="imp-table" id="impuestos-table">
-        <thead>
-          <tr>
-            <th>Concepto</th>
-            <th class="text-center" style="width:80px;">%</th>
-            <th class="text-right" style="width:155px;" id="th-monto">Monto ($)</th>
-            <th style="width:44px;"></th>
-          </tr>
-        </thead>
-        <tbody id="imp-fixed-body">
-          <tr id="row-subtotal">
-            <td>Subtotal</td>
-            <td></td>
-            <td class="text-right" id="val-subtotal">0,00</td>
-            <td></td>
-          </tr>
-          <tr id="row-descuento">
-            <td>Descuento</td>
-            <td><input type="text" id="pct-descuento" class="imp-pct text-right" placeholder=""></td>
-            <td><input type="text" id="monto-descuento" class="imp-monto num-input text-right" value="0,00"></td>
-            <td></td>
-          </tr>
-          <tr id="row-nogravado">
-            <td>No gravado</td>
-            <td><input type="text" id="pct-nogravado" class="imp-pct text-right" placeholder=""></td>
-            <td><input type="text" id="monto-nogravado" class="imp-monto num-input text-right" value="0,00"></td>
-            <td></td>
-          </tr>
-          <tr id="row-gravado">
-            <td><strong>Gravado</strong></td>
-            <td></td>
-            <td class="text-right" id="val-gravado">0,00</td>
-            <td></td>
-          </tr>
-        </tbody>
-        <tbody id="impuestos-tbody"></tbody>
-        <tfoot>
-          <tr id="imp-total-row">
-            <td colspan="2"><strong>TOTAL</strong></td>
-            <td class="text-right" id="imp-total-value">0,00</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </div>
+      <!-- STEP 4 — Tabla de ítems -->
+      <div class="card oc-section">
+        <div class="card-header">
+          <span class="card-title">
+            <span class="oc-step-ic oc-step-ic--sky"><svg class="icon" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+            Ítems
+          </span>
+          <button class="btn btn-sm btn-secondary" id="btn-add-row">+ Agregar ítem</button>
+        </div>
+        <div class="iva-bar oc-segs">
+          <input type="checkbox" id="iva-toggle" hidden>
+          <input type="checkbox" id="moneda-toggle" hidden>
+          <span class="oc-seg-g">
+            <span class="oc-seg-l">Precios</span>
+            <span class="oc-seg" role="group" aria-label="Precios">
+              <button type="button" data-chk="iva-toggle" data-v="0">Sin IVA</button>
+              <button type="button" data-chk="iva-toggle" data-v="1">Con IVA incluido</button>
+            </span>
+          </span>
+          <div class="iva-pct-wrap hidden" id="iva-pct-wrap">
+            <input type="text" id="iva-pct" class="iva-pct-input" value="21">
+            <span class="iva-pct-label">%  →  precio neto</span>
+          </div>
+          <span class="oc-seg-g">
+            <span class="oc-seg-l">Moneda</span>
+            <span class="oc-seg" role="group" aria-label="Moneda">
+              <button type="button" data-chk="moneda-toggle" data-v="0">Pesos</button>
+              <button type="button" data-chk="moneda-toggle" data-v="1">Dólares</button>
+            </span>
+          </span>
+        </div>
+        <div id="verif-banner" class="verif-banner hidden">
+          <div class="verif-banner-header">
+            <span><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>Verificación: hay discrepancias entre el documento y los datos extraídos</strong></span>
+            <button id="verif-banner-close" class="verif-banner-close" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <ul id="verif-banner-list" class="verif-banner-list"></ul>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div class="items-table-wrapper">
+            <table class="items-table" id="items-table">
+              <thead>
+                <tr>
+                  <th class="text-center" style="width:38px;">N°</th>
+                  <th style="min-width:200px;">Descripción</th>
+                  <th class="text-center" style="width:70px;">Unidad</th>
+                  <th class="text-right" style="width:90px;">Cantidad</th>
+                  <th class="text-right" style="width:125px;" id="th-precio-unit">Precio Unit. ($)</th>
+                  <th class="text-right" style="width:125px;" id="th-importe">Importe ($)</th>
+                  <th style="width:40px;"></th>
+                </tr>
+              </thead>
+              <tbody id="items-tbody"></tbody>
+            </table>
+          </div>
+          <div id="items-cards"></div>
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg></div>
+            <p>Usá <strong>Importar con IA</strong> o hacé clic en <strong>+ Agregar ítem</strong>.</p>
+          </div>
+        </div>
+      </div>
 
-  <!-- Generate bar -->
-  <div class="generate-bar">
-    <button class="foc-btn foc-btn--clear" id="btn-clear-form"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Limpiar formulario</button>
-    <button class="foc-btn foc-btn--edit hidden" id="btn-same-provider"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Mismo proveedor</button>
-    <button class="foc-btn foc-btn--edit" id="btn-preview"><svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Vista previa</button>
-    <button class="foc-btn foc-btn--gen btn-generate" id="btn-generate">
-      <svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      Generar PDF — Orden de Compra
-    </button>
+      <!-- STEP 5 — Impuestos y Totales -->
+      <div class="card oc-section">
+        <div class="card-header">
+          <span class="card-title">
+            <span class="oc-step-ic oc-step-ic--green"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><line x1="8" y1="10" x2="8.01" y2="10"/><line x1="12" y1="10" x2="12.01" y2="10"/><line x1="16" y1="10" x2="16.01" y2="10"/><line x1="8" y1="14" x2="8.01" y2="14"/><line x1="12" y1="14" x2="12.01" y2="14"/><line x1="8" y1="18" x2="8.01" y2="18"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+            Impuestos y totales
+          </span>
+          <button class="btn btn-sm btn-secondary" id="btn-add-impuesto">+ Agregar impuesto</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <table class="imp-table" id="impuestos-table">
+            <thead>
+              <tr>
+                <th>Concepto</th>
+                <th class="text-center" style="width:80px;">%</th>
+                <th class="text-right" style="width:155px;" id="th-monto">Monto ($)</th>
+                <th style="width:44px;"></th>
+              </tr>
+            </thead>
+            <tbody id="imp-fixed-body">
+              <tr id="row-subtotal">
+                <td>Subtotal</td>
+                <td></td>
+                <td class="text-right" id="val-subtotal">0,00</td>
+                <td></td>
+              </tr>
+              <tr id="row-descuento">
+                <td>Descuento</td>
+                <td><input type="text" id="pct-descuento" class="imp-pct text-right" placeholder=""></td>
+                <td><input type="text" id="monto-descuento" class="imp-monto num-input text-right" value="0,00"></td>
+                <td></td>
+              </tr>
+              <tr id="row-nogravado">
+                <td>No gravado</td>
+                <td><input type="text" id="pct-nogravado" class="imp-pct text-right" placeholder=""></td>
+                <td><input type="text" id="monto-nogravado" class="imp-monto num-input text-right" value="0,00"></td>
+                <td></td>
+              </tr>
+              <tr id="row-gravado">
+                <td><strong>Gravado</strong></td>
+                <td></td>
+                <td class="text-right" id="val-gravado">0,00</td>
+                <td></td>
+              </tr>
+            </tbody>
+            <tbody id="impuestos-tbody"></tbody>
+            <tfoot>
+              <tr id="imp-total-row">
+                <td colspan="2"><strong>TOTAL</strong></td>
+                <td class="text-right" id="imp-total-value">0,00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Al costado (escritorio): total, lo que falta para generar y los botones.
+         En el teléfono el hero va arriba y los botones al final, como siempre. -->
+    <aside class="oc-side">
+      <!-- Hero de la OC: número, fecha y total en vivo (mismo idioma que el hero de reportes) -->
+      <div class="oc-banner oc-hero">
+        <div class="oc-hero-top">
+          <div class="oc-number-display">
+            <span class="oc-number-label">Próxima OC</span>
+            <span class="oc-number-value" id="oc-number-display">—</span>
+            <input type="text" id="oc-number-input" class="oc-number-input hidden" placeholder="0001-00000001">
+            <button class="btn btn-icon btn-xs" id="btn-edit-oc-number" title="Editar número de OC"><svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="btn btn-icon btn-xs hidden" id="btn-clear-oc-number" title="Volver a numeración automática"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="oc-banner-actions">
+            <span id="date-display" class="oc-hero-date"></span>
+          </div>
+        </div>
+        <div class="oc-hero-lbl">Total de la orden</div>
+        <div class="oc-hero-val" id="oc-hero-total">$ 0,00</div>
+        <div class="oc-hero-sub" id="oc-hero-sub">Sin ítems todavía</div>
+      </div>
+
+      <div class="card oc-check">
+        <div class="oc-check-t">Para generar</div>
+        <div class="oc-check-list" id="oc-check-list"></div>
+        <!-- Generate bar -->
+        <div class="generate-bar">
+          <button class="foc-btn foc-btn--clear" id="btn-clear-form"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Limpiar formulario</button>
+          <button class="foc-btn foc-btn--edit hidden" id="btn-same-provider"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Mismo proveedor</button>
+          <button class="foc-btn foc-btn--edit" id="btn-preview"><svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Vista previa</button>
+          <button class="foc-btn foc-btn--gen btn-generate" id="btn-generate">
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Generar PDF — Orden de Compra
+          </button>
+        </div>
+      </div>
+    </aside>
   </div>
 
 </main>
