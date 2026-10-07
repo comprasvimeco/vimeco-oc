@@ -9,34 +9,45 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .aut-card-top { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
-    .aut-nro { font-weight:700; color:var(--gray-800); }
-    .aut-fecha { color:var(--gray-500); font-size:.82rem; }
-    .aut-prov { font-weight:600; margin-top:.15rem; }
-    .aut-obra { color:var(--gray-600); font-size:.9rem; }
-    .aut-meta { color:var(--gray-500); font-size:.82rem; margin-top:.25rem; }
-    .aut-total { font-weight:700; color:var(--gray-800); }
-    .aut-actions { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.75rem; }
-    .aut-bottom { display:flex; justify-content:space-between; align-items:center; margin-top:.5rem; }
-    /* Tabs: Para firmar / Mis pedidos / Autorizadas */
-    .aut-tabs { display:flex; gap:.5rem; margin-bottom:.9rem; }
-    .aut-tab { flex:1; padding:.6rem .4rem; font-size:.86rem; font-weight:600;
-      border:1px solid var(--gray-300); border-radius:var(--radius); background:var(--white);
-      color:var(--gray-600); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; }
-    .aut-tab.active { background:var(--primary); border-color:var(--primary); color:#fff; }
-    .aut-tab-n { min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:#d64545;
-      color:#fff; font-size:.7rem; font-weight:700; line-height:18px; text-align:center; }
-    .aut-tab.active .aut-tab-n { background:rgba(255,255,255,.32); }
-    /* Chip de estado del pedido */
-    .aut-estado { display:inline-block; padding:.1rem .55rem; border-radius:999px; font-size:.72rem; font-weight:700; }
-    .aut-estado-espera { background:#fff4e0; color:#9a6a00; }
-    .aut-estado-aprob  { background:#e3f5e8; color:#1e7d3a; }
-    .aut-estado-rech   { background:#fde6e6; color:#b02a2a; }
-    .aut-estado-canc   { background:#eceef1; color:#5b6573; }
+    /* ---- Cabecera: título + pastilla "N para firmar" (como Novedades) ---- */
+    .aut-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .9rem; }
+    .aut-head h1 { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; white-space: nowrap; }
+    .aut-pend { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 999px;
+      background: #fde6e6; color: #b02a2a; font-size: .76rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .aut-pend::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+    /* ---- Pestañas: barra de pastillas, la elegida en el violeta de Autorizaciones ---- */
+    .aut-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem; background: var(--white); border-radius: 999px;
+      padding: .25rem; margin-bottom: .9rem; box-shadow: 0 1px 2px rgba(26,58,92,.08); }
+    .aut-tab { border: none; background: transparent; border-radius: 999px; padding: .5rem .3rem; font-size: .84rem; font-weight: 700;
+      color: var(--gray-600); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; white-space: nowrap; }
+    .aut-tab.active { background: #f1e8fb; color: #6b3fa0; }
+    .aut-tab-n { background: #fde6e6; color: #b02a2a; font-size: .7rem; padding: 0 .42rem; border-radius: 999px; line-height: 1.55; font-variant-numeric: tabular-nums; }
+    @media (max-width: 400px) { .aut-tab { font-size: .78rem; } }
+    /* ---- Tarjeta ---- */
+    .aut-card-top { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+    .aut-nro { font-size: .78rem; color: var(--gray-500); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .aut-prov { font-weight: 700; color: var(--primary-dark); font-size: .98rem; margin-top: .2rem; }
+    .aut-obra { color: var(--gray-500); font-size: .84rem; }
+    .aut-bottom { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; margin-top: .5rem; }
+    .aut-total { font-weight: 800; color: var(--gray-700); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    .aut-meta { color: var(--gray-500); font-size: .8rem; }
+    .aut-card-note { color: var(--gray-500); font-size: .8rem; margin-top: .35rem; }
+    .aut-motivo { color: #b02a2a; background: #fdf3f3; border-radius: 8px; padding: .35rem .55rem; font-size: .82rem; margin-top: .5rem; overflow-wrap: anywhere; }
+    .aut-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .7rem; padding-top: .65rem; border-top: 1px solid var(--gray-200); }
+    .aut-actions .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
+    /* Estado del pedido: pastilla con ícono */
+    .aut-estado { display: inline-flex; align-items: center; gap: .3rem; padding: .14rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+    .aut-estado .icon { width: 12px; height: 12px; }
+    .aut-estado-espera { background: #fbeedd; color: #8a4f0d; }
+    .aut-estado-aprob  { background: #dff3e5; color: #1a7f3c; }
+    .aut-estado-rech   { background: #fde6e6; color: #b02a2a; }
+    .aut-estado-canc   { background: #eceef1; color: #5b6573; }
+    /* Lista vacía: ícono en pastilla violeta */
+    .aut-empty { text-align: center; color: var(--gray-500); padding: 2.5rem 1rem; font-size: .92rem; }
+    .aut-empty-ic { width: 52px; height: 52px; border-radius: 15px; background: #f1e8fb; color: #6b3fa0; display: grid; place-items: center; margin: 0 auto .7rem; }
+    .aut-empty-ic .icon { width: 24px; height: 24px; }
     /* Pie de la ficha: con cuatro pastillas, en el celular pasa a dos renglones. */
     #modal-preview .foc-foot { flex-wrap: wrap; }
-    .aut-actions .foc-btn { font-size: .78rem; padding: .4rem .8rem; }
-    .aut-motivo { color:var(--gray-600); font-size:.85rem; margin-top:.45rem; font-style:italic; }
   </style>
 </head>
 <body>
@@ -58,37 +69,29 @@
 
 <main class="app-main">
   <div class="hist-page">
-    <div class="aut-tabs">
-      <button class="aut-tab active" id="tab-firmar" data-tab="firmar">Para firmar <span class="aut-tab-n hidden" id="n-firmar"></span></button>
-      <button class="aut-tab" id="tab-pedidos" data-tab="pedidos">Mis pedidos <span class="aut-tab-n hidden" id="n-pedidos"></span></button>
-      <button class="aut-tab" id="tab-resueltas" data-tab="resueltas">Autorizadas</button>
+    <div class="aut-head">
+      <h1>Autorizaciones</h1>
+      <span class="aut-pend hidden" id="aut-pend"></span>
+    </div>
+    <div class="aut-tabs" role="tablist">
+      <button class="aut-tab active" id="tab-firmar" data-tab="firmar" role="tab">Para firmar <span class="aut-tab-n hidden" id="n-firmar"></span></button>
+      <button class="aut-tab" id="tab-pedidos" data-tab="pedidos" role="tab">Mis pedidos <span class="aut-tab-n hidden" id="n-pedidos"></span></button>
+      <button class="aut-tab" id="tab-resueltas" data-tab="resueltas" role="tab">Autorizadas</button>
     </div>
 
     <div id="pane-firmar">
-      <div class="hist-toolbar">
-        <span class="card-title">OC pendientes de tu autorización</span>
-        <span class="hist-count" id="aut-count"></span>
-      </div>
       <div id="aut-list" class="hist-list">
         <div class="hist-loading">Cargando…</div>
       </div>
     </div>
 
     <div id="pane-pedidos" class="hidden">
-      <div class="hist-toolbar">
-        <span class="card-title">Estado de tus pedidos de autorización</span>
-        <span class="hist-count" id="ped-count"></span>
-      </div>
       <div id="ped-list" class="hist-list">
         <div class="hist-loading">Cargando…</div>
       </div>
     </div>
 
     <div id="pane-resueltas" class="hidden">
-      <div class="hist-toolbar">
-        <span class="card-title">OC que resolviste</span>
-        <span class="hist-count" id="res-count"></span>
-      </div>
       <div id="res-list" class="hist-list">
         <div class="hist-loading">Cargando…</div>
       </div>

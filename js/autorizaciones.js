@@ -32,11 +32,16 @@ function fmtMoney(n) {
 function render() {
   const list = $('aut-list');
   if (typeof ponerBadge === 'function') ponerBadge(pendientes.length);
-  $('aut-count').textContent = pendientes.length
-    ? `${pendientes.length} pendiente${pendientes.length !== 1 ? 's' : ''}` : '';
+  // Pastilla del título y contador de la pestaña: se actualizan acá porque
+  // firmar o rechazar vuelve a llamar a render() sin pasar por setTabCounts.
+  const n = pendientes.length;
+  $('aut-pend').textContent = `${n} para firmar`;
+  $('aut-pend').classList.toggle('hidden', !n);
+  $('n-firmar').textContent = n;
+  $('n-firmar').classList.toggle('hidden', !n);
 
-  if (!pendientes.length) {
-    list.innerHTML = '<div class="hist-empty">No tenés OC pendientes de autorización.</div>';
+  if (!n) {
+    list.innerHTML = vacioHtml('No tenés OC para firmar.');
     return;
   }
 
@@ -48,14 +53,13 @@ function render() {
     const total = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
     card.innerHTML = `
       <div class="aut-card-top">
-        <span class="aut-nro">${esc(oc.nroOC)}</span>
-        <span class="aut-fecha">${esc(oc.fecha || '')}</span>
+        <span class="aut-nro">${esc(oc.nroOC)}${oc.fecha ? ' · ' + esc(oc.fecha) : ''}</span>
       </div>
       <div class="aut-prov">${esc(oc.proveedor?.nombre || '—')}</div>
       <div class="aut-obra">${esc(oc.obra || '—')}</div>
       <div class="aut-bottom">
         <span class="aut-total">${total}</span>
-        <span class="aut-meta">Pide: ${esc(solicitante)}</span>
+        <span class="aut-meta">Pide ${esc(solicitante)}</span>
       </div>
       <div class="aut-actions">
         <button class="foc-btn foc-btn--gen btn-revisar">${icSvg('edit')}Revisar y firmar</button>
@@ -83,11 +87,22 @@ function bindPdf(card, oc) {
 const SEEN_KEY = () => 'vimeco_solicitudes_vistas_' + myCode;
 
 function estadoPedido(oc) {
-  if (oc.estado === 'autorizada') return ['aprob',  'Aprobada'];
-  if (oc.estado === 'rechazada')  return ['rech',   'Rechazada'];
-  if (oc.estado === 'cancelada')  return ['canc',   'Cancelada'];
-  return ['espera', 'En espera'];
+  if (oc.estado === 'autorizada') return ['aprob',  'Aprobada',  'checkSm'];
+  if (oc.estado === 'rechazada')  return ['rech',   'Rechazada', 'x'];
+  if (oc.estado === 'cancelada')  return ['canc',   'Cancelada', 'slash'];
+  return ['espera', 'En espera', 'clock'];
 }
+
+function estadoHtml(oc) {
+  const [cls, txt, icono] = estadoPedido(oc);
+  return `<span class="aut-estado aut-estado-${cls}">${icSvg(icono)}${txt}</span>`;
+}
+
+function vacioHtml(msg) {
+  return `<div class="aut-empty"><div class="aut-empty-ic">${icSvg('inbox')}</div>${esc(msg)}</div>`;
+}
+
+const BTN_VER = `<button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Ver OC</button>`;
 
 // Resueltas (aprobada/rechazada) que todavía no vi — alimenta el globito.
 function pedidosSinVer() {
@@ -111,17 +126,13 @@ function marcarPedidosVistos() {
 
 function renderPedidos() {
   const list = $('ped-list');
-  $('ped-count').textContent = misPedidos.length
-    ? `${misPedidos.length} pedido${misPedidos.length !== 1 ? 's' : ''}` : '';
-
   if (!misPedidos.length) {
-    list.innerHTML = '<div class="hist-empty">No mandaste ninguna OC a autorizar.</div>';
+    list.innerHTML = vacioHtml('No mandaste ninguna OC a autorizar.');
     return;
   }
 
   list.innerHTML = '';
   misPedidos.forEach(oc => {
-    const [cls, txt] = estadoPedido(oc);
     const a     = oc.autorizacion || {};
     const total = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
     const quien = a.solicitadoA?.nombre || '—';
@@ -129,28 +140,28 @@ function renderPedidos() {
     if (oc.estado === 'rechazada' && a.motivoRechazo) {
       extra = `<div class="aut-motivo">Motivo: ${esc(a.motivoRechazo)}</div>`;
     } else if (oc.estado === 'autorizada' && a.firmante) {
-      extra = `<div class="aut-meta">Firmó: ${esc(a.firmante)}</div>`;
+      extra = `<div class="aut-card-note">Firmó ${esc(a.firmante)}</div>`;
     } else if (oc.estado === 'cancelada' && a.canceladoEn) {
-      extra = `<div class="aut-meta">Cancelaste el pedido el ${esc(new Date(a.canceladoEn).toLocaleDateString('es-AR'))}</div>`;
+      extra = `<div class="aut-card-note">Cancelaste el pedido el ${esc(new Date(a.canceladoEn).toLocaleDateString('es-AR'))}</div>`;
     }
     const acciones = `<div class="aut-actions">
-           <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista</button>
+           ${BTN_VER}
            ${btnPdfHtml(oc)}
            ${oc.estado === 'rechazada' ? `<button class="foc-btn foc-btn--gen btn-rehacer" title="Cargar en el formulario para corregirla">${icSvg('undo')}Rehacer</button>` : ''}
-           ${oc.estado === 'pendiente' ? '<button class="foc-btn foc-btn--clear btn-cancelar-pedido">Cancelar pedido</button>' : ''}
+           ${oc.estado === 'pendiente' ? `<button class="foc-btn foc-btn--clear btn-cancelar-pedido">${icSvg('x')}Cancelar pedido</button>` : ''}
          </div>`;
     const card = document.createElement('div');
     card.className = 'hist-card';
     card.innerHTML = `
       <div class="aut-card-top">
-        <span class="aut-nro">${esc(oc.nroOC)}</span>
-        <span class="aut-estado aut-estado-${cls}">${txt}</span>
+        <span class="aut-nro">${esc(oc.nroOC)}${oc.fecha ? ' · ' + esc(oc.fecha) : ''}</span>
+        ${estadoHtml(oc)}
       </div>
       <div class="aut-prov">${esc(oc.proveedor?.nombre || '—')}</div>
       <div class="aut-obra">${esc(oc.obra || '—')}</div>
       <div class="aut-bottom">
         <span class="aut-total">${total}</span>
-        <span class="aut-meta">A: ${esc(quien)}</span>
+        <span class="aut-meta">A ${esc(quien)}</span>
       </div>
       ${extra}
       ${acciones}`;
@@ -222,18 +233,13 @@ async function siguePendiente(oc) {
 // ---- "Autorizadas": OC que YA resolví (firmé o rechacé) ----
 function renderResueltas() {
   const list = $('res-list');
-  const firmadas = resueltas.filter(oc => oc.estado === 'autorizada').length;
-  $('res-count').textContent = firmadas
-    ? `${firmadas} autorizada${firmadas !== 1 ? 's' : ''}` : '';
-
   if (!resueltas.length) {
-    list.innerHTML = '<div class="hist-empty">Todavía no autorizaste ninguna OC.</div>';
+    list.innerHTML = vacioHtml('Todavía no autorizaste ninguna OC.');
     return;
   }
 
   list.innerHTML = '';
   resueltas.forEach(oc => {
-    const [cls, txt] = estadoPedido(oc);
     const a       = oc.autorizacion || {};
     const total   = oc.total != null ? `$ ${fmtMoney(oc.total)}` : '—';
     const quien   = a.solicitadoPor?.nombre || oc.responsable?.nombre || '—';
@@ -246,18 +252,18 @@ function renderResueltas() {
     card.className = 'hist-card';
     card.innerHTML = `
       <div class="aut-card-top">
-        <span class="aut-nro">${esc(oc.nroOC)}</span>
-        <span class="aut-estado aut-estado-${cls}">${txt}</span>
+        <span class="aut-nro">${esc(oc.nroOC)}${oc.fecha ? ' · ' + esc(oc.fecha) : ''}</span>
+        ${estadoHtml(oc)}
       </div>
       <div class="aut-prov">${esc(oc.proveedor?.nombre || '—')}</div>
       <div class="aut-obra">${esc(oc.obra || '—')}</div>
       <div class="aut-bottom">
         <span class="aut-total">${total}</span>
-        <span class="aut-meta">Pidió: ${esc(quien)}${cuando ? ' · ' + esc(cuando) : ''}</span>
+        <span class="aut-meta">Pidió ${esc(quien)}${cuando ? ' · ' + esc(cuando) : ''}</span>
       </div>
       ${extra}
       <div class="aut-actions">
-        <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Vista</button>
+        ${BTN_VER}
         ${btnPdfHtml(oc)}
       </div>`;
     card.querySelector('.btn-ver').addEventListener('click', () => abrirPreview(oc, true));
@@ -281,9 +287,7 @@ function showTab(tab) {
 }
 
 function setTabCounts(sinVer) {
-  const nf = $('n-firmar'), np = $('n-pedidos');
-  if (pendientes.length) { nf.textContent = pendientes.length; nf.classList.remove('hidden'); }
-  else nf.classList.add('hidden');
+  const np = $('n-pedidos');
   if (sinVer) { np.textContent = sinVer; np.classList.remove('hidden'); }
   else np.classList.add('hidden');
 }
@@ -607,7 +611,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       (typeof getAutorizacionesResueltas === 'function' ? getAutorizacionesResueltas(myCode) : Promise.resolve([])).catch(() => [])
     ]);
   } catch (e) {
-    $('aut-list').innerHTML = '<div class="hist-empty">No se pudieron cargar las autorizaciones. Revisá tu conexión.</div>';
+    $('aut-list').innerHTML = vacioHtml('No se pudieron cargar las autorizaciones. Revisá tu conexión.');
     console.error('getAutorizacionesPendientes:', e);
     return;
   }
