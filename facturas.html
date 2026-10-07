@@ -11,6 +11,120 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    .fac-page { max-width: 860px; margin: 0 auto; padding: 1rem; }
+
+    /* ---- Cabecera: título + OC sin factura, como Historial ---- */
+    .fac-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .9rem; flex-wrap: wrap; }
+    .fac-head h1 { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; white-space: nowrap; }
+    .fac-pend { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 999px;
+      background: #fde6e6; color: #b02a2a; font-size: .76rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .fac-pend::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+
+    /* ---- Bandeja: subir la factura y que la IA busque la OC ---- */
+    .fac-drop { border: 2px dashed #d9c6f0; background: #fbf8fe; border-radius: 16px; padding: .9rem; margin-bottom: .9rem; transition: background .15s, border-color .15s; }
+    .fac-drop.drag-over { background: #f1e8fb; border-color: #b38be0; }
+    .fac-drop-main { display: flex; gap: .75rem; align-items: center; }
+    .fac-sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; background: #f1e8fb; color: #6b3fa0; }
+    .fac-sq .icon { width: 18px; height: 18px; }
+    .fac-drop-t { font-weight: 700; color: var(--primary-dark); font-size: .92rem; line-height: 1.3; }
+    .fac-drop-s { font-size: .78rem; color: var(--gray-500); line-height: 1.35; }
+    .fac-drop-btns { margin-left: auto; display: flex; gap: .4rem; }
+    .fac-file { display: flex; align-items: center; gap: .6rem; }
+    .fac-file-n { min-width: 0; flex: 1; }
+    .fac-file-n b { display: block; color: var(--primary-dark); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fac-file-n span { font-size: .74rem; color: var(--gray-500); }
+    .fac-file-acts { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .75rem; }
+    .fac-drop .scan-preview img { max-height: 180px; }
+    .fac-corto { display: none; }
+
+    /* Botones violeta (el tono de Facturas en el menú) */
+    .foc-btn--vios { background: #6b3fa0; color: #fff; }
+    .fac-ib { width: 34px; height: 34px; padding: 0; justify-content: center; flex: none; }
+    .fac-ib.foc-btn--clear { background: var(--gray-100); color: var(--gray-600); }
+    .fac-ib .icon { width: 16px; height: 16px; }
+
+    /* ---- Filtros ---- */
+    .fac-search { width: 100%; border-radius: 12px; margin-bottom: .6rem; }
+    .fac-kind { display: flex; align-items: center; gap: .55rem; margin-bottom: .6rem; }
+    .fac-tabs { display: flex; gap: .35rem; margin-bottom: .8rem; flex-wrap: wrap; }
+    .fac-tab { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600);
+      border-radius: 999px; padding: .34rem .8rem; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; }
+    .fac-tab b { font-size: .7rem; padding: 0 .4rem; border-radius: 999px; background: var(--gray-100); color: var(--gray-500); font-variant-numeric: tabular-nums; }
+    .fac-tab b:empty { display: none; }
+    .fac-tab[data-filtro="sin"] b { background: #fde6e6; color: #b02a2a; }
+    .fac-tab.active { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+    .fac-tab.active b { background: rgba(255,255,255,.17); color: #fff; }
+
+    /* ---- Lista compacta: un renglón por OC ---- */
+    .fac-panel { background: var(--white); border-radius: 14px; box-shadow: var(--shadow-sm); overflow: hidden; }
+    .fac-row { display: grid; grid-template-columns: 34px minmax(0, 1.3fr) minmax(0, 1fr) 130px 200px; gap: .65rem; align-items: center;
+      padding: .7rem .75rem; border-bottom: 1px solid var(--gray-200); }
+    .fac-row[data-modo="archivo"] { grid-template-columns: 34px minmax(0, 1.3fr) minmax(0, 1fr) 130px 250px; }
+    .fac-row:last-child { border-bottom: none; }
+    .fac-row--ok { background: #f3fbf5; }
+    .fac-row .fac-sq { width: 34px; height: 34px; border-radius: 10px; border: none; padding: 0; }
+    .fac-row .fac-sq .icon { width: 16px; height: 16px; }
+    button.fac-sq { cursor: pointer; }
+    .fac-sq--sin { background: #fde6e6; color: #b02a2a; }
+    .fac-sq--otros { background: #eceef1; color: #5b6573; }
+    .fac-prov { font-weight: 700; color: var(--primary-dark); font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fac-sub { font-size: .76rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+    .fac-sub-tot { display: none; font-weight: 800; color: var(--gray-700); }
+    .fac-mid { font-size: .8rem; color: var(--gray-600); min-width: 0; }
+    .fac-mid div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fac-mid .fac-por { color: var(--gray-500); font-size: .74rem; }
+    .fac-tot { font-weight: 800; font-size: .88rem; color: var(--gray-700); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .fac-tot small { display: block; font-weight: 600; font-size: .7rem; color: var(--gray-500); }
+    .fac-acts { display: flex; align-items: center; justify-content: flex-end; gap: .35rem; }
+    .fac-row .hist-doc-list { grid-column: 1 / -1; margin: 0; }
+    .fac-row .fac-hits { grid-column: 2 / -1; margin-top: -.35rem; }
+    .fac-sub-obra { display: none; }
+    .fac-est { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .58rem; border-radius: 999px; border: none; font: inherit;
+      font-size: .72rem; font-weight: 700; white-space: nowrap; }
+    .fac-est .icon { width: 12px; height: 12px; }
+    .fac-est--sin { background: #fde6e6; color: #b02a2a; }
+    .fac-est--otros { background: #eceef1; color: #5b6573; }
+    button.fac-est { background: #f1e8fb; color: #6b3fa0; cursor: pointer; }
+    .fac-subiendo { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 700; color: #6b3fa0; white-space: nowrap; }
+    .fac-subiendo .spinner { width: 14px; height: 14px; border-width: 2px; border-color: #d9c6f0; border-top-color: #6b3fa0; }
+    .fac-ok { display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .7rem; border-radius: 999px; background: #dff3e5; color: #1a7f3c;
+      font-size: .78rem; font-weight: 700; white-space: nowrap; }
+    .fac-ok .icon { width: 13px; height: 13px; }
+    .fac-score { font-size: .7rem; color: #6b3fa0; letter-spacing: .08em; }
+    .fac-vacio { padding: 1.2rem; text-align: center; color: var(--gray-500); font-size: .88rem; }
+    .fac-list .pager-more { margin-top: .6rem; width: 100%; }
+
+    /* ---- Resultado de la IA ---- */
+    .fac-res { margin-bottom: .9rem; }
+    .fac-res-h { display: flex; align-items: center; gap: .6rem; margin-bottom: .7rem; }
+    .fac-res-h .fac-drop-t { flex: 1; }
+    .fac-tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .7rem; }
+    .fac-tag { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .65rem; border-radius: 999px; background: #f1e8fb; color: #6b3fa0;
+      font-size: .78rem; font-weight: 700; }
+    .fac-tag .icon { width: 13px; height: 13px; }
+    .fac-res-l { font-size: .74rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 .45rem .1rem; }
+    .fac-res-foot { text-align: center; margin-top: .7rem; }
+    .fac-res .fac-search { margin-top: .2rem; }
+
+    @media (max-width: 700px) {
+      .fac-head h1 { font-size: 1.2rem; }
+      .fac-largo { display: none; }
+      .fac-corto { display: inline; }
+      .fac-drop-main { flex-wrap: wrap; }
+      .fac-drop-btns { margin-left: 0; width: 100%; }
+      .fac-drop-btns .foc-btn { flex: 1; justify-content: center; padding: .6rem; }
+      .fac-row, .fac-row[data-modo="archivo"] { grid-template-columns: 34px minmax(0, 1fr) auto; }
+      .fac-mid, .fac-tot, .fac-acts .fac-est { display: none; }
+      .fac-sub-tot { display: inline; }
+      .fac-file-acts .foc-btn { flex: 1 1 auto; justify-content: center; }
+      .fac-tab { padding: .3rem .6rem; font-size: .76rem; gap: .3rem; }
+      .fac-tabs { flex-wrap: nowrap; gap: .3rem; }
+      .btn-adj-attach { width: 34px; height: 34px; padding: 0; justify-content: center; }
+      .fac-sub-f { display: none; }
+      .fac-sub-obra { display: block; }
+    }
+  </style>
 </head>
 <body>
 
@@ -30,95 +144,93 @@
 </header>
 
 <main class="app-main">
-  <div class="adj-page">
+  <div class="fac-page">
 
-    <!-- Selección de archivo (flujo IA, secundario, oculto) -->
-    <div class="card hidden" id="card-file">
-      <div class="card-header">
-        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Buscar la OC con IA</span>
-        <button class="btn btn-sm btn-secondary" id="btn-close-ai"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cerrar</button>
+    <div class="fac-head">
+      <h1>Facturas</h1>
+      <span class="fac-pend hidden" id="fac-pend"></span>
+    </div>
+
+    <!-- Bandeja: con la factura en la mano y sin saber la OC, la IA la busca -->
+    <div class="fac-drop" id="import-zone">
+      <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
+      <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
+
+      <div class="fac-drop-main" id="fac-drop-main">
+        <span class="fac-sq"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+        <div>
+          <div class="fac-drop-t"><span class="fac-largo">Arrastrá la factura acá y buscamos la OC</span><span class="fac-corto">Subí la factura, buscamos la OC</span></div>
+          <div class="fac-drop-s">La IA la compara por proveedor y total con tus OC.</div>
+        </div>
+        <div class="fac-drop-btns">
+          <button type="button" class="foc-btn foc-btn--vios hidden" id="btn-camera"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Foto</button>
+          <button type="button" class="foc-btn foc-btn--vio" id="btn-select-file"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Elegir archivo</button>
+        </div>
       </div>
-      <div class="card-body">
-        <div id="import-zone">
-          <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none">
-          <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none">
-          <div class="import-buttons">
-            <button class="btn import-btn" id="btn-select-file">
-              <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
-              <span class="import-btn-label">Seleccionar archivo</span>
-            </button>
-            <button class="btn import-btn hidden" id="btn-camera">
-              <span class="import-btn-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
-              <span class="import-btn-label">Cámara</span>
-            </button>
-          </div>
-        </div>
 
-        <div id="file-info" class="hidden" style="margin-top:.75rem;">
-          <div class="extract-status success" id="file-ready-msg"></div>
+      <!-- Archivo elegido: se puede escanear (si es foto) y después buscar la OC -->
+      <div id="file-info" class="hidden">
+        <div class="fac-file">
+          <span class="fac-sq"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+          <div class="fac-file-n"><b id="file-name"></b><span id="file-size"></span></div>
+          <button type="button" class="foc-btn foc-btn--clear" id="btn-change-file">Cambiar</button>
         </div>
-
-        <!-- Preview de la imagen (escaneada o no): permite pasarla por el escáner -->
         <div id="file-preview" class="scan-preview hidden">
           <img id="file-preview-img" alt="Comprobante">
           <div class="scan-preview-actions">
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-file-rescan">
+            <button type="button" class="foc-btn foc-btn--clear" id="btn-file-rescan">
               <svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
               Escanear
             </button>
           </div>
         </div>
-
-        <div id="step1-actions" class="adj-step-actions hidden">
-          <div class="adj-step-btns">
-            <button class="btn btn-primary u-flex-1" id="btn-use-ai"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Buscar con IA</button>
-            <button class="btn btn-outline u-flex-1" id="btn-use-manual">Asignar manualmente</button>
-          </div>
-          <button class="btn btn-secondary btn-sm" id="btn-change-file" style="align-self:flex-end;">Cambiar archivo</button>
+        <div class="fac-file-acts">
+          <button type="button" class="foc-btn foc-btn--vios" id="btn-use-ai"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M18 13l.7 1.9L21 16l-2.3.9L18 19l-.9-2.1L15 16l2.1-.7L18 13z"/></svg>Buscar la OC con IA</button>
+          <button type="button" class="foc-btn foc-btn--vio" id="btn-use-manual">Elegir la OC a mano</button>
         </div>
       </div>
     </div>
 
-    <!-- Paso 2: análisis y resultados -->
-    <div class="card hidden" id="card-result">
-      <div class="card-header">
-        <span class="card-title" id="result-title">Resultados</span>
-        <button class="btn btn-sm btn-outline" id="btn-restart"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> Otro archivo</button>
+    <!-- Resultado de la búsqueda con IA (o la lista para elegir a mano) -->
+    <div class="fac-drop fac-res hidden" id="card-result">
+      <div class="fac-res-h">
+        <span class="fac-sq"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M18 13l.7 1.9L21 16l-2.3.9L18 19l-.9-2.1L15 16l2.1-.7L18 13z"/></svg></span>
+        <div class="fac-drop-t" id="result-title">Resultados</div>
+        <button type="button" class="foc-btn foc-btn--clear" id="btn-restart">Cambiar archivo</button>
       </div>
-      <div class="card-body" id="result-body"></div>
+      <div id="result-body"></div>
     </div>
 
-    <!-- Estado: éxito -->
-    <div class="card hidden" id="card-success">
-      <div class="card-body" style="text-align:center; padding:2rem 1rem;">
-        <div class="adj-success-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-        <p style="font-size:1rem; font-weight:600; color:var(--success); margin-bottom:.35rem;">Archivo subido correctamente</p>
-        <p id="success-detail" style="font-size:.85rem; color:var(--gray-500); margin-bottom:1.25rem;"></p>
-        <button class="btn btn-primary" id="btn-another">Subir otro archivo</button>
+    <!-- Éxito de la carga desde la bandeja -->
+    <div class="fac-drop hidden" id="card-success" style="border-style:solid;border-color:#b9e2c6;background:#f3fbf5;">
+      <div class="fac-drop-main">
+        <span class="fac-sq" style="background:#dff3e5;color:#1a7f3c;"><svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+        <div style="min-width:0;flex:1;">
+          <div class="fac-drop-t" style="color:#1a7f3c;">Archivo cargado</div>
+          <div class="fac-drop-s" id="success-detail"></div>
+        </div>
+        <div class="fac-drop-btns"><button type="button" class="foc-btn foc-btn--vio" id="btn-another">Subir otro</button></div>
       </div>
     </div>
 
-    <!-- Vista principal: lista de OC a las que cargarle un archivo -->
-    <div class="card" id="card-list">
-      <div class="card-header">
-        <span class="card-title"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Cargar a una OC</span>
-        <button class="btn btn-sm btn-outline" id="btn-toggle-ai"><svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Buscar con IA</button>
-      </div>
-      <div class="card-body">
-        <!-- Qué se está cargando: define el prefijo del archivo en Drive -->
-        <div class="cat-seg" id="adj-tipo" style="margin-bottom:.85rem;">
-          <button type="button" class="cat-seg-btn active" data-tipo="factura">Factura</button>
-          <button type="button" class="cat-seg-btn" data-tipo="otro">Otro archivo</button>
+    <!-- Lista de OC a las que cargarles un archivo -->
+    <div id="card-list">
+      <input type="search" id="adj-search-main" class="hist-search fac-search" placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…">
+      <!-- Qué se está cargando: define el prefijo del archivo en Drive (vale también para la bandeja) -->
+      <div class="fac-kind">
+        <span class="oc-seg-l">Vas a cargar</span>
+        <div class="oc-seg" id="adj-tipo" role="group" aria-label="Qué vas a cargar">
+          <button type="button" data-tipo="factura" aria-pressed="true">Factura</button>
+          <button type="button" data-tipo="otro" aria-pressed="false">Otro archivo</button>
         </div>
-        <!-- Arranca en "Sin factura": lo primero que se ve es lo que falta cargar -->
-        <div class="rem-tabs" id="adj-filtro">
-          <button type="button" class="rem-tab active" data-filtro="sin">Sin factura</button>
-          <button type="button" class="rem-tab" data-filtro="con">Con factura</button>
-          <button type="button" class="rem-tab" data-filtro="todas">Todas</button>
-        </div>
-        <input type="search" id="adj-search-main" class="form-control" placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…" style="margin-bottom:.85rem;">
-        <div id="adj-oc-list-main"><div class="hist-empty">Cargando OC…</div></div>
       </div>
+      <!-- Arranca en "Sin factura": lo primero que se ve es lo que falta cargar -->
+      <div class="fac-tabs" id="adj-filtro">
+        <button type="button" class="fac-tab active" data-filtro="sin">Sin factura <b></b></button>
+        <button type="button" class="fac-tab" data-filtro="con">Con factura <b></b></button>
+        <button type="button" class="fac-tab" data-filtro="todas">Todas <b></b></button>
+      </div>
+      <div class="fac-list" id="adj-oc-list-main"><div class="fac-panel"><div class="fac-vacio">Cargando OC…</div></div></div>
     </div>
 
   </div>
@@ -171,6 +283,7 @@
 <script src="js/gemini.js"></script>
 <script src="js/scanner.js"></script>
 <script src="js/buscarOC.js"></script>
+<script src="js/fichaRemito.js"></script>
 <script src="js/facturas.js"></script>
 </body>
 </html>

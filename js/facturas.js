@@ -9,6 +9,11 @@ let rawFile     = null;   // imagen original (sin escanear), para volver a pasar
 let filePrevUrl = null;   // objectURL del preview actual
 let filtroOC    = 'sin';  // 'sin' | 'con' | 'todas' — arranca en lo que falta cargar
 
+// Momento de cada OC mientras se le carga algo: 'subiendo' | 'ok' (recién cargada).
+// Vive aparte de la OC para que el renglón se repinte igual en la lista y en el
+// resultado de la IA.
+const cargaOC = new Map();
+
 const ES_MOBILE = 'ontouchstart' in window || window.innerWidth <= 768;
 
 // En la carpeta de una compra conviven la OC, el presupuesto, la factura y los
@@ -26,6 +31,8 @@ const $ = id => document.getElementById(id);
 function fmtMoney(n) {
   return (parseFloat(n) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
+const moneyOC = oc => oc.total != null ? (oc.moneda === 'USD' ? 'US$ ' : '$ ') + fmtMoney(oc.total) : '—';
 
 function esc(str) {
   return String(str || '')
@@ -47,6 +54,10 @@ function estadoFactura(oc) {
   return estadoFacturaOC(oc);
 }
 
+// 'otros' cae del lado de "sin": que haya un archivo viejo sin rotular no
+// prueba que la factura esté cargada.
+const tieneFactura = oc => estadoFactura(oc).estado === 'con';
+
 // dd/mm a mano: toLocaleDateString('es-AR') con 2-digit igual devuelve "10/8".
 function fmtFechaCorta(ts) {
   if (!ts) return '';
@@ -54,15 +65,29 @@ function fmtFechaCorta(ts) {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function badgeFactura(f) {
+// Pastilla del estado. Con factura es un botón que la abre (una sola) o
+// despliega la lista (varias), igual que en el Historial.
+function estadoHtml(oc) {
+  const f = estadoFactura(oc);
   if (f.estado === 'con') {
-    const tip = f.por ? `Factura cargada por ${f.por}` : 'Factura cargada';
-    return `<span class="adj-badge adj-badge--con" title="${esc(tip)}">${icSvg('checkSm')} Factura ${fmtFechaCorta(f.ts)}</span>`;
+    const n   = facturasDeOC(oc).length;
+    const tip = (n > 1 ? 'Ver las facturas' : 'Abrir la factura') + (f.por ? ` · cargada por ${f.por}` : '');
+    return `<button type="button" class="fac-est" data-doc="fact" aria-expanded="false" title="${esc(tip)}">${icSvg('file')}${
+      n > 1 ? `Facturas · ${n}` : `Factura ${fmtFechaCorta(f.ts)}`}</button>`;
   }
   if (f.estado === 'otros') {
-    return `<span class="adj-badge adj-badge--otros" title="Archivos cargados antes de que la pantalla distinguiera la factura de otro archivo">${f.n} archivo${f.n > 1 ? 's' : ''}</span>`;
+    return `<span class="fac-est fac-est--otros" title="Archivos cargados antes de que la pantalla distinguiera la factura de otro archivo">${f.n} archivo${f.n > 1 ? 's' : ''}</span>`;
   }
-  return '<span class="adj-badge adj-badge--sin">Sin factura</span>';
+  return '<span class="fac-est fac-est--sin">Sin factura</span>';
+}
+
+// Cuadradito del renglón: en el teléfono es lo único que muestra el estado, y
+// con factura también la abre.
+function cuadroHtml(oc) {
+  const e = estadoFactura(oc).estado;
+  if (e === 'con') return `<button type="button" class="fac-sq" data-doc="fact" aria-label="Abrir la factura" title="Abrir la factura">${icSvg('file')}</button>`;
+  if (e === 'otros') return `<span class="fac-sq fac-sq--otros" title="Tiene archivos sin rotular">${icSvg('clip')}</span>`;
+  return `<span class="fac-sq fac-sq--sin" title="Sin factura">${icSvg('alert')}</span>`;
 }
 
 // Cargar una factura sobre una OC que ya la tiene suele ser el mismo archivo
@@ -98,24 +123,14 @@ async function registrarAdjunto(oc, file, res) {
   catch (e) { console.warn('registrarAdjunto:', e); }
 }
 
-// Repinta el sello de una tarjeta ya renderizada, sin rearmar la lista entera
-// (rearmarla sacaría la tarjeta de la vista justo cuando el usuario mira si
-// funcionó).
-function refrescarBadge(oc) {
-  const badge = document
-    .querySelector(`[data-nro="${CSS.escape(oc.nroOC)}"]`)
-    ?.closest('.adj-oc-card')?.querySelector('.adj-badge');
-  if (badge) badge.outerHTML = badgeFactura(estadoFactura(oc));
-}
-
 // ---- Archivo ----
 
 function setFile(file) {
   currentFile = file;
-  $('import-zone').classList.add('hidden');
-  $('file-ready-msg').innerHTML = `${icSvg('check')} ${esc(file.name)} &nbsp;(${(file.size / 1024).toFixed(0)} KB)`;
+  $('fac-drop-main').classList.add('hidden');
+  $('file-name').textContent = file.name;
+  $('file-size').textContent = `${(file.size / 1024).toFixed(0)} KB`;
   $('file-info').classList.remove('hidden');
-  $('step1-actions').classList.remove('hidden');
   mostrarPreview(file);
 }
 
@@ -138,11 +153,10 @@ function resetZone() {
   currentFile = null;
   rawFile     = null;
   if (filePrevUrl) { URL.revokeObjectURL(filePrevUrl); filePrevUrl = null; }
-  $('import-zone').classList.remove('hidden');
+  $('fac-drop-main').classList.remove('hidden');
   $('file-info').classList.add('hidden');
   $('file-preview').classList.add('hidden');
   $('file-preview-img').removeAttribute('src');
-  $('step1-actions').classList.add('hidden');
   $('file-input').value     = '';
   $('camera-input').value   = '';
   $('manual-camera').value  = '';
@@ -239,124 +253,96 @@ function getTopMatches(extracted, ocs) {
     .slice(0, 5);
 }
 
-// ---- Render ----
+// ---- Renglón de una OC ----
 
-function renderMatchCards(matches) {
-  return matches.map(({ oc, score }) => {
-    const stars = score >= 7 ? '●●●' : score >= 4 ? '●●○' : '●○○';
-    return `<div class="adj-oc-card">
-      <div class="adj-oc-top">
-        <span class="hist-nro">${esc(oc.nroOC)}</span>
-        <span class="adj-match-score" title="Nivel de coincidencia">${stars}</span>
-        <span class="hist-fecha">${esc(oc.fecha || '')}</span>
-      </div>
-      <div class="hist-proveedor">${esc(oc.proveedor?.nombre || '—')}</div>
-      <div class="hist-obra">${esc(oc.obra || '—')}</div>
-      <div class="adj-oc-bottom">
-        <span class="adj-oc-meta">
-          <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
-          ${badgeFactura(estadoFactura(oc))}
-        </span>
-        <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Cargar acá</button>
-      </div>
-    </div>`;
-  }).join('');
+// `modo`: 'lista' (vista principal: foto + cargar, elige el archivo al tocar) o
+// 'archivo' (ya hay un archivo elegido en la bandeja: "Cargar acá").
+function accionesHtml(oc, modo) {
+  const st  = cargaOC.get(oc.nroOC);
+  const nro = esc(oc.nroOC);
+  if (st === 'subiendo') return '<span class="fac-subiendo"><span class="spinner"></span>Subiendo…</span>';
+  if (st === 'ok')       return `<span class="fac-ok">${icSvg('checkSm')}Cargada</span>`;
+  if (modo === 'archivo') {
+    return `<button type="button" class="foc-btn foc-btn--vios btn-adj-attach" data-nro="${nro}" title="Cargar acá">${icSvg('clip')}<span class="fac-largo">Cargar acá</span></button>`;
+  }
+  const que = tipoCarga === 'factura' ? 'Cargar factura' : 'Cargar archivo';
+  return (ES_MOBILE ? `<button type="button" class="foc-btn foc-btn--clear fac-ib btn-attach-cam" data-nro="${nro}" title="Sacar foto" aria-label="Sacar foto">${icSvg('camera')}</button>` : '') +
+    `<button type="button" class="foc-btn foc-btn--vio fac-ib btn-attach-pick" data-nro="${nro}" title="${que}" aria-label="${que}">${icSvg('clip')}</button>`;
 }
 
-function renderOCListItems(ocs) {
-  if (!ocs.length) return '<div class="hist-empty">No hay OC en el historial.</div>';
-  return ocs.map(oc => `<div class="adj-oc-card">
-    <div class="adj-oc-top">
-      <span class="hist-nro">${esc(oc.nroOC)}</span>
-      <span class="hist-fecha">${esc(oc.fecha || '')}</span>
+function filaHtml(oc, modo, terms = [], score = null) {
+  const hl   = t => resaltarTxt(t, terms, esc);
+  const por  = viewerIsAdmin && oc.responsable?.nombre ? `<div class="fac-por">por ${hl(oc.responsable.nombre)}</div>` : '';
+  const dots = score == null ? '' : `<span class="fac-score" title="Nivel de coincidencia">${score >= 7 ? '●●●' : score >= 4 ? '●●○' : '●○○'}</span>`;
+  const fact = facturasDeOC(oc);
+  return `<div class="fac-row${cargaOC.get(oc.nroOC) === 'ok' ? ' fac-row--ok' : ''}" data-nro="${esc(oc.nroOC)}" data-modo="${modo}"${
+      score == null ? '' : ` data-score="${score}"`}>
+    ${cuadroHtml(oc)}
+    <div style="min-width:0">
+      <div class="fac-prov">${hl(oc.proveedor?.nombre || '—')}</div>
+      <div class="fac-sub">${hl(oc.nroOC)} · <span class="fac-sub-f">${esc(oc.fecha || '')}</span><span class="fac-sub-tot">${moneyOC(oc)}</span></div>
+      <div class="fac-sub fac-sub-obra">${hl(oc.obra || '—')}</div>
     </div>
-    <div class="hist-proveedor">${esc(oc.proveedor?.nombre || '—')}</div>
-    <div class="hist-obra">${esc(oc.obra || '—')}</div>
-    <div class="adj-oc-bottom">
-      <span class="adj-oc-meta">
-        <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
-        ${badgeFactura(estadoFactura(oc))}
-      </span>
-      <button class="btn btn-sm btn-primary btn-adj-attach" data-nro="${esc(oc.nroOC)}">Cargar acá</button>
-    </div>
-  </div>`).join('');
+    <div class="fac-mid"><div>${hl(oc.obra || '—')}</div>${por}</div>
+    <div class="fac-tot">${moneyOC(oc)}<small>${esc(oc.fecha || '')}</small></div>
+    <div class="fac-acts">${dots}${estadoHtml(oc)}${accionesHtml(oc, modo)}</div>
+    ${hitsHtml(oc, itemsCoincidentes(oc, terms), esc, terms).replace('class="rem-hits"', 'class="rem-hits fac-hits"')}
+    ${docsListasHtml(fact, [])}
+  </div>`;
 }
 
-function renderManualListHTML(ocs) {
-  return `<input type="search" class="hist-search" id="adj-search"
-    placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…"
-    style="margin-bottom:.75rem;width:100%;">
-  <div id="adj-oc-list">${renderOCListItems(ocs)}</div>`;
+// Pinta los renglones en un panel y engancha las pastillas de factura.
+function pintarPanel(box, ocs, modo, terms, vacio) {
+  box.innerHTML = `<div class="fac-panel">${ocs.length
+    ? ocs.map(x => x.oc ? filaHtml(x.oc, modo, terms, x.score) : filaHtml(x, modo, terms)).join('')
+    : `<div class="fac-vacio">${vacio}</div>`}</div>`;
+  box.querySelectorAll('.fac-row').forEach(bindFila);
+}
+
+function bindFila(row) {
+  const oc = allOCs.find(o => o.nroOC === row.dataset.nro);
+  if (oc) bindDocsOC(row, oc, facturasDeOC(oc), []);
+}
+
+// Repinta el renglón de una OC donde esté (lista y resultado de la IA), sin
+// rearmar la lista: rearmarla sacaría la OC de la vista justo cuando el usuario
+// mira si funcionó.
+function repintarFila(oc) {
+  document.querySelectorAll(`.fac-row[data-nro="${CSS.escape(oc.nroOC)}"]`).forEach(row => {
+    const score = row.dataset.score != null ? +row.dataset.score : null;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = filaHtml(oc, row.dataset.modo, terminosBusqueda($('adj-search-main').value), score);
+    const nueva = tmp.firstElementChild;
+    row.replaceWith(nueva);
+    bindFila(nueva);
+  });
 }
 
 // ---- Vista principal: lista de OC (se elige el archivo al tocar Cargar) ----
 
-function renderPrimaryListItems(ocs) {
-  if (!ocs.length) {
-    if ($('adj-search-main').value.trim()) return '<div class="hist-empty">No se encontraron OC.</div>';
-    return `<div class="hist-empty">${
-      filtroOC === 'sin' ? 'No queda ninguna OC sin factura.' :
-      filtroOC === 'con' ? 'Todavía no hay ninguna OC con factura cargada.' :
-                           'No hay OC en el historial.'}</div>`;
-  }
-  return ocs.map(oc => `<div class="adj-oc-card">
-    <div class="adj-oc-top">
-      <span class="hist-nro">${esc(oc.nroOC)}</span>
-      <span class="hist-fecha">${esc(oc.fecha || '')}</span>
-    </div>
-    <div class="hist-proveedor">${esc(oc.proveedor?.nombre || '—')}</div>
-    <div class="hist-obra">${esc(oc.obra || '—')}</div>
-    ${viewerIsAdmin && oc.responsable?.nombre ? `<div class="hist-obra" style="color:var(--gray-500);font-size:.78rem;">por ${esc(oc.responsable.nombre)}</div>` : ''}
-    <div class="adj-oc-bottom">
-      <span class="adj-oc-meta">
-        <span class="hist-total">${oc.total != null ? '$ ' + fmtMoney(oc.total) : '—'}</span>
-        ${badgeFactura(estadoFactura(oc))}
-      </span>
-      <span class="adj-oc-actions">
-        ${ES_MOBILE ? `<button class="btn btn-sm btn-secondary btn-icon btn-attach-cam" data-nro="${esc(oc.nroOC)}" title="Sacar foto" aria-label="Sacar foto"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></button>` : ''}
-        <button class="btn btn-sm btn-primary btn-attach-pick" data-nro="${esc(oc.nroOC)}"><svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg> Cargar</button>
-      </span>
-    </div>
-  </div>`).join('');
+function actualizarContadores() {
+  const con = allOCs.filter(tieneFactura).length;
+  const sin = allOCs.length - con;
+  const pend = $('fac-pend');
+  pend.textContent = sin === 1 ? '1 sin factura' : `${sin} sin factura`;
+  pend.classList.toggle('hidden', !sin);
+  const n = { sin, con, todas: allOCs.length };
+  $('adj-filtro').querySelectorAll('.fac-tab').forEach(b => { b.querySelector('b').textContent = n[b.dataset.filtro]; });
 }
 
 function renderPrimaryList(filter = '') {
   const terms = terminosBusqueda(filter);
-  // 'otros' cae del lado de "sin": que haya un archivo viejo sin rotular no
-  // prueba que la factura esté cargada.
   let list = filtroOC === 'todas'
     ? allOCs
-    : allOCs.filter(oc => (estadoFactura(oc).estado === 'con') === (filtroOC === 'con'));
+    : allOCs.filter(oc => tieneFactura(oc) === (filtroOC === 'con'));
   if (terms.length) list = list.filter(oc => coincideOC(oc, terms));
+  const vacio = terms.length ? 'No se encontraron OC.' :
+    filtroOC === 'sin' ? 'No queda ninguna OC sin factura.' :
+    filtroOC === 'con' ? 'Todavía no hay ninguna OC con factura cargada.' :
+                         'No hay OC en el historial.';
   const box = $('adj-oc-list-main');
-  box.innerHTML = renderPrimaryListItems(pager.take('adj', list));
-  bindPickButtons();
+  pintarPanel(box, pager.take('adj', list), 'lista', terms, vacio);
   pager.footer('adj', box, list, () => renderPrimaryList(filter));
-}
-
-function bindPickButtons() {
-  document.querySelectorAll('.btn-attach-pick').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
-      if (!oc || !await confirmarDuplicado(oc)) return;
-      pendingOC = oc;
-      const mf = $('manual-file');
-      mf.value = '';
-      mf.click();
-    });
-  });
-
-  // Sacar foto: la factura pasa por el escáner y se sube apenas se toca "Listo".
-  document.querySelectorAll('.btn-attach-cam').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
-      if (!oc || !await confirmarDuplicado(oc)) return;
-      pendingOC = oc;
-      const ci = $('manual-camera');
-      ci.value = '';
-      ci.click();
-    });
-  });
 }
 
 // Registra la carga en el feed de Novedades (best-effort). Los eventos viejos
@@ -379,10 +365,12 @@ function logAdjuntoActivity(oc, file, folderId) {
   });
 }
 
-async function doAttachPick(file, oc) {
-  if (!file || !oc) return;
-  const btn = document.querySelector(`.btn-attach-pick[data-nro="${oc.nroOC}"]`);
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Subiendo…'; }
+// Sube el archivo a la carpeta de la OC y lo registra. El renglón muestra
+// "Subiendo…" y después "Cargada"; si falla vuelve a sus botones.
+// Devuelve el archivo subido, o null si falló.
+async function subirAOC(file, oc) {
+  cargaOC.set(oc.nroOC, 'subiendo');
+  repintarFila(oc);
   try {
     const subida = archivoParaDrive(file);
     const res = await attachToDriveOC(subida, {
@@ -396,111 +384,85 @@ async function doAttachPick(file, oc) {
     });
     logAdjuntoActivity(oc, subida, res?.folderId);
     await registrarAdjunto(oc, subida, res);
-    refrescarBadge(oc);
     await clearShareFile();
-    toast(`${tipoCarga === 'factura' ? 'Factura cargada' : 'Archivo cargado'} en OC ${oc.nroOC}`, 'success');
-    if (btn) { btn.innerHTML = `${icSvg('checkSm')} Cargado`; }
+    cargaOC.set(oc.nroOC, 'ok');
+    repintarFila(oc);
+    actualizarContadores();
+    return subida;
   } catch (e) {
-    console.error('doAttachPick:', e);
+    console.error('subirAOC:', e);
     toast('Error al subir el archivo a Drive.', 'error');
-    if (btn) { btn.disabled = false; btn.innerHTML = 'Cargar'; }
+    cargaOC.delete(oc.nroOC);
+    repintarFila(oc);
+    return null;
   }
-  pendingOC = null;
 }
 
-function bindButtons() {
-  document.querySelectorAll('.btn-adj-attach').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const oc = allOCs.find(o => o.nroOC === btn.dataset.nro);
-      if (oc && await confirmarDuplicado(oc)) await doAttach(currentFile, oc, btn);
-    });
-  });
-
-  const search = $('adj-search');
-  if (search) {
-    search.addEventListener('input', () => {
-      const terms  = terminosBusqueda(search.value);
-      const list   = $('adj-oc-list');
-      const result = terms.length ? allOCs.filter(oc => coincideOC(oc, terms)) : allOCs;
-      list.innerHTML = renderOCListItems(result);
-      bindButtons();
-    });
+async function doAttachPick(file, oc) {
+  if (!file || !oc) return;
+  pendingOC = null;
+  if (await subirAOC(file, oc)) {
+    toast(`${tipoCarga === 'factura' ? 'Factura cargada' : 'Archivo cargado'} en OC ${oc.nroOC}`, 'success');
   }
+}
+
+// ---- Resultado de la IA / elegir a mano ----
+
+function renderManualList(q = '') {
+  const terms = terminosBusqueda(q);
+  const list  = terms.length ? allOCs.filter(oc => coincideOC(oc, terms)) : allOCs;
+  pintarPanel($('adj-oc-list'), list, 'archivo', terms, list.length ? '' : 'No se encontraron OC.');
+}
+
+function showManualList(intro = '') {
+  $('result-body').innerHTML = `${intro}
+    <input type="search" class="hist-search fac-search" id="adj-search" placeholder="Buscar por artículo, proveedor, obra, responsable o N° OC…">
+    <div id="adj-oc-list"></div>`;
+  renderManualList();
+  $('adj-search').addEventListener('input', e => renderManualList(e.target.value));
 }
 
 function showAIResults(extracted, matches) {
-  $('result-title').textContent = 'Resultados del análisis';
+  $('result-title').textContent = 'Resultado de la búsqueda';
 
-  let html = '<div class="adj-extracted">';
-  if (extracted.proveedor)       html += `<span class="adj-tag">${icSvg('building')} ${esc(extracted.proveedor)}</span>`;
-  if (extracted.total_documento) html += `<span class="adj-tag">${icSvg('dollar')} $${fmtMoney(extracted.total_documento)}</span>`;
-  html += '</div>';
+  let tags = '';
+  if (extracted.proveedor)       tags += `<span class="fac-tag">${icSvg('building')} ${esc(extracted.proveedor)}</span>`;
+  if (extracted.total_documento) tags += `<span class="fac-tag">${icSvg('dollar')} $ ${fmtMoney(extracted.total_documento)}</span>`;
+  tags = tags ? `<div class="fac-tags">${tags}</div>` : '';
 
   if (matches.length === 0) {
-    html += '<p class="adj-no-match">No se encontraron coincidencias. Elegí una OC manualmente:</p>';
-    html += renderManualListHTML(allOCs);
-  } else {
-    html += '<p class="adj-section-label">OC recomendadas:</p>';
-    html += renderMatchCards(matches);
-    html += `<div class="adj-manual-fallback">
-      <button class="btn btn-outline btn-sm" id="btn-show-manual">Ver todas las OC</button>
-    </div>`;
+    $('result-title').textContent = 'No encontramos la OC';
+    showManualList(tags + '<p class="fac-res-l">Elegila de la lista</p>');
+    return;
   }
 
-  $('result-body').innerHTML = html;
-  bindButtons();
+  $('result-body').innerHTML = `${tags}<p class="fac-res-l">OC que coinciden</p><div id="adj-match-list"></div>
+    <div class="fac-res-foot"><button type="button" class="foc-btn foc-btn--clear" id="btn-show-manual">${icSvg('eye')}Ver todas las OC</button></div>`;
+  pintarPanel($('adj-match-list'), matches, 'archivo', [], '');
 
-  $('btn-show-manual')?.addEventListener('click', () => {
-    $('result-title').textContent = 'Elegir OC';
-    $('result-body').innerHTML = renderManualListHTML(allOCs);
-    bindButtons();
+  $('btn-show-manual').addEventListener('click', () => {
+    $('result-title').textContent = 'Elegir la OC';
+    showManualList();
   });
 }
 
-function showManualMode() {
-  $('result-title').textContent = 'Elegir OC';
-  $('result-body').innerHTML = renderManualListHTML(allOCs);
-  bindButtons();
-}
+// ---- Carga desde la bandeja ----
 
-// ---- Attach ----
-
-async function doAttach(file, oc, btn) {
-  btn.disabled  = true;
-  btn.innerHTML = '<span class="spinner"></span> Subiendo…';
-  try {
-    const subida = archivoParaDrive(file);
-    const res = await attachToDriveOC(subida, {
-      drive_folder_obras_id:       oc.drive_folder_obras_id       || null,
-      drive_folder_proveedores_id: oc.drive_folder_proveedores_id || null,
-      drive_folder_id:             oc.drive_folder_id             || null,
-      obra:      oc.obra              || '',
-      fecha:     displayToISODate(oc.fecha),
-      proveedor: oc.proveedor?.nombre || '',
-      nroOC:     oc.nroOC
-    });
-    logAdjuntoActivity(oc, subida, res?.folderId);
-    await registrarAdjunto(oc, subida, res);
-    await clearShareFile();
-    $('card-result').classList.add('hidden');
-    $('success-detail').textContent = `${subida.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
-    $('card-success').classList.remove('hidden');
-  } catch (e) {
-    toast('Error al subir el archivo a Drive.', 'error');
-    console.error('doAttach:', e);
-    btn.disabled    = false;
-    btn.textContent = 'Cargar acá';
-  }
+async function doAttach(file, oc) {
+  const subida = await subirAOC(file, oc);
+  if (!subida) return;
+  $('card-result').classList.add('hidden');
+  $('success-detail').textContent = `${subida.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
+  $('card-success').classList.remove('hidden');
 }
 
 // ---- Reset ----
 
 function resetToStart() {
   resetZone();
-  $('card-file').classList.remove('hidden');
+  $('import-zone').classList.remove('hidden');
   $('card-result').classList.add('hidden');
   $('card-success').classList.add('hidden');
-  renderPrimaryList($('adj-search-main').value);   // la OC recién cargada cambió de sello
 }
 
 // ---- Init ----
@@ -524,10 +486,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { const u = await getUsuario(code); isAdmin = !!(u && u.admin); } catch (_) {}
   }
   viewerIsAdmin = isAdmin;
+  const pintarTodo = () => { actualizarContadores(); renderPrimaryList($('adj-search-main').value); };
   getHistorial(code, isAdmin)
     .then(async ocs => {
       allOCs = ocs;
-      renderPrimaryList($('adj-search-main').value);
+      pintarTodo();
       // Primera vez tras el deploy: reconstruir el estado de las OC viejas a
       // partir del feed de Novedades. Después de eso ya viene en el historial.
       const sembrado = await sembrarAdjuntosDesdeActividad(ocs);
@@ -536,29 +499,31 @@ document.addEventListener('DOMContentLoaded', async () => {
           const reg = sembrado[String(oc.nroOC).replace(/-/g, '')];
           if (reg) oc.adjuntos = { ...reg, ...(oc.adjuntos || {}) };
         });
-        renderPrimaryList($('adj-search-main').value);
+        pintarTodo();
       }
     })
     .catch(() => {
       const cached = typeof getHistorialCached === 'function' ? getHistorialCached(code) : null;
       if (cached) allOCs = cached;
-      renderPrimaryList($('adj-search-main').value);
+      pintarTodo();
     });
 
-  // Qué se está cargando (define el prefijo del archivo en Drive)
+  // Qué se está cargando (define el prefijo del archivo en Drive). Vale para la
+  // lista y para la bandeja.
   $('adj-tipo').addEventListener('click', ev => {
-    const btn = ev.target.closest('.cat-seg-btn');
+    const btn = ev.target.closest('button[data-tipo]');
     if (!btn) return;
     tipoCarga = btn.dataset.tipo;
-    $('adj-tipo').querySelectorAll('.cat-seg-btn').forEach(b => b.classList.toggle('active', b === btn));
+    $('adj-tipo').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    renderPrimaryList($('adj-search-main').value);   // el botón de cargar dice qué carga
   });
 
   // Filtro por estado de factura
   $('adj-filtro').addEventListener('click', ev => {
-    const btn = ev.target.closest('.rem-tab');
+    const btn = ev.target.closest('.fac-tab');
     if (!btn) return;
     filtroOC = btn.dataset.filtro;
-    $('adj-filtro').querySelectorAll('.rem-tab').forEach(b => b.classList.toggle('active', b === btn));
+    $('adj-filtro').querySelectorAll('.fac-tab').forEach(b => b.classList.toggle('active', b === btn));
     pager.reset('adj');
     renderPrimaryList($('adj-search-main').value);
   });
@@ -569,7 +534,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderPrimaryList(e.target.value);
   });
 
-  // Adjuntar manual: archivo elegido tras tocar "Adjuntar" en una OC
+  // Botones de los renglones (delegado: los renglones se repintan solos)
+  document.querySelector('.fac-page').addEventListener('click', async ev => {
+    const btn = ev.target.closest('.btn-attach-pick, .btn-attach-cam, .btn-adj-attach');
+    if (!btn) return;
+    const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
+    if (!oc || !await confirmarDuplicado(oc)) return;
+    if (btn.classList.contains('btn-adj-attach')) { await doAttach(currentFile, oc); return; }
+    pendingOC = oc;
+    // Sacar foto: la factura pasa por el escáner y se sube apenas se toca "Listo".
+    const input = $(btn.classList.contains('btn-attach-cam') ? 'manual-camera' : 'manual-file');
+    input.value = '';
+    input.click();
+  });
+
+  // Adjuntar manual: archivo elegido tras tocar "Cargar" en una OC
   $('manual-file').addEventListener('change', e => {
     const f = e.target.files[0];
     if (f && pendingOC) doAttachPick(f, pendingOC);
@@ -586,21 +565,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     else pendingOC = null;   // canceló el escaneo: no se sube nada
   });
 
-  // Toggle del flujo IA (secundario)
-  $('btn-toggle-ai').addEventListener('click', () => {
-    $('card-file').classList.remove('hidden');
-    $('card-file').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-  $('btn-close-ai').addEventListener('click', () => {
-    $('card-file').classList.add('hidden');
-    $('card-result').classList.add('hidden');
-    $('card-success').classList.add('hidden');
-    resetZone();
-  });
-
-  // Archivo compartido por share target → abre el flujo IA con el archivo cargado
+  // Archivo compartido por share target → queda cargado en la bandeja
   const sharedFile = await checkShareFile();
-  if (sharedFile) { $('card-file').classList.remove('hidden'); setFile(sharedFile); }
+  if (sharedFile) setFile(sharedFile);
 
   // Botones de selección
   const fileInput   = $('file-input');
@@ -654,26 +621,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('btn-use-ai').addEventListener('click', async () => {
     if (!currentFile) return;
-    $('card-file').classList.add('hidden');
+    $('import-zone').classList.add('hidden');
     $('card-result').classList.remove('hidden');
-    $('result-title').textContent = 'Analizando con IA…';
+    $('result-title').textContent = 'Buscando la OC…';
     $('result-body').innerHTML    = `<div class="extract-status loading"><div class="spinner"></div> Analizando el documento…</div>`;
     try {
       const extracted = await extractBasicFromFile(currentFile);
       showAIResults(extracted, getTopMatches(extracted, allOCs));
     } catch (e) {
       $('result-title').textContent = 'No se pudo analizar';
-      $('result-body').innerHTML    =
-        `<div class="extract-status error" style="margin-bottom:1rem;">${esc(e.message)}</div>` +
-        renderManualListHTML(allOCs);
-      bindButtons();
+      showManualList(`<div class="extract-status error" style="margin-bottom:.75rem;">${esc(e.message)}</div>`);
     }
   });
 
   $('btn-use-manual').addEventListener('click', () => {
     if (!currentFile) return;
-    $('card-file').classList.add('hidden');
+    $('import-zone').classList.add('hidden');
     $('card-result').classList.remove('hidden');
-    showManualMode();
+    $('result-title').textContent = 'Elegir la OC';
+    showManualList();
   });
 });
