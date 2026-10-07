@@ -21,6 +21,12 @@ let menuHtml = fs.readFileSync('menu.html', 'utf8');
 menuHtml = menuHtml.replace(menuVersionRe, (_, pre, _num, post) => `${pre}${nextVersion}${post}`);
 fs.writeFileSync('menu.html', menuHtml);
 
+// Y al pie del ingreso
+const loginVersionRe = /(<div class="lg-version">v)(\d+)(<\/div>)/;
+let indexHtml = fs.readFileSync('index.html', 'utf8');
+indexHtml = indexHtml.replace(loginVersionRe, (_, pre, _num, post) => `${pre}${nextVersion}${post}`);
+fs.writeFileSync('index.html', indexHtml);
+
 // Bump SW cache version so mobile devices detect the update
 let sw = fs.readFileSync('sw.js', 'utf8');
 sw = sw.replace(/vimeco-oc-v[\w.]+/, 'vimeco-oc-v' + Date.now());

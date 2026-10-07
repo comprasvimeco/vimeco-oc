@@ -49,13 +49,16 @@ function renderUsers(list) {
     const pwd = u.passwordHash
       ? `<span class="usr-meta-i">${icSvg('key')}Con contraseña</span>`
       : `<span class="usr-meta-i usr-warn">${icSvg('alert')}Sin contraseña</span>`;
+    // Pedido desde "¿Te olvidaste la contraseña?" del ingreso; se borra al resetear.
+    const pedido = u.passwordHash && u.resetPedido
+      ? `<span class="usr-meta-i usr-pedido" title="Lo pidió el ${new Date(u.resetPedido).toLocaleString('es-AR')}">${icSvg('key')}Pidió resetear</span>` : '';
     return `
     <div class="usr-card ${u.activo ? '' : 'usr-card--off'}">
       <div class="usr-head">
         <div class="usr-avatar" aria-hidden="true">${esc(iniciales(u.nombre))}</div>
         <div class="usr-id">
           <div class="usr-name" title="${esc(u.nombre)}">${esc(u.nombre)}</div>
-          <div class="usr-meta"><span class="usr-code">${esc(u.codigo)}</span>${pwd}</div>
+          <div class="usr-meta"><span class="usr-code">${esc(u.codigo)}</span>${pwd}${pedido}</div>
         </div>
         ${u.activo ? '' : '<span class="usr-off">Inactivo</span>'}
       </div>
@@ -171,7 +174,7 @@ window.resetPwd = async function (codigo, nombre) {
   );
   if (!ok) return;
   try {
-    await patchUsuario(codigo, { passwordHash: null });
+    await patchUsuario(codigo, { passwordHash: null, resetPedido: null });
     showToast('Contraseña reseteada.');
     await loadUsers();
   } catch (_) {

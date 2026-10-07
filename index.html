@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIMECO S.A. — Sistema de Órdenes de Compra</title>
+  <title>VIMECO S.A. — Ingresar</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" type="image/png" href="icono_app.png">
   <link rel="manifest" href="manifest.json">
@@ -12,63 +12,170 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
   <style>
-    .login-page { background: linear-gradient(135deg, #0f2236 0%, #1a3a5c 55%, #2557a7 100%); }
-    .login-card { animation: fadeIn .35s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-    .login-logo { background: transparent; padding: 0; text-align: center; margin-bottom: .5rem; }
-    .login-logo img { width: 180px; display: block; margin: 0 auto; }
+    /* Teléfono: tarjeta sobre el fondo claro de la app (variante A).
+       Escritorio (≥900px): panel azul de marca a la izquierda y el mismo formulario a la derecha (variante C). */
+    .lg-wrap { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: 2rem .9rem 1rem; }
+    .lg-brand { display: none; }
+    .lg-main { width: 100%; max-width: 410px; display: flex; flex-direction: column; flex: 1; }
+    .lg-card { background: #fff; border-radius: 22px; box-shadow: var(--shadow-glass); padding: 1.6rem 1.25rem 1.4rem; display: flex; flex-direction: column; gap: 1rem; animation: lgIn .35s var(--ease-spring) both; }
+    @keyframes lgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .lg-hd { display: flex; flex-direction: column; align-items: center; gap: .7rem; }
+    .lg-hd img { width: 150px; display: block; }
+    .lg-hd h1 { font-size: 1.2rem; font-weight: 700; color: var(--primary-dark); }
+    .lg-hd p { display: none; }
+    .lg-step { display: flex; flex-direction: column; gap: 1rem; }
+    .lg-lbl { display: block; font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gray-500); margin-bottom: .4rem; }
+    .lg-inp { display: flex; align-items: center; gap: .5rem; border: 1.5px solid var(--gray-300); border-radius: 12px; padding: 0 .5rem 0 .8rem; min-height: 48px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+    .lg-inp:focus-within { border-color: var(--primary-light); box-shadow: 0 0 0 3px #2557a722; }
+    .lg-inp > .icon { width: 17px; height: 17px; color: var(--gray-400); flex: none; }
+    .lg-inp input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 1rem; color: var(--gray-900); padding: .6rem 0; }
+    .lg-eye { flex: none; width: 34px; height: 34px; border: 0; border-radius: 9px; background: var(--gray-100); color: var(--gray-500); display: grid; place-items: center; cursor: pointer; }
+    .lg-eye .icon { width: 17px; height: 17px; }
+    .lg-eye[aria-pressed="true"] { background: var(--blue-bg, #e8eef7); color: var(--primary); }
+
+    .lg-seguir { display: flex; align-items: center; gap: .75rem; width: 100%; text-align: left; background: #f5f8fc; border: 1.5px solid #dbe3ef; border-radius: 16px; padding: .7rem .75rem; cursor: pointer; font: inherit; color: inherit; }
+    .lg-seguir:hover { border-color: #b9c8de; }
+    .lg-seguir b { display: block; color: var(--gray-900); font-size: .98rem; }
+    .lg-seguir small { color: var(--gray-500); font-size: .78rem; }
+    .lg-go { margin-left: auto; width: 38px; height: 38px; border-radius: 12px; background: var(--primary); color: #fff; display: grid; place-items: center; flex: none; }
+    .lg-go .icon { width: 18px; height: 18px; }
+
+    .lg-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .8rem; flex: none; }
+    .lg-av--lg { width: 44px; height: 44px; font-size: .95rem; }
+    .lg-c0 { background: #e8eef7; color: #234870; } .lg-c1 { background: #dff3e5; color: #1a7f3c; }
+    .lg-c2 { background: #fbeedd; color: #8a4f0d; } .lg-c3 { background: #f1e8fb; color: #6b3fa0; }
+    .lg-c4 { background: #dcf3ef; color: #16695f; } .lg-c5 { background: #fce8ee; color: #a23a57; }
+    .lg-c6 { background: #e0f0fb; color: #0e6a96; }
+
+    .lg-list { border: 1.5px solid var(--gray-200); border-radius: 14px; overflow-y: auto; max-height: min(46vh, 380px); }
+    .lg-it { display: flex; align-items: center; gap: .65rem; width: 100%; padding: .55rem .75rem; border: 0; border-top: 1px solid #f0f1f4; background: #fff; font: inherit; font-weight: 600; color: var(--gray-900); font-size: .93rem; text-align: left; cursor: pointer; }
+    .lg-it:first-child { border-top: 0; }
+    .lg-it:hover, .lg-it:focus-visible { background: #f5f8fc; outline: none; }
+    .lg-it mark { background: #fff1b8; color: inherit; border-radius: 3px; }
+    .lg-vacio { padding: .9rem; color: var(--gray-500); font-size: .88rem; text-align: center; }
+
+    .lg-sel { display: flex; align-items: center; gap: .75rem; padding: .65rem .75rem; background: #f5f8fc; border-radius: 14px; }
+    .lg-sel > div { min-width: 0; }
+    .lg-sel > div b { display: block; color: var(--gray-900); font-size: .98rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lg-sel > div span { color: var(--gray-500); font-size: .78rem; }
+    .lg-chg { margin-left: auto; flex: none; font: inherit; font-size: .8rem; font-weight: 700; color: var(--primary-light); background: #fff; border: 1px solid #dbe3ef; padding: .3rem .7rem; border-radius: 99px; cursor: pointer; }
+
+    .lg-hint { font-size: .8rem; color: var(--gray-500); display: flex; gap: .4rem; align-items: flex-start; line-height: 1.4; }
+    .lg-hint .icon { width: 14px; height: 14px; margin-top: 2px; flex: none; }
+    .lg-hint--ok { color: #1a7f3c; }
+    .lg-err { background: #fde6e6; color: #b02a2a; border-radius: 12px; padding: .6rem .75rem; font-size: .85rem; font-weight: 600; display: flex; gap: .5rem; align-items: center; }
+    .lg-err .icon { width: 15px; height: 15px; flex: none; }
+    .lg-err button { margin-left: auto; font: inherit; font-weight: 700; font-size: .8rem; background: #fff; color: #b02a2a; border: 1px solid #f3c4c4; border-radius: 99px; padding: .25rem .7rem; cursor: pointer; }
+    .lg-btn { display: flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; min-height: 48px; border: 0; border-radius: 14px; font: inherit; font-weight: 700; font-size: 1rem; background: var(--primary); color: #fff; cursor: pointer; }
+    .lg-btn:hover { background: var(--primary-dark); }
+    .lg-btn:disabled { background: #dfe5ee; color: #8a97a8; cursor: default; }
+    .lg-btn .icon { width: 18px; height: 18px; }
+    .lg-link { align-self: center; border: 0; background: none; font: inherit; font-size: .85rem; font-weight: 600; color: var(--primary-light); cursor: pointer; padding: .2rem; }
+    .lg-olvide { background: #f5f8fc; border-radius: 14px; padding: .75rem .85rem; font-size: .85rem; color: var(--gray-600); display: flex; flex-direction: column; gap: .6rem; line-height: 1.45; }
+    .lg-olvide .lg-btn { min-height: 40px; font-size: .9rem; background: #fff; color: var(--primary); border: 1.5px solid #dbe3ef; }
+    .lg-olvide .lg-btn:hover { border-color: #b9c8de; }
+    .lg-cargando { text-align: center; color: var(--gray-500); font-size: .9rem; padding: .5rem 0; }
+    .lg-version { text-align: center; color: var(--gray-400); font-size: .72rem; margin-top: auto; padding-top: 1.25rem; }
+    .lg-user-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+    @media (min-width: 900px) {
+      .lg-wrap { display: grid; grid-template-columns: 1.05fr 1fr; align-items: stretch; padding: 0; }
+      .lg-brand { display: flex; flex-direction: column; gap: 1.25rem; background: linear-gradient(150deg, #13304d 0%, var(--primary) 60%, var(--primary-light) 120%); color: #fff; padding: 3rem 3.25rem; }
+      .lg-brand img { width: 180px; display: block; }
+      .lg-brand h2 { margin-top: auto; font-size: 2.3rem; line-height: 1.15; font-weight: 700; }
+      .lg-gold { width: 48px; height: 4px; border-radius: 4px; background: var(--accent); }
+      .lg-brand p { color: #c9d7ea; max-width: 38ch; line-height: 1.5; margin-bottom: 2rem; }
+      .lg-main { max-width: none; background: #fff; padding: 2rem 4rem 1rem; align-items: center; }
+      .lg-card { box-shadow: none; border-radius: 0; padding: 0; width: 100%; max-width: 400px; margin: auto 0 0; }
+      .lg-hd { align-items: flex-start; gap: .3rem; }
+      .lg-hd img { display: none; }
+      .lg-hd h1 { font-size: 1.6rem; }
+      .lg-hd p { display: block; color: var(--gray-500); }
+      .lg-version { align-self: stretch; }
+    }
+    @media (prefers-reduced-motion: reduce) { .lg-card { animation: none; } }
   </style>
 </head>
-<body class="login-page">
-  <div class="login-container">
-    <div class="login-card">
-      <div class="login-logo">
-        <img id="logo-img" src="" alt="VIMECO S.A." style="width:180px; margin-bottom:.25rem;">
-      </div>
+<body class="lg-page">
+  <div class="lg-wrap">
+    <aside class="lg-brand">
+      <img src="assets/logo_claro.png" alt="VIMECO S.A.">
+      <h2 id="lg-saludo">Hola</h2>
+      <div class="lg-gold"></div>
+      <p>Órdenes de compra, facturas y remitos de cada obra, en un solo lugar.</p>
+    </aside>
 
-      <hr class="login-divider">
-      <p class="login-title">Sistema de Órdenes de Compra</p>
-
-      <div class="form-group">
-        <label for="responsable">Responsable</label>
-        <select id="responsable" class="form-control">
-          <option value="">— Seleccioná un responsable —</option>
-        </select>
-      </div>
-
-      <!-- Contraseña (usuario existente) -->
-      <div class="form-group hidden" id="pwd-section">
-        <label for="pwd-input">Contraseña</label>
-        <input type="password" id="pwd-input" class="form-control" placeholder="Ingresá tu contraseña" autocomplete="current-password">
-      </div>
-
-      <!-- Primera vez: crear contraseña -->
-      <div id="new-pwd-section" class="hidden">
-        <div class="login-first-time-box">
-          <p class="login-first-time-msg">Primera vez — creá tu contraseña de acceso:</p>
-          <div class="form-group">
-            <label for="new-pwd-1">Nueva contraseña</label>
-            <input type="password" id="new-pwd-1" class="form-control" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
-          </div>
-          <div class="form-group u-mb-0">
-            <label for="new-pwd-2">Confirmar contraseña</label>
-            <input type="password" id="new-pwd-2" class="form-control" placeholder="Repetí la contraseña" autocomplete="new-password">
-          </div>
+    <main class="lg-main">
+      <div class="lg-card">
+        <div class="lg-hd">
+          <img id="logo-img" src="" alt="VIMECO S.A.">
+          <h1>Ingresar</h1>
+          <p>Elegí tu nombre y poné tu contraseña.</p>
         </div>
+
+        <div id="lg-cargando" class="lg-cargando">Cargando…</div>
+
+        <!-- Paso 1: quién sos -->
+        <div id="lg-paso-quien" class="lg-step hidden">
+          <button type="button" id="lg-seguir" class="lg-seguir hidden">
+            <span id="lg-seguir-av" class="lg-av lg-av--lg"></span>
+            <span><b id="lg-seguir-nombre"></b><small id="lg-seguir-cuando"></small></span>
+            <span class="lg-go" id="lg-seguir-go"></span>
+          </button>
+          <div>
+            <label class="lg-lbl" for="lg-buscar">¿Quién sos?</label>
+            <div class="lg-inp"><span id="lg-ic-buscar"></span><input type="search" id="lg-buscar" placeholder="Buscá tu nombre" autocomplete="off" enterkeyhint="go"></div>
+          </div>
+          <div id="lg-list" class="lg-list" role="listbox" aria-label="Personas"></div>
+        </div>
+
+        <!-- Paso 2: contraseña -->
+        <form id="lg-form" class="lg-step hidden" autocomplete="on" novalidate>
+          <div class="lg-sel">
+            <span id="lg-sel-av" class="lg-av lg-av--lg"></span>
+            <div><b id="lg-sel-nombre"></b><span id="lg-sel-estado"></span></div>
+            <button type="button" id="lg-cambiar" class="lg-chg">Cambiar</button>
+          </div>
+          <input type="text" id="lg-username" name="username" class="lg-user-hidden" autocomplete="username" tabindex="-1" aria-hidden="true">
+
+          <div id="pwd-section">
+            <label class="lg-lbl" for="pwd-input">Contraseña</label>
+            <div class="lg-inp"><input type="password" id="pwd-input" autocomplete="current-password" placeholder="Tu contraseña"><button type="button" class="lg-eye" data-for="pwd-input" aria-label="Mostrar contraseña" aria-pressed="false"></button></div>
+          </div>
+
+          <div id="new-pwd-section" class="lg-step hidden">
+            <div>
+              <label class="lg-lbl" for="new-pwd-1">Nueva contraseña</label>
+              <div class="lg-inp"><input type="password" id="new-pwd-1" autocomplete="new-password" placeholder="Mínimo 4 caracteres"><button type="button" class="lg-eye" data-for="new-pwd-1" aria-label="Mostrar contraseña" aria-pressed="false"></button></div>
+            </div>
+            <div>
+              <label class="lg-lbl" for="new-pwd-2">Repetila</label>
+              <div class="lg-inp"><input type="password" id="new-pwd-2" autocomplete="new-password" placeholder="La misma otra vez"></div>
+            </div>
+            <div id="lg-hint" class="lg-hint" aria-live="polite"></div>
+          </div>
+
+          <div id="login-error" class="lg-err hidden" role="alert"></div>
+
+          <button type="submit" id="btn-login" class="lg-btn">Ingresar</button>
+
+          <button type="button" id="lg-olvide-btn" class="lg-link">¿Te olvidaste la contraseña?</button>
+          <div id="lg-olvide" class="lg-olvide hidden">
+            <span id="lg-olvide-txt">La resetea quien administra, desde Usuarios. Después, al entrar, vas a crear una nueva.</span>
+            <button type="button" id="lg-avisar" class="lg-btn">Avisarle que la resetee</button>
+          </div>
+        </form>
       </div>
-
-      <div id="login-error" class="alert alert-error hidden"></div>
-
-      <button id="btn-login" class="btn btn-primary btn-full" style="margin-top:.75rem; padding:.75rem;" disabled>
-        Ingresar al Sistema
-      </button>
-    </div>
+      <div class="lg-version">v267</div>
+    </main>
   </div>
 
   <script src="js/logoBase64.js"></script>
   <script>document.getElementById('logo-img').src = LOGO_BASE64;</script>
+  <script src="js/icons.js"></script>
   <script src="js/config.js"></script>
   <script src="js/firebase.js"></script>
+  <script src="js/push.js"></script>
   <script src="js/auth.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
