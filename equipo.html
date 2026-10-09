@@ -9,73 +9,103 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .eq-ficha { max-width: 640px; margin: 0 auto; }
-
-    /* Foto */
-    .eq-foto-wrap { display:flex; flex-direction:column; align-items:center; gap:.6rem; margin-bottom:1.25rem; }
-    .eq-foto {
-      width: 100%; max-width: 420px; aspect-ratio: 4 / 3; border-radius: 14px;
-      background: var(--gray-100); border: 1px solid var(--gray-200);
-      display:flex; align-items:center; justify-content:center; overflow:hidden;
-      color: var(--gray-400);
+    /* Dos columnas en escritorio; en el teléfono una sola, en este orden:
+       cabecera, compras, ubicación, datos, repuestos, documentación. */
+    .eqf-lay { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: .9rem; align-items: start; padding-bottom: 4.5rem; }
+    .eqf-col { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+    @media (max-width: 999px) {
+      .eqf-lay { display: flex; flex-direction: column; align-items: stretch; gap: .75rem; }
+      .eqf-col { display: contents; }
+      .eqf-o1 { order: 1; } .eqf-o2 { order: 2; } .eqf-o3 { order: 3; } .eqf-o4 { order: 4; } .eqf-o5 { order: 5; } .eqf-o6 { order: 6; }
     }
-    .eq-foto img { width:100%; height:100%; object-fit:cover; }
-    .eq-foto svg { width:56px; height:56px; }
-    .eq-foto-actions { display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center; }
-    #eq-file, #eq-file-cam { display:none; }
 
-    /* Ficha (campos) */
-    .eq-card { background:#fff; border:1px solid var(--gray-200); border-radius:12px; padding:1rem 1.1rem; margin-bottom:1rem; }
-    .eq-card h2 { font-size:1rem; color:var(--gray-700); margin:0; }
-    .eq-card-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.85rem; }
-    .form-control[readonly] { background:var(--gray-100); color:var(--gray-600); cursor:default; }
-    .eq-estado-row { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding-top:.9rem; margin-top:.35rem; border-top:1px solid var(--gray-100); }
-    .eq-estado-row .eq-estado-lbl { color:var(--gray-600); font-size:.9rem; }
+    /* Foto: pastilla encima con su menú */
+    .eq-hero .ph { overflow: visible; }
+    .eq-hero .ph img { border-radius: 12px; }
+    #eq-foto { display: contents; }
+    #eq-foto > .icon { width: 44px; height: 44px; stroke-width: 1.4; }
+    .eq-hero .ph .act-dd { position: absolute; right: .4rem; bottom: .4rem; z-index: 2; }
+    .eqf-foto-btn { background: #ffffffeb; border: none; color: var(--primary-dark); font: inherit; font-size: .74rem; font-weight: 700; border-radius: 999px;
+      padding: .25rem .6rem; display: inline-flex; gap: .3rem; align-items: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+    .eqf-foto-btn .icon { width: 13px; height: 13px; }
+    .eq-hero .ph .act-menu { top: auto; bottom: calc(100% + 6px); min-width: 200px; }
+    .eqf-pencil { width: 30px; height: 30px; border-radius: 999px; border: none; background: var(--gray-100); color: var(--gray-600); display: inline-grid;
+      place-items: center; cursor: pointer; flex: none; }
+    .eqf-pencil .icon { width: 14px; height: 14px; }
+    .eqf-pencil:hover { background: var(--gray-200); }
+    #eq-file, #eq-file-cam, #doc-file { display: none; }
+    @media (max-width: 560px) { .eq-hero .eq-kv { display: none; } }
+
+    /* Datos: lectura y edición */
+    .eqf-estado { border: none; background: none; font: inherit; font-weight: 700; padding: 0; cursor: pointer; }
+    .eqf-estado--off { color: #b02a2a; } .eqf-estado--on { color: #1a7f3c; }
+    .eqf-estado:hover { text-decoration: underline; }
+    .eqf-card .form-group { margin-bottom: .65rem; }
+    .eqf-card .form-group:last-child { margin-bottom: 0; }
 
     /* Repuestos */
-    .eq-item-row { display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
-    .eq-item-row input { flex:1; }
-    .eq-item-del { border:none; background:none; color:var(--gray-400); cursor:pointer; font-size:1.4rem; line-height:1; padding:.2rem .35rem; border-radius:8px; }
-    .eq-item-del:hover { color:#d64545; background:var(--gray-100); }
-    .eq-items-empty { color:var(--gray-500); font-size:.85rem; margin:.25rem 0 .6rem; }
+    .eqf-items { display: flex; flex-direction: column; gap: .35rem; }
+    .eqf-item { display: flex; align-items: center; gap: .3rem; background: var(--gray-100); border-radius: 9px; padding: .1rem .2rem .1rem .55rem; }
+    .eqf-item input { flex: 1; min-width: 0; border: none; background: transparent; font: inherit; font-size: .88rem; color: var(--gray-700); padding: .4rem 0; }
+    .eqf-item input:focus { outline: none; }
+    .eqf-item:focus-within { background: #fff; box-shadow: inset 0 0 0 1.5px #7cc7bb; }
+    .eqf-item-del { border: none; background: none; color: var(--gray-400); cursor: pointer; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+    .eqf-item-del .icon { width: 15px; height: 15px; }
+    .eqf-item-del:hover { color: #b02a2a; background: #fde6e6; }
+    .eqf-add { border: 1.5px dashed var(--gray-300); background: none; border-radius: 9px; padding: .45rem; color: var(--gray-500); font: inherit; font-size: .84rem;
+      font-weight: 700; display: flex; align-items: center; justify-content: center; gap: .35rem; cursor: pointer; }
+    .eqf-add .icon { width: 14px; height: 14px; }
+    .eqf-add:hover { border-color: #7cc7bb; color: #16695f; }
+    .eqf-items-empty { color: var(--gray-500); font-size: .84rem; }
 
     /* Documentación */
-    .eq-card-head--wrap { flex-wrap:wrap; }
-    .eq-docs-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
-    .eq-docs-hint { color:var(--gray-500); font-size:.8rem; margin:-.4rem 0 .8rem; }
-    .eq-docs { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:.6rem; }
-    .eq-docs-empty { color:var(--gray-500); font-size:.85rem; }
-    .doc-card { position:relative; display:flex; align-items:stretch; border:1px solid var(--gray-200); border-radius:10px; background:#fff; overflow:hidden; transition:border-color .15s, box-shadow .15s; }
-    .doc-card:hover { border-color:var(--primary-light); box-shadow:0 2px 10px rgba(35,72,112,.10); }
-    .doc-link { flex:1; min-width:0; display:flex; align-items:center; gap:.7rem; padding:.65rem .7rem; color:inherit; text-decoration:none; }
-    .doc-tile { flex-shrink:0; width:42px; height:50px; border-radius:7px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; color:#fff; font-size:.6rem; font-weight:700; letter-spacing:.04em; }
-    .doc-tile .icon { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8; }
-    .doc-tile--pdf { background:#c2410c; }
-    .doc-tile--img { background:#2557a7; }
-    .doc-tile--xls { background:#15803d; }
-    .doc-tile--doc { background:#1d4ed8; }
-    .doc-tile--otro { background:var(--gray-500); }
-    .doc-body { min-width:0; }
-    .doc-texto { font-weight:600; color:var(--gray-800); font-size:.92rem; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
-    .doc-meta { color:var(--gray-500); font-size:.74rem; margin-top:.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .doc-btns { display:flex; flex-direction:column; justify-content:center; border-left:1px solid var(--gray-100); }
-    .doc-btn { border:none; background:none; color:var(--gray-400); cursor:pointer; padding:.45rem .5rem; flex:1; display:flex; align-items:center; }
-    .doc-btn .icon { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:2; }
-    .doc-btn:hover { color:var(--primary); background:var(--gray-100); }
-    .doc-btn--del:hover { color:var(--danger); }
-    .doc-card--subiendo { opacity:.75; }
-    .doc-card--subiendo .doc-link { cursor:default; }
-    .doc-bar { position:absolute; left:0; bottom:0; height:3px; background:var(--primary-light); transition:width .2s; }
-    #doc-file { display:none; }
-    .doc-elegido { font-size:.85rem; color:var(--gray-600); margin-top:.4rem; word-break:break-all; }
+    .eq-docs-hint { color: var(--gray-500); font-size: .76rem; margin: -.3rem 0 .7rem; }
+    .eq-docs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+    @media (max-width: 560px) { .eq-docs { grid-template-columns: minmax(0, 1fr); } }
+    .eq-docs-empty { color: var(--gray-500); font-size: .84rem; grid-column: 1 / -1; }
+    .doc-card { position: relative; display: flex; align-items: center; border: 1px solid var(--gray-200); border-radius: 11px; background: #fff; overflow: hidden;
+      min-width: 0; transition: border-color .15s, box-shadow .15s; }
+    .doc-card:hover { border-color: #b5e3db; box-shadow: 0 2px 10px rgba(26,58,92,.08); }
+    .doc-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: .55rem; padding: .45rem .55rem; color: inherit; text-decoration: none; }
+    .doc-tile { flex-shrink: 0; width: 34px; height: 40px; border-radius: 7px; display: grid; place-items: center; font-size: .58rem; font-weight: 800; letter-spacing: .02em; }
+    .doc-tile--pdf { background: #fde9df; color: #b2410f; }
+    .doc-tile--img { background: #e8eef7; color: var(--primary); }
+    .doc-tile--xls { background: #dff3e5; color: #1a7f3c; }
+    .doc-tile--doc { background: #e3ebfb; color: #1d4ed8; }
+    .doc-tile--otro { background: var(--gray-100); color: var(--gray-600); }
+    .doc-body { min-width: 0; display: block; }
+    .doc-texto { display: block; font-weight: 700; color: var(--gray-700); font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .doc-meta { display: block; color: var(--gray-500); font-size: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .doc-btns { display: flex; align-items: center; padding-right: .25rem; }
+    .doc-btn { border: none; background: none; color: var(--gray-400); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; }
+    .doc-btn .icon { width: 14px; height: 14px; }
+    .doc-btn:hover { color: var(--primary); background: var(--gray-100); }
+    .doc-btn--del:hover { color: #b02a2a; background: #fde6e6; }
+    .doc-card--subiendo { opacity: .8; }
+    .doc-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: #1b7a6e; transition: width .2s; }
+    .doc-elegido { font-size: .84rem; color: var(--gray-600); margin-top: .4rem; word-break: break-all; }
+    .eqf-icon-btn { padding: .32rem .55rem !important; }
 
-    .eq-save-bar { position:sticky; bottom:0; background:linear-gradient(transparent, var(--gray-50, #f7f8fa) 40%); padding:1rem 0 .5rem; display:flex; gap:.6rem; justify-content:flex-end; }
+    /* Barra de guardar: sólo con cambios */
+    .eqf-save { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--white); border-top: 1px solid var(--gray-200);
+      padding: .55rem .8rem calc(.55rem + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: .5rem;
+      box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); animation: eqfUp .2s ease-out both; }
+    .eqf-save.hidden { display: none; }
+    .eqf-save .s { flex: 1; min-width: 0; font-size: .82rem; color: #8a4f0d; font-weight: 700; display: flex; align-items: center; gap: .4rem; }
+    .eqf-save .s::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #e0a24a; flex: none; }
+    .eqf-save .s.err { color: #b02a2a; } .eqf-save .s.err::before { background: #d64545; }
+    .eqf-save .foc-btn { padding: .55rem 1rem; }
+    @media (min-width: 1000px) {
+      .eqf-save { left: auto; right: 1.5rem; bottom: 1.2rem; border: 1px solid var(--gray-200); border-radius: 999px; padding: .4rem .45rem .4rem 1.1rem; min-width: 420px; }
+    }
+    @keyframes eqfUp { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .eqf-save { animation: none; } }
   </style>
 </head>
 <body>
 
 <header class="app-header">
-  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
+  <div class="header-brand u-pointer" id="header-brand">
     <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
       onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
     <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
@@ -87,120 +117,134 @@
   </div>
 </header>
 
-<main class="app-main">
-  <div class="eq-ficha" id="eq-ficha" style="display:none">
+<main class="app-main eq-main">
+  <div id="eq-loading" class="hist-loading">Cargando ficha…</div>
 
-    <!-- Foto -->
-    <div class="eq-foto-wrap">
-      <div class="eq-foto" id="eq-foto">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-      </div>
-      <input type="file" id="eq-file" accept="image/*">
-      <input type="file" id="eq-file-cam" accept="image/*" capture="environment">
-      <div class="eq-foto-actions">
-        <button class="btn btn-sm btn-outline" id="btn-foto-cam">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          Sacar foto
-        </button>
-        <button class="btn btn-sm btn-outline" id="btn-foto">Agregar foto</button>
-        <button class="btn btn-sm btn-danger" id="btn-foto-del" style="display:none">Quitar</button>
-      </div>
-    </div>
+  <div class="eqf-lay" id="eq-ficha" style="display:none">
+    <div class="eqf-col">
 
-    <!-- Datos -->
-    <div class="eq-card">
-      <div class="eq-card-head">
-        <h2>Datos del equipo</h2>
-        <button class="btn btn-sm btn-outline" id="btn-edit-datos">Editar</button>
-      </div>
-      <div class="form-group">
-        <label for="eq-codigo">Código *</label>
-        <input type="text" id="eq-codigo" class="form-control" placeholder="Ej: C 172" readonly>
-      </div>
-      <div class="form-group">
-        <label for="eq-tipo">Tipo / Descripción</label>
-        <input type="text" id="eq-tipo" class="form-control" placeholder="Ej: Camion L111" readonly>
-      </div>
-      <div class="form-group u-mb-0">
-        <label for="eq-patente">Patente / Dominio</label>
-        <input type="text" id="eq-patente" class="form-control" placeholder="Ej: AF440LL" autocapitalize="characters" style="text-transform:uppercase">
-      </div>
-      <div class="eq-estado-row">
-        <span class="eq-estado-lbl">Estado: <span id="eq-estado-badge" class="u-badge">—</span></span>
-        <button class="btn btn-sm" id="btn-toggle-activo">—</button>
-      </div>
-    </div>
-
-    <!-- Ubicación y responsable -->
-    <div class="eq-card">
-      <h2>Ubicación y responsable</h2>
-      <div class="form-group" style="margin-top:.75rem">
-        <label for="eq-ubicacion">Obra donde se encuentra</label>
-        <select id="eq-ubicacion" class="form-control">
-          <option value="">Sin asignar</option>
-        </select>
-      </div>
-      <div class="form-group u-mb-0">
-        <label for="eq-responsable">Responsable del equipo</label>
-        <input type="text" id="eq-responsable" class="form-control" placeholder="Nombre y apellido">
-      </div>
-    </div>
-
-    <!-- Repuestos y características -->
-    <div class="eq-card">
-      <h2>Repuestos y características</h2>
-      <div id="eq-items"></div>
-      <button class="btn btn-sm btn-outline" id="btn-add-item">+ Agregar renglón</button>
-    </div>
-
-    <!-- Documentación (archivos en Drive: EQUIPOS/{equipo}/) -->
-    <div class="eq-card">
-      <div class="eq-card-head eq-card-head--wrap">
-        <h2>Documentación</h2>
-        <div class="eq-docs-actions">
-          <a class="btn btn-sm btn-outline" id="btn-docs-carpeta" target="_blank" rel="noopener" style="display:none" title="Abrir la carpeta en Drive"></a>
-          <button class="btn btn-sm btn-outline" id="btn-docs-sync" style="display:none" title="Sumar archivos subidos directo en Drive">Traer de Drive</button>
-          <button class="btn btn-sm btn-primary" id="btn-docs-add"></button>
+      <!-- Cabecera: foto, código, pastillas -->
+      <div class="eq-card eqf-o1">
+        <div class="eq-hero">
+          <div class="ph" id="eq-foto-box">
+            <span id="eq-foto"></span>
+            <div class="act-dd">
+              <button type="button" class="act-pick eqf-foto-btn" data-dd="foto" aria-haspopup="menu" aria-expanded="false" id="btn-foto-menu"></button>
+              <div class="act-menu act-menu--right hidden" role="menu" id="menu-foto"></div>
+            </div>
+          </div>
+          <input type="file" id="eq-file" accept="image/*">
+          <input type="file" id="eq-file-cam" accept="image/*" capture="environment">
+          <div class="info">
+            <div class="cod"><span id="h-cod"></span><button type="button" class="eqf-pencil" id="btn-edit-hero" title="Editar código y descripción" aria-label="Editar código y descripción"></button></div>
+            <div class="tp" id="h-tp"></div>
+            <div class="eq-chips" id="h-chips"></div>
+            <div class="eq-kv" id="h-kv" style="margin-top:.3rem"></div>
+          </div>
         </div>
       </div>
-      <p class="eq-docs-hint">Títulos, manuales, seguros… Se guardan en Drive al subirlos, sin necesidad de Guardar cambios.</p>
-      <div class="eq-docs" id="eq-docs"></div>
+
+      <!-- Ubicación y responsable -->
+      <div class="eq-card eqf-card eqf-o3">
+        <div class="eq-sec-h"><span class="eq-sq" id="ic-ubic"></span><h2>Ubicación y responsable</h2></div>
+        <div class="form-group">
+          <label for="eq-ubicacion">Obra donde se encuentra</label>
+          <select id="eq-ubicacion" class="form-control">
+            <option value="">Sin asignar</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="eq-responsable">Responsable del equipo</label>
+          <input type="text" id="eq-responsable" class="form-control" placeholder="Nombre y apellido">
+        </div>
+      </div>
+
+      <!-- Datos (código y descripción protegidos detrás de Editar) -->
+      <div class="eq-card eqf-card eqf-o4">
+        <div class="eq-sec-h"><span class="eq-sq eq-sq--gr" id="ic-datos"></span><h2>Datos</h2>
+          <span class="eq-push"><button type="button" class="foc-btn foc-btn--clear" id="btn-edit-datos"></button></span></div>
+        <div class="eq-kv" id="datos-ver"></div>
+        <div id="datos-edit" style="display:none">
+          <div class="form-group">
+            <label for="eq-codigo">Código *</label>
+            <input type="text" id="eq-codigo" class="form-control" placeholder="Ej: C 172">
+          </div>
+          <div class="form-group">
+            <label for="eq-tipo">Tipo / descripción</label>
+            <input type="text" id="eq-tipo" class="form-control" placeholder="Ej: Camion L111">
+          </div>
+          <div class="eq-dlg-row">
+            <div class="form-group">
+              <label for="eq-familia">Familia</label>
+              <select id="eq-familia" class="form-control"></select>
+            </div>
+            <div class="form-group">
+              <label for="eq-patente">Patente / dominio</label>
+              <input type="text" id="eq-patente" class="form-control" placeholder="Ej: AF440LL" autocapitalize="characters" style="text-transform:uppercase">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Repuestos y características -->
+      <div class="eq-card eqf-o5">
+        <div class="eq-sec-h"><span class="eq-sq eq-sq--amb" id="ic-items"></span><h2>Repuestos y características</h2></div>
+        <div class="eqf-items" id="eq-items"></div>
+        <button type="button" class="eqf-add" id="btn-add-item" style="margin-top:.4rem;width:100%"></button>
+      </div>
     </div>
 
-    <div id="eq-error" class="alert alert-error hidden"></div>
+    <div class="eqf-col">
+      <!-- Compras del equipo (OC con este equipo) -->
+      <div class="eq-card eqf-o2">
+        <div class="eq-sec-h"><span class="eq-sq eq-sq--blue" id="ic-compras"></span><h2>Compras del equipo</h2>
+          <span class="eq-push" id="compras-periodo"></span></div>
+        <div id="f-compras"><div class="eq-vacio">Buscando las OC del equipo…</div></div>
+      </div>
 
-    <div class="eq-save-bar">
-      <button class="btn btn-primary" id="btn-save">Guardar cambios</button>
+      <!-- Documentación (archivos en Drive: EQUIPOS/{equipo}/) -->
+      <div class="eq-card eqf-o6">
+        <div class="eq-sec-h"><span class="eq-sq eq-sq--vio" id="ic-docs"></span><h2>Documentación</h2>
+          <span class="eq-push">
+            <a class="foc-btn foc-btn--clear eqf-icon-btn" id="btn-docs-carpeta" target="_blank" rel="noopener" style="display:none" title="Abrir la carpeta en Drive" aria-label="Abrir la carpeta en Drive"></a>
+            <button type="button" class="foc-btn foc-btn--clear eqf-icon-btn" id="btn-docs-sync" style="display:none" title="Sumar archivos subidos directo en Drive" aria-label="Traer de Drive"></button>
+            <button type="button" class="foc-btn foc-btn--vio" id="btn-docs-add"></button>
+          </span></div>
+        <p class="eq-docs-hint">Títulos, manuales, seguros… Se guardan en Drive al subirlos, sin necesidad de guardar la ficha.</p>
+        <div class="eq-docs" id="eq-docs"></div>
+      </div>
     </div>
   </div>
 
-  <div id="eq-loading" class="hist-loading">Cargando ficha…</div>
+  <div class="eqf-save hidden" id="eq-savebar" role="region" aria-label="Cambios sin guardar">
+    <span class="s" id="eq-save-st">Cambios sin guardar</span>
+    <button type="button" class="foc-btn foc-btn--clear" id="btn-descartar">Descartar</button>
+    <button type="button" class="foc-btn foc-btn--tea" id="btn-save"></button>
+  </div>
 </main>
 
-<!-- Modal: Adjuntar / editar documento -->
-<div class="modal-overlay hidden" id="modal-doc">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-doc-title">Adjuntar documento</span>
-    </div>
-    <div class="modal-body">
-      <div class="form-group" id="doc-file-group">
-        <input type="file" id="doc-file">
-        <button class="btn btn-sm btn-outline" id="btn-doc-elegir">Elegir archivo</button>
-        <div class="doc-elegido" id="doc-elegido"></div>
-      </div>
-      <div class="form-group u-mb-0">
-        <label for="doc-texto">Texto de la card</label>
-        <input type="text" id="doc-texto" class="form-control" placeholder="Ej: Título del automotor" maxlength="100">
+<!-- Adjuntar / editar documento -->
+<div class="modal-overlay eq-dlg-ov hidden" id="modal-doc">
+  <div class="eq-dlg" role="dialog" aria-modal="true" aria-labelledby="modal-doc-title">
+    <div class="eq-dlg-h">
+      <span class="eq-sq eq-sq--vio" id="ic-modal-doc"></span>
+      <div>
+        <h2 id="modal-doc-title">Adjuntar documento</h2>
+        <p>Se sube a la carpeta del equipo en Drive.</p>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-doc-no">Cancelar</button>
-      <button class="btn btn-primary" id="modal-doc-yes">Subir</button>
+    <div class="form-group" id="doc-file-group">
+      <input type="file" id="doc-file">
+      <button type="button" class="foc-btn foc-btn--edit" id="btn-doc-elegir"></button>
+      <div class="doc-elegido" id="doc-elegido"></div>
+    </div>
+    <div class="form-group u-mb-0">
+      <label for="doc-texto">Texto de la tarjeta</label>
+      <input type="text" id="doc-texto" class="form-control" placeholder="Ej: Título del automotor" maxlength="100">
+    </div>
+    <div class="eq-dlg-f">
+      <button type="button" class="foc-btn foc-btn--clear" id="modal-doc-no">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--vio" id="modal-doc-yes">Subir</button>
     </div>
   </div>
 </div>
@@ -212,6 +256,9 @@
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>
+<script src="js/driveBackup.js"></script>
+<script src="js/duplicados.js"></script>
+<script src="js/equiposComun.js"></script>
 <script src="js/equipo.js"></script>
 </body>
 </html>

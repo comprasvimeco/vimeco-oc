@@ -609,6 +609,14 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     return data && data.foto ? data.foto : null;
   };
 
+  // Claves de los equipos que tienen foto, sin bajar las fotos (shallow): el
+  // mosaico de Equipos pide después sólo las que se ven.
+  window.getEquiposConFoto = async function () {
+    const resp = await fetch(_base() + '/equipos_fotos.json?shallow=true');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return new Set(Object.keys((await resp.json()) || {}));
+  };
+
   window.saveEquipoFoto = async function (key, dataURL) {
     const resp = await fetch(_base() + '/equipos_fotos/' + key + '.json', {
       method:  'PUT',

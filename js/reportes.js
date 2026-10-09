@@ -1867,10 +1867,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Patentes por código de equipo (best-effort: sin esto el reporte sigue
   // mostrando el equipo, sólo que sin la patente).
+  // Desde la ficha de un equipo ("Ver en Reportes") se llega con ?equipo=CÓDIGO:
+  // el reporte arranca filtrado por ese equipo.
+  const eqParam = new URLSearchParams(location.search).get('equipo');
+  let eqTipo = '';
   try {
     PATENTES = {};
-    (await getAllEquipos()).forEach(e => { if (e.patente) PATENTES[e.codigo] = e.patente; });
+    (await getAllEquipos()).forEach(e => {
+      if (e.patente) PATENTES[e.codigo] = e.patente;
+      if (e.codigo === eqParam) eqTipo = e.tipo || '';
+    });
   } catch (_) {}
+  if (eqParam) state.filtroEquipo = { key: eqParam, label: equipoLabel({ codigo: eqParam, tipo: eqTipo }) };
 
   renderDolarHoy();
   if (typeof getDolarSnapshot === 'function') getDolarSnapshot().then(renderDolarHoy).catch(() => {});

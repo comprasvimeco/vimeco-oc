@@ -7,6 +7,11 @@
  *     (perspectiva corregida + filtro) o null si el usuario cancela.
  *     Rechaza ante error duro (no se pudieron cargar las librerías/imagen).
  *
+ * El editor (claro, como el resto de la app) lo arma este archivo la primera
+ * vez que se abre: las páginas sólo cargan el script. Título con la indicación,
+ * "Toda la foto" (sin recorte), Rotar, filtros con miniatura y una lupa sobre
+ * la esquina mientras se arrastra (en el teléfono el dedo la tapa).
+ *
  * Robustez: el display NO depende de OpenCV — la foto se dibuja siempre con
  * canvas 2D plano. OpenCV se usa solo para la detección de bordes (sobre una
  * copia chica) y para el warp + filtro de salida. Cualquier fallo de OpenCV
@@ -21,6 +26,69 @@
   const DETECT_SIZE  = 700;    // lado mayor para correr la detección (px)
   const MAX_OUT      = 1800;   // lado mayor de la imagen de salida (px)
   const JPEG_QUALITY = 0.85;
+  const QUAD_COLOR   = '#2557a7';
+  const LOUPE_PX     = 104;    // diámetro de la lupa (px CSS)
+  const LOUPE_ZOOM   = 2.5;
+
+  // ─── Markup del editor ────────────────────────────────────────────────────
+  const SVG = (inner) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
+  const I = {
+    x:      '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    full:   '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
+    rotate: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>',
+    check:  '<polyline points="20 6 9 17 4 12"/>',
+  };
+  const FILTROS = [['color', 'Color'], ['gray', 'Grises'], ['bw', 'B&N']];
+
+  function ensureEditor() {
+    let ed = document.getElementById('scan-editor');
+    if (ed) return ed;
+    ed = document.createElement('div');
+    ed.id = 'scan-editor';
+    ed.className = 'scan-editor hidden';
+    ed.setAttribute('role', 'dialog');
+    ed.setAttribute('aria-modal', 'true');
+    ed.setAttribute('aria-labelledby', 'scan-title');
+    ed.innerHTML = `
+      <div class="scan-top" id="scan-top">
+        <button type="button" class="scan-x" data-scan-cancel aria-label="Cancelar">${SVG(I.x)}</button>
+        <div class="scan-tt">
+          <b id="scan-title">Recortar comprobante</b>
+          <span>Mové las esquinas al borde del papel<span class="scan-largo">; la foto se endereza sola</span></span>
+        </div>
+        <div class="scan-top-acts">
+          <button type="button" class="scan-ib" id="scan-full" title="Usar la foto entera, sin recortar">${SVG(I.full)}<span>Toda la foto</span></button>
+          <button type="button" class="scan-ib" id="scan-rotate" title="Rotar">${SVG(I.rotate)}<span>Rotar</span></button>
+        </div>
+      </div>
+      <div class="scan-area">
+        <div class="scan-stage" id="scan-stage">
+          <canvas id="scan-canvas"></canvas>
+          <canvas id="scan-quad"></canvas>
+          <div class="scan-handle" data-corner="tl"></div>
+          <div class="scan-handle" data-corner="tr"></div>
+          <div class="scan-handle" data-corner="br"></div>
+          <div class="scan-handle" data-corner="bl"></div>
+          <canvas class="scan-loupe hidden" id="scan-loupe"></canvas>
+        </div>
+        <span class="scan-tip hidden" id="scan-tip"></span>
+      </div>
+      <div class="scan-loading hidden" id="scan-loading">
+        <div class="scan-spinner"></div>
+        <span id="scan-loading-text">Cargando escáner…</span>
+      </div>
+      <div class="scan-bot" id="scan-bot">
+        <div class="scan-filters" role="group" aria-label="Filtro">
+          ${FILTROS.map(([f, l]) => `<button type="button" class="scan-chip" data-filter="${f}" aria-pressed="false"><canvas class="scan-th"></canvas><span>${l}</span></button>`).join('')}
+        </div>
+        <div class="scan-actions">
+          <button type="button" class="scan-btn" data-scan-cancel>Cancelar</button>
+          <button type="button" class="scan-btn primary" id="scan-done">${SVG(I.check)}Usar este recorte</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ed);
+    return ed;
+  }
 
   // ─── Carga diferida de librerías ──────────────────────────────────────────
   let libsPromise = null;
@@ -74,18 +142,25 @@
   // ─── Editor ───────────────────────────────────────────────────────────────
   function openScanner(file) {
     return new Promise((resolve, reject) => {
+      const editor = ensureEditor();
+      const q = (sel) => editor.querySelector(sel);
       const els = {
-        editor:   document.getElementById('scan-editor'),
-        stage:    document.getElementById('scan-stage'),
-        canvas:   document.getElementById('scan-canvas'),
-        quad:     document.getElementById('scan-quad'),
-        loading:  document.getElementById('scan-loading'),
-        loadTxt:  document.getElementById('scan-loading-text'),
-        rotate:   document.getElementById('scan-rotate'),
-        cancel:   document.getElementById('scan-cancel'),
-        done:     document.getElementById('scan-done'),
-        chips:    Array.from(document.querySelectorAll('#scan-editor .scan-chip')),
-        handles:  Array.from(document.querySelectorAll('#scan-editor .scan-handle')),
+        editor,
+        top:      q('#scan-top'),
+        bot:      q('#scan-bot'),
+        stage:    q('#scan-stage'),
+        canvas:   q('#scan-canvas'),
+        quad:     q('#scan-quad'),
+        loupe:    q('#scan-loupe'),
+        tip:      q('#scan-tip'),
+        loading:  q('#scan-loading'),
+        loadTxt:  q('#scan-loading-text'),
+        rotate:   q('#scan-rotate'),
+        full:     q('#scan-full'),
+        cancels:  Array.from(editor.querySelectorAll('[data-scan-cancel]')),
+        done:     q('#scan-done'),
+        chips:    Array.from(editor.querySelectorAll('.scan-chip')),
+        handles:  Array.from(editor.querySelectorAll('.scan-handle')),
       };
 
       const state = {
@@ -99,8 +174,12 @@
 
       // —— Limpieza / salida ——
       const cleanups = [];
+      let tipTimer = null;
       function teardown() {
         cleanups.forEach((fn) => { try { fn(); } catch (_) {} });
+        clearTimeout(tipTimer);
+        els.tip.classList.add('hidden');
+        els.loupe.classList.add('hidden');
         els.editor.classList.add('hidden');
         document.body.classList.remove('scan-open');
       }
@@ -112,6 +191,13 @@
         els.loading.classList.remove('hidden');
       }
       function hideLoading() { els.loading.classList.add('hidden'); }
+
+      function tip(txt) {
+        clearTimeout(tipTimer);
+        els.tip.textContent = txt;
+        els.tip.classList.remove('hidden');
+        tipTimer = setTimeout(() => els.tip.classList.add('hidden'), 2600);
+      }
 
       // —— Imagen de trabajo (rotación + cap de resolución), canvas 2D plano ——
       function buildSrc() {
@@ -132,7 +218,8 @@
         ctx.restore();
       }
 
-      // —— Detección de bordes (copia chica, validada; fallback recorte completo) ——
+      // —— Detección de bordes (copia chica, validada; fallback recorte casi completo) ——
+      // Devuelve true si encontró el papel.
       function detectCorners() {
         const w = state.src.width, h = state.src.height;
         const fallback = {
@@ -156,11 +243,11 @@
                 x: Math.max(0, Math.min(w, p.x / k)),
                 y: Math.max(0, Math.min(h, p.y / k)),
               });
-              const q = { tl: up(pts[0]), tr: up(pts[1]), br: up(pts[2]), bl: up(pts[3]) };
+              const q4 = { tl: up(pts[0]), tr: up(pts[1]), br: up(pts[2]), bl: up(pts[3]) };
               // descartar cuadriláteros degenerados
-              const ok = dist(q.tl, q.tr) > w * 0.15 && dist(q.bl, q.br) > w * 0.15 &&
-                         dist(q.tl, q.bl) > h * 0.15 && dist(q.tr, q.br) > h * 0.15;
-              if (ok) { state.corners = q; return; }
+              const ok = dist(q4.tl, q4.tr) > w * 0.15 && dist(q4.bl, q4.br) > w * 0.15 &&
+                         dist(q4.tl, q4.bl) > h * 0.15 && dist(q4.tr, q4.br) > h * 0.15;
+              if (ok) { state.corners = q4; return true; }
             }
           }
         } catch (_) { /* fallback */ }
@@ -169,6 +256,7 @@
           if (mat)     { try { mat.delete();     } catch (_) {} }
         }
         state.corners = fallback;
+        return false;
       }
 
       // Normaliza la iluminación de un canal de grises IN PLACE:
@@ -230,12 +318,26 @@
         return out;
       }
 
+      // —— Miniaturas de los filtros (sobre una copia chica de la foto) ——
+      function renderThumbs() {
+        const w = state.src.width, h = state.src.height;
+        const k = 120 / Math.max(w, h);
+        const small = scaledCanvas(state.src, w * k, h * k);
+        els.chips.forEach((ch) => {
+          const c = ch.querySelector('canvas');
+          let shown = small;
+          try { shown = applyFilter(small, ch.dataset.filter); } catch (_) { shown = small; }
+          c.width = shown.width; c.height = shown.height;
+          c.getContext('2d').drawImage(shown, 0, 0);
+        });
+      }
+
       // —— Layout: dimensiona display y posiciona manijas ——
       function layout() {
         const w = state.src.width, h = state.src.height;
-        const toolbarH = 132;
-        const maxW = Math.min(window.innerWidth - 24, 1000);
-        const maxH = Math.max(160, window.innerHeight - toolbarH - 24);
+        const reservado = els.top.offsetHeight + els.bot.offsetHeight + 28;
+        const maxW = Math.min(window.innerWidth - 28, 1000);
+        const maxH = Math.max(160, window.innerHeight - reservado);
         const scale = Math.min(maxW / w, maxH / h, 1) || 1;
         state.scale = scale;
         const dw = Math.max(1, Math.round(w * scale));
@@ -276,11 +378,43 @@
         ctx.lineTo(c.br.x * s, c.br.y * s);
         ctx.lineTo(c.bl.x * s, c.bl.y * s);
         ctx.closePath();
-        ctx.strokeStyle = '#22c55e';
+        ctx.strokeStyle = QUAD_COLOR;
         ctx.lineWidth = 2;
         ctx.stroke();
-        ctx.fillStyle = 'rgba(34,197,94,0.10)';
+        ctx.fillStyle = 'rgba(37,87,167,0.12)';
         ctx.fill();
+      }
+
+      // —— Lupa: muestra ampliado lo que hay bajo la esquina que se arrastra ——
+      function drawLoupe(dx, dy) {
+        const dpr = window.devicePixelRatio || 1;
+        const L = els.loupe;
+        if (L.width !== LOUPE_PX * dpr) { L.width = L.height = LOUPE_PX * dpr; }
+        const ctx = L.getContext('2d');
+        const half = LOUPE_PX / 2 / LOUPE_ZOOM;   // px de display a cada lado
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = '#e9eef6';
+        ctx.fillRect(0, 0, LOUPE_PX, LOUPE_PX);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(els.canvas, dx - half, dy - half, half * 2, half * 2, 0, 0, LOUPE_PX, LOUPE_PX);
+        ctx.drawImage(els.quad,   dx - half, dy - half, half * 2, half * 2, 0, 0, LOUPE_PX, LOUPE_PX);
+        ctx.strokeStyle = QUAD_COLOR;
+        ctx.lineWidth = 1.5;
+        const m = LOUPE_PX / 2;
+        ctx.beginPath();
+        ctx.moveTo(m, m - 14); ctx.lineTo(m, m + 14);
+        ctx.moveTo(m - 14, m); ctx.lineTo(m + 14, m);
+        ctx.stroke();
+        ctx.restore();
+        // Arriba a la izquierda del dedo; si no entra, del otro lado.
+        const sw = els.stage.offsetWidth;
+        let left = dx - LOUPE_PX - 28, top = dy - LOUPE_PX - 28;
+        if (left < -8) left = Math.min(dx + 28, sw - LOUPE_PX + 8);
+        if (top < -8) top = dy + 28;
+        L.style.left = left + 'px';
+        L.style.top  = top + 'px';
+        L.classList.remove('hidden');
       }
 
       // —— Arrastre de manijas ——
@@ -294,15 +428,21 @@
             x: Math.max(0, Math.min(state.src.width,  px)),
             y: Math.max(0, Math.min(state.src.height, py)),
           };
-          el.style.left = (state.corners[key].x * state.scale) + 'px';
-          el.style.top  = (state.corners[key].y * state.scale) + 'px';
+          const dx = state.corners[key].x * state.scale, dy = state.corners[key].y * state.scale;
+          el.style.left = dx + 'px';
+          el.style.top  = dy + 'px';
           drawQuad();
+          drawLoupe(dx, dy);
         }
         function onDown(ev) {
           ev.preventDefault();
           try { el.setPointerCapture(ev.pointerId); } catch (_) {}
+          el.classList.add('drag');
+          drawLoupe(state.corners[key].x * state.scale, state.corners[key].y * state.scale);
           el.addEventListener('pointermove', onMove);
           const up = () => {
+            el.classList.remove('drag');
+            els.loupe.classList.add('hidden');
             el.removeEventListener('pointermove', onMove);
             el.removeEventListener('pointerup', up);
             el.removeEventListener('pointercancel', up);
@@ -359,9 +499,12 @@
             return;
           }
           setTimeout(() => {
-            try { detectCorners(); positionHandles(); drawQuad(); }
+            let hallado = false;
+            try { hallado = detectCorners(); positionHandles(); drawQuad(); }
             catch (_) { /* se queda con recorte completo */ }
             finally { hideLoading(); }
+            tip(hallado ? 'Bordes detectados' : 'Llevá las esquinas al borde del papel');
+            try { renderThumbs(); } catch (_) {}
           }, 30);
         }, 16);
       }
@@ -369,7 +512,7 @@
       // —— Controles ——
       function setFilter(f) {
         state.filter = f;
-        els.chips.forEach((ch) => ch.classList.toggle('active', ch.dataset.filter === f));
+        els.chips.forEach((ch) => ch.setAttribute('aria-pressed', String(ch.dataset.filter === f)));
       }
       els.chips.forEach((ch) => {
         const fn = () => { setFilter(ch.dataset.filter); if (state.corners) render(); };
@@ -384,9 +527,21 @@
       els.rotate.addEventListener('click', onRotate);
       cleanups.push(() => els.rotate.removeEventListener('click', onRotate));
 
+      const onFull = () => {
+        if (!state.corners) return;
+        state.corners = fullFrameCorners();
+        positionHandles();
+        drawQuad();
+        tip('Se usa la foto entera');
+      };
+      els.full.addEventListener('click', onFull);
+      cleanups.push(() => els.full.removeEventListener('click', onFull));
+
       const onCancel = () => finish(null);
-      els.cancel.addEventListener('click', onCancel);
-      cleanups.push(() => els.cancel.removeEventListener('click', onCancel));
+      els.cancels.forEach((b) => {
+        b.addEventListener('click', onCancel);
+        cleanups.push(() => b.removeEventListener('click', onCancel));
+      });
 
       const onDone = async () => {
         showLoading('Procesando…');
@@ -413,6 +568,10 @@
         document.body.classList.add('scan-open');
         els.editor.classList.remove('hidden');
         setFilter('color');
+        els.chips.forEach((ch) => {
+          const c = ch.querySelector('canvas');
+          c.getContext('2d').clearRect(0, 0, c.width, c.height);
+        });
         showLoading('Cargando escáner…');
         try {
           await ensureLibs();

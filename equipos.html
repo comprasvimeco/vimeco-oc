@@ -9,42 +9,17 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .eq-list { display:flex; flex-direction:column; gap:.4rem; }
-    .eq-row {
-      display:flex; align-items:center; gap:.65rem;
-      background:#fff; border:1px solid var(--gray-200); border-radius:10px;
-      padding:.7rem .9rem; cursor:pointer;
-      transition: border-color .15s, box-shadow .15s, transform .05s;
+    /* Teléfono: mosaico. Escritorio (≥1000px): lista por familia + ficha al costado. */
+    .eq-corto { display: none; }
+    @media (max-width: 560px) {
+      .eq-corto { display: inline; } .eq-largo { display: none; }
+      .eq-ttl #cnt-inact { display: none; }
     }
-    .eq-row:hover { border-color:var(--primary); box-shadow:0 2px 8px rgba(35,72,112,.10); }
-    .eq-row:active { transform:scale(.995); }
-    .eq-row--inactive { opacity:.55; }
-    .eq-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:.12rem; }
-    .eq-line { display:flex; align-items:center; gap:.5rem; min-width:0; }
-    .eq-code { font-weight:700; color:var(--gray-800); font-size:.95rem; white-space:nowrap; flex-shrink:0; }
-    .eq-pat {
-      font-size:.7rem; font-weight:700; letter-spacing:.04em; color:var(--gray-600);
-      background:var(--gray-100); border:1px solid var(--gray-200); border-radius:5px;
-      padding:.06rem .32rem; white-space:nowrap; flex-shrink:0;
-    }
-    .eq-tipo { color:var(--gray-500); font-size:.88rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .eq-resp { flex-shrink:0; display:inline-flex; align-items:center; gap:.22rem; font-size:.76rem; color:var(--gray-500); white-space:nowrap; }
-    .eq-resp svg { width:12px; height:12px; flex-shrink:0; }
-    .eq-ubic { flex-shrink:0; display:inline-flex; align-items:center; gap:.25rem; font-size:.76rem; font-weight:600;
-      color:var(--primary); background:var(--gray-100); border-radius:999px; padding:.16rem .55rem;
-      max-width:42%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .eq-ubic svg { width:12px; height:12px; flex-shrink:0; }
-    .eq-ubic--none { color:var(--gray-400); font-weight:500; background:transparent; padding-left:0; padding-right:0; }
-    .eq-search { position:relative; margin:.25rem 0 .6rem; }
-    .eq-search svg { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--gray-400); pointer-events:none; }
-    .eq-search input { padding-left:2.15rem; }
-    .eq-filter-bar { display:flex; align-items:center; gap:.5rem; margin:.25rem 0 .9rem; }
-    .eq-filter-bar label { font-size:.85rem; color:var(--gray-600); flex-shrink:0; }
-    .eq-filter-bar select { max-width:340px; }
-    .eq-row .u-badge { flex-shrink:0; }
-    .eq-chev { color:var(--gray-300); flex-shrink:0; display:flex; }
-    .eq-chev svg { width:20px; height:20px; }
-    .eq-row:hover .eq-chev { color:var(--primary); }
+    .eq-side-acts { display: flex; gap: .5rem; margin-top: .75rem; }
+    .eq-side-acts .foc-btn { flex: 1; justify-content: center; padding: .6rem; font-size: .86rem; }
+    .eq-side-vacio { text-align: center; color: var(--gray-500); padding: 2.5rem 1rem; }
+    .eq-side-vacio .eq-sq { margin: 0 auto .6rem; width: 48px; height: 48px; border-radius: 14px; }
+
   </style>
 </head>
 <body>
@@ -62,60 +37,82 @@
   </div>
 </header>
 
-<main class="app-main">
-  <div class="hist-page">
-    <div class="hist-toolbar">
-      <span style="font-weight:600;color:var(--gray-700);">Equipos del sistema</span>
-      <div style="display:flex;gap:.5rem;">
-        <button class="btn btn-secondary btn-sm hidden" id="btn-seed">Importar lista inicial</button>
-        <button class="btn btn-primary btn-sm" id="btn-add-equipo">+ Agregar equipo</button>
-      </div>
+<main class="app-main eq-main">
+  <div class="eq-ttl">
+    <h1 class="eq-t">Equipos</h1>
+    <span class="eq-cnt hidden" id="cnt-total"></span>
+    <span class="eq-cnt hidden" id="cnt-obra"></span>
+    <span class="eq-cnt hidden" id="cnt-inact"></span>
+    <div class="eq-push">
+      <button type="button" class="foc-btn foc-btn--clear hidden" id="btn-seed">Importar lista inicial</button>
+      <button type="button" class="foc-btn foc-btn--tea" id="btn-add-equipo"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="eq-largo">Agregar equipo</span><span class="eq-corto">Agregar</span></button>
     </div>
-    <div class="eq-search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="search" id="buscar-equipo" class="form-control" placeholder="Buscar por código o tipo…" autocomplete="off">
+  </div>
+
+  <div class="eq-srch">
+    <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" id="buscar-equipo" placeholder="Código, tipo, patente o responsable…" autocomplete="off" aria-label="Buscar equipo">
+  </div>
+
+  <div class="eq-flt">
+    <div class="act-dd">
+      <button type="button" class="act-pick eq-pick-tea" data-dd="ubic" aria-haspopup="listbox" aria-expanded="false" aria-label="Ubicación"></button>
+      <div class="act-menu act-menu--scroll hidden" id="menu-ubic" role="listbox"></div>
     </div>
-    <div class="eq-filter-bar">
-      <label for="filtro-obra">Ubicación</label>
-      <select id="filtro-obra" class="form-control">
-        <option value="">Todas las ubicaciones</option>
-      </select>
+    <div class="act-dd">
+      <button type="button" class="act-pick" data-dd="fam" aria-haspopup="listbox" aria-expanded="false" aria-label="Familia"></button>
+      <div class="act-menu act-menu--scroll hidden" id="menu-fam" role="listbox"></div>
     </div>
-    <div id="equipos-list" class="eq-list">
-      <div class="hist-loading">Cargando equipos…</div>
+    <div class="eq-seg" id="seg-estado" role="group" aria-label="Estado">
+      <button type="button" data-e="act">Activos</button>
+      <button type="button" data-e="inact">Inactivos</button>
+      <button type="button" data-e="todos">Todos</button>
     </div>
+  </div>
+
+  <div id="equipos-list">
+    <div class="hist-loading">Cargando equipos…</div>
   </div>
 </main>
 
-<!-- Modal: Agregar / Editar equipo -->
-<div class="modal-overlay hidden" id="modal-equipo">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-equipo-title">Agregar equipo</span>
-      <button class="modal-close" id="modal-equipo-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+<!-- Alta rápida: la foto, los repuestos y los documentos se cargan después en la ficha -->
+<div class="modal-overlay eq-dlg-ov hidden" id="modal-equipo">
+  <div class="eq-dlg" role="dialog" aria-modal="true" aria-labelledby="modal-equipo-title">
+    <div class="eq-dlg-h">
+      <span class="eq-sq"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>
+      <div>
+        <h2 id="modal-equipo-title">Agregar equipo</h2>
+        <p>La foto, los repuestos y los documentos se cargan después en la ficha.</p>
+      </div>
+      <button type="button" class="modal-close" id="modal-equipo-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="modal-body">
+    <div class="eq-dlg-row">
       <div class="form-group">
         <label for="equipo-codigo">Código *</label>
         <input type="text" id="equipo-codigo" class="form-control" placeholder="Ej: C 172">
       </div>
       <div class="form-group">
-        <label for="equipo-tipo">Tipo / Descripción</label>
-        <input type="text" id="equipo-tipo" class="form-control" placeholder="Ej: Camion L111">
-      </div>
-      <div class="form-group">
-        <label for="equipo-patente">Patente / Dominio</label>
+        <label for="equipo-patente">Patente</label>
         <input type="text" id="equipo-patente" class="form-control" placeholder="Ej: AF440LL" autocapitalize="characters" style="text-transform:uppercase">
       </div>
-      <div class="form-group u-mb-0">
-        <label for="equipo-responsable">Responsable</label>
-        <input type="text" id="equipo-responsable" class="form-control" placeholder="Nombre y apellido">
-      </div>
-      <div id="modal-equipo-error" class="alert alert-error hidden"></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-equipo-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="modal-equipo-save">Guardar</button>
+    <div class="form-group">
+      <label for="equipo-tipo">Tipo / descripción</label>
+      <input type="text" id="equipo-tipo" class="form-control" placeholder="Ej: Camion L111">
+    </div>
+    <div class="form-group">
+      <label>Familia</label>
+      <div class="eq-fam-chips" id="equipo-familia" role="group" aria-label="Familia"></div>
+      <div class="eq-hint" id="equipo-familia-hint"></div>
+    </div>
+    <div class="form-group u-mb-0">
+      <label for="equipo-responsable">Responsable</label>
+      <input type="text" id="equipo-responsable" class="form-control" placeholder="Nombre y apellido">
+    </div>
+    <div id="modal-equipo-error" class="alert alert-error hidden" style="margin-top:.7rem"></div>
+    <div class="eq-dlg-f">
+      <button type="button" class="foc-btn foc-btn--clear" id="modal-equipo-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--tea" id="modal-equipo-save"><svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg><span>Crear y abrir la ficha</span></button>
     </div>
   </div>
 </div>
@@ -126,6 +123,10 @@
 <script src="js/ui.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
+<script src="js/buscarOC.js"></script>
+<script src="js/driveBackup.js"></script>
+<script src="js/duplicados.js"></script>
+<script src="js/equiposComun.js"></script>
 <script src="js/equipos.js"></script>
 </body>
 </html>

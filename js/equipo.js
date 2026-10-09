@@ -1,20 +1,13 @@
-/* VIMECO S.A. — Ficha de Equipo (admin 0000 o Jefe de taller) */
+/* VIMECO S.A. — Ficha de Equipo (admin 0000 o Jefe de taller)
+
+   Cabecera (foto, código, pastillas), Compras del equipo (OC con este equipo),
+   ubicación y responsable, datos (código y descripción detrás de "Editar"),
+   repuestos y documentación en Drive. "Guardar" aparece sólo con cambios y se
+   avisa antes de salir sin guardar. Los documentos se guardan solos al subirlos. */
 
 const $ = id => document.getElementById(id);
 
-function esc(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// Clave de Firebase derivada del código (igual que en equipos.js).
-function equipoKey(codigo) {
-  return String(codigo).trim()
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
-}
+// esc, equipoKey, familias, ubicPill, compras: equiposComun.js
 
 // Redimensiona y comprime la imagen en el cliente antes de guardarla como
 // dataURL. Una foto de celular pesa 3-5 MB; así queda en ~80-150 KB.
@@ -48,27 +41,83 @@ function compressImage(file, maxDim = 1000, quality = 0.7) {
 let currentKey = null;
 let equipo     = null;   // datos del equipo cargado
 let obras      = [];     // obras para el selector de ubicación
+let obrasMap   = {};
 let fotoActual = null;   // dataURL guardado en Firebase (para saber si cambió)
 let fotoNueva  = null;   // dataURL elegido en esta sesión (null = sin cambios)
 let fotoQuitar = false;  // se pidió borrar la foto
+let periodo    = '12m';  // de Compras del equipo
+let verReportes = false;
+let guardando  = false;
+
+// ---- Cambios sin guardar ----
+// Foto de lo editable; si difiere de la base, aparece la barra de Guardar.
+let base = '';
+function snapshot() {
+  return JSON.stringify({
+    c: $('eq-codigo').value.trim(), t: $('eq-tipo').value.trim(),
+    p: $('eq-patente').value.trim().toUpperCase(), f: $('eq-familia').value,
+    u: $('eq-ubicacion').value, r: $('eq-responsable').value.trim(),
+    i: collectItems(), foto: fotoNueva ? 'nueva' : fotoQuitar ? 'quitar' : ''
+  });
+}
+function hayCambios() { return !!equipo && snapshot() !== base; }
+function revisarCambios() {
+  const sucio = hayCambios();
+  $('eq-savebar').classList.toggle('hidden', !sucio);
+  if (sucio) { $('eq-save-st').textContent = 'Cambios sin guardar'; $('eq-save-st').classList.remove('err'); }
+}
+function errorGuardar(msg) {
+  $('eq-savebar').classList.remove('hidden');
+  $('eq-save-st').textContent = msg;
+  $('eq-save-st').classList.add('err');
+}
+
+async function salir(url) {
+  if (hayCambios()) {
+    const ok = await showConfirm('Salir sin guardar',
+      'Hay cambios en la ficha que no se guardaron. Si salís, se pierden.',
+      { boton: 'Salir sin guardar', tono: 'warn', icono: 'alert', cancelar: 'Seguir editando' });
+    if (!ok) return;
+    base = snapshot();   // para que no salte el aviso del navegador
+  }
+  window.location.href = url;
+}
+
+// ---- Cabecera ----
+function pintarCabecera() {
+  const codigo = $('eq-codigo').value.trim() || equipo.codigo;
+  const tipo   = $('eq-tipo').value.trim();
+  const fam    = FAM_BY_KEY[$('eq-familia').value] || familiaDe(equipo);
+  const pat    = $('eq-patente').value.trim().toUpperCase();
+  const activo = equipo.activo !== false;
+  const ubic   = $('eq-ubicacion').value;
+  $('h-cod').textContent = codigo;
+  $('h-tp').textContent  = [tipo || '—', fam.n].join(' · ');
+  $('h-chips').innerHTML =
+    (pat ? `<span class="eq-pat">${esc(pat)}</span>` : '') +
+    `<span class="eq-st ${activo ? 'eq-st--ok' : 'eq-st--off'}">${icSvg(activo ? 'checkSm' : 'power')}${activo ? 'Activo' : 'Inactivo'}</span>` +
+    ubicPill({ ubicacion: ubic, activo: true }, obrasMap);
+  const resp = $('eq-responsable').value.trim();
+  $('h-kv').innerHTML = `<span>Responsable</span><b>${esc(resp || '—')}</b>`;
+  $('ic-ubic').className = 'eq-sq' + (ubic && esTaller(obrasMap[ubic]) ? ' eq-sq--blue' : '');
+  $('ic-ubic').innerHTML = icSvg(ubic && esTaller(obrasMap[ubic]) ? 'tool' : 'pin');
+  document.querySelector('.header-title').textContent = codigo || 'Ficha de Equipo';
+  pintarFoto();
+}
 
 // ---- Foto ----
-function pintarFoto(dataURL) {
-  const box = $('eq-foto');
-  if (dataURL) {
-    box.innerHTML = `<img src="${dataURL}" alt="Foto del equipo">`;
-    $('btn-foto').textContent = 'Cambiar foto';
-    $('btn-foto-del').style.display = '';
-  } else {
-    box.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-        <circle cx="8.5" cy="8.5" r="1.5"/>
-        <polyline points="21 15 16 10 5 21"/>
-      </svg>`;
-    $('btn-foto').textContent = 'Agregar foto';
-    $('btn-foto-del').style.display = 'none';
-  }
+function fotoVisible() { return fotoQuitar ? null : (fotoNueva || fotoActual); }
+
+function pintarFoto() {
+  const src = fotoVisible();
+  $('eq-foto').innerHTML = src
+    ? `<img src="${src}" alt="Foto del equipo">`
+    : icSvg((FAM_BY_KEY[$('eq-familia').value] || familiaDe(equipo)).i);
+  $('btn-foto-menu').innerHTML = icSvg('camera') + (src ? 'Cambiar foto' : 'Agregar foto');
+  $('menu-foto').innerHTML =
+    `<button type="button" class="act-opt" role="menuitem" data-foto="cam"><span class="act-opt-ic eq-sq">${icSvg('camera')}</span>Sacar foto</button>` +
+    `<button type="button" class="act-opt" role="menuitem" data-foto="gal"><span class="act-opt-ic eq-sq eq-sq--blue">${icSvg('image')}</span>Elegir de la galería</button>` +
+    (src ? `<button type="button" class="act-opt" role="menuitem" data-foto="del"><span class="act-opt-ic eq-sq" style="background:#fde6e6;color:#b02a2a">${icSvg('trash')}</span>Quitar la foto</button>` : '');
 }
 
 async function onFotoElegida(e) {
@@ -76,10 +125,10 @@ async function onFotoElegida(e) {
   e.target.value = '';
   if (!file) return;
   try {
-    const dataURL = await compressImage(file);
-    fotoNueva  = dataURL;
+    fotoNueva  = await compressImage(file);
     fotoQuitar = false;
-    pintarFoto(dataURL);
+    pintarFoto();
+    revisarCambios();
   } catch (_) {
     showToast('No se pudo procesar la imagen.', 'error');
   }
@@ -87,21 +136,12 @@ async function onFotoElegida(e) {
 
 function onQuitarFoto() {
   fotoNueva  = null;
-  fotoQuitar = true;
-  pintarFoto(null);
+  fotoQuitar = !!fotoActual;
+  pintarFoto();
+  revisarCambios();
 }
 
-// ---- Estado (activo / inactivo) ----
-function pintarEstado() {
-  const activo = equipo.activo !== false;
-  const badge  = $('eq-estado-badge');
-  badge.textContent = activo ? 'Activo' : 'Inactivo';
-  badge.className   = 'u-badge ' + (activo ? 'u-badge-activo' : 'u-badge-inactivo');
-  const btn = $('btn-toggle-activo');
-  btn.textContent = activo ? 'Desactivar' : 'Activar';
-  btn.className   = 'btn btn-sm ' + (activo ? 'btn-danger' : 'btn-success');
-}
-
+// ---- Estado (activo / inactivo): se guarda al instante, como antes ----
 async function toggleActivo() {
   const activo = equipo.activo !== false;
   const ok = await showConfirm(
@@ -112,40 +152,61 @@ async function toggleActivo() {
     activo ? { boton: 'Desactivar', tono: 'warn', icono: 'power' } : { boton: 'Activar', tono: 'ok', icono: 'power' }
   );
   if (!ok) return;
-  const btn = $('btn-toggle-activo');
-  btn.disabled = true;
   try {
     await patchEquipo(currentKey, { activo: !activo });
     equipo.activo = !activo;
-    pintarEstado();
+    pintarDatosVer();
+    pintarCabecera();
     showToast(`Equipo ${activo ? 'desactivado' : 'activado'}.`);
   } catch (_) {
     showToast('Error al actualizar el estado.', 'error');
-  } finally {
-    btn.disabled = false;
   }
 }
 
-// ---- Edición protegida de código / descripción ----
+// ---- Datos: lectura / edición protegida ----
 let editandoDatos = false;
+
+function pintarDatosVer() {
+  const activo = equipo.activo !== false;
+  const fam = FAM_BY_KEY[$('eq-familia').value] || familiaDe(equipo);
+  $('datos-ver').innerHTML =
+    `<span>Código</span><b>${esc($('eq-codigo').value.trim() || '—')}</b>` +
+    `<span>Descripción</span><b>${esc($('eq-tipo').value.trim() || '—')}</b>` +
+    `<span>Familia</span><b>${esc(fam.n)}</b>` +
+    `<span>Patente</span><b>${esc($('eq-patente').value.trim().toUpperCase() || '—')}</b>` +
+    `<span>Estado</span><b>${activo ? 'Activo' : 'Inactivo'} · <button type="button" class="eqf-estado ${activo ? 'eqf-estado--off' : 'eqf-estado--on'}" id="btn-toggle-activo">${activo ? 'Desactivar' : 'Activar'}</button></b>`;
+  $('btn-toggle-activo').addEventListener('click', toggleActivo);
+}
 
 function setDatosEditables(on) {
   editandoDatos = on;
-  $('eq-codigo').readOnly = !on;
-  $('eq-tipo').readOnly   = !on;
-  $('btn-edit-datos').textContent = on ? 'Editando…' : 'Editar';
-  $('btn-edit-datos').disabled = on;
+  $('datos-ver').style.display  = on ? 'none' : '';
+  $('datos-edit').style.display = on ? '' : 'none';
+  $('btn-edit-datos').style.display = on ? 'none' : '';
   if (on) $('eq-codigo').focus();
+  else pintarDatosVer();
 }
 
 async function habilitarEdicionDatos() {
-  if (editandoDatos) return;
+  if (editandoDatos) { $('eq-codigo').focus(); return; }
   const ok = await showConfirm(
     'Editar datos del equipo',
-    'Vas a habilitar la edición del código y la descripción. Cambiar el código renombra el equipo. ¿Continuar?',
+    'Vas a habilitar la edición del código, la descripción, la familia y la patente. Cambiar el código renombra el equipo. ¿Continuar?',
     { boton: 'Editar', tono: 'info', icono: 'edit' }
   );
-  if (ok) setDatosEditables(true);
+  if (ok) {
+    setDatosEditables(true);
+    if (window.matchMedia('(max-width: 999px)').matches)
+      $('datos-edit').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function pintarFamiliaSelect() {
+  const auto = familiaPorCodigo($('eq-codigo').value);
+  const sel  = $('eq-familia');
+  const v    = sel.value;
+  sel.innerHTML = FAMILIAS.map(f => `<option value="${f.k}">${esc(f.n)}${f.k === auto.k ? ' (por el código)' : ''}</option>`).join('');
+  sel.value = v || familiaDe(equipo).k;
 }
 
 // ---- Ubicación ----
@@ -168,14 +229,15 @@ function pintarUbicacion() {
 // ---- Repuestos ----
 function addItemRow(valor = '') {
   const row = document.createElement('div');
-  row.className = 'eq-item-row';
+  row.className = 'eqf-item';
   row.innerHTML = `
-    <input type="text" class="form-control" placeholder="Ej: Filtro de aceite Mann W940">
-    <button class="eq-item-del" title="Quitar">&times;</button>`;
+    <input type="text" placeholder="Ej: Filtro de aceite Mann W940" aria-label="Repuesto o característica">
+    <button type="button" class="eqf-item-del" title="Quitar" aria-label="Quitar">${icSvg('x')}</button>`;
   row.querySelector('input').value = valor;
-  row.querySelector('.eq-item-del').addEventListener('click', () => {
+  row.querySelector('.eqf-item-del').addEventListener('click', () => {
     row.remove();
     refreshItemsEmpty();
+    revisarCambios();
   });
   $('eq-items').appendChild(row);
   refreshItemsEmpty();
@@ -184,11 +246,11 @@ function addItemRow(valor = '') {
 
 function refreshItemsEmpty() {
   const cont = $('eq-items');
-  const hasRows = cont.querySelector('.eq-item-row');
-  let ph = cont.querySelector('.eq-items-empty');
+  const hasRows = cont.querySelector('.eqf-item');
+  let ph = cont.querySelector('.eqf-items-empty');
   if (!hasRows && !ph) {
     ph = document.createElement('div');
-    ph.className = 'eq-items-empty';
+    ph.className = 'eqf-items-empty';
     ph.textContent = 'Sin repuestos ni características cargados todavía.';
     cont.prepend(ph);
   } else if (hasRows && ph) {
@@ -197,15 +259,26 @@ function refreshItemsEmpty() {
 }
 
 function collectItems() {
-  return Array.from($('eq-items').querySelectorAll('.eq-item-row input'))
+  return Array.from($('eq-items').querySelectorAll('.eqf-item input'))
     .map(inp => inp.value.trim())
     .filter(Boolean);
+}
+
+// ---- Compras del equipo ----
+function pintarCompras() {
+  $('compras-periodo').innerHTML = periodoDdHTML('periodo', periodo);
+  ocsConEquipo().then(ocs => {
+    $('f-compras').innerHTML = comprasHTML(resumenCompras(ocs, equipo.codigo, periodo),
+      { max: 4, linkReportes: verReportes ? linkReportesEquipo(equipo.codigo) : '' });
+  }).catch(() => {
+    $('f-compras').innerHTML = '<div class="eq-vacio">No se pudieron leer las compras.</div>';
+  });
 }
 
 // ---- Documentación (archivos en Drive) ----
 // Índice en Firebase (/equipos_docs/{key}); el archivo vive en Drive, en
 // EQUIPOS/{Código - Descripción}/. Subir o quitar un documento impacta al
-// instante: no pasa por "Guardar cambios".
+// instante: no pasa por "Guardar".
 let docsFolderId = null;
 let docs         = [];     // [{ id, texto, nombre, fileId, mime, size, subidoPor, fecha }]
 let docEditando  = null;   // id del documento cuyo texto se edita (null = alta)
@@ -225,7 +298,7 @@ function sinExtension(nombre) {
   return String(nombre || '').replace(/\.[a-z0-9]{1,6}$/i, '');
 }
 
-// Color y rótulo del cuadradito de la card según el tipo de archivo.
+// Color y rótulo del cuadradito de la tarjeta según el tipo de archivo.
 function tipoDoc(mime, nombre) {
   const ext = extension(nombre);
   mime = mime || '';
@@ -253,7 +326,7 @@ function fmtFecha(ts) {
 
 function docTileHTML(mime, nombre) {
   const t = tipoDoc(mime, nombre);
-  return `<span class="doc-tile doc-tile--${t.cls}">${icSvg('file')}<span>${esc(t.label)}</span></span>`;
+  return `<span class="doc-tile doc-tile--${t.cls}">${esc(t.label)}</span>`;
 }
 
 function docCardHTML(d) {
@@ -268,8 +341,8 @@ function docCardHTML(d) {
         </span>
       </a>
       <div class="doc-btns">
-        <button class="doc-btn" data-act="edit" title="Editar texto" aria-label="Editar texto">${icSvg('edit')}</button>
-        <button class="doc-btn doc-btn--del" data-act="del" title="Quitar" aria-label="Quitar">${icSvg('x')}</button>
+        <button type="button" class="doc-btn" data-act="edit" title="Editar texto" aria-label="Editar texto">${icSvg('edit')}</button>
+        <button type="button" class="doc-btn doc-btn--del" data-act="del" title="Quitar" aria-label="Quitar">${icSvg('x')}</button>
       </div>
     </div>`;
 }
@@ -280,11 +353,11 @@ function pintarDocs() {
     : '<div class="eq-docs-empty">Sin documentos adjuntos todavía.</div>';
   const carpeta = $('btn-docs-carpeta');
   if (docsFolderId) carpeta.href = 'https://drive.google.com/drive/folders/' + encodeURIComponent(docsFolderId);
-  carpeta.style.display           = docsFolderId ? '' : 'none';
+  carpeta.style.display            = docsFolderId ? '' : 'none';
   $('btn-docs-sync').style.display = docsFolderId ? '' : 'none';
 }
 
-// Card provisoria con barra de progreso mientras sube.
+// Tarjeta provisoria con barra de progreso mientras sube.
 function cardSubiendo(texto, file) {
   const el = document.createElement('div');
   el.className = 'doc-card doc-card--subiendo';
@@ -353,7 +426,7 @@ async function confirmarModalDoc() {
   await subirDoc(file, texto || sinExtension(file.name));
 }
 
-// El archivo en Drive se llama como el texto de la card (+ extensión original),
+// El archivo en Drive se llama como el texto de la tarjeta (+ extensión original),
 // así la carpeta queda prolija para quien la abra directo en Drive.
 function nombreEnDrive(texto, nombreOriginal) {
   const ext = extension(nombreOriginal);
@@ -402,7 +475,7 @@ async function renombrarDoc(doc, texto) {
     showToast('No se pudo guardar el texto.', 'error');
     return;
   }
-  // Best-effort: la card ya quedó bien aunque Drive no acompañe.
+  // Best-effort: la tarjeta ya quedó bien aunque Drive no acompañe.
   const nombre = nombreEnDrive(texto, doc.nombre);
   renameDriveItem(doc.fileId, nombre)
     .then(() => { doc.nombre = nombre; return patchEquipoArchivo(currentKey, doc.id, { nombre }); })
@@ -431,7 +504,6 @@ async function quitarDoc(doc) {
 async function traerDeDrive() {
   const btn = $('btn-docs-sync');
   btn.disabled = true;
-  btn.textContent = 'Buscando…';
   try {
     const enDrive   = await listDriveFolderFiles(docsFolderId);
     const conocidos = new Set(docs.map(d => d.fileId));
@@ -454,7 +526,6 @@ async function traerDeDrive() {
     showToast('No se pudo leer la carpeta de Drive.', 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Traer de Drive';
   }
 }
 
@@ -468,42 +539,61 @@ function onDocsClick(e) {
 }
 
 // ---- Carga ----
+// Vuelca `equipo` (y la foto guardada) al formulario y toma esa foto como base.
+function volcarFormulario() {
+  $('eq-codigo').value      = equipo.codigo || '';
+  $('eq-tipo').value        = equipo.tipo || '';
+  $('eq-patente').value     = equipo.patente || '';
+  $('eq-responsable').value = equipo.responsable || '';
+  $('eq-familia').value     = '';
+  pintarFamiliaSelect();
+  pintarUbicacion();
+  $('eq-items').innerHTML = '';
+  (equipo.items || []).forEach(it => addItemRow(it));
+  refreshItemsEmpty();
+  fotoNueva = null; fotoQuitar = false;
+  setDatosEditables(false);
+  pintarCabecera();
+  base = snapshot();
+  revisarCambios();
+}
+
 async function loadFicha() {
   try {
     equipo = await getEquipo(currentKey);
     if (!equipo) {
-      $('eq-loading').innerHTML = '<div class="hist-empty">El equipo no existe.</div>';
+      $('eq-loading').innerHTML = '<div class="eq-card eq-vacio">El equipo no existe.</div>';
       return;
     }
-    fotoActual = await getEquipoFoto(currentKey).catch(() => null);
-    obras      = await getAllObras().catch(() => []);
-    const d    = await getEquipoDocs(currentKey).catch(() => ({ folderId: null, archivos: [] }));
+    const [foto, obrasAll, d] = await Promise.all([
+      getEquipoFoto(currentKey).catch(() => null),
+      getAllObras().catch(() => []),
+      getEquipoDocs(currentKey).catch(() => ({ folderId: null, archivos: [] }))
+    ]);
+    fotoActual   = foto;
+    obras        = obrasAll;
+    obrasMap     = Object.fromEntries(obras.map(o => [o.key, o.nombre]));
     docsFolderId = d.folderId;
     docs         = d.archivos;
 
-    $('eq-codigo').value      = equipo.codigo || '';
-    $('eq-tipo').value        = equipo.tipo || '';
-    $('eq-patente').value     = equipo.patente || '';
-    $('eq-responsable').value = equipo.responsable || '';
-    pintarEstado();
-    pintarUbicacion();
-
-    (equipo.items || []).forEach(it => addItemRow(it));
-    refreshItemsEmpty();
-
-    pintarFoto(fotoActual);
+    volcarFormulario();
     pintarDocs();
+    pintarCompras();
 
     $('eq-loading').style.display = 'none';
     $('eq-ficha').style.display   = '';
-    document.querySelector('.header-title').textContent = equipo.codigo || 'Ficha de Equipo';
   } catch (_) {
-    $('eq-loading').innerHTML = '<div class="hist-empty">Error al cargar la ficha.</div>';
+    $('eq-loading').innerHTML = '<div class="eq-card eq-vacio">Error al cargar la ficha.</div>';
   }
+}
+
+async function descartar() {
+  volcarFormulario();
 }
 
 // ---- Guardar ----
 async function save() {
+  if (guardando) return;
   const codigo      = $('eq-codigo').value.trim();
   const tipo        = $('eq-tipo').value.trim();
   const patente     = $('eq-patente').value.trim().toUpperCase();
@@ -511,19 +601,21 @@ async function save() {
   const activo      = equipo.activo !== false;
   const ubicacion   = $('eq-ubicacion').value || null;
   const items       = collectItems();
-  const errEl       = $('eq-error');
-  errEl.classList.add('hidden');
+  // La familia sólo se guarda si difiere de la que sale del código.
+  const famSel      = $('eq-familia').value;
+  const familia     = famSel && famSel !== familiaPorCodigo(codigo).k ? famSel : null;
 
   if (!codigo) {
-    errEl.textContent = 'El código es requerido.';
-    errEl.classList.remove('hidden');
+    if (!editandoDatos) setDatosEditables(true);
+    errorGuardar('El código es requerido.');
     return;
   }
 
   const newKey = equipoKey(codigo);
   const btn = $('btn-save');
+  guardando = true;
   btn.disabled = true;
-  btn.textContent = 'Guardando…';
+  btn.innerHTML = icSvg('checkSm') + 'Guardando…';
 
   try {
     let keyFinal = currentKey;
@@ -532,19 +624,20 @@ async function save() {
       // Cambió el código = cambió la clave: mover el equipo (y su foto) a la clave nueva.
       const existentes = await getAllEquipos();
       if (existentes.some(e => e.key === newKey)) {
-        errEl.textContent = 'Ya existe un equipo con ese código.';
-        errEl.classList.remove('hidden');
+        errorGuardar('Ya existe un equipo con ese código.');
         return;
       }
-      await saveEquipo(newKey, {
+      const datos = {
         codigo, tipo, patente, responsable, activo, ubicacion, items,
         creadoEn: equipo.creadoEn || Date.now()
-      });
+      };
+      if (familia) datos.familia = familia;
+      await saveEquipo(newKey, datos);
       await deleteEquipo(currentKey);
       await moveEquipoDocs(currentKey, newKey).catch(() => {});
       keyFinal = newKey;
     } else {
-      await patchEquipo(currentKey, { codigo, tipo, patente, responsable, activo, ubicacion, items });
+      await patchEquipo(currentKey, { codigo, tipo, patente, responsable, activo, ubicacion, items, familia });
     }
 
     // Foto
@@ -566,22 +659,24 @@ async function save() {
 
     showToast('Ficha guardada.');
     if (keyFinal !== currentKey) {
+      base = snapshot();
       window.location.replace('equipo.html?key=' + encodeURIComponent(keyFinal));
       return;
     }
     // Refrescar estado local
-    equipo = { key: keyFinal, codigo, tipo, patente, responsable, activo, ubicacion, items, creadoEn: equipo.creadoEn };
+    const codigoAntes = equipo.codigo;
+    equipo = { ...equipo, key: keyFinal, codigo, tipo, patente, responsable, activo, ubicacion, items };
+    if (familia) equipo.familia = familia; else delete equipo.familia;
     if (fotoNueva) fotoActual = fotoNueva;
     else if (fotoQuitar) fotoActual = null;
-    fotoNueva = null; fotoQuitar = false;
-    setDatosEditables(false);
-    document.querySelector('.header-title').textContent = codigo;
+    volcarFormulario();
+    if (codigo !== codigoAntes) pintarCompras();
   } catch (_) {
-    errEl.textContent = 'Error al guardar. Intentá de nuevo.';
-    errEl.classList.remove('hidden');
+    errorGuardar('Error al guardar. Intentá de nuevo.');
   } finally {
+    guardando = false;
     btn.disabled = false;
-    btn.textContent = 'Guardar cambios';
+    btn.innerHTML = icSvg('checkSm') + 'Guardar';
   }
 }
 
@@ -604,27 +699,73 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   userName = name || '';
   $('hdr-name').textContent = name || '—';
-  $('btn-back').addEventListener('click', () => { window.location.href = 'equipos.html'; });
-  $('btn-foto').addEventListener('click', () => $('eq-file').click());
-  $('btn-foto-cam').addEventListener('click', () => $('eq-file-cam').click());
+
+  // Íconos de los encabezados de sección y botones
+  $('btn-edit-hero').innerHTML  = icSvg('edit');
+  $('btn-edit-datos').innerHTML = icSvg('edit') + 'Editar';
+  $('ic-datos').innerHTML       = icSvg('file');
+  $('ic-items').innerHTML       = icSvg('tool');
+  $('ic-compras').innerHTML     = icSvg('cart');
+  $('ic-docs').innerHTML        = icSvg('clip');
+  $('ic-modal-doc').innerHTML   = icSvg('clip');
+  $('btn-add-item').innerHTML   = icSvg('plus') + 'Agregar renglón';
+  $('btn-save').innerHTML       = icSvg('checkSm') + 'Guardar';
+  $('btn-docs-add').innerHTML     = icSvg('plus') + 'Adjuntar';
+  $('btn-docs-carpeta').innerHTML = icSvg('folder');
+  $('btn-docs-sync').innerHTML    = icSvg('undo');
+  $('btn-doc-elegir').innerHTML   = icSvg('file') + 'Elegir archivo';
+
+  // Salir: avisa si hay cambios
+  $('btn-back').addEventListener('click', () => salir('equipos.html'));
+  $('header-brand').addEventListener('click', () => salir('menu.html'));
+  window.addEventListener('beforeunload', ev => {
+    if (hayCambios()) { ev.preventDefault(); ev.returnValue = ''; }
+  });
+
+  // Foto
+  bindDesplegables((opt, dd) => {
+    if (dd === 'periodo') { periodo = opt.dataset.periodo; pintarCompras(); return; }
+    if (dd === 'foto') {
+      const a = opt.dataset.foto;
+      if (a === 'cam') $('eq-file-cam').click();
+      else if (a === 'gal') $('eq-file').click();
+      else if (a === 'del') onQuitarFoto();
+    }
+  });
   $('eq-file').addEventListener('change', onFotoElegida);
   $('eq-file-cam').addEventListener('change', onFotoElegida);
-  $('btn-foto-del').addEventListener('click', onQuitarFoto);
-  $('btn-edit-datos').addEventListener('click', habilitarEdicionDatos);
-  $('btn-toggle-activo').addEventListener('click', toggleActivo);
-  $('btn-add-item').addEventListener('click', () => addItemRow().querySelector('input').focus());
-  $('btn-save').addEventListener('click', save);
 
-  $('btn-docs-add').innerHTML     = icSvg('clip') + ' Adjuntar';
-  $('btn-docs-carpeta').innerHTML = icSvg('folder') + ' Carpeta';
+  // Datos
+  $('btn-edit-datos').addEventListener('click', habilitarEdicionDatos);
+  $('btn-edit-hero').addEventListener('click', habilitarEdicionDatos);
+  $('eq-codigo').addEventListener('input', pintarFamiliaSelect);
+
+  // Cualquier cambio en la ficha: cabecera al día y barra de Guardar
+  $('eq-ficha').addEventListener('input', () => { if (equipo) { pintarCabecera(); revisarCambios(); } });
+  $('eq-ficha').addEventListener('change', () => { if (equipo) { pintarCabecera(); revisarCambios(); } });
+
+  $('btn-add-item').addEventListener('click', () => { addItemRow().querySelector('input').focus(); });
+  $('eq-items').addEventListener('keydown', ev => {
+    // Enter en un renglón agrega otro abajo
+    if (ev.key === 'Enter' && ev.target.matches('.eqf-item input')) {
+      ev.preventDefault();
+      addItemRow().querySelector('input').focus();
+    }
+  });
+  $('btn-save').addEventListener('click', save);
+  $('btn-descartar').addEventListener('click', descartar);
+
+  // Documentación
   $('btn-docs-add').addEventListener('click', () => abrirModalDoc(null));
   $('btn-docs-sync').addEventListener('click', traerDeDrive);
   $('btn-doc-elegir').addEventListener('click', () => $('doc-file').click());
   $('doc-file').addEventListener('change', onDocElegido);
   $('modal-doc-no').addEventListener('click', cerrarModalDoc);
   $('modal-doc-yes').addEventListener('click', confirmarModalDoc);
+  $('modal-doc').addEventListener('click', ev => { if (ev.target.id === 'modal-doc') cerrarModalDoc(); });
   $('doc-texto').addEventListener('keydown', e => { if (e.key === 'Enter') confirmarModalDoc(); });
   $('eq-docs').addEventListener('click', onDocsClick);
 
+  puedeVerReportes(code).then(v => { verReportes = v; if (equipo) pintarCompras(); });
   loadFicha();
 });

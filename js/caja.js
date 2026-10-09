@@ -540,7 +540,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   const HOJAS = ['modal-gasto', 'modal-recarga', 'modal-ficha'];
   document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape' || !$('scan-editor').classList.contains('hidden')) return;
+    // El editor de escaneo lo arma scanner.js recién al abrirlo.
+    const scan = $('scan-editor');
+    if (e.key !== 'Escape' || (scan && !scan.classList.contains('hidden'))) return;
     if (!$('img-lightbox').classList.contains('hidden')) { closeLightbox(); return; }
     const abierta = HOJAS.find(h => !$(h).classList.contains('hidden'));
     if (abierta === 'modal-gasto') closeGastoModal();
