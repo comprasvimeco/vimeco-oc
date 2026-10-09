@@ -434,6 +434,13 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     return await resp.json();
   };
 
+  // A quién está pedida hoy la autorización (el solicitante puede cambiarlo).
+  window.getHistorialAutorizador = async function (key) {
+    const resp = await _fetchConTope(_base() + '/historial/' + key + '/autorizacion/solicitadoA/codigo.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return await resp.json();
+  };
+
   // Link al presupuesto de una OC pendiente, leído del servidor: la bandeja se
   // carga una vez y la subida puede haber llegado después.
   window.getHistorialFuente = async function (key) {

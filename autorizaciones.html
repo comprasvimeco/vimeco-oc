@@ -154,6 +154,20 @@
   </div>
 </div>
 
+<!-- ===== MODAL: Cambiar autorizador ===== -->
+<div class="modal-overlay hidden" id="modal-reasignar">
+  <div class="confirm-box confirm-box--vio" role="dialog" aria-modal="true" aria-labelledby="reasignar-title">
+    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg></span>
+    <div class="confirm-title" id="reasignar-title">Cambiar autorizador</div>
+    <p id="reasignar-texto" class="confirm-msg">Elegí a quién le pasás el pedido.</p>
+    <div id="reasignar-lista" class="pedir-lista" role="radiogroup" aria-label="A quién le pedís la firma"></div>
+    <div class="confirm-btns">
+      <button type="button" class="foc-btn foc-btn--clear" id="btn-reasignar-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--vio" id="btn-reasignar-confirm"><svg class="icon" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Pasar pedido</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL: Rechazar ===== -->
 <div class="modal-overlay hidden" id="modal-rechazo">
   <div class="confirm-box confirm-box--del" role="dialog" aria-modal="true" aria-labelledby="rechazo-title">

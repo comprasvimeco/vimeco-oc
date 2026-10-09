@@ -149,6 +149,7 @@ function renderPedidos() {
            ${BTN_VER}
            ${btnPdfHtml(oc)}
            ${oc.estado === 'rechazada' ? `<button class="foc-btn foc-btn--gen btn-rehacer" title="Cargar en el formulario para corregirla">${icSvg('undo')}Rehacer</button>` : ''}
+           ${oc.estado === 'pendiente' ? `<button class="foc-btn foc-btn--vio btn-reasignar" title="Pasarle el pedido a otra persona">${icSvg('users')}Cambiar autorizador</button>` : ''}
            ${oc.estado === 'pendiente' ? `<button class="foc-btn foc-btn--clear btn-cancelar-pedido">${icSvg('x')}Cancelar pedido</button>` : ''}
          </div>`;
     const card = document.createElement('div');
@@ -172,6 +173,8 @@ function renderPedidos() {
     if (btnRehacer) btnRehacer.addEventListener('click', () => rehacerOC(oc));
     const btnCanc = card.querySelector('.btn-cancelar-pedido');
     if (btnCanc) btnCanc.addEventListener('click', () => cancelarPedido(oc, btnCanc));
+    const btnReasig = card.querySelector('.btn-reasignar');
+    if (btnReasig) btnReasig.addEventListener('click', () => reasignarPedido(oc, btnReasig));
     list.appendChild(card);
   });
 }
@@ -217,13 +220,129 @@ async function cancelarPedido(oc, btn) {
   }
 }
 
-// Antes de firmar o rechazar: si el solicitante canceló el pedido (o ya lo
-// resolvió otro), no pisarlo. Si no se puede leer, se sigue como antes.
+// ---- Cambiar autorizador ----
+// El solicitante le pasa el pedido pendiente a otra persona (el autorizador
+// está de viaje, no contesta, se eligió mal). La OC sale de la bandeja del
+// anterior y entra en la del nuevo, con el mismo número. Si el pedido fue por
+// monto (`montoRequerido`), sólo se ofrecen quienes hoy pueden firmar ese monto.
+function iniciales(nombre) {
+  const p = String(nombre || '').split(/\s+/).filter(w => w && !/\.$/.test(w));
+  return ((p[0]?.[0] || '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() || '?';
+}
+
+// Resuelve {codigo,nombre} o null si cancela.
+function elegirNuevoAutorizador(oc) {
+  return new Promise(resolve => {
+    const modal  = $('modal-reasignar');
+    const lista  = $('reasignar-lista');
+    const btnOk  = $('btn-reasignar-confirm');
+    const a      = oc.autorizacion || {};
+    const actual = a.solicitadoA?.codigo;
+    const monto  = a.montoRequerido > 0 ? a.montoRequerido : null;
+    let elegido  = null;
+
+    btnOk.disabled = true;
+    lista.innerHTML = '<div class="pedir-estado">Cargando usuarios…</div>';
+    $('reasignar-texto').textContent =
+      `La OC ${oc.nroOC} hoy la tiene ${a.solicitadoA?.nombre || 'otra persona'}. ` +
+      (monto ? `Por el monto, sólo se la podés pasar a quien firme OC de más de $ ${Math.round(monto).toLocaleString('es-AR')}.`
+             : 'Elegí a quién le pasás el pedido; le va a aparecer en su bandeja.');
+    modal.classList.remove('hidden');
+
+    const elegir = u => {
+      elegido = u;
+      lista.querySelectorAll('.pedir-who').forEach(b => b.setAttribute('aria-checked', b.dataset.codigo === u.codigo));
+      btnOk.disabled = false;
+    };
+    getUsuariosActivos().then(list => {
+      const opts = (list || []).filter(u => u.codigo !== myCode && u.codigo !== actual &&
+                                            (!monto || u.autorizaDesde >= monto));
+      if (!opts.length) {
+        lista.innerHTML = `<div class="pedir-estado">${monto
+          ? 'No hay otra persona que pueda firmar este monto.'
+          : 'No hay otros usuarios activos disponibles.'}</div>`;
+        return;
+      }
+      lista.innerHTML = opts.map(u => `
+        <button type="button" class="pedir-who" role="radio" aria-checked="false" data-codigo="${esc(u.codigo)}">
+          <span class="pedir-who-av">${esc(iniciales(u.nombre))}</span><b>${esc(u.nombre)}</b><span class="pedir-who-rad"></span>
+        </button>`).join('');
+      lista.querySelectorAll('.pedir-who').forEach((b, i) => b.addEventListener('click', () => elegir(opts[i])));
+      if (opts.length === 1) elegir(opts[0]);
+    }).catch(() => {
+      lista.innerHTML = '<div class="pedir-estado">No se pudieron cargar los usuarios. Revisá tu conexión.</div>';
+    });
+
+    const close = val => {
+      modal.classList.add('hidden');
+      modal.onclick = null;
+      resolve(val);
+    };
+    $('btn-reasignar-cancel').onclick = () => close(null);
+    modal.onclick = e => { if (e.target === modal) close(null); };
+    btnOk.onclick = () => { if (elegido) close({ codigo: elegido.codigo, nombre: elegido.nombre || '' }); };
+  });
+}
+
+async function reasignarPedido(oc, btn) {
+  const nuevo = await elegirNuevoAutorizador(oc);
+  if (!nuevo) return;
+  const histKey = oc.nroOC.replace(/-/g, '');
+  btn.disabled = true;
+  try {
+    const actual = await getHistorialEstado(histKey);
+    if (actual !== 'pendiente') {
+      toast(actual === 'autorizada' ? `La OC ${oc.nroOC} ya fue autorizada.`
+          : actual === 'rechazada'  ? `La OC ${oc.nroOC} ya fue rechazada.`
+          : `La OC ${oc.nroOC} ya no está pendiente.`, 'warning');
+      if (actual) oc.estado = actual;
+      renderPedidos();
+      return;
+    }
+    const prev = oc.autorizacion || {};
+    // Se guarda a quién se le había pedido antes, por si hay que rastrearlo.
+    const nuevaAut = {
+      ...prev,
+      solicitadoA:  { codigo: nuevo.codigo, nombre: nuevo.nombre },
+      reasignaciones: [...(prev.reasignaciones || []),
+        { de: prev.solicitadoA || null, a: { codigo: nuevo.codigo, nombre: nuevo.nombre }, en: Date.now() }]
+    };
+    await patchHistorialEntry(histKey, { autorizacion: nuevaAut });
+    oc.autorizacion = nuevaAut;
+    renderPedidos();
+    toast(`OC ${oc.nroOC} pasada a ${nuevo.nombre}.`, 'success');
+    if (nuevo.codigo !== myCode && typeof notificarUsuario === 'function') {
+      notificarUsuario(nuevo.codigo, {
+        title: 'Autorización pendiente',
+        body:  `OC ${oc.nroOC} · ${oc.proveedor?.nombre || 'Sin proveedor'} · ${oc.obra || 'Sin obra'}\n` +
+               `$ ${fmtMoney(oc.total)} — pide ${myName}`,
+        url:   'autorizaciones.html?tab=firmar',
+        tag:   'aut-' + histKey
+      });
+    }
+  } catch (e) {
+    toast('No se pudo cambiar el autorizador. Revisá tu conexión.', 'error');
+    console.error('reasignarPedido:', e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Antes de firmar o rechazar: si el solicitante canceló el pedido, se lo pasó
+// a otra persona o ya lo resolvió otro, no pisarlo. Si no se puede leer, se
+// sigue como antes.
 async function siguePendiente(oc) {
-  let actual;
-  try { actual = await getHistorialEstado(oc.nroOC.replace(/-/g, '')); } catch (_) { return true; }
-  if (actual === 'pendiente') return true;
+  const key = oc.nroOC.replace(/-/g, '');
+  let actual, autorizador;
+  try {
+    [actual, autorizador] = await Promise.all([
+      getHistorialEstado(key),
+      typeof getHistorialAutorizador === 'function' ? getHistorialAutorizador(key) : myCode
+    ]);
+  } catch (_) { return true; }
+  if (actual === 'pendiente' && (!autorizador || autorizador === myCode)) return true;
   toast(actual === 'cancelada' ? `El solicitante canceló el pedido de la OC ${oc.nroOC}.`
+      : actual === 'pendiente' ? `El solicitante le pasó la OC ${oc.nroOC} a otra persona.`
                                : `La OC ${oc.nroOC} ya no está pendiente.`, 'warning');
   quitarDeLista(oc);
   cerrarRechazo();
@@ -619,7 +738,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-firma').addEventListener('click', e => { if (e.target === e.currentTarget) cerrarFirma(); });
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    if (!$('modal-rechazo').classList.contains('hidden')) cerrarRechazo();
+    if (!$('modal-reasignar').classList.contains('hidden')) $('btn-reasignar-cancel').click();
+    else if (!$('modal-rechazo').classList.contains('hidden')) cerrarRechazo();
     else if (!$('modal-firma').classList.contains('hidden')) cerrarFirma();
   });
   $('btn-rechazo-confirm').addEventListener('click', () => {
