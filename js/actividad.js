@@ -341,7 +341,7 @@ function render() {
     // todas juntas con "Ver todas".
     const accion = vista
       ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
-      : `<button class="foc-btn foc-btn--clear act-mark" data-key="${esc(e.key)}">${icSvg('check')}Marcar como vista</button>`;
+      : `<button class="foc-btn foc-btn--clear act-mark" data-key="${esc(e.key)}">${icSvg('check')}Marcar Vista</button>`;
     const borrar = isSuper
       ? `<button class="foc-btn foc-btn--del act-del" data-key="${esc(e.key)}" title="Borrar la novedad para todos">${icSvg('trash')}Borrar</button>`
       : '';
