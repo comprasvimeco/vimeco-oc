@@ -2160,6 +2160,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   } catch (_) {}
   if (eqParam) state.filtroEquipo = { key: eqParam, label: equipoLabel({ codigo: eqParam, tipo: eqTipo }) };
+  // Igual desde la ficha de una obra (obras.html), con ?obra=NOMBRE.
+  const obParam = new URLSearchParams(location.search).get('obra');
+  if (obParam) state.filtroObra = { key: obParam, label: obParam };
 
   renderDolarHoy();
   if (typeof getDolarSnapshot === 'function') getDolarSnapshot().then(renderDolarHoy).catch(() => {});

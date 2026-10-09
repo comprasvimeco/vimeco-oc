@@ -8,6 +8,209 @@
   <link rel="icon" type="image/png" href="icono_app.png">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
+  <style>
+    /* Tonos: categoría de la obra (los de .cat-tag en Reportes) y los módulos. */
+    body { --arq-bg: #fdf0dc; --arq: #8a5a0b; --vial-bg: #e8eefc; --vial: #2c4fa8; --ofi-bg: #efebfd; --ofi: #5a45a8;
+      --obr-bg: #e8eef7; --obr: #234870; --per-bg: #fbeedd; --per: #8a4f0d; --rep-bg: #e0f0fb; --rep: #0e6a96; }
+    .ob-page { max-width: 1180px; margin: 0 auto; padding: 1rem 1rem 5rem; }
+
+    .ob-ttl-row { display: flex; align-items: center; gap: .45rem; margin: .3rem 0 .85rem; flex-wrap: wrap; }
+    .ob-ttl { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; }
+    .ob-cnt { display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--gray-200); color: var(--gray-600);
+      font-size: .74rem; font-weight: 700; padding: .18rem .6rem; border-radius: 999px; white-space: nowrap; }
+    .ob-cnt.warn { background: #fef3c7; color: #854d0e; border-color: transparent; cursor: pointer; font-family: inherit; }
+    .ob-add { margin-left: auto; background: var(--primary); color: #fff; }
+
+    .ob-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+    @media (min-width: 1000px) {
+      .ob-layout { grid-template-columns: 380px minmax(0, 1fr); }
+      .ob-side { position: sticky; top: .75rem; max-height: calc(100vh - 90px); overflow-y: auto; padding: 2px 4px 1rem 2px; margin: -2px -4px 0 -2px; scrollbar-width: thin; }
+    }
+    /* Teléfono: lista o ficha, una a la vez. */
+    @media (max-width: 999.98px) {
+      .ob-ficha { display: none; }
+      body.ob-open .ob-ficha { display: block; }
+      body.ob-open .ob-side, body.ob-open .ob-ttl-row { display: none; }
+    }
+    @media (max-width: 560px) {
+      .ob-page { padding: .8rem .6rem 5rem; }
+      .ob-ttl { font-size: 1.2rem; }
+      .ob-ttl-row { flex-wrap: nowrap; }
+      .ob-ttl-row .ob-cnt:not(.warn) { display: none; }
+      .ob-add-txt { display: none; }
+      .ob-add { padding: .45rem .65rem; }
+    }
+
+    .ob-srch { display: flex; align-items: center; gap: .5rem; background: #fff; border: 1px solid var(--gray-200); border-radius: 12px;
+      padding: 0 .75rem; color: var(--gray-400); margin-bottom: .6rem; }
+    .ob-srch input { flex: 1; border: none; outline: none; background: transparent; font: inherit; font-size: .9rem; padding: .6rem 0; color: var(--gray-800); min-width: 0; }
+    .ob-srch:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px #2348701f; }
+    .ob-flt { display: flex; gap: .35rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    @media (max-width: 560px) { .ob-flt { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -.6rem; padding-right: .6rem; } }
+    .ob-flt button { flex: none; display: inline-flex; align-items: center; gap: .3rem; font: inherit; font-size: .76rem; font-weight: 700;
+      padding: .3rem .7rem; border-radius: 999px; background: #fff; border: 1px solid var(--gray-200); color: var(--gray-600); cursor: pointer; white-space: nowrap; }
+    .ob-flt button .icon { width: 13px; height: 13px; }
+    .ob-flt button b { color: var(--gray-400); }
+    .ob-flt button.on { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+    .ob-flt button.on b { color: #ffffffaa; }
+
+    .ob-rows { background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); overflow: hidden; }
+    .ob-row { display: flex; align-items: center; gap: .65rem; padding: .62rem .75rem; border: none; border-bottom: 1px solid var(--gray-100);
+      background: none; width: 100%; text-align: left; font: inherit; cursor: pointer; color: inherit; }
+    .ob-row:last-child { border-bottom: none; }
+    .ob-row:hover { background: #f8fafc; }
+    .ob-row.sel { background: #f3f6fb; box-shadow: inset 3px 0 0 var(--primary); }
+    .ob-row .mid { flex: 1; min-width: 0; }
+    .ob-row .nm { display: block; font-weight: 700; color: var(--primary-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ob-row .l2 { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; margin-top: .22rem; }
+    .ob-row .st { font-size: .76rem; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+    .ob-row .st b { color: var(--gray-700); }
+    .ob-row.off .nm, .ob-row.off .l2 { opacity: .55; }
+    .ob-row .chev { color: var(--gray-300); }
+    .ob-grp { display: flex; align-items: center; gap: .45rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+      font-weight: 700; color: var(--gray-500); margin: .95rem .2rem .4rem; }
+    .ob-grp:first-child { margin-top: .1rem; }
+    .ob-grp .n { background: var(--gray-200); color: var(--gray-600); border-radius: 999px; padding: 0 .45rem; font-size: .68rem; letter-spacing: 0; }
+    .ob-empty { padding: 1.2rem; text-align: center; color: var(--gray-500); font-size: .88rem; }
+
+    .ob-sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+    .ob-sq .icon { width: 18px; height: 18px; }
+    .ob-sq.sm { width: 32px; height: 32px; border-radius: 10px; }
+    .ob-sq.sm .icon { width: 16px; height: 16px; }
+    .ob-sq.lg { width: 52px; height: 52px; border-radius: 15px; }
+    .ob-sq.lg .icon { width: 24px; height: 24px; }
+    .ob-pm { display: inline-flex; align-items: center; gap: .28rem; font-size: .7rem; font-weight: 700; padding: .14rem .5rem .14rem .42rem;
+      border-radius: 999px; white-space: nowrap; }
+    .ob-pm .icon { width: 11px; height: 11px; }
+    .t-arquitectura { background: var(--arq-bg); color: var(--arq); } .t-vial { background: var(--vial-bg); color: var(--vial); }
+    .t-oficina { background: var(--ofi-bg); color: var(--ofi); } .t-obr { background: var(--obr-bg); color: var(--obr); }
+    .t-per { background: var(--per-bg); color: var(--per); } .t-rep { background: var(--rep-bg); color: var(--rep); }
+    .t-warn { background: #fef3c7; color: #854d0e; } .t-red { background: #fde6e6; color: #b02a2a; }
+    .t-gr { background: var(--gray-100); color: var(--gray-500); }
+
+    .ob-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); padding: .85rem .9rem; }
+    .ob-card + .ob-card { margin-top: .75rem; }
+    .ob-sec-h { display: flex; align-items: center; gap: .55rem; margin-bottom: .55rem; }
+    .ob-sec-h b { color: var(--primary-dark); font-size: .98rem; }
+    .ob-sec-h .push { margin-left: auto; }
+    .ob-aviso { display: flex; gap: .45rem; align-items: flex-start; background: #fef7e8; color: #7a4a0c; border-radius: 10px;
+      padding: .5rem .65rem; font-size: .78rem; line-height: 1.35; margin-top: .45rem; }
+    .ob-aviso .icon { width: 14px; height: 14px; margin-top: .1rem; }
+    .ob-aviso.red { background: #fde6e6; color: #8f2323; }
+    .ob-hint { font-size: .76rem; color: var(--gray-500); line-height: 1.4; margin-top: .45rem; }
+
+    /* Para revisar */
+    .ob-rev { margin-top: .9rem; }
+    .ob-rev .r { display: flex; align-items: flex-start; gap: .55rem; padding: .5rem 0; border: none; border-top: 1px solid var(--gray-100);
+      font: inherit; font-size: .84rem; background: none; width: 100%; text-align: left; cursor: pointer; color: var(--gray-600); line-height: 1.4; }
+    .ob-rev .ob-sec-h + .r { border-top: none; }
+    .ob-rev .r .icon { width: 15px; height: 15px; margin-top: .15rem; flex: none; }
+    .ob-rev .r b { color: var(--gray-700); }
+    .ob-rev .r .chev { margin-left: auto; color: var(--gray-300); }
+
+    /* Ficha */
+    .ob-vacia { text-align: center; color: var(--gray-500); padding: 3rem 1rem; }
+    .ob-vacia .icon { width: 34px; height: 34px; color: var(--gray-300); margin-bottom: .5rem; }
+    .ob-fhead { display: flex; align-items: center; gap: .8rem; }
+    .ob-fhead .id { min-width: 0; flex: 1; }
+    .ob-fhead .nm { font-size: 1.25rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; overflow-wrap: anywhere; }
+    .ob-fhead .meta { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .35rem; align-items: center; }
+    .ob-fcols { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; margin-top: .75rem; align-items: start; }
+    @media (min-width: 1240px) { .ob-fcols { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+
+    .ob-uso { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+    @media (min-width: 600px) { .ob-uso { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (min-width: 1240px) { .ob-uso { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .ob-uso div { background: var(--gray-100); border-radius: 10px; padding: .5rem .6rem; min-width: 0; }
+    .ob-uso b { display: block; font-size: 1.05rem; color: var(--primary-dark); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ob-uso small { color: var(--gray-500); font-size: .72rem; }
+    .ob-uso.cargando b { color: var(--gray-300); }
+    .ob-lnk { display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; font-weight: 700; color: var(--rep); margin-top: .6rem; text-decoration: none; }
+    .ob-lnk .icon { width: 14px; height: 14px; }
+
+    .ob-fld { margin-bottom: .65rem; }
+    .ob-fld:last-child { margin-bottom: 0; }
+    .ob-fld > label, .ob-fld > .lb { display: block; font-size: .72rem; font-weight: 700; color: var(--gray-500); margin-bottom: .25rem; }
+    .ob-fld .form-control.chg { border-color: #e0a24a; box-shadow: 0 0 0 3px #e0a24a26; }
+    .ob-seg { display: flex; gap: .3rem; flex-wrap: wrap; }
+    .ob-seg button { display: inline-flex; align-items: center; gap: .3rem; font: inherit; font-size: .8rem; font-weight: 700; padding: .38rem .75rem;
+      border-radius: 999px; background: var(--gray-100); color: var(--gray-600); border: none; cursor: pointer; }
+    .ob-seg button .icon { width: 13px; height: 13px; }
+    .ob-seg button.on.t-arquitectura { background: var(--arq-bg); color: var(--arq); box-shadow: inset 0 0 0 1.5px #f0d6a8; }
+    .ob-seg button.on.t-vial { background: var(--vial-bg); color: var(--vial); box-shadow: inset 0 0 0 1.5px #c7d4f4; }
+    .ob-seg button.on.t-oficina { background: var(--ofi-bg); color: var(--ofi); box-shadow: inset 0 0 0 1.5px #d6cdf6; }
+    .ob-seg button:not(.on) { background: var(--gray-100); color: var(--gray-600); }
+    .ob-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .ob-pesos { display: flex; align-items: center; gap: .35rem; }
+    .ob-pesos span { color: var(--gray-400); }
+
+    .ob-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+    .ob-chip { display: inline-flex; align-items: center; gap: .25rem; font-size: .76rem; font-weight: 700; border-radius: 999px; padding: .22rem .35rem .22rem .6rem;
+      background: var(--gray-100); color: var(--gray-700); border: none; font-family: inherit; }
+    .ob-chip .icon { width: 11px; height: 11px; }
+    .ob-chip.jefe { background: var(--obr-bg); color: var(--obr); }
+    .ob-chip.inact { background: var(--gray-100); color: var(--gray-500); }
+    .ob-chip.nuevo { box-shadow: 0 0 0 2px #e0a24a; }
+    .ob-chip .tx { border: none; background: none; font: inherit; color: inherit; padding: 0; cursor: text; }
+    .ob-chip .tx:disabled { cursor: default; }
+    .ob-chip .q { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent;
+      color: inherit; opacity: .55; cursor: pointer; padding: 0; }
+    .ob-chip .q:hover { opacity: 1; background: #ffffffaa; }
+    .ob-chip input { border: none; outline: none; font: inherit; background: transparent; width: 11rem; max-width: 60vw; padding: 0; }
+    .ob-chip.edit { background: #fff; box-shadow: 0 0 0 1.5px var(--primary); padding-right: .6rem; }
+    .ob-chip-add { display: inline-flex; align-items: center; gap: .25rem; font: inherit; font-size: .74rem; font-weight: 700; border-radius: 999px;
+      padding: .22rem .6rem; background: transparent; border: 1.5px dashed var(--gray-300); color: var(--gray-500); cursor: pointer; }
+    .ob-chip-add .icon { width: 11px; height: 11px; }
+    .ob-chip-add.hot { border-color: #e0a24a; color: #8a4f0d; }
+    .ob-rub-new { display: flex; gap: .4rem; margin-top: .55rem; }
+    .ob-rub-new .form-control { flex: 1; padding: .4rem .65rem; font-size: .88rem; }
+
+    .ob-prow { display: flex; align-items: center; gap: .65rem; padding: .1rem 0 .55rem; cursor: pointer; }
+    .ob-prow .tx { flex: 1; min-width: 0; }
+    .ob-prow .tx b { display: block; font-size: .9rem; color: var(--gray-700); font-weight: 600; }
+    .ob-prow .tx small { display: block; font-size: .76rem; color: var(--gray-500); line-height: 1.35; }
+    .ob-prow.dis { opacity: .5; cursor: default; }
+    .ob-sw { position: relative; width: 36px; height: 21px; flex: none; }
+    .ob-sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: inherit; }
+    .ob-sw span { position: absolute; inset: 0; border-radius: 999px; background: var(--gray-200); transition: background .15s; pointer-events: none; }
+    .ob-sw span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+    .ob-sw input:checked + span { background: var(--primary); }
+    .ob-sw input:checked + span::after { transform: translateX(15px); }
+    .ob-sw input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    /* Barra de guardar: sólo con cambios. */
+    .ob-savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: #fff; border-top: 1px solid var(--gray-200);
+      padding: .55rem .8rem calc(.55rem + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: .5rem;
+      box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); }
+    .ob-savebar.hidden { display: none; }
+    .ob-savebar .s { flex: 1; font-size: .8rem; color: #8a4f0d; font-weight: 700; display: flex; align-items: center; gap: .35rem; }
+    .ob-savebar .s::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #e0a24a; flex: none; }
+    .ob-savebar .foc-btn--save { background: var(--primary); color: #fff; }
+    @media (min-width: 1000px) {
+      .ob-savebar { left: auto; right: 1.4rem; bottom: 1.1rem; border: 1px solid var(--gray-200); border-radius: 999px; padding: .4rem .45rem .4rem 1rem; }
+    }
+
+    /* Alta y elegir jefes */
+    .ob-dlg { max-width: 460px; align-items: stretch; text-align: left; padding: 1.1rem 1.1rem 1rem; }
+    .ob-dlg-h { display: flex; align-items: center; gap: .6rem; margin-bottom: .85rem; }
+    .ob-dlg-h b { font-size: 1.05rem; color: var(--primary-dark); display: block; }
+    .ob-dlg-h small { font-size: .78rem; color: var(--gray-500); }
+    .ob-dupe { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+    .ob-dupe span { font-size: .74rem; font-weight: 700; padding: .2rem .55rem; border-radius: 999px; background: #fef3c7; color: #854d0e; }
+    .ob-dlg-f { display: flex; gap: .5rem; margin-top: .9rem; }
+    .ob-dlg-f .foc-btn { flex: 1; justify-content: center; padding: .62rem; font-size: .88rem; }
+    .ob-dlg-f .foc-btn--save { background: var(--primary); color: #fff; }
+    .ob-jlist { max-height: 50vh; overflow-y: auto; margin: 0 -.2rem; }
+    .ob-jlist label { display: flex; align-items: center; gap: .6rem; padding: .5rem .2rem; border-bottom: 1px solid var(--gray-100); cursor: pointer; font-size: .9rem; }
+    .ob-jlist label:last-child { border-bottom: none; }
+    .ob-jlist input { width: 18px; height: 18px; flex: none; }
+    .ob-jlist small { color: var(--gray-400); margin-left: auto; font-size: .72rem; text-align: right; }
+    @media (max-width: 560px) {
+      #modal-obra, #modal-jefes { align-items: flex-end; padding: 0; }
+      #modal-obra .confirm-box, #modal-jefes .confirm-box { border-radius: 18px 18px 0 0; max-width: none; width: 100%; }
+    }
+  </style>
 </head>
 <body>
 
@@ -25,84 +228,57 @@
 </header>
 
 <main class="app-main">
-  <div class="hist-page">
-    <div class="hist-toolbar">
-      <span style="font-weight:600;color:var(--gray-700);">Obras del sistema</span>
-      <button class="btn btn-primary btn-sm" id="btn-add-obra">+ Agregar obra</button>
+  <div class="ob-page">
+    <div class="ob-ttl-row">
+      <h1 class="ob-ttl">Obras</h1>
+      <span class="ob-cnt" id="ob-count"></span>
+      <button type="button" class="ob-cnt warn hidden" id="ob-sinmov"></button>
+      <button type="button" class="foc-btn ob-add" id="btn-add-obra"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="ob-add-txt">Agregar obra</span></button>
     </div>
-    <div id="obras-list" class="users-list">
-      <div class="hist-loading">Cargando obras…</div>
+    <div class="ob-layout">
+      <div class="ob-side">
+        <label class="ob-srch"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="ob-q" placeholder="Buscar obra o lugar de entrega" autocomplete="off" aria-label="Buscar obra"></label>
+        <div class="ob-flt" id="ob-flt" role="group" aria-label="Filtrar"></div>
+        <div id="obras-list"><div class="hist-loading">Cargando obras…</div></div>
+        <div id="ob-rev"></div>
+      </div>
+      <div class="ob-ficha" id="ob-ficha"></div>
     </div>
   </div>
 </main>
 
-<!-- Modal: Agregar / Editar obra -->
+<div class="ob-savebar hidden" id="ob-savebar">
+  <span class="s" id="ob-save-txt"></span>
+  <button type="button" class="foc-btn foc-btn--clear" id="ob-undo">Deshacer</button>
+  <button type="button" class="foc-btn foc-btn--save" id="ob-save"></button>
+</div>
+
+<!-- Alta -->
 <div class="modal-overlay hidden" id="modal-obra">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-obra-title">Agregar obra</span>
-      <button class="modal-close" id="modal-obra-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div class="confirm-box ob-dlg" role="dialog" aria-modal="true" aria-labelledby="ob-alta-t">
+    <div class="ob-dlg-h"><span class="ob-sq sm t-obr" id="ob-alta-ic"></span><div><b id="ob-alta-t">Agregar obra</b><small>Aparece enseguida en la OC, Remitos y Caja</small></div></div>
+    <div class="ob-fld"><label for="alta-nombre">Nombre</label><input type="text" id="alta-nombre" class="form-control" placeholder="Ej: Edificio San Martín" autocomplete="off">
+      <div id="alta-parecidas"></div></div>
+    <div class="ob-fld"><span class="lb">Categoría</span><div class="ob-seg" id="alta-cat"></div></div>
+    <div class="ob-fld"><label for="alta-lugar">Lugar de entrega (opcional)</label><input type="text" id="alta-lugar" class="form-control" placeholder="Dirección donde reciben los materiales"></div>
+    <div class="ob-hint">Jefes, rubros, jornada y comida se completan en la ficha, que se abre al crear.</div>
+    <div id="modal-obra-error" class="alert alert-error hidden" style="margin-top:.6rem"></div>
+    <div class="ob-dlg-f">
+      <button type="button" class="foc-btn foc-btn--clear" id="modal-obra-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--save" id="modal-obra-save"></button>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label for="obra-nombre">Nombre de la obra *</label>
-        <input type="text" id="obra-nombre" class="form-control" placeholder="Ej: Edificio San Martín">
-      </div>
-      <div class="form-group">
-        <label for="obra-categoria">Categoría</label>
-        <select id="obra-categoria" class="form-control">
-          <option value="">Sin categoría</option>
-          <option value="arquitectura">Arquitectura</option>
-          <option value="vial">Vial</option>
-          <option value="oficina">Oficina</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="obra-lugar">Lugar de entrega</label>
-        <input type="text" id="obra-lugar" class="form-control" placeholder="Ej: Av. San Martín 1234, Córdoba">
-      </div>
+  </div>
+</div>
 
-      <hr style="border:none;border-top:1px solid var(--gray-200);margin:1rem 0 .75rem;">
-      <div style="display:flex;align-items:center;gap:.5rem;margin:0 0 .35rem;">
-        <p style="font-weight:600;color:var(--gray-700);margin:0;">Rubros</p>
-        <span class="u-badge" id="obra-rubros-estado">Lista abierta</span>
-      </div>
-      <p style="font-size:.78rem;color:var(--gray-500);margin:0 0 .5rem;">
-        Mientras la lista esté abierta, las OC de esta obra no piden rubro.
-      </p>
-      <div style="display:flex;gap:.5rem;margin-bottom:.5rem;">
-        <input type="text" id="rubro-nuevo" class="form-control" placeholder="Ej: Instalación eléctrica">
-        <button class="btn btn-secondary" id="btn-add-rubro" type="button">Agregar</button>
-      </div>
-      <div id="obra-rubros-list" style="display:flex;flex-direction:column;gap:.4rem;max-height:200px;overflow-y:auto;"></div>
-      <button class="btn btn-outline btn-sm" id="btn-toggle-rubros" type="button" style="margin-top:.5rem;">Cerrar lista</button>
-
-      <hr style="border:none;border-top:1px solid var(--gray-200);margin:1rem 0 .75rem;">
-      <p style="font-weight:600;color:var(--gray-700);margin:0 0 .5rem;">Personal</p>
-
-      <div style="display:flex;gap:.75rem;">
-        <div class="form-group u-flex-1">
-          <label for="obra-jornada">Jornada (horas)</label>
-          <input type="number" id="obra-jornada" class="form-control" min="0" max="24" step="0.5" placeholder="8">
-        </div>
-        <div class="form-group u-flex-1">
-          <label for="obra-comida">Valor comida ($)</label>
-          <input type="number" id="obra-comida" class="form-control" min="0" step="0.01" placeholder="0">
-        </div>
-      </div>
-
-      <div class="form-group u-mb-0">
-        <label>Jefes de obra asignados</label>
-        <div id="obra-jefes-list" style="border:1px solid var(--gray-200);border-radius:8px;padding:.5rem .75rem;max-height:160px;overflow-y:auto;">
-          <span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span>
-        </div>
-      </div>
-
-      <div id="modal-obra-error" class="alert alert-error hidden"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-obra-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="modal-obra-save">Guardar</button>
+<!-- Elegir jefes de obra -->
+<div class="modal-overlay hidden" id="modal-jefes">
+  <div class="confirm-box ob-dlg" role="dialog" aria-modal="true" aria-labelledby="ob-jefes-t">
+    <div class="ob-dlg-h"><span class="ob-sq sm t-obr" id="ob-jefes-ic"></span><div><b id="ob-jefes-t">Jefes de obra</b><small>Ven todas las OC y remitos de la obra y cargan sus partes</small></div></div>
+    <div class="ob-jlist" id="ob-jlist"></div>
+    <div class="ob-dlg-f">
+      <button type="button" class="foc-btn foc-btn--clear" id="ob-jefes-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--save" id="ob-jefes-ok">Listo</button>
     </div>
   </div>
 </div>
