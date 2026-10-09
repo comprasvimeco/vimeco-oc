@@ -35,8 +35,7 @@
     .fac-file-n b { display: block; color: var(--primary-dark); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fac-file-n span { font-size: .74rem; color: var(--gray-500); }
     .fac-file-acts { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .75rem; }
-    .fac-drop .scan-preview img { max-height: 180px; align-self: center; }
-    .fac-drop .scan-preview-actions { justify-content: center; }
+    .fac-drop .scan-preview img { max-height: 180px; }
     .fac-corto { display: none; }
 
     /* Botones violeta (el tono de Facturas en el menú) */
@@ -188,7 +187,7 @@
         </button>
         <button type="button" class="fac-tipo-opt" data-tipo="otro" role="radio" aria-checked="false">
           <span class="fac-sq"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></span>
-          <span><b>Otro archivo</b><small>Foto, presupuesto, constancia…</small></span>
+          <span><b>Otro archivo</b><small>Remito, foto, presupuesto, constancia…</small></span>
           <span class="fac-tipo-ok"><svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
         </button>
       </div>
@@ -211,7 +210,7 @@
         </div>
       </div>
 
-      <!-- Archivo elegido: se puede escanear (si es foto); abajo ya aparece la lista para elegir la OC, o la busca la IA -->
+      <!-- Archivo elegido: se puede escanear (si es foto) y después buscar la OC -->
       <div id="file-info" class="hidden">
         <div class="fac-file">
           <span class="fac-sq"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
@@ -229,6 +228,7 @@
         </div>
         <div class="fac-file-acts">
           <button type="button" class="foc-btn foc-btn--vios" id="btn-use-ai"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M18 13l.7 1.9L21 16l-2.3.9L18 19l-.9-2.1L15 16l2.1-.7L18 13z"/></svg>Buscar la OC con IA</button>
+          <button type="button" class="foc-btn foc-btn--vio" id="btn-use-manual">Elegir la OC a mano</button>
         </div>
       </div>
     </div>
@@ -280,7 +280,7 @@
     <p class="confirm-msg" id="modal-tipo-oc"></p>
     <div class="confirm-opts">
       <button type="button" class="confirm-opt" data-tipo="factura"><span class="confirm-opt-ic confirm-opt-ic--vio"><svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span><b>Factura</b><small>La factura del proveedor por esta compra</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
-      <button type="button" class="confirm-opt" data-tipo="otro"><span class="confirm-opt-ic confirm-opt-ic--blue"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></span><span><b>Otro archivo</b><small>Foto, presupuesto, constancia…</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button type="button" class="confirm-opt" data-tipo="otro"><span class="confirm-opt-ic confirm-opt-ic--blue"><svg class="icon" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></span><span><b>Otro archivo</b><small>Remito, foto, presupuesto, constancia…</small></span><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
     <button type="button" class="foc-btn foc-btn--clear confirm-cancel" id="modal-tipo-cancel">Cancelar</button>
   </div>
