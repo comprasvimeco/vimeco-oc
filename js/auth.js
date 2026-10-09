@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       notificarUsuario(ADMIN, {
         title: 'Pedido de contraseña',
         body:  `${currentUser.nombre} no recuerda su contraseña. Reseteala desde Usuarios.`,
-        url:   'usuarios.html',
+        url:   'usuarios.html?u=' + currentUser.codigo,
         tag:   'reset-' + currentUser.codigo
       });
     }

@@ -9,84 +9,226 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .perm-row { display:flex; align-items:flex-start; gap:.7rem; padding:.7rem .25rem; border-bottom:1px solid var(--gray-100); cursor:pointer; }
-    .perm-row:last-of-type { border-bottom:none; }
-    .perm-row input { width:20px; height:20px; margin-top:.15rem; flex-shrink:0; }
-    .perm-row span { display:flex; flex-direction:column; gap:.15rem; }
-    .perm-row strong { color:var(--gray-800); font-size:.95rem; font-weight:600; }
-    .perm-row small { color:var(--gray-500); font-size:.8rem; line-height:1.3; }
-    /* Permiso que cuelga de otro (Personal de Jefe de Obra): sangrado y apagado sin el de arriba. */
-    .perm-row--sub { padding-left:2.1rem; }
-    .perm-row--sub.is-off { opacity:.45; cursor:default; }
-    .perm-monto { display:flex; flex-direction:column; gap:.35rem; padding:.8rem .25rem .4rem; border-top:1px solid var(--gray-100); }
-    .perm-monto strong { color:var(--gray-800); font-size:.95rem; font-weight:600; }
-    .perm-monto small { color:var(--gray-500); font-size:.8rem; line-height:1.3; }
-    .perm-monto-input { display:flex; align-items:center; gap:.4rem; }
-    .perm-monto-input span { color:var(--gray-600); font-weight:600; }
+    /* Tonos de cada permiso = el del módulo en el menú. */
+    body { --adm-bg: #eef0f3; --adm: #4b5563; --adm-sw: #6b7280;
+      --caj-bg: #dff3e5; --caj: #1a7f3c; --caj-sw: #1f8a45;
+      --obr-bg: #e8eef7; --obr: #234870; --obr-sw: #234870;
+      --per-bg: #fbeedd; --per: #8a4f0d; --per-sw: #c07a1e;
+      --tal-bg: #dcf3ef; --tal: #16695f; --tal-sw: #1b7a6e;
+      --rep-bg: #e0f0fb; --rep: #0e6a96; --rep-sw: #1583b8;
+      --nov-bg: #fce8ee; --nov: #a23a57; --nov-sw: #c0506f;
+      --aut-bg: #f1e8fb; --aut: #6b3fa0; }
+    .us-page { max-width: 1180px; margin: 0 auto; padding: 1rem 1rem 5rem; }
 
-    /* ---- Lista de usuarios ---- */
-    .usr-page { max-width: 1040px; margin: 0 auto; padding: 1rem; }
-    .usr-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: .75rem;
-      flex-wrap: wrap; margin: .5rem 0 1.1rem; }
-    .usr-title { font-size: 1.25rem; font-weight: 800; color: var(--primary); line-height: 1.2; }
-    .usr-count { font-size: .8rem; color: var(--gray-500); margin-top: .15rem; }
-    .usr-add { background: var(--grad-header); color: #fff; box-shadow: 0 6px 18px -8px rgba(26,58,92,.55); }
-    .usr-add .icon { width: 16px; height: 16px; }
+    .us-ttl-row { display: flex; align-items: center; gap: .45rem; margin: .3rem 0 .85rem; flex-wrap: wrap; }
+    .us-ttl { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; }
+    .us-cnt { display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--gray-200); color: var(--gray-600);
+      font-size: .74rem; font-weight: 700; padding: .18rem .6rem; border-radius: 999px; white-space: nowrap; }
+    .us-pend { display: inline-flex; align-items: center; gap: .35rem; background: #fde6e6; color: #b02a2a; font-size: .74rem;
+      font-weight: 700; padding: .18rem .6rem; border-radius: 999px; white-space: nowrap; border: none; cursor: pointer; font-family: inherit; }
+    .us-pend::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+    .us-add { margin-left: auto; background: var(--primary); color: #fff; }
 
-    .usr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: .8rem; }
-    .usr-grid > .hist-loading, .usr-grid > .hist-empty { grid-column: 1 / -1; }
-    .usr-card { display: flex; flex-direction: column; background: var(--glass-bg-strong);
-      border: 1px solid var(--glass-border); border-radius: 14px; box-shadow: var(--shadow-glass);
-      padding: .9rem 1rem .75rem; transition: transform .18s var(--ease-spring), box-shadow .18s; }
-    .usr-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-glow); }
-    .usr-card--off { opacity: .6; }
-    .usr-card--off:hover { opacity: .85; }
+    .us-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+    @media (min-width: 1000px) {
+      .us-layout { grid-template-columns: 340px minmax(0, 1fr); }
+      .us-side { position: sticky; top: .75rem; max-height: calc(100vh - 90px); overflow-y: auto; padding: 2px 4px 1rem 2px; margin: -2px -4px 0 -2px; scrollbar-width: thin; }
+    }
+    /* Teléfono: lista o ficha, una a la vez. */
+    @media (max-width: 999.98px) {
+      .us-ficha { display: none; }
+      body.us-open .us-ficha { display: block; }
+      body.us-open .us-side, body.us-open .us-ttl-row { display: none; }
+    }
+    @media (max-width: 560px) {
+      .us-page { padding: .8rem .6rem 5rem; }
+      .us-ttl { font-size: 1.2rem; }
+      .us-ttl-row { flex-wrap: nowrap; }
+      .us-ttl-row .us-cnt { display: none; }
+      .us-add-txt { display: none; }
+      .us-add { padding: .45rem .65rem; }
+    }
 
-    .usr-head { display: flex; align-items: center; gap: .75rem; }
-    .usr-avatar { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center;
-      justify-content: center; background: var(--grad-header); color: #fff; font-weight: 800; font-size: .95rem;
-      letter-spacing: .03em; }
-    .usr-card--off .usr-avatar { background: var(--gray-400); }
-    .usr-id { min-width: 0; flex: 1; }
-    .usr-name { font-size: 1rem; font-weight: 700; color: var(--gray-900); line-height: 1.25;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .usr-meta { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .2rem;
-      font-size: .76rem; color: var(--gray-500); }
-    .usr-code { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 700;
-      color: var(--gray-600); background: var(--gray-100); border-radius: 5px; padding: 0 .35rem; }
-    .usr-meta-i { display: inline-flex; align-items: center; gap: .25rem; }
-    .usr-meta-i .icon { width: 12px; height: 12px; }
-    .usr-pedido { color: #b02a2a; background: #fde6e6; border-radius: 999px; padding: 0 .45rem; font-weight: 700; }
-    .usr-warn { color: #854d0e; background: #fef9c3; border-radius: 999px; padding: 0 .45rem; font-weight: 700; }
-    .usr-off { flex-shrink: 0; font-size: .7rem; font-weight: 700; padding: .12rem .55rem; border-radius: 999px;
-      background: #fde6e6; color: #b02a2a; }
+    .us-srch { display: flex; align-items: center; gap: .5rem; background: #fff; border: 1px solid var(--gray-200); border-radius: 12px;
+      padding: 0 .75rem; color: var(--gray-400); margin-bottom: .6rem; }
+    .us-srch input { flex: 1; border: none; outline: none; background: transparent; font: inherit; font-size: .9rem; padding: .6rem 0; color: var(--gray-800); min-width: 0; }
+    .us-srch:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px #2348701f; }
+    .us-flt { display: flex; gap: .35rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    @media (max-width: 560px) { .us-flt { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -.6rem; padding-right: .6rem; } }
+    .us-flt button { flex: none; display: inline-flex; align-items: center; gap: .3rem; font: inherit; font-size: .76rem; font-weight: 700;
+      padding: .3rem .7rem; border-radius: 999px; background: #fff; border: 1px solid var(--gray-200); color: var(--gray-600); cursor: pointer; white-space: nowrap; }
+    .us-flt button b { color: var(--gray-400); }
+    .us-flt button.on { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+    .us-flt button.on b { color: #ffffffaa; }
+    .us-flt button.red { color: #b02a2a; }
+    .us-flt button.red.on { color: #fff; }
 
-    .usr-perms { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .7rem; }
-    .usr-perm { display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .6rem .16rem .5rem;
-      border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
-    .usr-perm .icon { width: 12px; height: 12px; }
-    .usr-perm--caja     { background: #dcf3ef; color: #16695f; }
-    .usr-perm--admin    { background: #efebfd; color: #5a45a8; }
-    .usr-perm--obra     { background: #fdf0dc; color: #8a5a0b; }
-    .usr-perm--personal { background: #fdf0dc; color: #8a5a0b; box-shadow: inset 0 0 0 1px #f0d6a8; }
-    .usr-perm--taller   { background: #e8eefc; color: #2c4fa8; }
-    .usr-perm--reportes { background: #fce8ee; color: #a23a57; }
-    .usr-perm--nov      { background: #e0f2fe; color: #0369a1; }
-    .usr-perm--autoriza { background: #fbf3dc; color: #7a5c0f; box-shadow: inset 0 0 0 1px #ecd9a0; }
-    .usr-perm--autoriza b { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-    .usr-noperms { font-size: .76rem; color: var(--gray-400); font-style: italic; }
+    .us-rows { background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); overflow: hidden; }
+    .us-row { display: flex; align-items: center; gap: .65rem; padding: .62rem .75rem; border: none; border-bottom: 1px solid var(--gray-100);
+      background: none; width: 100%; text-align: left; font: inherit; cursor: pointer; color: inherit; }
+    .us-row:last-child { border-bottom: none; }
+    .us-row:hover { background: #f8fafc; }
+    .us-row.sel { background: #f3f6fb; box-shadow: inset 3px 0 0 var(--primary); }
+    .us-row .mid { flex: 1; min-width: 0; }
+    .us-row .l1 { display: flex; align-items: center; gap: .4rem; min-width: 0; }
+    .us-row .nm { font-weight: 700; color: var(--primary-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .us-cod { font-size: .7rem; font-weight: 700; color: var(--gray-500); background: var(--gray-100); border-radius: 5px; padding: 0 .3rem;
+      font-family: var(--font-num); font-variant-numeric: tabular-nums; flex: none; }
+    .us-row .l2 { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; margin-top: .22rem; }
+    .us-row .none { font-size: .76rem; color: var(--gray-400); }
+    .us-row.off .nm, .us-row.off .l2 { opacity: .55; }
+    .us-row .chev { color: var(--gray-300); }
+    .us-dots { display: none; gap: 3px; }
+    @media (max-width: 560px) { .us-row .us-pills { display: none; } .us-dots { display: inline-flex; } }
+    .us-grp { display: flex; align-items: center; gap: .45rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+      font-weight: 700; color: var(--gray-500); margin: .95rem .2rem .4rem; }
+    .us-grp .n { background: var(--gray-200); color: var(--gray-600); border-radius: 999px; padding: 0 .45rem; font-size: .68rem; letter-spacing: 0; }
+    .us-empty { padding: 1.2rem; text-align: center; color: var(--gray-500); font-size: .88rem; }
 
-    /* Acciones: pastillas en un renglón al pie, como en Novedades. Desactivar va aparte, a la derecha. */
-    .usr-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
-      margin-top: auto; padding-top: .6rem; border-top: 1px solid var(--gray-100); }
-    .usr-perms + .usr-actions { margin-top: .75rem; }
-    .usr-actions .foc-btn { font-size: .76rem; padding: .35rem .8rem; white-space: nowrap; }
-    .usr-actions .foc-btn .icon { width: 13px; height: 13px; }
-    .usr-actions .usr-toggle { margin-left: auto; }
+    .us-av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 800; font-size: .82rem;
+      letter-spacing: .03em; background: var(--obr-bg); color: var(--obr); }
+    .us-av.off { background: var(--gray-200); color: var(--gray-500); }
+    .us-av.lg { width: 56px; height: 56px; font-size: 1.1rem; }
 
-    @media (max-width: 520px) {
-      .usr-grid { grid-template-columns: 1fr; }
-      .usr-toolbar { align-items: center; }
+    .us-pm { display: inline-flex; align-items: center; gap: .28rem; font-size: .7rem; font-weight: 700; padding: .14rem .5rem .14rem .42rem;
+      border-radius: 999px; white-space: nowrap; }
+    .us-pm .icon { width: 11px; height: 11px; }
+    .us-pills { display: contents; }
+    .us-dot { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; }
+    .us-dot .icon { width: 12px; height: 12px; }
+    .t-adm { background: var(--adm-bg); color: var(--adm); } .t-caj { background: var(--caj-bg); color: var(--caj); }
+    .t-obr { background: var(--obr-bg); color: var(--obr); } .t-per { background: var(--per-bg); color: var(--per); }
+    .t-tal { background: var(--tal-bg); color: var(--tal); } .t-rep { background: var(--rep-bg); color: var(--rep); }
+    .t-nov { background: var(--nov-bg); color: var(--nov); } .t-aut { background: var(--aut-bg); color: var(--aut); }
+    .t-warn { background: #fef3c7; color: #854d0e; } .t-red { background: #fde6e6; color: #b02a2a; }
+    .t-gr { background: var(--gray-100); color: var(--gray-500); }
+
+    .us-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); padding: .85rem .9rem; }
+    .us-card + .us-card { margin-top: .75rem; }
+    .us-sq { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+    .us-sq .icon { width: 16px; height: 16px; }
+
+    /* Quién autoriza */
+    .us-esc { margin-top: .9rem; }
+    .us-esc .h { display: flex; align-items: center; gap: .55rem; margin-bottom: .55rem; }
+    .us-esc .h b { color: var(--primary-dark); }
+    .us-step { display: flex; gap: .6rem; padding: .45rem 0; border-top: 1px solid var(--gray-100); align-items: flex-start; }
+    .us-step .m { flex: none; width: 112px; font-size: .78rem; font-weight: 700; color: var(--aut); font-variant-numeric: tabular-nums; }
+    .us-step .w { flex: 1; display: flex; flex-wrap: wrap; gap: .3rem; font-size: .8rem; }
+    .us-step .w span { background: var(--gray-100); border-radius: 999px; padding: .08rem .5rem; color: var(--gray-700); font-weight: 600;
+      display: inline-flex; gap: .25rem; align-items: center; }
+    .us-step .w span.warn { background: #fef3c7; color: #854d0e; }
+    .us-step .w span .icon { width: 11px; height: 11px; }
+    .us-step .w i { color: var(--gray-500); font-style: normal; }
+    .us-aviso { display: flex; gap: .45rem; align-items: flex-start; background: #fef7e8; color: #7a4a0c; border-radius: 10px;
+      padding: .5rem .65rem; font-size: .78rem; line-height: 1.35; margin-top: .45rem; }
+    .us-aviso .icon { width: 14px; height: 14px; margin-top: .1rem; }
+
+    /* Ficha */
+    .us-vacia { text-align: center; color: var(--gray-500); padding: 3rem 1rem; }
+    .us-vacia .icon { width: 34px; height: 34px; color: var(--gray-300); margin-bottom: .5rem; }
+    .us-fhead { display: flex; align-items: center; gap: .8rem; }
+    .us-fhead .id { min-width: 0; flex: 1; }
+    .us-fhead .nm { font-size: 1.25rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; display: flex; align-items: center; gap: .45rem; }
+    .us-fhead .nm span { overflow: hidden; text-overflow: ellipsis; }
+    .us-fhead .meta { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .3rem; align-items: center; }
+    .us-fhead .us-cod { font-size: .74rem; padding: .05rem .4rem; border-radius: 6px; color: var(--gray-600); }
+    .us-nom-in { width: 100%; font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--primary-dark); border: 1px solid var(--gray-300);
+      border-radius: 10px; padding: .35rem .6rem; }
+    .us-nom-in:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px #2348701f; }
+    .us-pencil { width: 28px; height: 28px; border-radius: 999px; background: var(--gray-100); color: var(--gray-600); display: inline-grid;
+      place-items: center; flex: none; border: none; cursor: pointer; }
+    .us-pencil .icon { width: 13px; height: 13px; }
+    .us-sec-h { display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }
+    .us-sec-h b { color: var(--primary-dark); font-size: .98rem; }
+    .us-fcols { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; margin-top: .75rem; align-items: start; }
+    @media (min-width: 1240px) { .us-fcols { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+    .us-fcols > div > .us-card + .us-card { margin-top: .75rem; }
+
+    .us-prow { display: flex; align-items: center; gap: .65rem; padding: .55rem 0; border-top: 1px solid var(--gray-100); cursor: pointer; }
+    .us-sec-h + .us-prow { border-top: none; }
+    .us-prow .us-dot { width: 30px; height: 30px; border-radius: 9px; }
+    .us-prow .us-dot .icon { width: 15px; height: 15px; }
+    .us-prow .tx { flex: 1; min-width: 0; }
+    .us-prow .tx b { display: block; font-size: .9rem; color: var(--gray-700); font-weight: 600; }
+    .us-prow .tx small { display: block; font-size: .76rem; color: var(--gray-500); line-height: 1.35; }
+    .us-prow.sub { padding-left: 1.6rem; }
+    .us-prow.dis { opacity: .45; cursor: default; }
+    .us-sw { position: relative; width: 36px; height: 21px; flex: none; }
+    .us-sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: inherit; }
+    .us-sw span { position: absolute; inset: 0; border-radius: 999px; background: var(--gray-200); transition: background .15s; pointer-events: none; }
+    .us-sw span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+    .us-sw input:checked + span { background: var(--c, var(--primary)); }
+    .us-sw input:checked + span::after { transform: translateX(15px); }
+    .us-sw input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .us-obras { display: flex; flex-wrap: wrap; gap: .3rem; margin: .1rem 0 .45rem 2.6rem; }
+    .us-ob { display: inline-flex; align-items: center; gap: .25rem; font-size: .74rem; font-weight: 700; border-radius: 999px; padding: .2rem .35rem .2rem .6rem;
+      background: var(--obr-bg); color: var(--obr); border: none; font-family: inherit; }
+    .us-ob .icon { width: 11px; height: 11px; }
+    .us-ob.inact { background: var(--gray-100); color: var(--gray-500); }
+    .us-ob.nuevo { box-shadow: 0 0 0 2px #e0a24a; }
+    .us-ob .q { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: none; background: transparent;
+      color: inherit; opacity: .6; cursor: pointer; padding: 0; }
+    .us-ob .q:hover { opacity: 1; background: #ffffff99; }
+    .us-ob-add { display: inline-flex; align-items: center; gap: .25rem; font: inherit; font-size: .74rem; font-weight: 700; border-radius: 999px;
+      padding: .2rem .6rem; background: transparent; border: 1.5px dashed var(--gray-300); color: var(--gray-500); cursor: pointer; }
+    .us-ob-add .icon { width: 11px; height: 11px; }
+    .us-ob-add.hot { border-color: #e0a24a; color: #8a4f0d; }
+    .us-obras + .us-aviso { margin: -.1rem 0 .45rem 2.6rem; }
+
+    .us-monto { display: flex; align-items: center; gap: .4rem; background: #fff; border: 1px solid var(--gray-300); border-radius: 10px; padding: 0 .7rem; }
+    .us-monto span { color: var(--gray-400); white-space: nowrap; }
+    .us-monto input { flex: 1; border: none; outline: none; font: inherit; padding: .5rem 0; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--gray-700); min-width: 0; }
+    .us-monto:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px #2348701f; }
+    .us-chips { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .45rem; }
+    .us-chips button { font: inherit; font-size: .74rem; font-weight: 700; padding: .22rem .6rem; border-radius: 999px; background: var(--gray-100);
+      color: var(--gray-600); border: none; cursor: pointer; font-variant-numeric: tabular-nums; }
+    .us-chips button.on { background: var(--aut-bg); color: var(--aut); box-shadow: inset 0 0 0 1.5px #dccaf2; }
+    .us-hint { font-size: .76rem; color: var(--gray-500); line-height: 1.4; margin-top: .45rem; }
+    .us-kv { display: grid; grid-template-columns: auto 1fr; gap: .3rem .9rem; font-size: .84rem; margin-bottom: .75rem; }
+    .us-kv span { color: var(--gray-500); }
+    .us-kv b { color: var(--gray-700); font-weight: 600; }
+    .us-acc { display: flex; gap: .45rem; flex-wrap: wrap; }
+    .us-super { font-size: .84rem; color: var(--gray-600); line-height: 1.45; }
+    .us-super .us-pm { margin: .5rem .25rem 0 0; }
+
+    /* Barra de guardar: sólo con cambios. */
+    .us-savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: #fff; border-top: 1px solid var(--gray-200);
+      padding: .55rem .8rem calc(.55rem + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: .5rem;
+      box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); }
+    .us-savebar.hidden { display: none; }
+    .us-savebar .s { flex: 1; font-size: .8rem; color: #8a4f0d; font-weight: 700; display: flex; align-items: center; gap: .35rem; }
+    .us-savebar .s::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #e0a24a; flex: none; }
+    .us-savebar .foc-btn--save { background: var(--primary); color: #fff; }
+    @media (min-width: 1000px) {
+      .us-savebar { left: auto; right: 1.4rem; bottom: 1.1rem; border: 1px solid var(--gray-200); border-radius: 999px; padding: .4rem .45rem .4rem 1rem; }
+    }
+
+    /* Alta y elegir obras */
+    .us-dlg { max-width: 460px; align-items: stretch; text-align: left; padding: 1.1rem 1.1rem 1rem; }
+    .us-dlg-h { display: flex; align-items: center; gap: .6rem; margin-bottom: .85rem; }
+    .us-dlg-h b { font-size: 1.05rem; color: var(--primary-dark); display: block; }
+    .us-dlg-h small { font-size: .78rem; color: var(--gray-500); }
+    .us-row2 { display: grid; grid-template-columns: 100px 1fr; gap: .5rem; }
+    .us-fld { margin-bottom: .65rem; }
+    .us-fld label { display: block; font-size: .72rem; font-weight: 700; color: var(--gray-500); margin-bottom: .2rem; }
+    .us-copy { display: flex; flex-wrap: wrap; gap: .3rem; }
+    .us-copy button { font: inherit; font-size: .74rem; font-weight: 700; padding: .28rem .6rem; border-radius: 999px; background: var(--gray-100);
+      color: var(--gray-600); border: none; cursor: pointer; }
+    .us-copy button.on { background: var(--obr-bg); color: var(--obr); box-shadow: inset 0 0 0 1.5px #c9d6ea; }
+    .us-copy-prev { display: flex; gap: .25rem; flex-wrap: wrap; margin-top: .45rem; min-height: 1px; }
+    .us-dlg-f { display: flex; gap: .5rem; margin-top: .9rem; }
+    .us-dlg-f .foc-btn { flex: 1; justify-content: center; padding: .62rem; font-size: .88rem; }
+    .us-dlg-f .foc-btn--save { background: var(--primary); color: #fff; }
+    .us-oblist { max-height: 50vh; overflow-y: auto; margin: 0 -.2rem; }
+    .us-oblist label { display: flex; align-items: center; gap: .6rem; padding: .5rem .2rem; border-bottom: 1px solid var(--gray-100); cursor: pointer; font-size: .9rem; }
+    .us-oblist label:last-child { border-bottom: none; }
+    .us-oblist input { width: 18px; height: 18px; flex: none; }
+    .us-oblist small { color: var(--gray-400); margin-left: auto; font-size: .72rem; }
+    @media (max-width: 560px) {
+      #modal-user, #modal-obras { align-items: flex-end; padding: 0; }
+      #modal-user .confirm-box, #modal-obras .confirm-box { border-radius: 18px 18px 0 0; max-width: none; width: 100%; }
     }
   </style>
 </head>
@@ -106,91 +248,58 @@
 </header>
 
 <main class="app-main">
-  <div class="usr-page">
-    <div class="usr-toolbar">
-      <div>
-        <div class="usr-title">Usuarios del sistema</div>
-        <div class="usr-count" id="users-count"></div>
-      </div>
-      <button class="foc-btn usr-add" id="btn-add-user"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar usuario</button>
+  <div class="us-page">
+    <div class="us-ttl-row">
+      <h1 class="us-ttl">Usuarios</h1>
+      <span class="us-cnt" id="users-count"></span>
+      <button type="button" class="us-pend hidden" id="us-pend"></button>
+      <button type="button" class="foc-btn us-add" id="btn-add-user"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg><span class="us-add-txt">Agregar usuario</span></button>
     </div>
-    <div id="users-list" class="usr-grid">
-      <div class="hist-loading">Cargando usuarios…</div>
+    <div class="us-layout">
+      <div class="us-side">
+        <label class="us-srch"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="us-q" placeholder="Buscar por nombre o código" autocomplete="off" aria-label="Buscar usuario"></label>
+        <div class="us-flt" id="us-flt" role="group" aria-label="Filtrar"></div>
+        <div id="users-list"><div class="hist-loading">Cargando usuarios…</div></div>
+        <div id="us-esc"></div>
+      </div>
+      <div class="us-ficha" id="us-ficha"></div>
     </div>
   </div>
 </main>
 
-<!-- Modal: Agregar / Editar usuario -->
+<div class="us-savebar hidden" id="us-savebar">
+  <span class="s" id="us-save-txt"></span>
+  <button type="button" class="foc-btn foc-btn--clear" id="us-undo">Deshacer</button>
+  <button type="button" class="foc-btn foc-btn--save" id="us-save"></button>
+</div>
+
+<!-- Alta -->
 <div class="modal-overlay hidden" id="modal-user">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-user-title">Agregar usuario</span>
-      <button class="modal-close" id="modal-user-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div class="confirm-box us-dlg" role="dialog" aria-modal="true" aria-labelledby="us-alta-t">
+    <div class="us-dlg-h"><span class="us-sq t-obr" id="us-alta-ic"></span><div><b id="us-alta-t">Agregar usuario</b><small>Entra con su código y crea su contraseña la primera vez</small></div></div>
+    <div class="us-row2">
+      <div class="us-fld"><label for="user-codigo">Código</label><input type="text" id="user-codigo" class="form-control" maxlength="4" inputmode="numeric"></div>
+      <div class="us-fld"><label for="user-nombre">Nombre completo</label><input type="text" id="user-nombre" class="form-control" placeholder="Nombre y apellido / título"></div>
     </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label for="user-codigo">Código (4 dígitos)</label>
-        <input type="text" id="user-codigo" class="form-control" placeholder="0001" maxlength="4">
-      </div>
-      <div class="form-group u-mb-0">
-        <label for="user-nombre">Nombre completo</label>
-        <input type="text" id="user-nombre" class="form-control" placeholder="Nombre y apellido / título">
-      </div>
-      <div id="modal-user-error" class="alert alert-error hidden"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-user-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="modal-user-save">Guardar</button>
+    <div class="us-fld u-mb-0"><label>Copiar permisos de (opcional)</label><div class="us-copy" id="us-copy"></div><div class="us-copy-prev" id="us-copy-prev"></div></div>
+    <div class="us-hint">Las obras y el monto de autorización no se copian: se eligen en la ficha, que se abre al crear.</div>
+    <div id="modal-user-error" class="alert alert-error hidden" style="margin-top:.6rem"></div>
+    <div class="us-dlg-f">
+      <button type="button" class="foc-btn foc-btn--clear" id="modal-user-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--save" id="modal-user-save"></button>
     </div>
   </div>
 </div>
 
-<!-- Modal: Permisos -->
-<div class="modal-overlay hidden" id="modal-permisos">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title">Permisos de <span id="modal-permisos-name">—</span></span>
-      <button class="modal-close" id="modal-permisos-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <label class="perm-row">
-        <input type="checkbox" id="perm-caja">
-        <span><strong>Caja Chica</strong><small>Registra ingresos y egresos de su propia caja.</small></span>
-      </label>
-      <label class="perm-row">
-        <input type="checkbox" id="perm-admin">
-        <span><strong>Administrador</strong><small>Funciones de admin (incluida la Caja de todos), salvo el menú de Administración.</small></span>
-      </label>
-      <label class="perm-row">
-        <input type="checkbox" id="perm-jefeObra">
-        <span><strong>Jefe de Obra</strong><small>Ve todas las OC de las obras asignadas y sus remitos, aunque las haya emitido otro; les puede cargar remitos y facturas, usarlas como base y anularlas si son duplicadas.</small></span>
-      </label>
-      <label class="perm-row perm-row--sub" id="perm-personal-row">
-        <input type="checkbox" id="perm-personal">
-        <span><strong>Personal</strong><small>Gestiona la cuadrilla y los partes de sus obras. Requiere Jefe de Obra.</small></span>
-      </label>
-      <label class="perm-row">
-        <input type="checkbox" id="perm-jefeTaller">
-        <span><strong>Jefe de Taller</strong><small>Accede a Equipos: edita datos, foto y repuestos de cada equipo.</small></span>
-      </label>
-      <label class="perm-row">
-        <input type="checkbox" id="perm-reportes">
-        <span><strong>Reportes</strong><small>Accede al panel de Reportes (gasto por obra, equipo, proveedor).</small></span>
-      </label>
-      <label class="perm-row">
-        <input type="checkbox" id="perm-novedades">
-        <span><strong>Novedades</strong><small>Ve el feed de Novedades (OC, remitos y facturas que se cargan).</small></span>
-      </label>
-      <div class="perm-monto">
-        <label for="perm-autorizaDesde"><strong>Autoriza OC desde</strong></label>
-        <div class="perm-monto-input"><span>$</span><input type="text" id="perm-autorizaDesde" class="form-control" inputmode="numeric" placeholder="Sin monto"></div>
-        <small>Las OC que superen este monto se le tienen que pedir a este usuario o a quien tenga un monto mayor. Si varios comparten el mismo monto, sirve cualquiera de ellos. Vacío: no participa.</small>
-      </div>
-      <div id="modal-permisos-error" class="alert alert-error hidden"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-permisos-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="modal-permisos-save">Guardar</button>
+<!-- Elegir obras del Jefe de Obra -->
+<div class="modal-overlay hidden" id="modal-obras">
+  <div class="confirm-box us-dlg" role="dialog" aria-modal="true" aria-labelledby="us-obras-t">
+    <div class="us-dlg-h"><span class="us-sq t-obr" id="us-obras-ic"></span><div><b id="us-obras-t">Obras a cargo</b><small id="us-obras-sub"></small></div></div>
+    <div class="us-oblist" id="us-oblist"></div>
+    <div class="us-dlg-f">
+      <button type="button" class="foc-btn foc-btn--clear" id="us-obras-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--save" id="us-obras-ok">Listo</button>
     </div>
   </div>
 </div>

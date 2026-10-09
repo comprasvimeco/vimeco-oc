@@ -305,6 +305,17 @@
     // 0000 ve todo. El resto según sus permisos: Caja con `caja` o `admin`; Personal con
     // `admin` o `personal` (que requiere `jefeObra`); Equipos con `jefeTaller`; Reportes con `admin` o `reportes`;
     // Novedades con su permiso propio o, si no lo tiene, lo que diga `admin`. Administración, solo 0000.
+    // Último uso, para la ficha de Usuarios: la sesión queda guardada y casi
+    // nadie pasa por el ingreso, así que se anota al abrir el menú (una vez por hora).
+    try {
+      const k = 'vimeco_ultimo_uso_' + _s.codigo;
+      if (Date.now() - (+localStorage.getItem(k) || 0) > 3600e3 && typeof patchUsuario === 'function') {
+        patchUsuario(_s.codigo, { ultimoUso: Date.now() })
+          .then(() => { try { localStorage.setItem(k, String(Date.now())); } catch (_) {} })
+          .catch(() => {});
+      }
+    } catch (_) {}
+
     if (_s.codigo === '0000') {
       ['menu-card-caja', 'menu-card-personal', 'menu-card-equipos', 'menu-card-reportes', 'menu-card-admin']
         .forEach(id => show(id, true));
