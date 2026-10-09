@@ -49,6 +49,19 @@
     .cj-acts .foc-btn .icon, .cj-fab .foc-btn .icon { width: 17px; height: 17px; }
     .foc-btn--egr { background: #fde6e6; color: #b02a2a; }
     .foc-btn--egr-solid { background: #c43c3c; color: #fff; }
+    .cj-cierre { margin-top: .75rem; padding-top: .7rem; border-top: 1px solid var(--gray-200); display: flex; flex-direction: column; gap: .5rem; }
+    .cj-ci-btns { display: flex; gap: .4rem; }
+    .cj-ci-btns .foc-btn { flex: 1; justify-content: center; padding: .5rem .4rem; font-size: .8rem; white-space: nowrap; }
+    .cj-ci-btns .foc-btn .icon { width: 15px; height: 15px; }
+    .cj-ci-btns .foc-btn--clear { background: var(--white); border: 1px solid var(--gray-200); }
+    .cj-ci-st { display: flex; align-items: flex-start; gap: .45rem; background: #dff3e5; color: #1a7f3c; border-radius: 10px; padding: .45rem .6rem; font-size: .76rem; line-height: 1.35; }
+    .cj-ci-st .icon { width: 15px; height: 15px; flex: none; margin-top: 1px; }
+    .cj-ci-st span { flex: 1; min-width: 0; }
+    .cj-ci-st small { display: block; font-size: .72rem; font-weight: 600; }
+    .cj-ci-st a { color: var(--primary); font-weight: 700; white-space: nowrap; }
+    .cj-ci-st.cambio { background: #fff4e0; color: #9a5b00; }
+    .cj-mini--cerr { background: #dff3e5; color: #1a7f3c; display: inline-flex; align-items: center; gap: .25rem; }
+    .cj-mini--cerr .icon { width: 11px; height: 11px; }
     .cj-side-t { font-size: .72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .55rem; }
     .cj-bar { margin-bottom: .55rem; }
     .cj-bar:last-child { margin-bottom: 0; }
@@ -332,6 +345,8 @@
           <button type="button" class="foc-btn foc-btn--gen" id="btn-nuevo-ingreso"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Ingreso</button>
           <button type="button" class="foc-btn foc-btn--egr" id="btn-nuevo-gasto"><svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Egreso</button>
         </div>
+        <!-- Exportar el mes y cerrarlo (comprobante en Drive) -->
+        <div class="cj-cierre" id="cj-cierre"></div>
       </div>
       <div class="cj-card cj-solo-desk"><div class="cj-side-t">Egresos por obra</div><div id="cj-por-obra"></div></div>
       <div class="cj-card cj-solo-desk"><div class="cj-side-t">Por categoría</div><div class="cj-bars--cat" id="cj-por-cat"></div></div>

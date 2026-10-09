@@ -1,7 +1,8 @@
 /* global getCajaMovimientos, saveCajaMovimiento, deleteCajaMovimiento,
           patchCajaMovimiento, getCategoriasCaja, saveCategoriasCaja,
           getAllUsuarios, getUsuario, getObrasActivas, uploadToCajaDrive,
-          getTodasLasCajas, extractFromTicket */
+          getTodasLasCajas, extractFromTicket, getCajaCierres, saveCajaCierre,
+          deleteCajaCierre, generateCajaBlob */
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -33,6 +34,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   let obras        = [];   // nombres de /obras activas, para imputar cada egreso
   let personas     = [];   // administración: quienes tienen caja { codigo, nombre }
   let cajasTodas   = {};   // administración: { codigo: [movimientos] }
+  let cierres      = {};   // cierres de la caja abierta: { 'YYYY-MM': cierre }
+  let cierresTodas = {};   // administración: { codigo: { 'YYYY-MM': cierre } }
   let vista        = isAdmin ? 'todas' : 'caja';
   let mesSel       = '';
   let tab          = 'todos';
@@ -281,8 +284,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function cargarPersonas() {
     let usuarios = [];
     try { usuarios = await getAllUsuarios(); } catch (_) {}
-    try { cajasTodas = await getTodasLasCajas(); } catch (err) {
-      cajasTodas = {};
+    try { ({ movimientos: cajasTodas, cierres: cierresTodas } = await getTodasLasCajas()); } catch (err) {
+      cajasTodas = {}; cierresTodas = {};
       showToast('Error al cargar las cajas: ' + (err.message || err), 'error');
     }
     const porCod = {};
@@ -327,7 +330,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const egr   = delMes.filter(esEgreso).reduce((s, m) => s + (m.monto || 0), 0);
       const sin   = delMes.filter(m => esEgreso(m) && !m.driveFileId).length;
       const ult   = delMes.map(m => m.fecha).sort().pop();
-      return { ...p, saldo, ing, egr, sin, n: delMes.length, ult };
+      const cerrada = !!cierresTodas[p.codigo]?.[mesSel];
+      return { ...p, saldo, ing, egr, sin, n: delMes.length, ult, cerrada };
     });
     const neg   = filas.filter(f => Math.round(f.saldo * 100) < 0);
     const tSal  = filas.reduce((s, f) => s + f.saldo, 0);
@@ -354,7 +358,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="cj-box-s">${f.n ? `${f.n} ${f.n === 1 ? 'movimiento' : 'movimientos'} · último ${cuando(f.ult)}` : 'Sin movimientos en el mes'}</div></div></div>
         <div class="cj-box-sal${esNeg ? ' neg' : ''}"><small>Saldo</small>${fmtSaldo(f.saldo)}</div>
         <div class="cj-box-bot"><span class="cj-mini cj-mini--ing">+${fmtMonto(f.ing)}</span><span class="cj-mini cj-mini--egr">−${fmtMonto(f.egr)}</span>
-          ${f.sin ? `<span class="cj-mini cj-mini--sin">${f.sin} sin comprobante</span>` : ''}</div>
+          ${f.sin ? `<span class="cj-mini cj-mini--sin">${f.sin} sin comprobante</span>` : ''}
+          ${f.cerrada ? `<span class="cj-mini cj-mini--cerr">${icSvg('lock')}Cerrado</span>` : ''}</div>
       </button>`;
     }).join('') : '<div class="cj-vacio">' + icSvg('briefcase') + 'No hay cajas para mostrar.</div>';
   }
@@ -393,16 +398,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadMovimientos() {
     $('cj-lista').innerHTML = '<div class="cj-vacio"><div class="spinner" style="width:24px;height:24px;margin:0 auto .5rem;"></div>Cargando…</div>';
     const pedido = targetCodigo;
-    let movs;
+    let movs, cie;
     try {
-      movs = await getCajaMovimientos(pedido);
+      [movs, cie] = await Promise.all([getCajaMovimientos(pedido), getCajaCierres(pedido).catch(() => ({}))]);
     } catch (err) {
-      movs = [];
+      movs = []; cie = {};
       showToast('Error al cargar movimientos: ' + (err.message || err), 'error');
     }
     if (pedido !== targetCodigo) return;   // se cambió de caja mientras cargaba
     movimientos = movs;
-    if (isAdmin) cajasTodas[targetCodigo] = movs;
+    cierres = cie;
+    if (isAdmin) { cajasTodas[targetCodigo] = movs; cierresTodas[targetCodigo] = cie; }
     renderMovimientos();
   }
 
@@ -410,20 +416,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     return movimientos.filter(m => m.fecha?.startsWith(mesSel));
   }
 
+  // Balance de un mes con arrastre: excedente anterior = neto de TODOS los
+  // movimientos de meses previos.
+  function balance(mes) {
+    const movs      = movimientos.filter(m => m.fecha?.startsWith(mes));
+    const ingresos  = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
+    const egresos   = movs.filter(m => m.tipo === 'gasto').reduce((s, m) => s + (m.monto || 0), 0);
+    const excedente = movimientos.filter(m => m.fecha && m.fecha.substring(0, 7) < mes).reduce((s, m) => s + neto(m), 0);
+    return { movs, ingresos, egresos, excedente, saldo: excedente + ingresos - egresos };
+  }
+
+  const fechaHora = ts => {
+    const d = new Date(ts);
+    return `${fmtFecha(isoLocal(d))} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  // ¿Cambió algo del mes (o de los anteriores, por el arrastre) desde que se cerró?
+  function cambioDesdeCierre(c, b) {
+    const r = n => Math.round((n || 0) * 100);
+    return r(c.saldo) !== r(b.saldo) || r(c.ingresos) !== r(b.ingresos) || r(c.egresos) !== r(b.egresos) || (c.n || 0) !== b.movs.length;
+  }
+  // El cierre del mes si sigue reflejando los números de hoy (si no, se exporta sin el sello).
+  function cierreVigente(mes) {
+    const c = cierres[mes];
+    return c && !cambioDesdeCierre(c, balance(mes)) ? c : null;
+  }
+
+  function renderCierre(b) {
+    const c = cierres[mesSel];
+    const cambio = c && cambioDesdeCierre(c, b);
+    const puede = canDelete();
+    const btn = (acc, ic, txt, cls) => `<button type="button" class="foc-btn ${cls}" data-acc="${acc}">${icSvg(ic)}${txt}</button>`;
+    let estado = '';
+    if (c) {
+      estado = `<div class="cj-ci-st${cambio ? ' cambio' : ''}">${icSvg(cambio ? 'alert' : 'lock')}<span>` +
+        `<b>Cerrado el ${esc(fechaHora(c.ts))}</b> por ${esc(c.por?.nombre || '—')}` +
+        (cambio ? `<small>Cambiaron movimientos después del cierre (saldo al cerrar: ${fmtSaldo(c.saldo)})</small>` : '') +
+        `</span>${c.pdfId ? `<a href="${driveUrl(c.pdfId)}" target="_blank" rel="noopener" title="Ver el PDF del cierre en Drive">Ver</a>` : ''}</div>`;
+    }
+    $('cj-cierre').innerHTML = estado + '<div class="cj-ci-btns">' +
+      btn('xlsx', 'sheet', 'Excel', 'foc-btn--clear') + btn('pdf', 'file', 'PDF', 'foc-btn--clear') +
+      (!puede ? '' : !c ? btn('cerrar', 'lock', 'Cerrar mes', 'foc-btn--edit')
+        : cambio ? btn('cerrar', 'lock', 'Volver a cerrar', 'foc-btn--edit')
+        : btn('reabrir', 'unlock', 'Reabrir', 'foc-btn--clear')) + '</div>';
+  }
+
   function renderMovimientos() {
     if (vista !== 'caja') return;
     pintarMeses(movimientos);
     pintarQuien();
-    const filtered = delMes();
-
-    // Balance del mes seleccionado (con arrastre acumulado)
-    const totalIngresos = filtered.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0);
-    const totalGastos   = filtered.filter(m => m.tipo === 'gasto').reduce((s, m)  => s + (m.monto || 0), 0);
-    // Excedente anterior = neto de TODOS los movimientos de meses previos al seleccionado
-    const excedente = movimientos
-      .filter(m => m.fecha && m.fecha.substring(0, 7) < mesSel)
-      .reduce((s, m) => s + neto(m), 0);
-    const saldo = excedente + totalIngresos - totalGastos;
+    const b = balance(mesSel);
+    const filtered = b.movs;
+    const { excedente, saldo } = b;
+    const totalIngresos = b.ingresos, totalGastos = b.egresos;
+    renderCierre(b);
 
     $('cj-saldo-k').textContent = 'Saldo de ' + nombreMes(mesSel).split(' ')[0].toLowerCase();
     countUp($('val-excedente'), excedente);
@@ -1184,25 +1230,45 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ─── Sincronizar Excel con Drive (se llama automáticamente tras cada movimiento) ──
   async function sincronizarExcel(mes) {
     if (typeof uploadToCajaDrive !== 'function') return;
-
-    if (!window.XLSX) {
-      try {
-        await new Promise((resolve, reject) => {
-          const s   = document.createElement('script');
-          // xlsx-js-style: fork de SheetJS Community Edition que sí escribe estilos
-          // (fills/fonts/borders) al generar el .xlsx — la edición community pura
-          // ignora la propiedad `s` de cada celda al exportar.
-          s.src     = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
-          s.onload  = resolve;
-          s.onerror = reject;
-          document.head.appendChild(s);
-        });
-      } catch (_) { return; }
-    }
-
-    const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    const hoy       = new Date();
+    try { await cargarScript(XLSX_URL); } catch (_) { return; }
     const mesActual = mes || mesHoy();
+
+    // ─── Subir a Drive silenciosamente ──────────────────
+    try {
+      await uploadToCajaDrive(archivoExcel(mesActual, 'Caja'), {
+        userId: targetCodigo, userName: targetNombre,
+        fecha: mesActual + '-01', tipo: 'planilla'   // mesActual ya es el mes correcto
+      });
+    } catch (_) {}
+  }
+
+  // xlsx-js-style: fork de SheetJS Community Edition que sí escribe estilos
+  // (fills/fonts/borders) al generar el .xlsx — la edición community pura
+  // ignora la propiedad `s` de cada celda al exportar.
+  const XLSX_URL = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+
+  // Carga un script una sola vez (las librerías del Excel y del PDF van a demanda).
+  const _scripts = {};
+  function cargarScript(src) {
+    return _scripts[src] || (_scripts[src] = new Promise((resolve, reject) => {
+      const s   = document.createElement('script');
+      s.src     = src;
+      s.onload  = resolve;
+      s.onerror = () => { delete _scripts[src]; reject(new Error('No se pudo cargar ' + src)); };
+      document.head.appendChild(s);
+    }));
+  }
+
+  // Nombre de archivo: Caja_Juan_Perez_Octubre_2026.xlsx / Cierre_Caja_….pdf
+  function nombreArchivo(prefijo, mes, ext) {
+    const safe = targetNombre.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+    return `${prefijo}_${safe}_${nombreMes(mes).replace(/\s+/g, '_')}.${ext}`;
+  }
+
+  // La planilla del mes como File (.xlsx). Con `cierre`, el encabezado lo dice.
+  function archivoExcel(mesActual, prefijo, cierre) {
+    const MESES = MESES_LBL;
+    const hoy       = new Date();
     const [yr, mo]  = mesActual.split('-');
     const periodo   = `${MESES[parseInt(mo, 10)]} ${yr}`;
 
@@ -1277,7 +1343,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     rows[R_TITLE]   = [`VIMECO S.A. — Caja Chica`, ...E.slice(1)];
     rows[R_USER]    = [`Usuario: ${targetNombre}`,  ...E.slice(1)];
     rows[R_PERIODO] = [`Período: ${periodo}`,        ...E.slice(1)];
-    rows[R_GEN]     = [`Generado: ${hoy.toLocaleDateString('es-AR')}`, ...E.slice(1)];
+    rows[R_GEN]     = [`Generado: ${hoy.toLocaleDateString('es-AR')}` +
+                       (cierre ? ` · Mes cerrado el ${fechaHora(cierre.ts)} por ${cierre.por?.nombre || '—'}` : ''), ...E.slice(1)];
     rows[4]         = [...E];
     rows[R_RESUMEN] = [`RESUMEN — ${periodo}`, ...E.slice(1)];
     rows[R_EXC]     = kv('Excedente anterior', valExc);
@@ -1424,18 +1491,134 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     XLSX.utils.book_append_sheet(wb, ws, periodo.substring(0, 31));
 
-    // ─── Subir a Drive silenciosamente ──────────────────
-    try {
-      const wbout  = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
-      const blob   = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const safe   = targetNombre.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-      const fname  = `Caja_${safe}_${periodo.replace(/\s+/g, '_')}.xlsx`;
-      await uploadToCajaDrive(new File([blob], fname, { type: blob.type }), {
-        userId: targetCodigo, userName: targetNombre,
-        fecha: mesActual + '-01', tipo: 'planilla'   // mesActual ya es el mes correcto
-      });
-    } catch (_) {}
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
+    const type  = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return new File([new Blob([wbout], { type })], nombreArchivo(prefijo, mesActual, 'xlsx'), { type });
   }
+
+  // ─── PDF del mes ─────────────────────────────────────
+  async function archivoPDF(mes, prefijo, cierre) {
+    await cargarScript('js/jspdf.umd.min.js');
+    await cargarScript('js/logoBase64.js');
+    await cargarScript('js/cajaPDF.js');
+    const b = balance(mes);
+    const porGrupo = agrupar => {
+      const o = {};
+      b.movs.filter(esEgreso).forEach(m => { const k = agrupar(m); o[k] = (o[k] || 0) + (m.monto || 0); });
+      return Object.entries(o).sort((x, y) => y[1] - x[1]);
+    };
+    const blob = generateCajaBlob({
+      caja: targetNombre,
+      periodo: nombreMes(mes),
+      excedente: b.excedente, ingresos: b.ingresos, egresos: b.egresos, saldo: b.saldo,
+      porObra: porGrupo(m => m.obra || 'Sin obra'),
+      porCat:  porGrupo(m => m.categoria || 'Sin categoría'),
+      // Del más viejo al más nuevo, para que el saldo corrido se lea de arriba abajo
+      movs: [...b.movs].sort((x, y) => String(x.fecha || '').localeCompare(String(y.fecha || '')) || (x.timestamp || 0) - (y.timestamp || 0))
+        .map(m => ({ fecha: m.fecha, tipo: m.tipo, descripcion: m.descripcion, obra: m.obra, categoria: m.categoria,
+                     proveedor: m.proveedor, monto: m.monto || 0, comp: !!m.driveFileId })),
+      cierre: cierre ? { por: cierre.por?.nombre || '—', fecha: fechaHora(cierre.ts) } : null,
+      generado: fechaHora(Date.now())
+    });
+    return new File([blob], nombreArchivo(prefijo, mes, 'pdf'), { type: 'application/pdf' });
+  }
+
+  function descargar(file) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  // ─── Exportar y cerrar el mes ────────────────────────
+  // El cierre es un comprobante: guarda quién y cuándo, el balance de ese momento y
+  // el PDF + Excel en Drive. No bloquea nada: si después se toca un movimiento del
+  // mes, la pantalla avisa que cambió y se puede volver a cerrar.
+  async function exportar(formato, btn) {
+    btn.disabled = true;
+    try {
+      const c = cierreVigente(mesSel);
+      const file = formato === 'pdf'
+        ? await archivoPDF(mesSel, c ? 'Cierre_Caja' : 'Caja', c)
+        : (await cargarScript(XLSX_URL), archivoExcel(mesSel, c ? 'Cierre_Caja' : 'Caja', c));
+      descargar(file);
+    } catch (err) {
+      showToast('No se pudo generar el ' + (formato === 'pdf' ? 'PDF' : 'Excel') + ': ' + (err.message || err), 'error');
+    }
+    btn.disabled = false;
+  }
+
+  const cent = n => Math.round((n || 0) * 100) / 100;
+
+  async function cerrarMes(btn) {
+    const mes = mesSel;
+    const b = balance(mes);
+    const otra = cierres[mes] ? 'Volver a cerrar' : 'Cerrar';
+    if (!await showConfirm(`${otra} ${nombreMes(mes).toLowerCase()}`,
+      `Se guarda el comprobante del mes (PDF y Excel) en Drive con saldo de ${fmtSaldo(b.saldo)}. ` +
+      'Los movimientos se pueden seguir editando.', { boton: otra, tono: 'ok', icono: 'lock' })) return;
+    btn.disabled = true;
+    const codigo = targetCodigo, nombre = targetNombre;
+    const cierre = { por: { codigo: userCodigo, nombre: userNombre }, ts: Date.now(),
+                     excedente: cent(b.excedente), ingresos: cent(b.ingresos), egresos: cent(b.egresos), saldo: cent(b.saldo), n: b.movs.length };
+    let sinDrive = false;
+    try {
+      const [pdf] = await Promise.all([archivoPDF(mes, 'Cierre_Caja', cierre), cargarScript(XLSX_URL)]);
+      const xlsx = archivoExcel(mes, 'Cierre_Caja', cierre);
+      if (typeof uploadToCajaDrive === 'function') {
+        const meta = { userId: codigo, userName: nombre, fecha: mes + '-01', tipo: 'planilla' };
+        try {
+          const [rp, rx] = await Promise.all([uploadToCajaDrive(pdf, meta), uploadToCajaDrive(xlsx, meta)]);
+          if (rp?.fileId) cierre.pdfId = rp.fileId;
+          if (rx?.fileId) cierre.xlsxId = rx.fileId;
+        } catch (_) { sinDrive = true; }
+      }
+      await saveCajaCierre(codigo, mes, cierre);
+      if (codigo === targetCodigo) cierres[mes] = cierre;
+      if (isAdmin) (cierresTodas[codigo] = cierresTodas[codigo] || {})[mes] = cierre;
+      if (typeof logActivity === 'function') logActivity({
+        tipo: 'caja', usuario: { codigo: userCodigo, nombre: userNombre },
+        titulo: `Cierre de caja — ${nombreMes(mes)}${codigo !== userCodigo ? ` (caja de ${nombre})` : ''}`,
+        detalle: `Saldo ${fmtSaldo(b.saldo)} · ${b.movs.length} ${b.movs.length === 1 ? 'movimiento' : 'movimientos'}`,
+        driveUrl: cierre.pdfId ? driveUrl(cierre.pdfId) : ''
+      });
+      showToast(sinDrive ? 'Mes cerrado, pero el comprobante no se pudo subir a Drive: descargalo desde acá' : `${nombreMes(mes)} cerrado`,
+        sinDrive ? 'warning' : 'success');
+    } catch (err) {
+      showToast('No se pudo cerrar el mes: ' + (err.message || err), 'error');
+    }
+    btn.disabled = false;
+    renderMovimientos();
+  }
+
+  async function reabrirMes(btn) {
+    const mes = mesSel;
+    if (!await showConfirm(`Reabrir ${nombreMes(mes).toLowerCase()}`,
+      'Se quita la marca de cerrado. El comprobante que ya se guardó en Drive queda ahí.',
+      { boton: 'Reabrir', tono: 'del', icono: 'unlock' })) return;
+    btn.disabled = true;
+    try {
+      await deleteCajaCierre(targetCodigo, mes);
+      delete cierres[mes];
+      if (cierresTodas[targetCodigo]) delete cierresTodas[targetCodigo][mes];
+      showToast(`${nombreMes(mes)} reabierto`, 'success');
+    } catch (err) {
+      showToast('No se pudo reabrir: ' + (err.message || err), 'error');
+    }
+    btn.disabled = false;
+    renderMovimientos();
+  }
+
+  $('cj-cierre').addEventListener('click', e => {
+    const b = e.target.closest('button[data-acc]');
+    if (!b) return;
+    const acc = b.dataset.acc;
+    if (acc === 'xlsx' || acc === 'pdf') exportar(acc, b);
+    else if (acc === 'cerrar') cerrarMes(b);
+    else if (acc === 'reabrir') reabrirMes(b);
+  });
 
   // ─── Init ────────────────────────────────────────────
   mesSel = mesHoy();

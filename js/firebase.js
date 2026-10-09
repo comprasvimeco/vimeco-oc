@@ -788,15 +788,36 @@ window._fetchConTope = function (url, opts, ms = 20000) {
       .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || (b.timestamp || 0) - (a.timestamp || 0));
   };
 
-  // Todas las cajas de una vez, para el tablero de administración: { codigo: [movimientos] }.
+  // Todas las cajas de una vez, para el tablero de administración:
+  // { movimientos: { codigo: [movimientos] }, cierres: { codigo: { 'YYYY-MM': cierre } } }.
   window.getTodasLasCajas = async function () {
     const resp = await _fbFetch(_base() + '/cajas.json');
     const data = await resp.json();
-    const out  = {};
+    const movimientos = {}, cierres = {};
     Object.entries(data || {}).forEach(([codigo, c]) => {
-      out[codigo] = Object.entries(c?.movimientos || {}).map(([key, m]) => ({ key, ...m }));
+      movimientos[codigo] = Object.entries(c?.movimientos || {}).map(([key, m]) => ({ key, ...m }));
+      if (c?.cierres) cierres[codigo] = c.cierres;
     });
-    return out;
+    return { movimientos, cierres };
+  };
+
+  // Cierres de mes de una caja: { 'YYYY-MM': { por, ts, saldo, ... } }. El cierre
+  // es un comprobante: no bloquea los movimientos del mes.
+  window.getCajaCierres = async function (userId) {
+    const resp = await _fbFetch(_base() + '/cajas/' + userId + '/cierres.json');
+    return (await resp.json()) || {};
+  };
+
+  window.saveCajaCierre = async function (userId, mes, cierre) {
+    await _fbFetch(_base() + '/cajas/' + userId + '/cierres/' + mes + '.json', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(cierre)
+    });
+  };
+
+  window.deleteCajaCierre = async function (userId, mes) {
+    await _fbFetch(_base() + '/cajas/' + userId + '/cierres/' + mes + '.json', { method: 'DELETE' });
   };
 
   window.saveCajaMovimiento = async function (userId, movimiento) {
