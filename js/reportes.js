@@ -1697,8 +1697,8 @@ function renderDuplicados(list) {
               <span class="rep-dup-tot">${esc(fmtFull(oc.total, oc.moneda || 'ARS'))}</span>
               <span class="rep-dup-dif">${esc(etiquetaDup(oc, head))}</span>
             </span>
-            <button class="btn btn-sm btn-danger rep-dup-del" data-delkey="${esc(histKeyOf(oc))}"
-                    title="Borrar la OC ${esc(oc.nroOC)} del historial">Borrar</button>
+            <button class="btn btn-sm btn-danger rep-dup-del" data-anularkey="${esc(histKeyOf(oc))}"
+                    title="Anular la OC ${esc(oc.nroOC)}: sigue en el historial, pero deja de contar">Anular</button>
           </div>`).join('')}
         <div class="rep-dup-foot">
           <button class="btn btn-sm btn-outline rep-dup-ok" data-okkeys="${esc(g.map(histKeyOf).join(','))}"
@@ -1710,8 +1710,8 @@ function renderDuplicados(list) {
   if (!$('rep-dup')._wired) {
     $('rep-dup')._wired = true;
     $('rep-dup').addEventListener('click', e => {
-      const del = e.target.closest('[data-delkey]');
-      if (del) { borrarDuplicado(del.dataset.delkey); return; }
+      const anu = e.target.closest('[data-anularkey]');
+      if (anu) { anularDuplicado(anu.dataset.anularkey); return; }
       const okBtn = e.target.closest('[data-okkeys]');
       if (okBtn) { marcarNoDuplicadas(okBtn); return; }
       const ver = e.target.closest('[data-ockey]');
@@ -1778,7 +1778,13 @@ async function borrarOC(key, titulo) {
   }
 }
 
-function borrarDuplicado(key) { return borrarOC(key, 'Borrar OC duplicada'); }
+// Anular, no borrar: la OC sigue en el historial y en Novedades como
+// "Duplicada" y se puede desanular. Borrarla desde acá perdía la OC entera
+// (le pasó a la 0006-00000510). El diálogo está en js/duplicados.js.
+async function anularDuplicado(key) {
+  const oc = ocByKey(key);
+  if (oc && await anularOCManual(oc, ALL)) render();
+}
 
 // ===================================================
 //  Ficha de la OC
