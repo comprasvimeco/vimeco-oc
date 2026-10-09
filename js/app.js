@@ -2968,12 +2968,16 @@ async function solicitarAutorizacion(autorizador, regla = null, repetida = null)
   };
 
   const histKey = numero.replace(/-/g, '');
+  // El presupuesto se toma ahora: terminarBorrador() y la próxima OC lo pisan.
+  const fuente = selectedFile;
   recordarObra(ocData.proveedor.ubicacion);
   try {
     await saveOCToHistory(ocData, ocData._total, {
       estado:       'pendiente',
       autorizacion,
       _payload:     ocData,
+      // Avisa en la bandeja que hay presupuesto aunque la subida no haya llegado.
+      ...(fuente ? { tieneFuente: true } : {}),
       ...extraRepetida(repetida)
     });
     updateProveedoresCache();
@@ -2990,31 +2994,42 @@ async function solicitarAutorizacion(autorizador, regla = null, repetida = null)
   const driveFecha = new Date().toISOString().slice(0, 10);
   const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
 
+  // Subir el presupuesto a Drive (si hay) para que el autorizador lo revise.
+  // Se espera a que llegue antes de avisarle: con la subida en segundo plano la
+  // notificación salía primero, y quien la abría enseguida veía la OC sin el
+  // presupuesto; y si el solicitante cambiaba de app a mitad de camino, la
+  // subida se cortaba sin aviso.
+  let fuenteFallo = !!fuente;
+  if (fuente) btn.innerHTML = '<span class="spinner"></span> Subiendo presupuesto…';
+  if (typeof uploadSourceToDrive === 'function') {
+    try {
+      const { obrasFolderId, proveedoresFolderId, sourceLink } = await uploadSourceToDrive(
+        { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, fuente);
+      fuenteFallo = !!fuente && !sourceLink;
+      await patchHistorialEntry(histKey, {
+        drive_folder_obras_id:       obrasFolderId || null,
+        drive_folder_proveedores_id: proveedoresFolderId || null,
+        fuenteUrl:                   sourceLink || ''
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
   if (typeof notificarUsuario === 'function' && autorizador.codigo !== solicitante.codigo) {
     notificarUsuario(autorizador.codigo, {
       title: 'Autorización pendiente',
-      body:  `OC ${numero} · ${driveProv} · ${driveObra}\n${monedaUSD ? 'USD' : '$'} ${fmtMoneyDisplay(ocData._total)} — pide ${solicitante.nombre}`,
+      body:  `OC ${numero} · ${driveProv} · ${driveObra}\n${monedaUSD ? 'USD' : '$'} ${fmtMoneyDisplay(ocData._total)} — pide ${solicitante.nombre}` +
+             (fuente && !fuenteFallo ? '\nCon presupuesto adjunto' : ''),
       url:   'autorizaciones.html?tab=firmar',
       tag:   'aut-' + histKey
     });
-  }
-
-  // Subir el archivo fuente a Drive (si hay) para que el autorizador lo revise.
-  if (typeof uploadSourceToDrive === 'function') {
-    uploadSourceToDrive({ obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
-      .then(({ obrasFolderId, proveedoresFolderId, sourceLink }) =>
-        patchHistorialEntry(histKey, {
-          drive_folder_obras_id:       obrasFolderId || null,
-          drive_folder_proveedores_id: proveedoresFolderId || null,
-          fuenteUrl:                   sourceLink || ''
-        }).catch(() => {}))
-      .catch(() => {});
   }
 
   refreshOCNumberDisplay();
   terminarBorrador();
   toast(`OC ${numero} enviada a ${autorizador.nombre} para autorización.` +
     (repetida?.tipo === 'correccion' ? ' La anterior se anula cuando la firme.' : ''), 'success');
+  if (fuenteFallo)
+    toast(`No se pudo subir el presupuesto: ${autorizador.nombre} va a ver la OC sin él. Mandáselo por otro medio.`, 'error');
   btn.disabled = false;
   btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
   $('btn-same-provider').classList.remove('hidden');

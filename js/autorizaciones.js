@@ -62,6 +62,7 @@ function render() {
         <span class="aut-meta">Pide ${esc(solicitante)}</span>
       </div>
       <div class="aut-actions">
+        ${oc.fuenteUrl ? `<a class="foc-btn foc-btn--drive" href="${esc(oc.fuenteUrl)}" target="_blank" rel="noopener">${icSvg('clip')}Presupuesto</a>` : ''}
         <button class="foc-btn foc-btn--gen btn-revisar">${icSvg('edit')}Revisar y firmar</button>
         <button class="foc-btn foc-btn--del btn-rechazar-rapido">${icSvg('x')}Rechazar</button>
       </div>`;
@@ -315,10 +316,22 @@ function abrirPreview(oc, soloLectura) {
   const quien = oc.autorizacion?.solicitadoPor?.nombre || oc.responsable?.nombre;
   pintarFichaOC(data, estadoChipFicha(oc) + (quien ? `<span class="foc-chip">Pide: ${esc(quien)}</span>` : ''));
 
-  // Link al archivo fuente (presupuesto/factura) si el solicitante lo adjuntó.
+  // Link al presupuesto si el solicitante lo adjuntó. Si no vino con la lista,
+  // se pregunta al servidor: puede haber terminado de subirse después.
   const fuente = $('preview-fuente');
-  if (oc.fuenteUrl) { fuente.href = oc.fuenteUrl; fuente.classList.remove('hidden'); }
-  else { fuente.removeAttribute('href'); fuente.classList.add('hidden'); }
+  const ponerFuente = url => {
+    if (url) { fuente.href = url; fuente.classList.remove('hidden'); }
+    else { fuente.removeAttribute('href'); fuente.classList.add('hidden'); }
+  };
+  ponerFuente(oc.fuenteUrl);
+  if (!oc.fuenteUrl && !soloLectura && typeof getHistorialFuente === 'function') {
+    getHistorialFuente(oc.nroOC.replace(/-/g, '')).then(url => {
+      if (!url) return;
+      oc.fuenteUrl = url;
+      if (vigente()) ponerFuente(url);
+      render();
+    }).catch(() => {});
+  }
 
   // Las ya resueltas y los pedidos propios se abren solo para mirarlos.
   $('preview-firmar').classList.toggle('hidden', !!soloLectura);
