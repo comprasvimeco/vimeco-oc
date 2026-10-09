@@ -1122,6 +1122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     adjuntarArchivo(e.dataTransfer.files[0]);
   });
   $('btn-rem-rescan').addEventListener('click', () => { if (modalRawFile) escanear(modalRawFile); });
+  $('rv-thumb').addEventListener('click', () => verImagen(modalPrevUrl));
   $('btn-rem-quitar').addEventListener('click', limpiarFoto);
   $('btn-rem-ia').addEventListener('click', leerConIA);
 

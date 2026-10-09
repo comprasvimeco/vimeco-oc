@@ -117,6 +117,53 @@ window.showConfirm = function (title, msg, { boton = 'Confirmar', tono = 'ok', i
 };
 
 /*
+ * Visor de foto a pantalla completa (las miniaturas de comprobante en Remitos,
+ * Facturas y Caja). Se arma solo la primera vez. Tocar la foto alterna entre
+ * "entera" y ampliada (2,5×, centrada donde se tocó, se recorre arrastrando);
+ * tocar el fondo, la X o Escape cierra.
+ *
+ *   verImagen(objectUrl)
+ */
+window.verImagen = function (src) {
+  if (!src) return;
+  let lb = document.getElementById('img-lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'img-lightbox';
+    lb.className = 'img-lightbox hidden';
+    lb.setAttribute('role', 'dialog');
+    lb.setAttribute('aria-modal', 'true');
+    lb.innerHTML =
+      '<button type="button" class="img-lightbox-close" aria-label="Cerrar">' + icSvg('x') + '</button>' +
+      '<img alt="Comprobante">';
+    document.body.appendChild(lb);
+    const img = lb.querySelector('img');
+    const cerrar = () => {
+      lb.classList.add('hidden');
+      lb.classList.remove('zoom');
+      img.removeAttribute('src');
+      document.removeEventListener('keydown', lb._onKey, true);
+    };
+    lb._onKey = e => { if (e.key === 'Escape') { e.stopImmediatePropagation(); cerrar(); } };
+    lb.addEventListener('click', e => {
+      if (e.target !== img) return cerrar();
+      // Ampliar centrado en el punto tocado (proporción dentro de la foto).
+      const r = img.getBoundingClientRect();
+      const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      const zoom = lb.classList.toggle('zoom');
+      if (zoom) {
+        lb.scrollLeft = fx * img.offsetWidth  - lb.clientWidth  / 2;
+        lb.scrollTop  = fy * img.offsetHeight - lb.clientHeight / 2;
+      }
+    });
+  }
+  lb.classList.remove('zoom');
+  lb.querySelector('img').src = src;
+  lb.classList.remove('hidden');
+  document.addEventListener('keydown', lb._onKey, true);
+};
+
+/*
  * Paginador "Ver más" para las listas que crecen sin techo (Historial, Adjuntar,
  * Novedades). Sin esto cada una pinta el historial entero de una: en jul-2026 son
  * 156 OC y ~26.000 px de scroll, y sólo va para arriba.

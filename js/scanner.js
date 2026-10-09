@@ -21,14 +21,14 @@
   'use strict';
 
   const OPENCV_SRC   = 'js/vendor/opencv.js';
-  const JSCANIFY_SRC = 'js/vendor/jscanify.min.js';
-  const MAX_SRC      = 1400;   // lado mayor de la imagen de trabajo (px)
-  const DETECT_SIZE  = 700;    // lado mayor para correr la detección (px)
-  const MAX_OUT      = 1800;   // lado mayor de la imagen de salida (px)
-  const JPEG_QUALITY = 0.85;
+  const MAX_SRC      = 2600;   // lado mayor de la imagen de trabajo (px)
+  const DETECT_SIZE  = 800;    // lado mayor para correr la detección (px)
+  const MAX_OUT      = 2200;   // lado mayor de la imagen de salida (px)
+  const JPEG_QUALITY = 0.88;
   const QUAD_COLOR   = '#2557a7';
   const LOUPE_PX     = 104;    // diámetro de la lupa (px CSS)
-  const LOUPE_ZOOM   = 2.5;
+  const LOUPE_ZOOM   = 3;
+  const THUMB_PX     = 120;    // lado mayor de las miniaturas de filtro (px)
 
   // ─── Markup del editor ────────────────────────────────────────────────────
   const SVG = (inner) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
@@ -113,7 +113,6 @@
         window.cv = window.cv || {};
         window.cv.onRuntimeInitialized = () => resolve();
       });
-      if (!window.jscanify) await loadScript(JSCANIFY_SRC);
     })().catch((err) => { libsPromise = null; throw err; });
     return libsPromise;
   }
@@ -131,12 +130,154 @@
 
   function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
+  // Achica en pasos de a la mitad: un drawImage directo de 2600 px a 300 px
+  // saltea píxeles y la foto queda serruchada y borrosa.
   function scaledCanvas(srcCanvas, w, h) {
+    const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h));
+    let cur = srcCanvas;
+    while (cur.width / 2 > W && cur.height / 2 > H) {
+      const half = document.createElement('canvas');
+      half.width = Math.round(cur.width / 2);
+      half.height = Math.round(cur.height / 2);
+      const hc = half.getContext('2d');
+      hc.imageSmoothingQuality = 'high';
+      hc.drawImage(cur, 0, 0, half.width, half.height);
+      cur = half;
+    }
     const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(w));
-    c.height = Math.max(1, Math.round(h));
-    c.getContext('2d').drawImage(srcCanvas, 0, 0, c.width, c.height);
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cur, 0, 0, W, H);
     return c;
+  }
+
+  // Ordena 4 puntos como tl, tr, br, bl (por suma y diferencia de coordenadas).
+  function ordenarEsquinas(pts) {
+    const by = (f) => pts.slice().sort((a, b) => f(a) - f(b));
+    const suma = by((p) => p.x + p.y), dif = by((p) => p.y - p.x);
+    return { tl: suma[0], br: suma[3], tr: dif[0], bl: dif[3] };
+  }
+
+  // Busca el papel en un canvas chico. Devuelve {tl,tr,br,bl} en px del canvas, o null.
+  // Prueba varios mapas binarios (bordes Canny con umbral automático y con umbral
+  // bajo, y "zona clara" por Otsu); de cada contorno toma la envolvente convexa y
+  // arma cuadriláteros convexos que la representen bien. Gana el de mejor
+  // "apoyo × área": apoyo = fracción de su perímetro que cae sobre un borde real
+  // (así un fondo con vetas o rayas pegado al papel no le gana al papel).
+  function findPaperQuad(small) {
+    const cv = window.cv;
+    const W = small.width, H = small.height, A = W * H;
+    const mats = [];
+    const keep = (m) => { mats.push(m); return m; };
+    let best = null;
+    try {
+      const rgba = keep(cv.imread(small));
+      const gray = keep(new cv.Mat());
+      cv.cvtColor(rgba, gray, cv.COLOR_RGBA2GRAY);
+      cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+      const kernel = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3)));
+      const kernel5 = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+
+      // mediana de grises (muestreada) para el umbral automático de Canny
+      const hist = new Uint32Array(256), d = gray.data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 3) { hist[d[i]]++; n++; }
+      let med = 0;
+      for (let acc = 0; med < 255; med++) { acc += hist[med]; if (acc >= n / 2) break; }
+
+      const bins = [];
+      for (const [lo, hi] of [[Math.max(10, 0.66 * med), Math.min(255, 1.33 * med)], [20, 60]]) {
+        const e = keep(new cv.Mat());
+        cv.Canny(gray, e, lo, hi);
+        cv.dilate(e, e, kernel);           // une trazos del borde cortados
+        bins.push(e);
+      }
+      const otsu = keep(new cv.Mat());
+      cv.threshold(gray, otsu, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+      cv.morphologyEx(otsu, otsu, cv.MORPH_OPEN, kernel5);
+      bins.push(otsu);
+
+      // Apoyo: muestrea los 4 lados cada ~2 px sobre el mapa de bordes de umbral bajo.
+      const edges = bins[1].data;
+      const apoyo = (q) => {
+        let on = 0, tot = 0;
+        for (let i = 0; i < 4; i++) {
+          const a = q[i], b = q[(i + 1) % 4];
+          const steps = Math.max(2, Math.round(dist(a, b) / 2));
+          for (let s = 0; s <= steps; s++) {
+            const x = Math.round(a.x + (b.x - a.x) * s / steps);
+            const y = Math.round(a.y + (b.y - a.y) * s / steps);
+            if (x < 0 || y < 0 || x >= W || y >= H) continue;
+            tot++;
+            if (edges[y * W + x]) on++;
+          }
+        }
+        return tot ? on / tot : 0;
+      };
+
+      for (const bin of bins) {
+        const contours = new cv.MatVector(), hier = new cv.Mat();
+        cv.findContours(bin, contours, hier, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+        for (let i = 0; i < contours.size(); i++) {
+          const c = contours.get(i);
+          const hull = new cv.Mat();
+          cv.convexHull(c, hull, false, true);
+          const hullArea = cv.contourArea(hull);
+          if (hullArea > A * 0.15 && hullArea < A * 0.97) {
+            const peri = cv.arcLength(hull, true);
+            for (const eps of [0.02, 0.03, 0.045, 0.06]) {
+              const ap = new cv.Mat();
+              cv.approxPolyDP(hull, ap, eps * peri, true);
+              const rows = ap.rows;
+              if (rows === 4 && cv.isContourConvex(ap)) {
+                const quadArea = cv.contourArea(ap);
+                // el cuadrilátero tiene que cubrir casi toda la envolvente
+                if (quadArea > hullArea * 0.9 && quadArea < A * 0.97) {
+                  const p = ap.data32S;
+                  const pts = [0, 2, 4, 6].map((j) => ({ x: p[j], y: p[j + 1] }));
+                  const sup = apoyo(pts);
+                  const score = sup * sup * quadArea;
+                  if (sup > 0.5 && (!best || score > best.score)) best = { score, pts };
+                }
+              }
+              ap.delete();
+              if (rows <= 4) break;
+            }
+          }
+          hull.delete(); c.delete();
+        }
+        contours.delete(); hier.delete();
+      }
+    } finally {
+      mats.forEach((m) => { try { m.delete(); } catch (_) {} });
+    }
+    return best ? ordenarEsquinas(best.pts) : null;
+  }
+
+  // Endereza el cuadrilátero `c` (px de srcCanvas) a un canvas de W×H.
+  function warpQuad(srcCanvas, c, W, H, interp) {
+    const cv = window.cv;
+    const src = cv.imread(srcCanvas), dst = new cv.Mat();
+    const from = cv.matFromArray(4, 1, cv.CV_32FC2, [c.tl.x, c.tl.y, c.tr.x, c.tr.y, c.br.x, c.br.y, c.bl.x, c.bl.y]);
+    const to   = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, W, 0, W, H, 0, H]);
+    const M = cv.getPerspectiveTransform(from, to);
+    const out = document.createElement('canvas');
+    try {
+      cv.warpPerspective(src, dst, M, new cv.Size(W, H), interp, cv.BORDER_REPLICATE, new cv.Scalar());
+      cv.imshow(out, dst);
+    } finally {
+      src.delete(); dst.delete(); from.delete(); to.delete(); M.delete();
+    }
+    return out;
+  }
+
+  // Tamaño de salida del recorte (promedio de lados opuestos), con lado mayor ≤ max.
+  function quadSize(c, max) {
+    const w = (dist(c.tl, c.tr) + dist(c.bl, c.br)) / 2;
+    const h = (dist(c.tl, c.bl) + dist(c.tr, c.br)) / 2;
+    const k = Math.min(1, max / Math.max(w, h, 1));
+    return { W: Math.max(1, Math.round(w * k)), H: Math.max(1, Math.round(h * k)) };
   }
 
   // ─── Editor ───────────────────────────────────────────────────────────────
@@ -170,6 +311,7 @@
         src:      document.createElement('canvas'), // imagen de trabajo (plana, rotada, capada)
         corners:  null,   // {tl,tr,br,bl} en px de state.src
         scale:    1,      // px display / px src
+        dpr:      1,      // px de canvas / px CSS del display
       };
 
       // —— Limpieza / salida ——
@@ -226,35 +368,21 @@
           tl: { x: w * 0.04, y: h * 0.04 }, tr: { x: w * 0.96, y: h * 0.04 },
           br: { x: w * 0.96, y: h * 0.96 }, bl: { x: w * 0.04, y: h * 0.96 },
         };
-        const cv = window.cv;
-        let mat = null, contour = null;
         try {
           const k = Math.min(1, DETECT_SIZE / Math.max(w, h));
-          const small = scaledCanvas(state.src, w * k, h * k);
-          const scanner = new window.jscanify();
-          mat = cv.imread(small);
-          contour = scanner.findPaperContour(mat);
-          const minArea = small.width * small.height * 0.12;
-          if (contour && cv.contourArea(contour) > minArea) {
-            const c = scanner.getCornerPoints(contour, mat);
-            const pts = [c.topLeftCorner, c.topRightCorner, c.bottomRightCorner, c.bottomLeftCorner];
-            if (pts.every((p) => p && isFinite(p.x) && isFinite(p.y))) {
-              const up = (p) => ({
-                x: Math.max(0, Math.min(w, p.x / k)),
-                y: Math.max(0, Math.min(h, p.y / k)),
-              });
-              const q4 = { tl: up(pts[0]), tr: up(pts[1]), br: up(pts[2]), bl: up(pts[3]) };
-              // descartar cuadriláteros degenerados
-              const ok = dist(q4.tl, q4.tr) > w * 0.15 && dist(q4.bl, q4.br) > w * 0.15 &&
-                         dist(q4.tl, q4.bl) > h * 0.15 && dist(q4.tr, q4.br) > h * 0.15;
-              if (ok) { state.corners = q4; return true; }
-            }
+          const q = findPaperQuad(scaledCanvas(state.src, w * k, h * k));
+          if (q) {
+            const up = (p) => ({
+              x: Math.max(0, Math.min(w, p.x / k)),
+              y: Math.max(0, Math.min(h, p.y / k)),
+            });
+            const q4 = { tl: up(q.tl), tr: up(q.tr), br: up(q.br), bl: up(q.bl) };
+            // descartar cuadriláteros degenerados
+            const ok = dist(q4.tl, q4.tr) > w * 0.15 && dist(q4.bl, q4.br) > w * 0.15 &&
+                       dist(q4.tl, q4.bl) > h * 0.15 && dist(q4.tr, q4.br) > h * 0.15;
+            if (ok) { state.corners = q4; return true; }
           }
         } catch (_) { /* fallback */ }
-        finally {
-          if (contour) { try { contour.delete(); } catch (_) {} }
-          if (mat)     { try { mat.delete();     } catch (_) {} }
-        }
         state.corners = fallback;
         return false;
       }
@@ -318,11 +446,18 @@
         return out;
       }
 
-      // —— Miniaturas de los filtros (sobre una copia chica de la foto) ——
+      // —— Miniaturas de los filtros: el recorte enderezado, en chico, con cada filtro ——
+      // (la foto grande queda sin filtro para ver bien los bordes al ubicar las esquinas)
       function renderThumbs() {
-        const w = state.src.width, h = state.src.height;
-        const k = 120 / Math.max(w, h);
-        const small = scaledCanvas(state.src, w * k, h * k);
+        const { W, H } = quadSize(state.corners, THUMB_PX * 3);
+        let small;
+        try {
+          small = warpQuad(state.src, state.corners, W, H, window.cv.INTER_AREA);
+          small = scaledCanvas(small, W / 3, H / 3);
+        } catch (_) {
+          const w = state.src.width, h = state.src.height, k = THUMB_PX / Math.max(w, h);
+          small = scaledCanvas(state.src, w * k, h * k);
+        }
         els.chips.forEach((ch) => {
           const c = ch.querySelector('canvas');
           let shown = small;
@@ -344,18 +479,21 @@
         const dh = Math.max(1, Math.round(h * scale));
         els.stage.style.width  = dw + 'px';
         els.stage.style.height = dh + 'px';
-        els.canvas.width = dw; els.canvas.height = dh;
-        els.quad.width   = dw; els.quad.height   = dh;
+        // Los canvas van a la resolución real de la pantalla (devicePixelRatio):
+        // a 1 px por px CSS, en el teléfono la foto se ve borrosa.
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        state.dpr = dpr;
+        const bw = Math.min(w, Math.round(dw * dpr)), bh = Math.min(h, Math.round(dh * dpr));
+        els.canvas.width = bw; els.canvas.height = bh;
+        els.quad.width   = Math.round(dw * dpr); els.quad.height = Math.round(dh * dpr);
       }
 
-      // —— Render del display: SIEMPRE dibuja la foto; filtro como capa opcional ——
+      // —— Render del display: la foto tal cual (el filtro se ve en las miniaturas) ——
       function render() {
         const ctx = els.canvas.getContext('2d');
         const base = scaledCanvas(state.src, els.canvas.width, els.canvas.height);
-        let shown = base;
-        try { shown = applyFilter(base, state.filter); } catch (_) { shown = base; }
         ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
-        ctx.drawImage(shown, 0, 0);
+        ctx.drawImage(base, 0, 0);
         positionHandles();
         drawQuad();
       }
@@ -370,7 +508,9 @@
 
       function drawQuad() {
         const ctx = els.quad.getContext('2d');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, els.quad.width, els.quad.height);
+        ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
         const s = state.scale, c = state.corners;
         ctx.beginPath();
         ctx.moveTo(c.tl.x * s, c.tl.y * s);
@@ -391,16 +531,23 @@
         const L = els.loupe;
         if (L.width !== LOUPE_PX * dpr) { L.width = L.height = LOUPE_PX * dpr; }
         const ctx = L.getContext('2d');
-        const half = LOUPE_PX / 2 / LOUPE_ZOOM;   // px de display a cada lado
+        // Se lee de la imagen de trabajo (resolución completa), no del display.
+        const half = LOUPE_PX / 2 / LOUPE_ZOOM / state.scale;   // px de src a cada lado
+        const sx = dx / state.scale - half, sy = dy / state.scale - half;
+        const f = LOUPE_PX / (half * 2);
         ctx.save();
         ctx.scale(dpr, dpr);
         ctx.fillStyle = '#e9eef6';
         ctx.fillRect(0, 0, LOUPE_PX, LOUPE_PX);
-        ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(els.canvas, dx - half, dy - half, half * 2, half * 2, 0, 0, LOUPE_PX, LOUPE_PX);
-        ctx.drawImage(els.quad,   dx - half, dy - half, half * 2, half * 2, 0, 0, LOUPE_PX, LOUPE_PX);
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(state.src, sx, sy, half * 2, half * 2, 0, 0, LOUPE_PX, LOUPE_PX);
+        const c = state.corners, P = (p) => [(p.x - sx) * f, (p.y - sy) * f];
+        ctx.beginPath();
+        ctx.moveTo(...P(c.tl)); ctx.lineTo(...P(c.tr)); ctx.lineTo(...P(c.br)); ctx.lineTo(...P(c.bl));
+        ctx.closePath();
         ctx.strokeStyle = QUAD_COLOR;
         ctx.lineWidth = 1.5;
+        ctx.stroke();
         const m = LOUPE_PX / 2;
         ctx.beginPath();
         ctx.moveTo(m, m - 14); ctx.lineTo(m, m + 14);
@@ -443,6 +590,7 @@
           const up = () => {
             el.classList.remove('drag');
             els.loupe.classList.add('hidden');
+            try { renderThumbs(); } catch (_) {}
             el.removeEventListener('pointermove', onMove);
             el.removeEventListener('pointerup', up);
             el.removeEventListener('pointercancel', up);
@@ -456,17 +604,8 @@
 
       // —— Salida: warp (perspectiva) + filtro -> File JPEG ——
       function buildOutput() {
-        const c = state.corners;
-        const outW = Math.round((dist(c.tl, c.tr) + dist(c.bl, c.br)) / 2);
-        const outH = Math.round((dist(c.tl, c.bl) + dist(c.tr, c.br)) / 2);
-        const k = Math.min(1, MAX_OUT / Math.max(outW, outH));
-        const W = Math.max(1, Math.round(outW * k));
-        const H = Math.max(1, Math.round(outH * k));
-        const scanner = new window.jscanify();
-        const warped = scanner.extractPaper(state.src, W, H, {
-          topLeftCorner:     c.tl, topRightCorner:    c.tr,
-          bottomLeftCorner:  c.bl, bottomRightCorner: c.br,
-        });
+        const { W, H } = quadSize(state.corners, MAX_OUT);
+        const warped = warpQuad(state.src, state.corners, W, H, window.cv.INTER_CUBIC);
         let result = warped;
         try { result = applyFilter(warped, state.filter); } catch (_) { result = warped; }
         return new Promise((res) => {
@@ -515,7 +654,7 @@
         els.chips.forEach((ch) => ch.setAttribute('aria-pressed', String(ch.dataset.filter === f)));
       }
       els.chips.forEach((ch) => {
-        const fn = () => { setFilter(ch.dataset.filter); if (state.corners) render(); };
+        const fn = () => setFilter(ch.dataset.filter);
         ch.addEventListener('click', fn);
         cleanups.push(() => ch.removeEventListener('click', fn));
       });
@@ -532,6 +671,7 @@
         state.corners = fullFrameCorners();
         positionHandles();
         drawQuad();
+        try { renderThumbs(); } catch (_) {}
         tip('Se usa la foto entera');
       };
       els.full.addEventListener('click', onFull);

@@ -636,6 +636,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (scan) setFile(scan);   // null = canceló: no cambia nada
   });
 
+  $('file-preview-img').addEventListener('click', () => verImagen(filePrevUrl));
   $('btn-file-rescan').addEventListener('click', async () => {
     const base = rawFile || currentFile;
     if (!base) return;

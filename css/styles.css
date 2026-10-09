@@ -899,7 +899,11 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
   display: flex; align-items: center; justify-content: center;
   padding: 1rem; cursor: zoom-out;
 }
-.img-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; }
+.img-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; cursor: zoom-in; }
+/* Ampliada: la foto a 2,5× del ancho de pantalla y el fondo se recorre con scroll */
+.img-lightbox.zoom { display: block; overflow: auto; padding: 0; -webkit-overflow-scrolling: touch; }
+.img-lightbox.zoom img { max-width: none; max-height: none; width: 250%; height: auto; border-radius: 0; cursor: zoom-out; }
+.img-lightbox.zoom .img-lightbox-close { position: fixed; z-index: 1; background: rgba(0,0,0,.55); }
 .img-lightbox-close {
   position: absolute; top: calc(.75rem + env(safe-area-inset-top)); right: .75rem;
   width: 42px; height: 42px; border-radius: 50%;
@@ -944,6 +948,7 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
 .scan-stage { position: relative; touch-action: none; }
 .scan-stage > canvas { position: absolute; inset: 0; display: block; }
 #scan-canvas { border-radius: 6px; box-shadow: 0 6px 24px -10px rgba(26,58,92,.45); }
+#scan-canvas, #scan-quad { width: 100%; height: 100%; }   /* el buffer va a devicePixelRatio */
 #scan-quad { pointer-events: none; }
 .scan-handle {
   position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px;

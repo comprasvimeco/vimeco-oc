@@ -543,7 +543,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // El editor de escaneo lo arma scanner.js recién al abrirlo.
     const scan = $('scan-editor');
     if (e.key !== 'Escape' || (scan && !scan.classList.contains('hidden'))) return;
-    if (!$('img-lightbox').classList.contains('hidden')) { closeLightbox(); return; }
     const abierta = HOJAS.find(h => !$(h).classList.contains('hidden'));
     if (abierta === 'modal-gasto') closeGastoModal();
     else if (abierta === 'modal-recarga') closeRecargaModal();
@@ -924,19 +923,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.disabled = false;
   });
 
-  // Lightbox: tocar la foto abre la imagen completa (sin editor)
-  const lightbox = $('img-lightbox');
-  function openLightbox(src) {
-    $('img-lightbox-img').src = src;
-    lightbox.classList.remove('hidden');
-  }
-  function closeLightbox() {
-    lightbox.classList.add('hidden');
-    $('img-lightbox-img').removeAttribute('src');
-  }
-  $('gasto-thumb').addEventListener('click', () => { if (gastoPreviewUrl) openLightbox(gastoPreviewUrl); });
-  lightbox.addEventListener('click', closeLightbox);
-  $('img-lightbox-close').addEventListener('click', closeLightbox);
+  // Tocar la foto la abre en grande (verImagen, ui.js)
+  $('gasto-thumb').addEventListener('click', () => { if (gastoPreviewUrl) verImagen(gastoPreviewUrl); });
 
   $('btn-gasto-guardar').addEventListener('click', async () => {
     const errorEl = $('gasto-error');
