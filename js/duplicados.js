@@ -302,6 +302,36 @@ function anularOCManual(oc, list) {
   });
 }
 
+// Deshace la anulación: la OC vuelve al estado que tenía (anulacion.estadoAnterior;
+// las viejas sin el dato, autorizada si tiene firma o emitida) y vuelve a contar
+// en Reportes. La OC que la reemplazaba deja de decir "Reemplaza a OC …". Si el
+// detector la sigue viendo duplicada de otra, vuelve al panel de duplicadas.
+// `list` es donde buscar la que la reemplazaba. Resuelve true si se desanuló.
+async function desanularOC(oc, list) {
+  const estado = oc.anulacion?.estadoAnterior || (oc.autorizacion?.firmante ? 'autorizada' : 'emitida');
+  const ok = await showConfirm('Desanular la OC ' + oc.nroOC,
+    `Vuelve a estar ${estado === 'autorizada' ? 'Autorizada' : 'Emitida'} y a contar en Reportes.`,
+    { boton: 'Desanular', tono: 'ok', icono: 'undo' });
+  if (!ok) return false;
+  try {
+    await patchHistorialEntry(oc.nroOC.replace(/-/g, ''), { estado, anulacion: null });
+    const por  = oc.anulacion?.reemplazadaPor;
+    const reem = por && list.find(o => o.nroOC === por);
+    if (reem?.reemplazaA?.includes(oc.nroOC)) {
+      const resto = reem.reemplazaA.filter(n => n !== oc.nroOC);
+      await patchHistorialEntry(reem.nroOC.replace(/-/g, ''), { reemplazaA: resto.length ? resto : null });
+      if (resto.length) reem.reemplazaA = resto; else delete reem.reemplazaA;
+    }
+    oc.estado = estado;
+    delete oc.anulacion;
+    toast(`OC ${oc.nroOC} desanulada: vuelve a contar en Reportes.`, 'success');
+    return true;
+  } catch (e) {
+    toast('No se pudo guardar. ' + e.message, 'error');
+    return false;
+  }
+}
+
 // Texto de la etiqueta de una OC anulada: "Duplicada" si la reemplazó otra OC,
 // "Anulada" si se anuló sin reemplazo (desde su tarjeta, "No, ninguna la reemplaza").
 function textoDuplicada(oc) {

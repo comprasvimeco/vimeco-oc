@@ -315,6 +315,9 @@ function accionesHtml(oc, modo) {
   const nro = esc(oc.nroOC);
   if (st === 'subiendo') return '<span class="fac-subiendo"><span class="spinner"></span>Subiendo…</span>';
   if (st === 'ok')       return `<span class="fac-ok">${icSvg('checkSm')}Cargada</span>`;
+  // Anulada: se ve lo que ya tiene, pero no se le carga nada (primero se desanula).
+  if (oc.estado === 'anulada')
+    return `<span class="fac-anulada" title="Para cargarle una factura, primero desanulala desde Historial o Novedades">${icSvg('slash')}Anulada</span>`;
   if (modo === 'archivo') {
     return `<button type="button" class="foc-btn foc-btn--vios btn-adj-attach" data-nro="${nro}" title="Cargar acá">${icSvg('clip')}<span class="fac-largo">Cargar acá</span></button>`;
   }
@@ -373,21 +376,24 @@ function repintarFila(oc) {
 
 // ---- Vista principal: lista de OC (se elige el archivo al tocar Cargar) ----
 
+// Una anulada no espera factura: no cuenta como "sin factura" ni se ofrece
+// para cargar. Si ya tiene, se sigue viendo en "Con factura" y "Todas".
+const ofrecible = oc => oc.estado !== 'anulada' || tieneFactura(oc);
+
 function actualizarContadores() {
   const con = allOCs.filter(tieneFactura).length;
-  const sin = allOCs.length - con;
+  const sin = allOCs.filter(oc => oc.estado !== 'anulada' && !tieneFactura(oc)).length;
   const pend = $('fac-pend');
   pend.textContent = sin === 1 ? '1 sin factura' : `${sin} sin factura`;
   pend.classList.toggle('hidden', !sin);
-  const n = { sin, con, todas: allOCs.length };
+  const n = { sin, con, todas: allOCs.filter(ofrecible).length };
   $('adj-filtro').querySelectorAll('.fac-tab').forEach(b => { b.querySelector('b').textContent = n[b.dataset.filtro]; });
 }
 
 function renderPrimaryList(filter = '') {
   const terms = terminosBusqueda(filter);
-  let list = filtroOC === 'todas'
-    ? allOCs
-    : allOCs.filter(oc => tieneFactura(oc) === (filtroOC === 'con'));
+  let list = allOCs.filter(ofrecible);
+  if (filtroOC !== 'todas') list = list.filter(oc => tieneFactura(oc) === (filtroOC === 'con'));
   if (terms.length) list = list.filter(oc => coincideOC(oc, terms));
   const vacio = terms.length ? 'No se encontraron OC.' :
     filtroOC === 'sin' ? 'No queda ninguna OC sin factura.' :
@@ -463,7 +469,8 @@ async function doAttachPick(file, oc) {
 
 function renderManualList(q = '') {
   const terms = terminosBusqueda(q);
-  const list  = terms.length ? allOCs.filter(oc => coincideOC(oc, terms)) : allOCs;
+  const vig   = allOCs.filter(oc => oc.estado !== 'anulada');
+  const list  = terms.length ? vig.filter(oc => coincideOC(oc, terms)) : vig;
   pintarPanel($('adj-oc-list'), list, 'archivo', terms, list.length ? '' : 'No se encontraron OC.');
 }
 
@@ -594,7 +601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = ev.target.closest('.btn-attach-pick, .btn-attach-cam, .btn-adj-attach');
     if (!btn) return;
     const oc = allOCs.find(o => o.nroOC === btn.dataset.nro) || null;
-    if (!oc || !await asegurarTipo(oc) || !await confirmarDuplicado(oc)) return;
+    if (!oc || oc.estado === 'anulada' || !await asegurarTipo(oc) || !await confirmarDuplicado(oc)) return;
     if (btn.classList.contains('btn-adj-attach')) { await doAttach(currentFile, oc); return; }
     pendingOC = oc;
     // Sacar foto: la factura pasa por el escáner y se sube apenas se toca "Listo".
@@ -684,7 +691,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('result-body').innerHTML    = `<div class="extract-status loading"><div class="spinner"></div> Analizando el documento…</div>`;
     try {
       const extracted = await extractBasicFromFile(currentFile);
-      showAIResults(extracted, getTopMatches(extracted, allOCs));
+      showAIResults(extracted, getTopMatches(extracted, allOCs.filter(oc => oc.estado !== 'anulada')));
     } catch (e) {
       $('result-title').textContent = 'No se pudo analizar';
       showManualList(`<div class="extract-status error" style="margin-bottom:.75rem;">${esc(e.message)}</div>`);

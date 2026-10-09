@@ -151,7 +151,8 @@ function renderCards(ocs) {
         <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Ver OC</button>
         ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('share')}PDF</button>` : ''}
         <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en el formulario">${icSvg('undo')}Usar como base</button>
-        ${puedeAnular(oc) ? `<button class="foc-btn foc-btn--del btn-anular" title="Anularla como duplicada: la reemplazó otra OC">${icSvg('x')}Anular</button>` : ''}
+        ${puedeAnular(oc) ? `<button class="foc-btn foc-btn--del btn-anular" title="Anularla como duplicada: la reemplazó otra OC">${icSvg('x')}Anular</button>`
+          : puedeDesanular(oc) ? `<button class="foc-btn foc-btn--clear btn-anular" title="Deshacer la anulación: vuelve a contar en Reportes">${icSvg('undo')}Desanular</button>` : ''}
       </div>`;
 
     card.querySelector('.btn-usar-base').addEventListener('click', () => usarComoBase(oc));
@@ -384,11 +385,14 @@ async function resolverDup(grupo, accion, btn) {
 // ---- Anular una OC como duplicada, desde su tarjeta ----
 // El diálogo está en js/duplicados.js (anularOCManual). La anula quien puede
 // resolver sus duplicadas: la propia, la de las obras del Jefe de Obra, o un admin.
-const puedeAnular = oc => esCompraFirme(oc) &&
-  (oc.responsable?.codigo === viewerCode || viewerIsAdmin || (viewerObras && esDeObrasJefe(oc, viewerObras)));
+// Las mismas personas la desanulan (desanularOC).
+const puedeResolver = oc =>
+  oc.responsable?.codigo === viewerCode || viewerIsAdmin || (viewerObras && esDeObrasJefe(oc, viewerObras));
+const puedeAnular    = oc => esCompraFirme(oc) && puedeResolver(oc);
+const puedeDesanular = oc => oc.estado === 'anulada' && puedeResolver(oc);
 
 async function abrirAnular(oc) {
-  if (!await anularOCManual(oc, allOCs)) return;
+  if (!await (oc.estado === 'anulada' ? desanularOC(oc, allOCs) : anularOCManual(oc, allOCs))) return;
   renderDuplicadas();
   applyFilters();   // cambió el estado de la OC: también los contadores de Estado
 }

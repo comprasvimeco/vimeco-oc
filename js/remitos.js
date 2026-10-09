@@ -136,6 +136,9 @@ function botonCargar(oc, chico) {
 }
 
 function accionesOC(oc) {
+  // Anulada: se ven sus remitos, pero no se le cargan más (primero se desanula).
+  if (oc.estado === 'anulada')
+    return `<span class="rv-cola" title="Para cargarle un remito, primero desanulala desde Historial o Novedades">${icSvg('slash')}Anulada</span>`;
   if (colaDeOC(oc.nroOC).length)
     return `<span class="rv-cola" title="El remito quedó guardado en este dispositivo y se sube solo cuando haya señal">${icSvg('wifi0')}<span class="rv-largo">Esperando señal</span><span class="rv-corto">En cola</span></span>${botonCargar(oc, true)}`;
   if (recientes.has(oc.nroOC))
@@ -166,7 +169,10 @@ function filaOC(oc, e, terms) {
 }
 
 function listaOCs(filtro) {
-  let list = ocsElegibles().map(oc => ({ oc, e: entregasDeOC(oc, true) }));
+  // Las anuladas sólo aparecen si ya tienen remitos.
+  let list = ocsElegibles()
+    .filter(oc => oc.estado !== 'anulada' || remitosDeOC(oc.nroOC).length)
+    .map(oc => ({ oc, e: entregasDeOC(oc, true) }));
   if (filtro === 'pendientes') list = list.filter(({ oc, e }) => e.estado !== 'completa' || recientes.has(oc.nroOC));
   if (filtro === 'entregadas') list = list.filter(({ e }) => e.estado === 'completa');
   return list;
