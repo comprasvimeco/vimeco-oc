@@ -22,7 +22,7 @@
 
   const OPENCV_SRC   = 'js/vendor/opencv.js';
   const MAX_SRC      = 2600;   // lado mayor de la imagen de trabajo (px)
-  const DETECT_SIZE  = 800;    // lado mayor para correr la detección (px)
+  const DETECT_SIZE  = 640;    // lado mayor para correr la detección (px)
   const MAX_OUT      = 2200;   // lado mayor de la imagen de salida (px)
   const JPEG_QUALITY = 0.88;
   const QUAD_COLOR   = '#2557a7';
@@ -159,12 +159,45 @@
     return { tl: suma[0], br: suma[3], tr: dif[0], bl: dif[3] };
   }
 
+  function polyArea(p) {
+    let s = 0;
+    for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a.x * b.y - b.x * a.y; }
+    return Math.abs(s) / 2;
+  }
+
+  function convexo(q) {
+    let sg = 0;
+    for (let i = 0; i < 4; i++) {
+      const a = q[i], b = q[(i + 1) % 4], c = q[(i + 2) % 4];
+      const cr = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+      if (Math.abs(cr) < 1e-9) return false;
+      const s = Math.sign(cr);
+      if (sg && s !== sg) return false;
+      sg = s;
+    }
+    return true;
+  }
+
+  // Intersección de dos rectas {p, d} (punto + dirección).
+  function interseccion(L1, L2) {
+    const den = L1.d.x * L2.d.y - L1.d.y * L2.d.x;
+    if (Math.abs(den) < 1e-6) return null;
+    const t = ((L2.p.x - L1.p.x) * L2.d.y - (L2.p.y - L1.p.y) * L2.d.x) / den;
+    return { x: L1.p.x + t * L1.d.x, y: L1.p.y + t * L1.d.y };
+  }
+
   // Busca el papel en un canvas chico. Devuelve {tl,tr,br,bl} en px del canvas, o null.
-  // Prueba varios mapas binarios (bordes Canny con umbral automático y con umbral
-  // bajo, y "zona clara" por Otsu); de cada contorno toma la envolvente convexa y
-  // arma cuadriláteros convexos que la representen bien. Gana el de mejor
-  // "apoyo × área": apoyo = fracción de su perímetro que cae sobre un borde real
-  // (así un fondo con vetas o rayas pegado al papel no le gana al papel).
+  //
+  // 1. Candidatos: contornos de cuatro mapas binarios (bordes Canny con umbral bajo
+  //    y medio, zona clara por Otsu y zona "blanca" = brillo − saturación, que separa
+  //    el papel de la madera). De cada contorno se prueban cuadriláteros con sus
+  //    vértices — del contorno real, no de la envolvente, para que otro papel pegado
+  //    al nuestro no lo arrastre — y quedan los de mejor puntaje.
+  // 2. Cada candidato se ajusta: en cada lado se busca el borde más fuerte a lo largo
+  //    de la normal, se ajusta una recta y las esquinas salen de cruzar las rectas.
+  // 3. Puntaje por lado: el papel tiene que contrastar adentro/afuera y el lado tiene
+  //    que caer sobre un borde. Manda el peor lado: un cuadrilátero que corta por
+  //    la mesa o por otra hoja tiene al menos un lado sin contraste.
   function findPaperQuad(small) {
     const cv = window.cv;
     const W = small.width, H = small.height, A = W * H;
@@ -176,83 +209,178 @@
       const gray = keep(new cv.Mat());
       cv.cvtColor(rgba, gray, cv.COLOR_RGBA2GRAY);
       cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
-      const kernel = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3)));
-      const kernel5 = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5)));
+      const g = gray.data;
+      const rgb = keep(new cv.Mat());
+      cv.cvtColor(rgba, rgb, cv.COLOR_RGBA2RGB);
+      const hsv = keep(new cv.Mat());
+      cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
+      const hv = hsv.data;
+      const white = keep(new cv.Mat(H, W, cv.CV_8UC1));
+      for (let i = 0, n = W * H; i < n; i++) white.data[i] = Math.max(0, hv[i * 3 + 2] - hv[i * 3 + 1]);
+      cv.GaussianBlur(white, white, new cv.Size(5, 5), 0);
+      const wd = white.data;
 
-      // mediana de grises (muestreada) para el umbral automático de Canny
-      const hist = new Uint32Array(256), d = gray.data;
-      let n = 0;
-      for (let i = 0; i < d.length; i += 3) { hist[d[i]]++; n++; }
-      let med = 0;
-      for (let acc = 0; med < 255; med++) { acc += hist[med]; if (acc >= n / 2) break; }
-
-      const bins = [];
-      for (const [lo, hi] of [[Math.max(10, 0.66 * med), Math.min(255, 1.33 * med)], [20, 60]]) {
-        const e = keep(new cv.Mat());
-        cv.Canny(gray, e, lo, hi);
-        cv.dilate(e, e, kernel);           // une trazos del borde cortados
-        bins.push(e);
-      }
-      const otsu = keep(new cv.Mat());
-      cv.threshold(gray, otsu, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-      cv.morphologyEx(otsu, otsu, cv.MORPH_OPEN, kernel5);
-      bins.push(otsu);
-
-      // Apoyo: muestrea los 4 lados cada ~2 px sobre el mapa de bordes de umbral bajo.
-      const edges = bins[1].data;
-      const apoyo = (q) => {
-        let on = 0, tot = 0;
-        for (let i = 0; i < 4; i++) {
-          const a = q[i], b = q[(i + 1) % 4];
-          const steps = Math.max(2, Math.round(dist(a, b) / 2));
-          for (let s = 0; s <= steps; s++) {
-            const x = Math.round(a.x + (b.x - a.x) * s / steps);
-            const y = Math.round(a.y + (b.y - a.y) * s / steps);
-            if (x < 0 || y < 0 || x >= W || y >= H) continue;
-            tot++;
-            if (edges[y * W + x]) on++;
-          }
-        }
-        return tot ? on / tot : 0;
+      const gx = keep(new cv.Mat()), gy = keep(new cv.Mat());
+      cv.Sobel(gray, gx, cv.CV_32F, 1, 0, 3);
+      cv.Sobel(gray, gy, cv.CV_32F, 0, 1, 3);
+      const GX = gx.data32F, GY = gy.data32F;
+      const mag = (x, y) => {
+        x |= 0; y |= 0;
+        if (x < 0 || y < 0 || x >= W || y >= H) return 0;
+        const i = y * W + x;
+        return Math.hypot(GX[i], GY[i]);
+      };
+      const pix = (arr, x, y) => {
+        x = Math.round(x); y = Math.round(y);
+        if (x < 0 || y < 0 || x >= W || y >= H) return -1;
+        return arr[y * W + x];
       };
 
-      for (const bin of bins) {
+      // —— mapas binarios ——
+      const k3  = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3)));
+      const k7  = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7)));
+      const k15 = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(15, 15)));
+      const maps = [];
+      for (const [lo, hi] of [[20, 60], [40, 120]]) {
+        const e = keep(new cv.Mat());
+        cv.Canny(gray, e, lo, hi);
+        cv.dilate(e, e, k3);                 // une trazos del borde cortados
+        maps.push({ m: e, modo: cv.RETR_LIST });
+      }
+      for (const fuente of [gray, white]) {
+        const t = keep(new cv.Mat());
+        cv.threshold(fuente, t, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+        cv.morphologyEx(t, t, cv.MORPH_CLOSE, k7);   // tapa el texto
+        cv.morphologyEx(t, t, cv.MORPH_OPEN, k15);   // corta uniones finas con otras cosas claras
+        maps.push({ m: t, modo: cv.RETR_EXTERNAL });
+      }
+
+      // —— puntaje por lado (0..1): contraste adentro/afuera + gradiente sobre la línea ——
+      function puntaje(q, paso) {
+        const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+        const lados = [];
+        for (let i = 0; i < 4; i++) {
+          const a = q[i], b = q[(i + 1) % 4], L = dist(a, b);
+          let nx = -(b.y - a.y) / L, ny = (b.x - a.x) / L;
+          if ((cx - (a.x + b.x) / 2) * nx + (cy - (a.y + b.y) / 2) * ny < 0) { nx = -nx; ny = -ny; }  // hacia adentro
+          let tot = 0, ok = 0, okG = 0;
+          const N = Math.max(8, Math.round(L / paso)), off = 5;
+          for (let s = 1; s < N; s++) {
+            const t = s / N;
+            if (t < 0.06 || t > 0.94) continue;
+            const px = a.x + (b.x - a.x) * t, py = a.y + (b.y - a.y) * t;
+            const gin = pix(g, px + nx * off, py + ny * off), gout = pix(g, px - nx * off, py - ny * off);
+            if (gin < 0 || gout < 0) continue;   // fuera de la foto: no cuenta
+            tot++;
+            const win = pix(wd, px + nx * off, py + ny * off), wout = pix(wd, px - nx * off, py - ny * off);
+            if (Math.abs(gin - gout) > 18 || Math.abs(win - wout) > 25) ok++;
+            let m = 0;
+            for (let o = -2; o <= 2; o++) m = Math.max(m, mag(px + nx * o, py + ny * o));
+            if (m > 60) okG++;
+          }
+          lados.push(tot < 5 ? 0.6 : (ok + okG) / (2 * tot));   // lado fuera de cuadro: neutro
+        }
+        return lados;
+      }
+      function nota(q, paso) {
+        const l = puntaje(q, paso);
+        const min = Math.min(...l), media = (l[0] + l[1] + l[2] + l[3]) / 4;
+        return { min, score: (min * 0.6 + media * 0.4) ** 2 * Math.sqrt(polyArea(q) / A) };
+      }
+
+      // —— ajuste de un lado: máximo de gradiente a lo largo de la normal + recta (PCA) ——
+      function ajustarLado(a, b, band) {
+        const L = dist(a, b);
+        if (L < 10) return null;
+        const nx = -(b.y - a.y) / L, ny = (b.x - a.x) / L;
+        const pts = [];
+        const N = Math.max(10, Math.round(L / 4));
+        for (let s = 1; s < N; s++) {
+          const t = s / N;
+          if (t < 0.08 || t > 0.92) continue;
+          const cx = a.x + (b.x - a.x) * t, cy = a.y + (b.y - a.y) * t;
+          let bm = 0, bo = 0;
+          for (let o = -band; o <= band; o++) {
+            const m = mag(cx + nx * o, cy + ny * o);
+            if (m > bm) { bm = m; bo = o; }
+          }
+          if (bm > 40) pts.push({ x: cx + nx * bo, y: cy + ny * bo, o: bo });
+        }
+        if (pts.length < 6) return null;
+        const os = pts.map((p) => p.o).sort((x, y) => x - y), med = os[os.length >> 1];
+        let use = pts.filter((p) => Math.abs(p.o - med) <= 3);   // fuera los desvíos (texto, sombras)
+        if (use.length < 6) use = pts;
+        let mx = 0, my = 0;
+        use.forEach((p) => { mx += p.x; my += p.y; });
+        mx /= use.length; my /= use.length;
+        let sxx = 0, sxy = 0, syy = 0;
+        use.forEach((p) => { const X = p.x - mx, Y = p.y - my; sxx += X * X; sxy += X * Y; syy += Y * Y; });
+        const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+        return { p: { x: mx, y: my }, d: { x: Math.cos(ang), y: Math.sin(ang) } };
+      }
+      function refinar(q) {
+        let cur = q;
+        for (const band of [8, 4]) {
+          const rectas = [0, 1, 2, 3].map((i) => ajustarLado(cur[i], cur[(i + 1) % 4], band));
+          if (rectas.some((r) => !r)) return cur;
+          const nq = [0, 1, 2, 3].map((i) => interseccion(rectas[(i + 3) % 4], rectas[i]));
+          if (nq.some((p) => !p || p.x < -W * 0.1 || p.y < -H * 0.1 || p.x > W * 1.1 || p.y > H * 1.1)) return cur;
+          cur = nq;
+        }
+        return cur;
+      }
+
+      // —— cuadriláteros con vértices de P: los 3 de mejor puntaje rápido ——
+      function subcuads(P) {
+        const n = P.length;
+        if (n < 4) return [];
+        if (n === 4) return [P];
+        const res = [];
+        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++)
+          for (let k = j + 1; k < n; k++) for (let l = k + 1; l < n; l++) {
+            const q = [P[i], P[j], P[k], P[l]];
+            if (polyArea(q) < A * 0.1 || !convexo(q)) continue;
+            res.push({ q, score: nota(q, 8).score });
+          }
+        res.sort((x, y) => y.score - x.score);
+        return res.slice(0, 3).map((r) => r.q);
+      }
+
+      for (const { m, modo } of maps) {
         const contours = new cv.MatVector(), hier = new cv.Mat();
-        cv.findContours(bin, contours, hier, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+        cv.findContours(m, contours, hier, modo, cv.CHAIN_APPROX_SIMPLE);
+        const cands = [];
         for (let i = 0; i < contours.size(); i++) {
           const c = contours.get(i);
           const hull = new cv.Mat();
           cv.convexHull(c, hull, false, true);
-          const hullArea = cv.contourArea(hull);
-          if (hullArea > A * 0.15 && hullArea < A * 0.97) {
-            const peri = cv.arcLength(hull, true);
-            for (const eps of [0.02, 0.03, 0.045, 0.06]) {
-              const ap = new cv.Mat();
-              cv.approxPolyDP(hull, ap, eps * peri, true);
-              const rows = ap.rows;
-              if (rows === 4 && cv.isContourConvex(ap)) {
-                const quadArea = cv.contourArea(ap);
-                // el cuadrilátero tiene que cubrir casi toda la envolvente
-                if (quadArea > hullArea * 0.9 && quadArea < A * 0.97) {
-                  const p = ap.data32S;
-                  const pts = [0, 2, 4, 6].map((j) => ({ x: p[j], y: p[j + 1] }));
-                  const sup = apoyo(pts);
-                  const score = sup * sup * quadArea;
-                  if (sup > 0.5 && (!best || score > best.score)) best = { score, pts };
-                }
-              }
-              ap.delete();
-              if (rows <= 4) break;
-            }
+          const ha = cv.contourArea(hull);
+          hull.delete();
+          if (ha > A * 0.1 && ha < A * 0.995) {
+            const peri = cv.arcLength(c, true);
+            const ap = new cv.Mat();
+            let eps = 0.01;
+            cv.approxPolyDP(c, ap, eps * peri, true);
+            while (ap.rows > 16 && eps < 0.06) { eps += 0.005; cv.approxPolyDP(c, ap, eps * peri, true); }
+            const P = [];
+            for (let j = 0; j < ap.rows; j++) P.push({ x: ap.data32S[j * 2], y: ap.data32S[j * 2 + 1] });
+            ap.delete();
+            cands.push(...subcuads(P));
           }
-          hull.delete(); c.delete();
+          c.delete();
         }
         contours.delete(); hier.delete();
+        for (const q0 of cands) {
+          const q = refinar(q0);
+          if (polyArea(q) < A * 0.1 || !convexo(q)) continue;
+          const r = nota(q, 3);
+          if (r.min >= 0.35 && (!best || r.score > best.score)) best = { score: r.score, q };
+        }
       }
     } finally {
       mats.forEach((m) => { try { m.delete(); } catch (_) {} });
     }
-    return best ? ordenarEsquinas(best.pts) : null;
+    return best ? ordenarEsquinas(best.q) : null;
   }
 
   // Endereza el cuadrilátero `c` (px de srcCanvas) a un canvas de W×H.
@@ -317,8 +445,11 @@
       // —— Limpieza / salida ——
       const cleanups = [];
       let tipTimer = null;
+      const doneHtml = els.done.innerHTML;
       function teardown() {
         cleanups.forEach((fn) => { try { fn(); } catch (_) {} });
+        els.done.disabled = false;
+        els.done.innerHTML = doneHtml;
         clearTimeout(tipTimer);
         els.tip.classList.add('hidden');
         els.loupe.classList.add('hidden');
@@ -684,7 +815,12 @@
       });
 
       const onDone = async () => {
-        showLoading('Procesando…');
+        if (els.done.disabled) return;
+        els.done.disabled = true;
+        els.done.innerHTML = '<span class="scan-spinner scan-spinner--btn"></span>Procesando…';
+        showLoading('Procesando la imagen…');
+        // El enderezado bloquea el hilo: primero dejar que se pinte el aviso.
+        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 40)));
         try {
           const out = await buildOutput();
           finish(out);

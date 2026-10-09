@@ -979,6 +979,7 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
   animation: scan-spin .8s linear infinite;
 }
 @keyframes scan-spin { to { transform: rotate(360deg); } }
+.scan-spinner--btn { width: 18px; height: 18px; border-width: 2.5px; border-color: rgba(255,255,255,.35); border-top-color: #fff; }
 
 .scan-bot {
   flex-shrink: 0; padding: .7rem .85rem calc(.8rem + env(safe-area-inset-bottom));
@@ -1003,6 +1004,7 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
 .scan-btn .icon { width: 18px; height: 18px; }
 .scan-btn.primary { flex: 2; background: var(--primary); color: #fff; }
 .scan-btn:hover { filter: brightness(.97); }
+.scan-btn:disabled { cursor: progress; opacity: .9; }
 @media (min-width: 700px) {
   .scan-bot { flex-direction: row; align-items: center; justify-content: space-between; padding-left: 1.2rem; padding-right: 1.2rem; }
   .scan-chip { width: 84px; flex: none; }
