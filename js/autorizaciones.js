@@ -149,8 +149,8 @@ function renderPedidos() {
            ${BTN_VER}
            ${btnPdfHtml(oc)}
            ${oc.estado === 'rechazada' ? `<button class="foc-btn foc-btn--gen btn-rehacer" title="Cargar en el formulario para corregirla">${icSvg('undo')}Rehacer</button>` : ''}
-           ${oc.estado === 'pendiente' ? `<button class="foc-btn foc-btn--vio btn-reasignar" title="Pasarle el pedido a otra persona">${icSvg('users')}Cambiar autorizador</button>` : ''}
-           ${oc.estado === 'pendiente' ? `<button class="foc-btn foc-btn--clear btn-cancelar-pedido">${icSvg('x')}Cancelar pedido</button>` : ''}
+           ${oc.estado === 'pendiente' ? `<button class="foc-btn foc-btn--vio btn-reasignar" title="Pasarle el pedido a otra persona">${icSvg('users')}Reasignar</button>` : ''}
+           ${oc.estado === 'pendiente' ? `<button class="foc-btn foc-btn--clear btn-cancelar-pedido" title="Cancelar el pedido de autorización">${icSvg('x')}Cancelar</button>` : ''}
          </div>`;
     const card = document.createElement('div');
     card.className = 'hist-card';
