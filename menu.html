@@ -95,40 +95,10 @@
       <button class="foc-btn push-btn-on" id="install-banner-btn">Instalar</button>
     </div>
   </div>
+  <script src="js/install.js"></script>
   <script>
-    // Botón "Instalar" en Android (Chrome, Edge, Samsung Internet): el navegador avisa con
-    // `beforeinstallprompt` sólo si la app se puede instalar y todavía no está instalada,
-    // así que abierta desde el ícono o ya instalada no aparece. Se puede posponer dos semanas.
-    (() => {
-      const LATER_KEY = 'vimeco_install_later';
-      const banner = document.getElementById('install-banner');
-      let pedido = null;
-      const cerrar = () => {
-        banner.classList.add('saliendo');
-        setTimeout(() => banner.classList.add('hidden'), 300);
-      };
-      window.addEventListener('beforeinstallprompt', e => {
-        e.preventDefault();
-        pedido = e;
-        let pospuesto = 0;
-        try { pospuesto = parseInt(localStorage.getItem(LATER_KEY) || '0', 10); } catch (_) {}
-        if (Date.now() - pospuesto < 14 * 864e5) return;
-        banner.classList.remove('hidden', 'saliendo');
-      });
-      window.addEventListener('appinstalled', () => { pedido = null; cerrar(); });
-      document.getElementById('install-banner-btn').addEventListener('click', async () => {
-        if (!pedido) return cerrar();
-        const p = pedido;
-        pedido = null;
-        p.prompt();
-        try { await p.userChoice; } catch (_) {}
-        cerrar();
-      });
-      document.getElementById('install-banner-later').addEventListener('click', () => {
-        try { localStorage.setItem(LATER_KEY, String(Date.now())); } catch (_) {}
-        cerrar();
-      });
-    })();
+    initInstalar(document.getElementById('install-banner'),
+      document.getElementById('install-banner-btn'), document.getElementById('install-banner-later'));
   </script>
   <div class="menu-grid menu-grid--tiles">
     <a href="compras.html" class="menu-card">

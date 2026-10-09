@@ -172,6 +172,17 @@ function setFile(file) {
   $('file-size').textContent = `${(file.size / 1024).toFixed(0)} KB`;
   $('file-info').classList.remove('hidden');
   mostrarPreview(file);
+  mostrarElegirOC();
+}
+
+// Con el archivo ya elegido, la lista para cargarlo en una OC aparece sola: la
+// lista principal (que pide otra foto por OC) se oculta para no subir dos veces.
+function mostrarElegirOC() {
+  $('card-list').classList.add('hidden');
+  $('card-result').classList.remove('hidden');
+  $('btn-restart').classList.add('hidden');   // ya está "Cambiar" en el archivo
+  $('result-title').textContent = 'Elegir la OC';
+  showManualList();
 }
 
 // El preview (con su botón de escanear) solo tiene sentido con imágenes: un PDF
@@ -195,6 +206,8 @@ function resetZone() {
   if (filePrevUrl) { URL.revokeObjectURL(filePrevUrl); filePrevUrl = null; }
   $('fac-drop-main').classList.remove('hidden');
   $('file-info').classList.add('hidden');
+  $('card-result').classList.add('hidden');
+  $('card-list').classList.remove('hidden');
   $('file-preview').classList.add('hidden');
   $('file-preview-img').removeAttribute('src');
   $('file-input').value     = '';
@@ -491,6 +504,7 @@ function showAIResults(extracted, matches) {
 async function doAttach(file, oc) {
   const subida = await subirAOC(file, oc);
   if (!subida) return;
+  $('import-zone').classList.add('hidden');
   $('card-result').classList.add('hidden');
   $('success-detail').textContent = `${subida.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
   $('card-success').classList.remove('hidden');
@@ -525,7 +539,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const { isAdmin, obrasJefe } = await alcanceOC(code);
   viewerIsAdmin = isAdmin;
   viewerCode    = code;
-  const pintarTodo = () => { actualizarContadores(); renderPrimaryList($('adj-search-main').value); };
+  const pintarTodo = () => {
+    actualizarContadores();
+    renderPrimaryList($('adj-search-main').value);
+    // Un archivo compartido puede llegar antes que las OC: repintar su lista
+    if ($('adj-oc-list')) renderManualList($('adj-search')?.value || '');
+  };
   getHistorial(code, isAdmin, false, obrasJefe)
     .then(async ocs => {
       allOCs = ocs;
@@ -660,6 +679,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!currentFile) return;
     $('import-zone').classList.add('hidden');
     $('card-result').classList.remove('hidden');
+    $('btn-restart').classList.remove('hidden');
     $('result-title').textContent = 'Buscando la OC…';
     $('result-body').innerHTML    = `<div class="extract-status loading"><div class="spinner"></div> Analizando el documento…</div>`;
     try {
@@ -671,11 +691,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  $('btn-use-manual').addEventListener('click', () => {
-    if (!currentFile) return;
-    $('import-zone').classList.add('hidden');
-    $('card-result').classList.remove('hidden');
-    $('result-title').textContent = 'Elegir la OC';
-    showManualList();
-  });
 });

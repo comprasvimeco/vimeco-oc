@@ -76,6 +76,18 @@
     .lg-olvide .lg-btn:hover { border-color: #b9c8de; }
     .lg-cargando { text-align: center; color: var(--gray-500); font-size: .9rem; padding: .5rem 0; }
     .lg-version { text-align: center; color: var(--gray-400); font-size: .72rem; margin-top: auto; padding-top: 1.25rem; }
+    /* Aviso "Instalar" (Android, js/install.js): tarjetita debajo del formulario. */
+    .lg-inst { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; margin-top: .9rem; background: #fff; border-radius: 18px; box-shadow: var(--shadow-glass); padding: .8rem .9rem; transition: opacity .3s, transform .3s; animation: lgIn .35s var(--ease-spring) both; }
+    .lg-inst.saliendo { opacity: 0; transform: translateY(-6px); }
+    .lg-inst-ic { width: 40px; height: 40px; border-radius: 12px; flex: none; display: grid; place-items: center; background: #e8eef7; color: var(--primary); }
+    .lg-inst-ic svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .lg-inst-txt { flex: 1; min-width: 0; }
+    .lg-inst-txt b { display: block; color: var(--gray-900); font-size: .93rem; }
+    .lg-inst-txt small { color: var(--gray-500); font-size: .78rem; line-height: 1.35; display: block; }
+    .lg-inst-acc { display: flex; align-items: center; gap: .3rem; margin-left: auto; }
+    .lg-inst-acc button { font: inherit; font-size: .82rem; font-weight: 700; border: 0; border-radius: 99px; padding: .45rem .9rem; cursor: pointer; }
+    .lg-inst-no { background: none; color: var(--gray-500); }
+    .lg-inst-si { background: var(--primary); color: #fff; }
     .lg-user-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
     @media (min-width: 900px) {
@@ -166,7 +178,19 @@
           </div>
         </form>
       </div>
+<<<<<<< Updated upstream
       <div class="lg-version">v279</div>
+=======
+      <div id="lg-inst" class="lg-inst hidden" role="status">
+        <span class="lg-inst-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 7v7"/><polyline points="9 11 12 14 15 11"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+        <div class="lg-inst-txt"><b>Instalá la app</b><small>Abrila directo desde la pantalla de inicio.</small></div>
+        <div class="lg-inst-acc">
+          <button type="button" class="lg-inst-no" id="lg-inst-no">Ahora no</button>
+          <button type="button" class="lg-inst-si" id="lg-inst-si">Instalar</button>
+        </div>
+      </div>
+      <div class="lg-version">v278</div>
+>>>>>>> Stashed changes
     </main>
   </div>
 
@@ -177,6 +201,11 @@
   <script src="js/firebase.js"></script>
   <script src="js/push.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/install.js"></script>
+  <script>
+    initInstalar(document.getElementById('lg-inst'),
+      document.getElementById('lg-inst-si'), document.getElementById('lg-inst-no'));
+  </script>
   <script>
     if ('serviceWorker' in navigator) {
       const hadController = !!navigator.serviceWorker.controller;
