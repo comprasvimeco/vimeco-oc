@@ -66,3 +66,7 @@ best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags
 - `menu.html` (raíz) → dos secciones: **Compras** (`compras.html`) y **Caja** (`caja.html`)
 - `compras.html` → submenú: Órdenes de Compra (`app.html`), Facturas (`facturas.html`), Historial (`historial.html`)
 - El logo/header de las páginas de Compras vuelve a `compras.html`; el de Caja vuelve a `menu.html`
+- `menu.html` → **Proveedores** (`proveedores.html`, para todos): ficha editable de cada proveedor, artículos
+  comprados con el último precio y comparación por artículo. Lo tildado abre `app.html` precargado vía
+  `sessionStorage.oc_desde_proveedor` (`loadOCDesdeProveedor`). Todos ven precios por unidad; no se muestran
+  totales de OC ni cantidades de compras ajenas (salvo admins).

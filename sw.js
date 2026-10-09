@@ -37,6 +37,8 @@ const STATIC_ASSETS = [
   BASE + '/icons/badge-vimeco.png',
   BASE + '/js/jspdf.umd.min.js',
   BASE + '/historial.html',
+  BASE + '/proveedores.html',
+  BASE + '/js/proveedores.js',
   BASE + '/js/historial.js',
   BASE + '/js/driveQueue.js',
   BASE + '/facturas.html',

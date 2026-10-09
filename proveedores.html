@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Proveedores</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    /* ===== Proveedores (índigo, el tono del módulo en el menú) ===== */
+    .pv-main { max-width: 1180px; padding-bottom: 6rem; }
+    .hidden { display: none !important; }
+    .pv-ttl { display: flex; align-items: center; gap: .45rem; margin-bottom: .8rem; flex-wrap: wrap; }
+    .pv-t { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; }
+    .pv-pill { display: inline-flex; align-items: center; gap: .35rem; background: #e9ebfb; color: #3f46a6; font-size: .78rem; font-weight: 700; padding: .26rem .7rem; border-radius: 999px; white-space: nowrap; }
+    .pv-pill .icon { width: 13px; height: 13px; }
+    .pv-push { margin-left: auto; }
+    .pv-btn { display: inline-flex; align-items: center; gap: .4rem; border: none; border-radius: 999px; font: inherit; font-weight: 700; font-size: .84rem;
+      padding: .5rem .95rem; cursor: pointer; white-space: nowrap; background: #e9ebfb; color: #3f46a6; }
+    .pv-btn .icon { width: 15px; height: 15px; }
+    .pv-btn--solid { background: #4a52c4; color: #fff; }
+    .pv-btn--clear { background: var(--gray-100); color: var(--gray-600); }
+    .pv-btn:disabled { background: var(--gray-200); color: var(--gray-500); cursor: default; }
+    .pv-btn:not(:disabled):hover { filter: brightness(.96); }
+    .pv-btn:focus-visible, .pv-row:focus-visible, .pv-tab:focus-visible, .pv-it:focus-visible, .pv-cmp:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+
+    .pv-tabs { display: flex; gap: .2rem; background: var(--white); border-radius: 999px; padding: 4px; box-shadow: 0 1px 2px rgba(26,58,92,.06); margin-bottom: .75rem; max-width: 420px; }
+    .pv-tab { flex: 1; border: none; background: none; font: inherit; font-size: .84rem; font-weight: 700; color: var(--gray-500); padding: .42rem .4rem; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+    .pv-tab[aria-selected="true"] { background: #e9ebfb; color: #3f46a6; }
+    .pv-tab small { font-size: .7rem; opacity: .75; font-weight: 700; }
+
+    .pv-search { display: flex; align-items: center; gap: .5rem; background: var(--white); border: 1.5px solid var(--gray-200); border-radius: 12px; padding: 0 .75rem; margin-bottom: .6rem; }
+    .pv-search .icon { width: 16px; height: 16px; color: var(--gray-400); flex: none; }
+    .pv-search input { border: none; outline: none; background: none; font: inherit; font-size: .9rem; padding: .58rem 0; flex: 1; min-width: 0; color: var(--gray-900); }
+    .pv-search:focus-within { border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(37,87,167,.12); }
+    .pv-chips { display: flex; gap: .35rem; margin-bottom: .7rem; flex-wrap: wrap; align-items: center; }
+    .pv-chip { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600); border-radius: 999px;
+      padding: .32rem .8rem; font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .pv-chip b { font-size: .7rem; padding: 0 .4rem; border-radius: 999px; background: var(--gray-100); color: var(--gray-500); }
+    .pv-chip[aria-pressed="true"] { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+    .pv-chip[aria-pressed="true"] b { background: #ffffff2b; color: #fff; }
+    .pv-chip .icon { width: 13px; height: 13px; }
+    .pv-chip--orden { margin-left: auto; }
+
+    .pv-md { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; align-items: start; }
+    @media (min-width: 1000px) {
+      .pv-md { grid-template-columns: 340px minmax(0, 1fr); }
+      .pv-md--art { grid-template-columns: minmax(0, 1fr); }
+      .pv-lista-col { position: sticky; top: .75rem; max-height: calc(100vh - 1.5rem); display: flex; flex-direction: column; }
+      .pv-lista-col .pv-panel { overflow-y: auto; min-height: 0; }
+    }
+    .pv-panel { background: var(--white); border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); overflow: hidden; }
+    .pv-card { background: var(--white); border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); padding: .85rem .9rem; }
+    .pv-vacio { text-align: center; padding: 1.5rem 1rem; color: var(--gray-500); font-size: .88rem; }
+
+    .pv-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: .65rem; align-items: center; padding: .62rem .75rem; border: none; border-bottom: 1px solid var(--gray-200);
+      background: none; width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+    .pv-row:last-child { border-bottom: none; }
+    .pv-row:hover { background: #fafbff; }
+    .pv-row.on { background: #f3f4fd; box-shadow: inset 3px 0 0 #4a52c4; }
+    .pv-av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .78rem; flex: none; }
+    .pv-av.a0 { background: #fbeedd; color: #8a4f0d; } .pv-av.a1 { background: #e8eef7; color: #234870; } .pv-av.a2 { background: #dcf3ef; color: #16695f; }
+    .pv-av.a3 { background: #f1e8fb; color: #6b3fa0; } .pv-av.a4 { background: #fce8ee; color: #a23a57; } .pv-av.a5 { background: #e9ebfb; color: #3f46a6; }
+    .pv-n { font-weight: 700; color: var(--primary-dark); font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pv-s { font-size: .73rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pv-r { text-align: right; white-space: nowrap; }
+    .pv-r b { display: block; font-size: .82rem; color: var(--gray-700); }
+    .pv-r small { font-size: .68rem; color: var(--gray-400); font-weight: 600; }
+    .pv-sep { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); background: var(--gray-100); padding: .35rem .8rem; }
+    .pv-hint { display: flex; align-items: center; gap: .5rem; font-size: .76rem; color: var(--gray-500); padding: .6rem .75rem; background: #fafbfc; border-top: 1px solid var(--gray-200); }
+    .pv-hint .icon { width: 14px; height: 14px; color: var(--gray-400); flex: none; }
+    .pv-mas { display: block; width: 100%; border: none; background: #fafbfc; color: #3f46a6; font: inherit; font-size: .8rem; font-weight: 700; padding: .6rem; cursor: pointer; border-top: 1px solid var(--gray-200); }
+
+    .mini { font-size: .66rem; font-weight: 700; border-radius: 999px; padding: .06rem .45rem; background: var(--gray-100); color: var(--gray-600); white-space: nowrap; }
+    .mini--ind { background: #e9ebfb; color: #3f46a6; }
+    .mini--warn { background: #fde6e6; color: #b02a2a; }
+    .mini--amb { background: #fbeedd; color: #8a4f0d; }
+    .mini--ok { background: #dff3e5; color: #1a7f3c; }
+
+    /* Ficha */
+    .pv-ficha { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+    .pv-fh { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    .pv-fh .pv-av { width: 50px; height: 50px; font-size: 1rem; }
+    .pv-fh-t { min-width: 0; flex: 1; }
+    .pv-fh-n { font-size: 1.15rem; font-weight: 700; color: var(--primary-dark); line-height: 1.25; overflow-wrap: anywhere; }
+    .pv-fh-p { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .3rem; }
+    .pv-acts { display: flex; gap: .45rem; margin-top: .75rem; flex-wrap: wrap; }
+    .pv-acts .pv-btn { flex: 1; justify-content: center; }
+    .pv-side-t { font-size: .72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 .55rem; display: flex; justify-content: space-between; gap: .5rem; }
+    .pv-dat { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .42rem .9rem; font-size: .83rem; margin: 0; }
+    .pv-dat dt { color: var(--gray-500); font-weight: 600; display: flex; align-items: center; gap: .35rem; white-space: nowrap; }
+    .pv-dat dt .icon { width: 13px; height: 13px; color: var(--gray-400); }
+    .pv-dat dd { margin: 0; color: var(--gray-700); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+    @media (min-width: 1200px) { .pv-dat { grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); } }
+    .pv-dat dd.vac { color: var(--gray-400); font-weight: 500; font-style: italic; }
+    .pv-edit-meta { font-size: .72rem; color: var(--gray-400); margin-top: .6rem; }
+
+    /* Artículos de la ficha */
+    .pv-phead { display: flex; align-items: center; gap: .5rem; padding: .7rem .75rem .5rem; flex-wrap: wrap; }
+    .pv-phead b { color: var(--primary-dark); font-size: .92rem; }
+    .pv-tools { display: flex; gap: .4rem; align-items: center; padding: 0 .75rem .6rem; flex-wrap: wrap; border-bottom: 1px solid var(--gray-200); }
+    .pv-tools .pv-search { margin: 0; flex: 1; min-width: 170px; border-radius: 10px; }
+    .pv-tools .pv-search input { padding: .4rem 0; font-size: .84rem; }
+    .pv-seg { display: inline-flex; background: var(--gray-100); border-radius: 999px; padding: 3px; gap: 2px; }
+    .pv-seg button { border: none; background: none; font: inherit; font-size: .74rem; font-weight: 700; color: var(--gray-600); padding: .3rem .65rem; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+    .pv-seg button[aria-pressed="true"] { background: var(--white); color: var(--primary-dark); box-shadow: 0 1px 3px rgba(26,58,92,.18); }
+    .pv-it { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: .6rem; align-items: center; padding: .58rem .75rem; border-bottom: 1px solid var(--gray-200); cursor: pointer; }
+    .pv-it:last-child { border-bottom: none; }
+    .pv-it.sel { background: #f3f4fd; }
+    .pv-ck { width: 24px; height: 24px; border-radius: 7px; border: 1.8px solid var(--gray-300); display: grid; place-items: center; background: var(--white); color: #fff; padding: 0; cursor: pointer; }
+    .pv-ck .icon { width: 14px; height: 14px; stroke-width: 3; }
+    .sel > .pv-ck { background: #4a52c4; border-color: #4a52c4; }
+    .pv-it-d { font-weight: 700; color: var(--primary-dark); font-size: .85rem; overflow-wrap: anywhere; }
+    .pv-it-s { font-size: .72rem; color: var(--gray-500); display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; margin-top: .1rem; }
+    .pv-it-p { text-align: right; white-space: nowrap; }
+    .pv-it-p b { display: block; font-size: .92rem; color: var(--gray-700); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .pv-it-p small { font-size: .66rem; color: var(--gray-400); font-weight: 600; }
+    .pv-trend { display: inline-flex; align-items: center; gap: .15rem; font-size: .68rem; font-weight: 700; border-radius: 999px; padding: .04rem .42rem; white-space: nowrap; }
+    .pv-trend .icon { width: 11px; height: 11px; }
+    .pv-trend.up { background: #fde6e6; color: #b02a2a; }
+    .pv-trend.dn { background: #dff3e5; color: #1a7f3c; }
+    .pv-trend.eq { background: var(--gray-100); color: var(--gray-500); }
+    .pv-hist { grid-column: 2 / -1; background: var(--gray-100); border-radius: 10px; padding: .4rem .6rem; display: flex; flex-direction: column; cursor: default; }
+    .pv-hist div { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: .5rem; font-size: .74rem; color: var(--gray-600); padding: .2rem 0; align-items: baseline; }
+    .pv-hist div + div { border-top: 1px solid var(--gray-200); }
+    .pv-hist b { color: var(--gray-700); text-align: right; font-variant-numeric: tabular-nums; }
+    .pv-hist span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Comparar por artículo */
+    .pv-grp-h { display: flex; align-items: center; gap: .5rem; padding: .55rem .75rem; background: var(--gray-100); font-size: .72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; }
+    .pv-cmp { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: .6rem; align-items: center; padding: .58rem .75rem; border-bottom: 1px solid var(--gray-200); cursor: pointer; }
+    .pv-cmp:last-child { border-bottom: none; }
+    .pv-cmp.sel { background: #f3f4fd; }
+    .pv-cmp.dim { opacity: .45; }
+    .pv-cmp-p { font-weight: 700; color: var(--primary-dark); font-size: .85rem; background: none; border: none; padding: 0; font-family: inherit; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: var(--gray-300); text-underline-offset: 3px; overflow-wrap: anywhere; }
+    .pv-cmp-d { font-size: .78rem; color: var(--gray-600); overflow-wrap: anywhere; }
+    .pv-best { font-size: .64rem; font-weight: 800; background: #dff3e5; color: #1a7f3c; border-radius: 999px; padding: .04rem .45rem; white-space: nowrap; }
+
+    /* Barra de selección */
+    .pv-selbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--white); border-top: 1px solid var(--gray-200);
+      padding: .6rem max(.8rem, calc((100vw - 1180px) / 2 + 1rem)) calc(.6rem + env(safe-area-inset-bottom, 0px)); display: flex; gap: .7rem; align-items: center; box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); }
+    .pv-selbar .n { flex: 1; min-width: 0; font-size: .8rem; color: var(--gray-600); line-height: 1.25; }
+    .pv-selbar .n b { color: var(--primary-dark); display: block; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pv-selbar .pv-btn { padding: .62rem 1rem; font-size: .88rem; }
+
+    /* Hojas (editar, armar OC) */
+    .pv-modal { max-width: 640px; }
+    .pv-modal .modal-header { gap: .6rem; justify-content: flex-start; }
+    .pv-modal .modal-close { margin-left: auto; }
+    .pv-modal .modal-body { background: #f7f8fa; }
+    .pv-sq { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: #e9ebfb; color: #3f46a6; }
+    .pv-sq .icon { width: 18px; height: 18px; }
+    .pv-mt-s { font-size: .74rem; color: var(--gray-500); }
+    .pv-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem .8rem; background: var(--white); border-radius: 14px; padding: .85rem; }
+    .pv-form .full { grid-column: 1 / -1; }
+    .pv-form .form-group { margin: 0; }
+    .pv-form label { font-size: .72rem; }
+    .pv-form .form-control.cambio { border-color: #4a52c4; box-shadow: 0 0 0 3px #4a52c41f; }
+    @media (max-width: 560px) { .pv-form { grid-template-columns: minmax(0, 1fr); } }
+    .pv-aviso { display: flex; gap: .5rem; align-items: flex-start; border-radius: 10px; padding: .55rem .65rem; font-size: .78rem; font-weight: 600; line-height: 1.4; margin-top: .7rem; }
+    .pv-aviso .icon { width: 15px; height: 15px; flex: none; margin-top: .1rem; }
+    .pv-aviso--amb { background: #fbeedd; color: #8a4f0d; }
+    .pv-aviso--ind { background: #e9ebfb; color: #3f46a6; }
+    .pv-aviso--gr { background: var(--gray-100); color: var(--gray-600); }
+    .pv-aviso--del { background: #fde6e6; color: #b02a2a; }
+    .pv-ft-st { font-size: .8rem; font-weight: 700; color: var(--gray-500); margin-right: auto; align-self: center; }
+
+    .pv-ao-list { background: var(--white); border-radius: 14px; padding: .2rem .85rem; }
+    .pv-ao { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .45rem .7rem; align-items: center; padding: .65rem 0; border-bottom: 1px solid var(--gray-200); }
+    .pv-ao:last-child { border-bottom: none; }
+    .pv-ao-d { font-weight: 700; color: var(--primary-dark); font-size: .85rem; overflow-wrap: anywhere; }
+    .pv-ao-s { font-size: .72rem; color: var(--gray-500); display: flex; gap: .35rem; flex-wrap: wrap; align-items: center; margin-top: .1rem; }
+    .pv-ao-q { display: flex; align-items: center; gap: .35rem; }
+    .pv-ao-q small { font-size: .72rem; color: var(--gray-500); font-weight: 700; }
+    .pv-step { display: inline-flex; align-items: center; background: var(--white); border: 1.5px solid var(--gray-200); border-radius: 10px; overflow: hidden; }
+    .pv-step button { width: 32px; height: 32px; border: none; background: none; color: var(--gray-500); font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; }
+    .pv-step input { width: 64px; text-align: center; border: none; border-left: 1px solid var(--gray-200); border-right: 1px solid var(--gray-200); font: inherit; font-weight: 700; color: var(--primary-dark); padding: .35rem 0; font-variant-numeric: tabular-nums; }
+    .pv-step input:focus { outline: none; background: #f3f4fd; }
+    .pv-ao-t { text-align: right; font-weight: 800; color: var(--primary-dark); font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; }
+    .pv-ao-t small { display: block; font-size: .68rem; font-weight: 600; color: var(--gray-400); }
+    .pv-tot { display: flex; justify-content: space-between; align-items: baseline; font-size: .84rem; color: var(--gray-600); padding: .65rem .1rem 0; }
+    .pv-tot b { font-size: 1.15rem; color: var(--primary-dark); font-variant-numeric: tabular-nums; }
+
+    .pv-back { display: inline-flex; align-items: center; gap: .3rem; border: none; background: none; color: #3f46a6; font: inherit; font-weight: 700; font-size: .84rem; padding: .2rem 0; cursor: pointer; margin-bottom: .5rem; }
+    .pv-back .icon { width: 15px; height: 15px; }
+
+    @media (max-width: 999px) {
+      .pv-main.ver-ficha .pv-lista-col, .pv-main.ver-ficha .pv-tabs { display: none; }
+      .pv-main:not(.ver-ficha) .pv-ficha-col { display: none; }
+    }
+    @media (min-width: 1000px) { .pv-back { display: none; } }
+    @media (max-width: 760px) {
+      .pv-t { font-size: 1.2rem; }
+      .pv-btn-txt { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Proveedores</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
+  </div>
+</header>
+
+<main class="app-main pv-main" id="pv-main">
+  <div class="pv-ttl">
+    <h1 class="pv-t">Proveedores</h1>
+    <span class="pv-pill hidden" id="pv-cuenta"></span>
+    <button type="button" class="pv-btn pv-push" id="btn-nuevo" title="Agregar un proveedor a la base"><span data-ic="plus"></span><span class="pv-btn-txt">Proveedor</span></button>
+  </div>
+  <div class="pv-tabs" role="tablist">
+    <button type="button" class="pv-tab" role="tab" id="tab-prov" aria-selected="true">Proveedores</button>
+    <button type="button" class="pv-tab" role="tab" id="tab-art" aria-selected="false">Artículos</button>
+  </div>
+
+  <!-- Proveedores: lista + ficha -->
+  <div class="pv-md" id="vista-prov">
+    <div class="pv-lista-col">
+      <div class="pv-search"><span data-ic="search"></span><input type="search" id="q-prov" placeholder="Nombre, CUIT o código interno" autocomplete="off"></div>
+      <div class="pv-chips">
+        <button type="button" class="pv-chip" id="f-mios" aria-pressed="true">Míos <b id="n-mios">0</b></button>
+        <button type="button" class="pv-chip" id="f-todos" aria-pressed="false">De todos <b id="n-todos">0</b></button>
+        <button type="button" class="pv-chip pv-chip--orden" id="f-orden"></button>
+      </div>
+      <div class="pv-panel" id="lista"><div class="pv-vacio">Cargando proveedores…</div></div>
+    </div>
+    <div class="pv-ficha-col" id="ficha-col">
+      <div class="pv-card pv-vacio" id="ficha-vacia">Elegí un proveedor de la lista para ver sus datos y lo que se le compró.</div>
+    </div>
+  </div>
+
+  <!-- Artículos: buscar y comparar entre proveedores -->
+  <div class="hidden" id="vista-art">
+    <div class="pv-search"><span data-ic="search"></span><input type="search" id="q-art" placeholder="Buscar un artículo (p. ej. cemento, disco 9, hierro 8)" autocomplete="off"></div>
+    <div class="pv-chips">
+      <button type="button" class="pv-chip" data-per="90" aria-pressed="true">Últimos 90 días</button>
+      <button type="button" class="pv-chip" data-per="mias" aria-pressed="false">Mis compras</button>
+      <button type="button" class="pv-chip" data-per="todo" aria-pressed="false">Todo</button>
+    </div>
+    <div id="art-res"><div class="pv-card pv-vacio">Escribí lo que buscás y se comparan los precios de todos los proveedores que lo vendieron.</div></div>
+  </div>
+</main>
+
+<div class="pv-selbar hidden" id="selbar">
+  <div class="n"><b id="sel-n"></b><span id="sel-s"></span></div>
+  <button type="button" class="pv-btn pv-btn--clear" id="sel-limpiar">Quitar</button>
+  <button type="button" class="pv-btn pv-btn--solid" id="sel-oc"><span data-ic="cart"></span>Orden de compra</button>
+</div>
+
+<!-- Editar / agregar proveedor -->
+<div class="modal-overlay hidden" id="modal-edit">
+  <div class="modal pv-modal">
+    <div class="modal-header">
+      <span class="pv-sq"><span data-ic="edit"></span></span>
+      <div><div class="modal-title" id="edit-title">Datos del proveedor</div><div class="pv-mt-s" id="edit-sub"></div></div>
+      <button class="modal-close" id="edit-close" aria-label="Cerrar"><span data-ic="x"></span></button>
+    </div>
+    <div class="modal-body">
+      <form class="pv-form" id="edit-form" autocomplete="off">
+        <div class="form-group full"><label for="e-nombre">Razón social</label><input class="form-control" id="e-nombre" data-f="nombre"></div>
+        <div class="form-group"><label for="e-cuit">CUIT</label><input class="form-control" id="e-cuit" data-f="cuit" inputmode="numeric" placeholder="30-12345678-9"></div>
+        <div class="form-group"><label for="e-codigo">Código interno</label><input class="form-control" id="e-codigo" data-f="codigoInterno"></div>
+        <div class="form-group"><label for="e-iva">Condición frente al IVA</label><input class="form-control" id="e-iva" data-f="condicionIVA" list="ivas"></div>
+        <div class="form-group"><label for="e-pago">Condición de pago habitual</label><input class="form-control" id="e-pago" data-f="condicionPago"></div>
+        <div class="form-group full"><label for="e-dom">Domicilio</label><input class="form-control" id="e-dom" data-f="domicilio"></div>
+        <div class="form-group"><label for="e-loc">Localidad</label><input class="form-control" id="e-loc" data-f="localidad"></div>
+        <div class="form-group"><label for="e-cp">Código postal</label><input class="form-control" id="e-cp" data-f="cp"></div>
+        <div class="form-group"><label for="e-tel">Teléfonos</label><input class="form-control" id="e-tel" data-f="telefonos" inputmode="tel"></div>
+        <div class="form-group"><label for="e-mail">Email</label><input class="form-control" id="e-mail" data-f="email" inputmode="email"></div>
+        <div class="form-group full"><label for="e-contacto">Contacto</label><input class="form-control" id="e-contacto" data-f="nombre_contacto" placeholder="Nombre de quien atiende"></div>
+      </form>
+      <datalist id="ivas"><option value="Responsable Inscripto"><option value="Monotributo"><option value="Exento"><option value="Consumidor Final"><option value="No Responsable"></datalist>
+      <div class="pv-aviso pv-aviso--gr" id="edit-aviso"><span data-ic="info"></span><span>Los cambios valen para las OC nuevas: las ya emitidas quedan como se hicieron.</span></div>
+    </div>
+    <div class="modal-footer">
+      <span class="pv-ft-st" id="edit-st"></span>
+      <button class="pv-btn pv-btn--clear" id="edit-cancel">Cancelar</button>
+      <button class="pv-btn pv-btn--solid" id="edit-save"><span data-ic="checkSm"></span>Guardar en la base</button>
+    </div>
+  </div>
+</div>
+
+<!-- Armar la OC -->
+<div class="modal-overlay hidden" id="modal-oc">
+  <div class="modal pv-modal">
+    <div class="modal-header">
+      <span class="pv-sq"><span data-ic="cart"></span></span>
+      <div style="min-width:0"><div class="modal-title" id="oc-title">Nueva OC</div><div class="pv-mt-s" id="oc-sub"></div></div>
+      <button class="modal-close" id="oc-close" aria-label="Cerrar"><span data-ic="x"></span></button>
+    </div>
+    <div class="modal-body">
+      <div class="pv-ao-list" id="oc-items"></div>
+      <div class="pv-tot" id="oc-tot"></div>
+      <div id="oc-avisos"></div>
+    </div>
+    <div class="modal-footer">
+      <span class="pv-ft-st"></span>
+      <button class="pv-btn pv-btn--clear" id="oc-cancel">Volver</button>
+      <button class="pv-btn pv-btn--solid" id="oc-abrir"><span data-ic="arrowRight"></span>Abrir la Orden de Compra</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/proveedores.js"></script>
+</body>
+</html>

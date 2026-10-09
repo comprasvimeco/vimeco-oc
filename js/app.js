@@ -2421,16 +2421,32 @@ async function empezarDeCero() {
 }
 
 // Al arrancar: retoma el borrador, salvo que se haya pedido "Usar como base"
-// desde el Historial; en ese caso se pregunta cuál de las dos sigue.
+// desde el Historial o una OC con artículos desde Proveedores; en ese caso se
+// pregunta cuál de las dos sigue.
 async function arrancarBorrador(obrasListas) {
   const b = leerBorrador();
   const baseRaw = sessionStorage.getItem('oc_base');
   sessionStorage.removeItem('oc_base');
   let base = null;
   try { base = baseRaw ? JSON.parse(baseRaw) : null; } catch (e) { console.warn('oc_base:', e); }
+  const provRaw = sessionStorage.getItem('oc_desde_proveedor');
+  sessionStorage.removeItem('oc_desde_proveedor');
+  let desdeProv = null;
+  try { desdeProv = provRaw ? JSON.parse(provRaw) : null; } catch (e) { console.warn('oc_desde_proveedor:', e); }
   await obrasListas;
 
-  if (base) {
+  if (desdeProv) {
+    const usarla = !b || await showConfirm('Tenés una OC sin terminar',
+      `${resumenBorrador(b)}.\nSi abrís la OC a ${desdeProv.proveedor?.nombre || 'este proveedor'}, la que estabas cargando se borra.`,
+      { boton: 'Abrir la nueva', tono: 'warn', icono: 'undo', cancelar: 'Seguir con la mía' });
+    if (usarla) {
+      if (b) borrarBorrador();
+      try { loadOCDesdeProveedor(desdeProv); } catch (e) { console.warn('loadOCDesdeProveedor:', e); }
+    } else {
+      await restaurarBorrador(b);
+      mostrarAvisoBorrador(b);
+    }
+  } else if (base) {
     const usarBase = !b || await showConfirm('Tenés una OC sin terminar',
       `${resumenBorrador(b)}.\nSi usás la OC ${base.nroOC} como base, la que estabas cargando se borra.`,
       { boton: 'Usar como base', tono: 'warn', icono: 'undo', cancelar: 'Seguir con la mía' });
@@ -3171,6 +3187,46 @@ function loadOCBase(oc) {
   recalcTotales();
   clearExtractStatus();
   toast(`Base cargada: OC ${oc.nroOC}`, 'info');
+}
+
+// ---- OC armada desde Proveedores ----
+// Trae el proveedor (con sus datos de la base), la condición de pago habitual,
+// los artículos tildados con el último precio y los impuestos en % de su última
+// OC. La obra queda para elegir.
+function loadOCDesdeProveedor(d) {
+  _ocBase = null;
+  const p = d.proveedor || {};
+  $('proveedor').value                = p.nombre          || '';
+  $('cuit-proveedor').value           = p.cuit            || '';
+  $('nombre-proveedor').value         = p.nombre_contacto || '';
+  $('codigo-interno-proveedor').value = p.codigoInterno   || '';
+  $('domicilio-proveedor').value      = p.domicilio       || '';
+  $('telefonos-proveedor').value      = p.telefonos       || '';
+  $('condicion-iva-proveedor').value  = p.condicionIVA    || 'Resp. Inscripto';
+  $('ref-presupuesto').value          = '';
+  if (d.condicionPago) $('condicion-pago').value = d.condicionPago;
+  _loadedProvCuit = p.enBase ? (p.enBase.replace(/\D/g, '') || null) : null;
+  snapshotProvider();
+
+  items = (d.items || []).map(it => ({
+    descripcion:     it.descripcion     || '',
+    unidad:          it.unidad          || 'u',
+    cantidad:        it.cantidad        || 1,
+    precio_unitario: it.precio_unitario || 0
+  }));
+  impuestos = (d.impuestos || []).map(imp => ({ nombre: imp.nombre || '', pct: imp.pct ?? null, monto: 0 }));
+  monedaUSD = d.moneda === 'USD';
+  const monedaChk = $('moneda-toggle');
+  if (monedaChk) monedaChk.checked = monedaUSD;
+  updateMonedaLabels();
+
+  renderTable();
+  renderImpuestos();
+  recalcTotales();
+  if (typeof updateOCSummaries === 'function') updateOCSummaries();
+  const n = items.length;
+  toast(n ? `${n} ${n === 1 ? 'artículo' : 'artículos'} de ${p.nombre} con el último precio. Revisá la obra.`
+          : `OC a ${p.nombre}. Revisá la obra y cargá los ítems.`, 'info');
 }
 
 // ---- Nueva OC mismo proveedor ----

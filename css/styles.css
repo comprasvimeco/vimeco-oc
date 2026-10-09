@@ -1445,6 +1445,7 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
 .menu-card[data-tone="teal"]   { --t-bg: #dcf3ef; --t-fg: #16695f; }
 .menu-card[data-tone="sky"]    { --t-bg: #e0f0fb; --t-fg: #0e6a96; }
 .menu-card[data-tone="gray"]   { --t-bg: #eef0f3; --t-fg: #4b5563; }
+.menu-card[data-tone="indigo"] { --t-bg: #e9ebfb; --t-fg: #3f46a6; }
 @media (max-width: 760px) {
   .menu-grid--tiles .menu-card { width: calc((100% - 2rem) / 3); }
 }
