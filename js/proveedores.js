@@ -67,6 +67,7 @@ const S = {
   per: '90',
   sel: { key: null, items: new Map() },   // artículos tildados (de un solo proveedor)
   empujado: false,           // la ficha del teléfono sumó una entrada al historial del navegador
+  tProv: [], tItems: [],     // lo buscado en la lista y en los artículos de la ficha (se resalta)
 };
 
 const prefKey = () => 'vimeco_prov_pref_' + S.code;
@@ -171,7 +172,8 @@ function ordenar(lista) {
 
 function filaProv(p) {
   const d = datosDe(p);
-  const mios = S.quien === 'mios';
+  // Con el buscador aparecen también proveedores sin compras tuyas: ahí van los de todos.
+  const mios = S.quien === 'mios' && p.mias > 0;
   let der = '';
   if (p.n) {
     const cnt = mios ? `${p.mias} ${p.mias === 1 ? 'tuya' : 'tuyas'}` : `${p.n} OC`;
@@ -183,8 +185,8 @@ function filaProv(p) {
   const sub = [d.cuit || '', d.localidad || ''].filter(Boolean).join(' · ');
   return `<button type="button" class="pv-row${S.abierto === p.key ? ' on' : ''}" data-key="${esc(p.key)}">
     <span class="pv-av ${tonoDe(p.key)}">${esc(iniciales(d.nombre))}</span>
-    <span style="min-width:0"><span class="pv-n" style="display:block">${esc(d.nombre)}</span>
-      <span class="pv-s" style="display:block">${d.cuit ? esc(sub) : `<span class="mini mini--warn">Sin CUIT</span> ${esc(d.localidad)}`}</span></span>
+    <span style="min-width:0"><span class="pv-n" style="display:block">${resaltarTxt(d.nombre, S.tProv, esc)}</span>
+      <span class="pv-s" style="display:block">${d.cuit ? resaltarTxt(sub, S.tProv, esc) : `<span class="mini mini--warn">Sin CUIT</span> ${esc(d.localidad)}`}</span></span>
     <span class="pv-r">${der}</span></button>`;
 }
 
@@ -201,6 +203,7 @@ function pintarLista() {
   $('pv-cuenta').classList.remove('hidden');
 
   const q = norm($('q-prov').value);
+  S.tProv = terminosBusqueda(q);
   let html = '';
   if (q) {
     // Buscando: se busca en toda la base. Primero los que tienen compras.
@@ -261,7 +264,7 @@ function filaItem(p, g) {
       <b>${fmtMonto(c.precio, g.moneda)}</b></div>`).join('')}</div>` : '';
   return `<div class="pv-it${sel ? ' sel' : ''}" data-g="${esc(g.id)}" tabindex="0" aria-expanded="${abierto}">
     <button type="button" class="pv-ck" data-ck="${esc(g.id)}" aria-pressed="${sel}" aria-label="Tildar ${esc(g.desc)}">${icSvg('checkSm')}</button>
-    <div style="min-width:0"><div class="pv-it-d">${esc(g.desc)}</div>
+    <div style="min-width:0"><div class="pv-it-d">${resaltarTxt(g.desc, S.tItems, esc)}</div>
       <div class="pv-it-s"><span>${esc(g.unidad)}</span><span>· ${g.n} ${g.n === 1 ? 'compra' : 'compras'}${g.mias ? ` (${g.mias} ${g.mias === 1 ? 'tuya' : 'tuyas'})` : ''}</span><span>· ${fmtCorta(g.ts)}</span>${trendHtml(g)}${viejoHtml(g)}</div></div>
     <div class="pv-it-p"><b>${fmtMonto(g.precio, g.moneda)}</b><small>por ${esc(g.unidad)} s/IVA</small></div>
     ${hist}</div>`;
@@ -272,6 +275,7 @@ function pintarItems(p) {
   if (!box) return;
   const q = norm($('q-items')?.value || '');
   const toks = q ? q.split(' ') : [];
+  S.tItems = toks;
   const lista = ordenItems(p, p.items.filter(g => toks.every(t => g.nd.includes(t))));
   box.innerHTML = lista.length ? lista.map(g => filaItem(p, g)).join('')
     : `<div class="pv-vacio">${p.items.length ? 'Ningún artículo con ese texto.' : 'Todavía no hay compras a este proveedor en la app.'}</div>`;
@@ -400,7 +404,7 @@ function pintarArticulos() {
         return `<div class="pv-cmp${sel ? ' sel' : ''}${dim ? ' dim' : ''}" data-cg="${esc(r.g.id)}" data-pk="${esc(r.p.key)}" tabindex="0">
           <button type="button" class="pv-ck" data-ck="${esc(r.g.id)}" data-pk="${esc(r.p.key)}" aria-pressed="${sel}" aria-label="Tildar">${icSvg('checkSm')}</button>
           <div style="min-width:0"><button type="button" class="pv-cmp-p" data-abrir="${esc(r.p.key)}">${esc(d.nombre)}</button>
-            <div class="pv-cmp-d">${esc(r.g.desc)}</div>
+            <div class="pv-cmp-d">${resaltarTxt(r.g.desc, toks, esc)}</div>
             <div class="pv-it-s"><span>${fmtFecha(r.g.ts)}</span><span>· ${r.g.n} ${r.g.n === 1 ? 'compra' : 'compras'}</span>${r === best ? '<span class="pv-best">Más barato reciente</span>' : ''}${viejoHtml(r.g)}</div></div>
           <div class="pv-it-p"><b>${fmtMonto(r.g.precio, r.g.moneda)}</b><small>por ${esc(r.g.unidad)} s/IVA</small></div></div>`;
       }).join('')}</div>`;
