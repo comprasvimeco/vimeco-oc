@@ -129,7 +129,7 @@ function estadoChipFicha(oc) {
             : oc.estado === 'autorizada' ? 'Autorizada' + (a.firmante ? ' — ' + a.firmante : '')
             : oc.estado === 'rechazada'  ? 'Rechazada'
             : oc.estado === 'cancelada'  ? 'Cancelada'
-            : oc.estado === 'anulada'    ? 'Duplicada' + (oc.anulacion?.reemplazadaPor ? ', se reemplazó por OC ' + oc.anulacion.reemplazadaPor : '')
+            : oc.estado === 'anulada'    ? (oc.anulacion?.reemplazadaPor ? 'Duplicada, se reemplazó por OC ' + oc.anulacion.reemplazadaPor : 'Anulada')
             : oc.reemplazaA?.length      ? 'Reemplaza a OC ' + oc.reemplazaA.join(', ') : '';
   return txt ? `<span class="foc-chip">${_fEsc(txt)}</span>` : '';
 }

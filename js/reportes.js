@@ -332,7 +332,8 @@ function estadoChip(oc) {
     pendiente:  ['Pendiente',  '#fff4e0', '#9a6a00'],
     rechazada:  ['Rechazada',  '#fde6e6', '#b02a2a'],
     cancelada:  ['Cancelada',  '#eceef1', '#5b6573'],
-    anulada:    ['Duplicada',  '#eceef1', '#5b6573'],
+    // Sin OC que la reemplace se anuló a mano, no por duplicada.
+    anulada:    [oc.anulacion?.reemplazadaPor ? 'Duplicada' : 'Anulada', '#eceef1', '#5b6573'],
   };
   const [txt, bg, fg] = map[e] || map.emitida;
   const quien = e === 'autorizada' ? oc.autorizacion?.firmante : '';

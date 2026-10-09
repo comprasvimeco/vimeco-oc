@@ -2667,7 +2667,7 @@ function elegirAutorizador(regla) {
 
 // ---- OC que repite otra reciente ----
 // Antes de generar se mira si quien emite ya le hizo, en la última hora, una OC
-// al mismo proveedor por un monto parecido (el criterio está en js/duplicados.js).
+// al mismo proveedor por un monto parecido o con los mismos artículos (el criterio está en js/duplicados.js).
 // Si la hay, decide qué es la nueva:
 //   'otra'       → otra compra: valen las dos y no se vuelven a marcar.
 //   'correccion' → corrige a las marcadas, que quedan anuladas ("Duplicada, se
@@ -2695,6 +2695,12 @@ async function revisarRepetida() {
     moneda:      monedaUSD ? 'USD' : 'ARS',
     total:       calcTotal()
   };
+  // Obra y artículos: reconocen la corrección que cambió mucho el monto.
+  try {
+    const d = buildOCData('');
+    nueva.obra  = d.proveedor.ubicacion;
+    nueva.items = d.items;
+  } catch (e) { console.warn('revisarRepetida items:', e); }
   const previas = duplicadosDeNueva(nueva, hist);
   // La OC de otra persona usada como base (ver baseParaCorregir) también se
   // ofrece para anular. Si no se puede leer, se sigue sin ella.
@@ -2717,8 +2723,8 @@ function elegirRepetida(previas, base = null) {
     } else {
       const min = Math.max(1, Math.round((Date.now() - previas[previas.length - 1].timestamp) / 60000));
       $('dup-texto').textContent = varias
-        ? `En la última hora ya le emitiste ${previas.length} OC a ${prov} por un monto parecido:`
-        : `Hace ${min} min ya le emitiste a ${prov} una OC por un monto parecido:`;
+        ? `En la última hora ya le emitiste ${previas.length} OC parecidas a ${prov}:`
+        : `Hace ${min} min ya le emitiste a ${prov} una OC parecida:`;
     }
     const nueva = calcTotal();
     $('dup-lista').innerHTML = previas.map((oc, i) => {

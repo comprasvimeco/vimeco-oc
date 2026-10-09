@@ -1288,6 +1288,12 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
 .dup-grupo + .dup-grupo { margin-top: .9rem; padding-top: .9rem; border-top: 1px dashed #f0cf95; }
 .dup-grupo-head { font-size: .82rem; color: var(--gray-600); margin-bottom: .45rem; }
 .dup-grupo-head b { color: var(--gray-900); }
+/* Anular una OC a mano (anularOCManual en js/duplicados.js): se elige cuál la reemplaza */
+.anular-pregunta { font-weight: 700; color: var(--primary-dark); font-size: .92rem; text-align: center; margin-top: .9rem; }
+.anular-lista { width: 100%; margin-top: .9rem; text-align: left; max-height: 45vh; overflow-y: auto; }
+.anular-lista .dup-oc { border: 1px solid var(--gray-200); }
+.anular-lista .dup-oc:has(input:checked) { border-color: #9ec9a9; background: #f1faf3; }
+.anular-lista input[type=radio] { width: 17px; height: 17px; flex-shrink: 0; accent-color: #1a7f3c; }
 .dup-grupo-foot { display: flex; flex-wrap: wrap; gap: .45rem; justify-content: flex-end; margin-top: .55rem; }
 /* Etiqueta de OC anulada por duplicada / que reemplaza a otra (Historial, Novedades). */
 .dup-tag { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 700;

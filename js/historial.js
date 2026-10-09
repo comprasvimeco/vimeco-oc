@@ -151,10 +151,12 @@ function renderCards(ocs) {
         <button class="foc-btn foc-btn--edit btn-ver" title="Ver la OC">${icSvg('eye')}Ver OC</button>
         ${showRegen ? `<button class="foc-btn foc-btn--pdf btn-regenerar" title="Descargar o compartir el PDF">${icSvg('share')}PDF</button>` : ''}
         <button class="foc-btn foc-btn--gen btn-usar-base" title="Cargar en el formulario">${icSvg('undo')}Usar como base</button>
+        ${puedeAnular(oc) ? `<button class="foc-btn foc-btn--del btn-anular" title="Anularla como duplicada: la reemplazó otra OC">${icSvg('x')}Anular</button>` : ''}
       </div>`;
 
     card.querySelector('.btn-usar-base').addEventListener('click', () => usarComoBase(oc));
     card.querySelector('.btn-ver').addEventListener('click', () => abrirFicha(oc));
+    card.querySelector('.btn-anular')?.addEventListener('click', () => abrirAnular(oc));
     bindDocs(card, oc);
 
     if (showRegen) {
@@ -295,7 +297,7 @@ function renderDuplicadas() {
       <span class="dup-panel-ic">${icSvg('alert')}</span>
       <div>
         <div class="dup-panel-t">${n > 1 ? n + ' posibles OC duplicadas' : 'Posible OC duplicada'}</div>
-        <div class="dup-panel-sub">${gruposDup.every(g => !esAjena(g[0])) ? 'Le emitiste' : 'Se le emitió'} más de una OC al mismo proveedor, en menos de una hora, por un monto parecido.
+        <div class="dup-panel-sub">${gruposDup.every(g => !esAjena(g[0])) ? 'Le emitiste' : 'Se le emitió'} más de una OC al mismo proveedor, en menos de una hora, por un monto parecido o repitiendo los mismos artículos.
           Marcá la que quedó sin validez: sigue en el historial como "Duplicada", pero deja de contar en Reportes.</div>
       </div>
     </div>
@@ -377,6 +379,18 @@ async function resolverDup(grupo, accion, btn) {
   }
   renderDuplicadas();
   applyFilters();   // cambió el estado de las OC: también los contadores de Estado
+}
+
+// ---- Anular una OC como duplicada, desde su tarjeta ----
+// El diálogo está en js/duplicados.js (anularOCManual). La anula quien puede
+// resolver sus duplicadas: la propia, la de las obras del Jefe de Obra, o un admin.
+const puedeAnular = oc => esCompraFirme(oc) &&
+  (oc.responsable?.codigo === viewerCode || viewerIsAdmin || (viewerObras && esDeObrasJefe(oc, viewerObras)));
+
+async function abrirAnular(oc) {
+  if (!await anularOCManual(oc, allOCs)) return;
+  renderDuplicadas();
+  applyFilters();   // cambió el estado de la OC: también los contadores de Estado
 }
 
 // ---- Ficha de la OC ----

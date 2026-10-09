@@ -383,6 +383,10 @@ function render() {
       : anulada ? `<span class="dup-tag">${esc(textoDuplicada(ocEv))}</span>`
       : ocEv.reemplazaA?.length ? `<span class="dup-tag dup-tag--nueva">Reemplaza a OC ${esc(ocEv.reemplazaA.join(', '))}</span>`
       : '';
+    // Anularla como duplicada (js/duplicados.js): las de OC que siguen vigentes.
+    const anular = e.tipo === 'oc' && ocEv && esCompraFirme(ocEv)
+      ? `<button class="foc-btn foc-btn--del act-anular" title="Anularla como duplicada: la reemplazó otra OC">${icSvg('x')}Anular</button>`
+      : '';
     const cardCls = (vista ? 'act-card-seen' : 'act-card-unseen')
       + (anulada ? ' act-card-anulada' : '');
     html += `
@@ -396,7 +400,7 @@ function render() {
             ${docsHtml(e, ocEv)}
             ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc, terms)}
             <div class="act-meta">${esc(quienDe(e, ocEv))} · ${fmtHora(e.timestamp)}</div>
-            <div class="act-actions">${ver}${verOC}${drive}${accion}${borrar}</div>
+            <div class="act-actions">${ver}${verOC}${drive}${accion}${anular}${borrar}</div>
           </div>
         </div>
       </div>`;
@@ -418,6 +422,9 @@ function render() {
       marcarVista(e.key);
     });
     card.querySelector('.act-oc')?.addEventListener('click', () => abrirFicha(oc));
+    card.querySelector('.act-anular')?.addEventListener('click', async () => {
+      if (await anularOCManual(oc, histAll)) render();
+    });
     if (oc && e.tipo === 'oc') bindDocsOC(card, oc, facturasDeOC(oc), remitosPorOC[oc.nroOC] || []);
   });
 

@@ -99,8 +99,31 @@ function indiceProveedores(list) {
   };
 }
 
+// La corrección que cambia mucho el monto: la OC rehecha repite los artículos
+// de la otra (y suele sumar o sacar alguno). La 0006-00000511 de REYES HILDA
+// JOSEFINA rehízo la 510 agregándole rejillas: +37%, y no se detectaba. Si
+// todos los renglones de la OC con menos renglones están en la otra, y es la
+// misma obra, el monto no se mira.
+//
+// No alcanzaba con que los números fueran seguidos: es muy común partir un
+// presupuesto en varias OC al hilo (una por tanda o por obra), y eso traía
+// 22 grupos falsos. La obra se exige acá porque comprar el mismo filtro para
+// dos obras, una OC para cada una, también es común y no es un duplicado.
+function _normDesc(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function _repiteArticulos(a, b) {
+  if ((a.obra || '').trim().toLowerCase() !== (b.obra || '').trim().toLowerCase()) return false;
+  const da = new Set((a.items || []).map(i => _normDesc(i.desc)).filter(Boolean));
+  const db = new Set((b.items || []).map(i => _normDesc(i.desc)).filter(Boolean));
+  const [menos, mas] = da.size <= db.size ? [da, db] : [db, da];
+  return menos.size > 0 && [...menos].every(d => mas.has(d));
+}
+
 const _parejaDup = (a, b) => Math.abs(b.timestamp - a.timestamp) <= DUP_VENTANA_MS &&
-  Math.abs(montoDe(b) - montoDe(a)) <= DUP_TOLERANCIA * Math.max(montoDe(a), montoDe(b));
+  (Math.abs(montoDe(b) - montoDe(a)) <= DUP_TOLERANCIA * Math.max(montoDe(a), montoDe(b)) ||
+   _repiteArticulos(a, b));
 
 // Grupos de OC duplicadas de `list`, cada uno en orden de emisión (la primera
 // adelante). `provKeyFn` agrupa por proveedor; por defecto, uno armado sobre la lista.
@@ -142,7 +165,8 @@ function duplicadosPorRevisar(list, codigo, obrasJefe = null) {
 }
 
 // Antes de emitir: las compras firmes de quien emite que la OC nueva estaría
-// repitiendo. `nueva` trae proveedor, moneda, total y responsable.codigo.
+// repitiendo. `nueva` trae proveedor, moneda, total y responsable.codigo, y
+// obra e items para reconocer la corrección que cambió el monto.
 function duplicadosDeNueva(nueva, list) {
   const ahora = Date.now();
   const yo    = { ...nueva, timestamp: ahora };
@@ -186,10 +210,103 @@ async function marcarComprasDistintas(ocs, por = _quienSoy()) {
       .then(() => { oc.noDuplicada = marca; })));
 }
 
-// Texto de la etiqueta de una OC anulada por duplicada.
+// ---- Anular una OC a mano, desde su tarjeta (Historial y Novedades) ----
+// Para la que el detector no agarra (proveedor mal cargado, más de una hora,
+// artículos distintos): el mismo resultado que resolver un grupo de duplicados.
+// Se elige qué OC al mismo proveedor de `list` la reemplaza; por defecto la
+// más cercana emitida después. Resuelve true si se anuló, false si no.
+function _escDup(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function _modalAnular() {
+  let m = document.getElementById('modal-anular');
+  if (m) return m;
+  m = document.createElement('div');
+  m.className = 'modal-overlay hidden';
+  m.id = 'modal-anular';
+  m.innerHTML = `
+    <div class="confirm-box confirm-box--warn confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="anular-title">
+      <span class="confirm-ic">${icSvg('copy')}</span>
+      <div class="confirm-title" id="anular-title">Anular OC</div>
+      <p id="anular-texto" class="confirm-msg"></p>
+      <p id="anular-pregunta" class="anular-pregunta">¿Fue reemplazada por alguna Orden de Compra?</p>
+      <div id="anular-lista" class="dup-lista anular-lista" role="radiogroup" aria-label="OC que la reemplaza"></div>
+      <div class="confirm-btns">
+        <button type="button" class="foc-btn foc-btn--clear" id="btn-anular-cancel">Cancelar</button>
+        <button type="button" class="foc-btn foc-btn--del" id="btn-anular-ok">${icSvg('x')}Anular</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+  return m;
+}
+
+function anularOCManual(oc, list) {
+  const m     = _modalAnular();
+  const prov  = indiceProveedores(list);
+  const k     = prov(oc);
+  const cands = list
+    .filter(o => o !== oc && o.nroOC !== oc.nroOC && esCompraFirme(o) && prov(o) === k)
+    .sort((a, b) => Math.abs(a.timestamp - oc.timestamp) - Math.abs(b.timestamp - oc.timestamp))
+    .slice(0, 8);
+  // La propuesta: la más cercana de la misma persona, mejor si es posterior. Una
+  // ajena al mismo proveedor (otra obra, otro día) rara vez es la corrección.
+  const mismas  = cands.filter(o => o.responsable?.codigo === oc.responsable?.codigo);
+  const elegida = mismas.find(o => o.timestamp > oc.timestamp) || mismas[0] || null;
+  const money   = o => (o.moneda === 'USD' ? 'US$ ' : '$ ') +
+    (parseFloat(o.total) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  m.querySelector('#anular-title').textContent = 'Anular la OC ' + oc.nroOC;
+  m.querySelector('#anular-texto').textContent =
+    'Sigue en el historial y en Novedades, tachada, pero deja de contar en Reportes.' + (cands.length
+      ? ''
+      : ' No hay otra OC vigente a ' + (oc.proveedor?.nombre || 'este proveedor') + ' que la reemplace.');
+  m.querySelector('#anular-pregunta').classList.toggle('hidden', !cands.length);
+  const lista = m.querySelector('#anular-lista');
+  // "No, ninguna la reemplaza" va primero; queda marcada si no hay una OC propia para proponer.
+  lista.innerHTML = (cands.length ? `
+    <label class="dup-oc">
+      <input type="radio" name="anular-por" value=""${elegida ? '' : ' checked'}>
+      <span class="dup-oc-main"><span class="dup-oc-nro">No, ninguna la reemplaza</span>
+        <span class="dup-oc-sub">Se anula sin reemplazo</span></span>
+    </label>` : '') + cands.map((o, i) => `
+    <label class="dup-oc">
+      <input type="radio" name="anular-por" value="${i}"${o === elegida ? ' checked' : ''}>
+      <span class="dup-oc-main">
+        <span class="dup-oc-nro">${_escDup(o.nroOC)}</span>
+        <span class="dup-oc-sub">${_escDup(o.fecha || '')} · ${_escDup(o.obra || 'Sin obra')}</span>
+      </span>
+      <span class="dup-oc-monto">${_escDup(money(o))}</span>
+    </label>`).join('');
+  lista.classList.toggle('hidden', !cands.length);
+
+  const ok = m.querySelector('#btn-anular-ok'), cancel = m.querySelector('#btn-anular-cancel');
+  ok.disabled = false;
+  m.classList.remove('hidden');
+  return new Promise(resolve => {
+    const cerrar = r => { m.classList.add('hidden'); ok.onclick = cancel.onclick = null; resolve(r); };
+    cancel.onclick = () => cerrar(false);
+    ok.onclick = async () => {
+      const v   = lista.querySelector('input:checked')?.value;
+      const por = v ? cands[+v] : null;
+      ok.disabled = true;
+      try {
+        await anularPorReemplazo([oc], por ? por.nroOC : null);
+        toast(`OC ${oc.nroOC} anulada como duplicada${por ? ': la reemplaza la ' + por.nroOC : ''}.`, 'success');
+        cerrar(true);
+      } catch (e) {
+        ok.disabled = false;
+        toast('No se pudo guardar. ' + e.message, 'error');
+      }
+    };
+  });
+}
+
+// Texto de la etiqueta de una OC anulada: "Duplicada" si la reemplazó otra OC,
+// "Anulada" si se anuló sin reemplazo (desde su tarjeta, "No, ninguna la reemplaza").
 function textoDuplicada(oc) {
   const nro = oc.anulacion?.reemplazadaPor;
-  return nro ? `Duplicada, se reemplazó por OC ${nro}` : 'Duplicada';
+  return nro ? `Duplicada, se reemplazó por OC ${nro}` : 'Anulada';
 }
 
 function horaDe(ts) {
