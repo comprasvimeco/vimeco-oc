@@ -287,9 +287,12 @@ function timeSeries(list) {
   const fin = finRango > hoy ? hoy : finRango;
   if (!ini || ini > fin) return { rows: [], unit: 'dia' };
 
+  // Con un período elegido (semana, quincena, mes, año) se dibuja el ACUMULADO
+  // contra el del período anterior: dice de un vistazo si se va gastando más o
+  // menos que la vez pasada al mismo día. Por semanas, un mes daba 2 puntos.
   const dias = Math.round((fin - ini) / 86400000) + 1;
-  let unit = state.periodo === 'semana' || state.periodo === 'quincena' ? 'dia'
-           : state.periodo === 'mes' ? 'semana'
+  let unit = state.periodo === 'anio' ? 'mes'
+           : state.periodo ? 'dia'
            : dias <= 31 ? 'dia' : dias <= 180 ? 'semana' : 'mes';
   let keys = bucketsEntre(ini, fin, unit);
   if (keys.length < 2 && unit !== 'dia') { unit = 'dia'; keys = bucketsEntre(ini, fin, unit); }
@@ -312,7 +315,7 @@ function timeSeries(list) {
     prev = pKeys.map(k => pBy.get(k) || cero(k));
   }
   const n = Math.max(keysFull.length, rows.length, prev ? prev.length : 0);
-  return { rows, unit, prev, keysFull, n };
+  return { rows, unit, prev, keysFull, n, acum: !!state.periodo };
 }
 
 function monthShort(k) {
@@ -377,17 +380,13 @@ const pctTxt  = v => v.toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '
 // Color de cada obra en la participación, para que "Gasto por Obra" la pinte
 // igual. Lo arma renderShare, que corre antes.
 let obraHue = new Map();
-// "Otras N obras" desplegado (se recuerda mientras se navega el reporte).
-let shareOtrasOpen = false;
-let _share = null;   // último dibujo, para redibujar al desplegar "Otras"
 
 // ---- Barra de participación (part-to-whole, top 5 + Otras) ----
+// Sólo la barra: lo que antes decía la leyenda lo dicen ahora las tarjetas de
+// cada obra, pintadas del mismo color.
 function renderShare(containerId, rows, grand) {
   const el = $(containerId);
-  if (!rows.length || grand <= 0) {
-    el.innerHTML = '<div class="rep-empty">Sin datos en el rango seleccionado.</div>';
-    return;
-  }
+  if (!rows.length || grand <= 0) { el.innerHTML = ''; obraHue = new Map(); return; }
   const top   = rows.slice(0, 5);
   const resto = rows.slice(5);
   obraHue = new Map(top.map((r, i) => [r.key, SHARE_HUES[i]]));
@@ -399,10 +398,8 @@ function renderShare(containerId, rows, grand) {
       hue: HUES.gris
     });
   }
-
   const pct = t => (t / grand) * 100;
-  // El % va en una burbuja dentro del segmento sólo si entra (≥ 8%); si no,
-  // lo dice la leyenda.
+  // El % va dentro del segmento sólo si entra (≥ 8%).
   el.innerHTML = `
     <div class="rep-share-track">
       ${segs.map(s => `
@@ -410,52 +407,137 @@ function renderShare(containerId, rows, grand) {
              title="${esc(s.label)} — ${esc(fmtFull(s.total, state.moneda))} (${pctTxt(pct(s.total))})">${
           pct(s.total) >= 8 ? `<span class="rep-share-pill">${Math.round(pct(s.total))}%</span>` : ''}</div>
       `).join('')}
-    </div>
-    <div class="rep-share-legend">
-      ${segs.map((s, i) => {
-        const otras = resto.length && i === segs.length - 1;
-        return `
-        <${otras ? 'button type="button"' : 'div'} class="rep-share-item${otras ? ' rep-share-otras' : ' rep-share-pick'}${otras && shareOtrasOpen ? ' open' : ''}"
-             style="${hueVars(s.hue)}"${otras ? ` aria-expanded="${shareOtrasOpen}" title="Ver las obras agrupadas"`
-               : ` data-obra="${esc(s.key)}" data-label="${esc(s.label)}" title="Ver sólo esta obra en todo el reporte"`}>
-          <span class="rep-share-dot"></span>
-          <span class="rep-share-lbl" title="${esc(s.label)}">${esc(s.label)}</span>
-          ${otras ? `<span class="rep-share-chev">${icSvg('chevR')}</span>` : ''}
-          <span class="rep-share-val">${esc(fmtCompact(s.total, state.moneda))}</span>
-          <span class="rep-share-pct">${pctTxt(pct(s.total))}</span>
-        </${otras ? 'button' : 'div'}>`;
-      }).join('')}
-    </div>
-    ${resto.length && shareOtrasOpen ? `
-    <div class="rep-share-rest">
-      ${resto.map(r => `
-        <div class="rep-share-rest-i rep-share-pick" data-obra="${esc(r.key)}" data-label="${esc(r.label)}" title="Ver sólo esta obra en todo el reporte">
-          <span class="rep-share-lbl" title="${esc(r.label)}">${esc(r.label)}</span>
-          <span class="rep-share-val">${esc(fmtCompact(r.total, state.moneda))}</span>
-          <span class="rep-share-rest-p">${pctTxt(pct(r.total))}</span>
-        </div>`).join('')}
-    </div>` : ''}`;
-
-  _share = { containerId, rows, grand };
+    </div>`;
   if (!el._wired) {
     el._wired = true;
     el.addEventListener('click', e => {
-      if (e.target.closest('.rep-share-otras')) {
-        shareOtrasOpen = !shareOtrasOpen;
-        renderShare(_share.containerId, _share.rows, _share.grand);
-        return;
-      }
       const o = e.target.closest('[data-obra]');
       if (o) setFiltro('obra', o.dataset.obra, o.dataset.label);
     });
   }
 }
 
+// ---- Una tarjeta por obra ----
+// Lo gastado en el período, la comparación con el mismo tramo del anterior,
+// los últimos 6 meses y cuántas OC faltan facturar. Tocarla filtra todo el
+// reporte por esa obra (lo mismo que hacía el embudito).
+const OBRAS_VISIBLES = 6;
+let obrasTodas = false;
+let obrasOrden = 'gasto';
+
+// Totales por obra de los últimos 6 meses que terminan en el del período (o en
+// el actual): mismo filtro de equipo y de compras firmes que el resto.
+function seisMeses() {
+  const r = rangoActual();
+  const hoy = hoy0();
+  let ref = r.hasta ? new Date(r.hasta + 'T00:00:00') : hoy;
+  if (ref > hoy) ref = hoy;
+  const keys = [];
+  for (let i = 5; i >= 0; i--) keys.push(monthKey(new Date(ref.getFullYear(), ref.getMonth() - i, 1).getTime()));
+  const idx = new Map(keys.map((k, i) => [k, i]));
+  const por = new Map();
+  ALL.forEach(oc => {
+    if (!pasaFiltros(oc)) return;
+    const i = idx.get(monthKey(oc.timestamp));
+    if (i == null) return;
+    const amt = amountIn(oc, state.moneda);
+    if (amt == null) return;
+    const k = oc.obra || '—';
+    if (!por.has(k)) por.set(k, [0, 0, 0, 0, 0, 0]);
+    por.get(k)[i] += amt;
+  });
+  return { keys, por };
+}
+
+function sparkSvg(vals, mark) {
+  const W = 132, H = 30, gap = 4, bw = (W - gap * 5) / 6;
+  const max = Math.max(...vals) || 1;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${vals.map((v, i) => {
+    const h = v ? Math.max(2, v / max * (H - 2)) : 1;
+    return `<rect x="${(i * (bw + gap)).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2"
+      fill="${i === 5 ? mark : '#d5e3ef'}"/>`;
+  }).join('')}</svg>`;
+}
+
+function renderObras(obras, total) {
+  const el = $('rep-obras');
+  $('rp-obras-n').textContent = obras.length ? String(obras.length) : '';
+  if (!obras.length) { el.innerHTML = '<div class="rep-empty">No hay OC con obra en el rango.</div>'; return; }
+
+  const r  = rangoActual();
+  const pr = rangoComparable(r);
+  const prevPor = new Map();
+  if (pr) ocsDeRango(pr).forEach(oc => {
+    const a = amountIn(oc, state.moneda); if (a == null) return;
+    const k = oc.obra || '—'; prevPor.set(k, (prevPor.get(k) || 0) + a);
+  });
+  const { keys, por } = seisMeses();
+  const corte = Date.now() - DIAS_FACTURA * 86400000;
+
+  const filas = obras.map(o => {
+    let sin = 0, venc = 0;
+    o.ocs.forEach(({ oc }) => {
+      if (estadoFacturaOC(oc).estado === 'con') return;
+      sin++; if ((oc.timestamp || 0) < corte) venc++;
+    });
+    const v = pr ? variacion(o.total, prevPor.get(o.key) || 0) : null;
+    return { ...o, sin, venc, v };
+  });
+  const subida = o => o.v == null ? -Infinity : o.v;   // Infinity = obra nueva: arriba de todo
+  if (obrasOrden === 'subio') filas.sort((a, b) => subida(b) - subida(a) || b.total - a.total);
+  if (obrasOrden === 'factura') filas.sort((a, b) => b.venc - a.venc || b.sin - a.sin || b.total - a.total);
+
+  const mesCorto = k => ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][Number(k.slice(5)) - 1];
+  const vis = obrasTodas ? filas : filas.slice(0, OBRAS_VISIBLES);
+  el.innerHTML = vis.map(o => {
+    const hue = obraHue.get(o.key) || HUES.gris;
+    const c   = obraCat.get(normObra(o.key));
+    const cat = c ? OBRA_CATS[c] : null;
+    const on  = filtroActivo('obra', o.key);
+    const st  = o.venc ? `<span class="ob-st ob-st--venc">${o.venc} sin factura +${DIAS_FACTURA} d</span>`
+              : o.sin  ? `<span class="ob-st ob-st--sin">${o.sin} sin factura</span>`
+              : '<span class="ob-st ob-st--ok">Todo facturado</span>';
+    const varTxt = o.v == null ? '' : !isFinite(o.v) ? '<span class="rp-var rp-var--up">nueva</span>'
+      : chipVar(o.v, `${o.v >= 0 ? '+' : '−'}${Math.abs(Math.round(o.v))}%`);
+    return `
+      <button type="button" class="ob-t${on ? ' on' : ''}" data-obra="${esc(o.key)}" data-label="${esc(o.label)}" style="${hueVars(hue)}"
+              title="${on ? 'Quitar el filtro' : 'Ver todo el reporte de esta obra'}">
+        <span class="ob-h">
+          <span class="rp-ic" style="background:${hue.bg};color:${hue.ink}">${icSvg(cat ? cat.icon : 'building')}</span>
+          <span class="ob-n"><b>${esc(o.label)}</b><span>${cat ? cat.label + ' · ' : ''}${o.count} OC</span></span>
+        </span>
+        <span class="ob-m"><b>${esc(fmtCompact(o.total, state.moneda))}</b>${varTxt}<span class="ob-p">${total ? Math.round(o.total / total * 100) : 0}%</span></span>
+        <span class="ob-s">${sparkSvg(por.get(o.key) || [0, 0, 0, 0, 0, 0], hue.mark)}
+          <span class="ob-ms">${keys.map(k => `<span>${mesCorto(k)}</span>`).join('')}</span></span>
+        <span class="ob-f">${st}<span class="ob-go">${on ? 'Quitar filtro' : 'Ver'}${icSvg('chevR')}</span></span>
+      </button>`;
+  }).join('') + (filas.length > OBRAS_VISIBLES
+    ? `<button type="button" class="ob-more" data-mas>${obrasTodas ? 'Mostrar menos' : `Ver las ${filas.length} obras`}</button>` : '');
+
+  if (!el._wired) {
+    el._wired = true;
+    el.addEventListener('click', e => {
+      if (e.target.closest('[data-mas]')) { obrasTodas = !obrasTodas; render(); return; }
+      const t = e.target.closest('[data-obra]');
+      if (t) setFiltro('obra', t.dataset.obra, t.dataset.label);
+    });
+  }
+}
+
+// Repuestos / Mantenimiento: una línea arriba de la lista de equipos.
+function renderCategorias(conEquipo) {
+  const g = groupAgg(conEquipo, oc => oc.equipo.categoria || 'Sin categoría', oc => oc.equipo.categoria || 'Sin categoría');
+  const cls = { Repuestos: 'rep', Mantenimiento: 'man' };
+  $('rep-categorias').innerHTML = g.map(r =>
+    `<span class="rp-cat rp-cat--${cls[r.key] || 'sin'}">${esc(r.label)} <b>${esc(fmtCompact(r.total, state.moneda))}</b></span>`).join('');
+}
+
+
 // ---- Evolución (área + línea) contra el período anterior (línea punteada) ----
 // Se dibuja al ancho real del contenedor para que los trazos no se deformen.
 let lineData = { rows: [], unit: 'mes' };
 
-const PREV_LBL = { semana: 'Semana anterior', quincena: 'Quincena anterior', mes: 'Mes anterior' };
+const PREV_LBL = { semana: 'Semana anterior', quincena: 'Quincena anterior', mes: 'Mes anterior', anio: 'Año anterior' };
 
 function renderLine(containerId, serie) {
   const el = $(containerId);
@@ -465,8 +547,13 @@ function renderLine(containerId, serie) {
   const n    = Math.max(serie.n || 0, rows.length);
   const ejeK = serie.keysFull && serie.keysFull.length ? serie.keysFull : rows.map(r => r.key);
 
-  $('rep-linea-title').textContent = unit === 'dia' ? 'Evolución diaria'
+  const acum = !!serie.acum;
+  $('rep-linea-title').textContent = acum ? 'Gasto acumulado'
+    : unit === 'dia' ? 'Evolución diaria'
     : unit === 'semana' ? 'Evolución semanal' : 'Evolución mensual';
+  const sumas = arr => { let s = 0; return arr.map(r => (s += r.total)); };
+  const vCur  = acum ? sumas(rows) : rows.map(r => r.total);
+  const vPrev = prev ? (acum ? sumas(prev) : prev.map(r => r.total)) : null;
 
   if (!rows.length) {
     el.innerHTML = '<div class="rep-empty">Sin movimientos en el rango seleccionado.</div>';
@@ -479,16 +566,16 @@ function renderLine(containerId, serie) {
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
 
-  const max  = Math.max(...rows.map(r => r.total), ...(prev || []).map(r => r.total));
+  const max  = Math.max(...vCur, ...(vPrev || []).slice(0, n));
   const top  = niceMax(max);
   const x = i => pad.l + (n === 1 ? iw / 2 : (i / (n - 1)) * iw);
   const y = v => pad.t + ih - (top ? (v / top) * ih : 0);
   const path = ps => ps.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
 
-  const pts  = rows.map((r, i) => [x(i), y(r.total)]);
+  const pts  = vCur.map((v, i) => [x(i), y(v)]);
   const line = path(pts);
   const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${(pad.t + ih).toFixed(1)} L${pts[0][0].toFixed(1)},${(pad.t + ih).toFixed(1)} Z`;
-  const prevLine = prev && prev.length > 1 ? path(prev.slice(0, n).map((r, i) => [x(i), y(r.total)])) : '';
+  const prevLine = vPrev && vPrev.length > 1 ? path(vPrev.slice(0, n).map((v, i) => [x(i), y(v)])) : '';
 
   // Ejes: hairlines sólidos, un tono por encima de la superficie.
   const ticks = [0, .25, .5, .75, 1].map(f => top * f);
@@ -528,14 +615,14 @@ function renderLine(containerId, serie) {
       ${prevLine ? `<path class="rep-line-prev" d="${prevLine}"/>` : ''}
       <path class="rep-area" d="${area}" fill="url(#repAreaGrad)"/>
       <path class="rep-line" d="${line}"/>
-      ${pts.map((p, i) => `<circle class="rep-dot ${i === last ? 'rep-dot-last' : ''}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === last ? 4.5 : 3}" data-i="${i}"/>`).join('')}
+      ${pts.map((p, i) => (acum && i !== last) ? '' : `<circle class="rep-dot ${i === last ? 'rep-dot-last' : ''}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === last ? 4.5 : 3}" data-i="${i}"/>`).join('')}
       <circle class="rep-dot-prev hidden" id="rep-dot-prev" r="3.5"/>
       <line class="rep-cross hidden" id="rep-cross" y1="${pad.t}" y2="${pad.t + ih}"/>
       <rect id="rep-hit" x="${pad.l}" y="${pad.t}" width="${iw}" height="${ih}" fill="transparent"/>
     </svg>
     <div class="rep-tip hidden" id="rep-tip"></div>`;
 
-  wireLineHover(el, { rows, prev, n, ejeK, unit, prevTxt }, x, y);
+  wireLineHover(el, { rows, prev, n, ejeK, unit, prevTxt, acum, vCur, vPrev }, x, y);
 }
 
 // Techo "redondo" para el eje (1 / 2 / 5 × potencia de 10).
@@ -548,7 +635,7 @@ function niceMax(v) {
 }
 
 function wireLineHover(el, d, x, y) {
-  const { rows, prev, n, ejeK, unit, prevTxt } = d;
+  const { rows, prev, n, ejeK, unit, prevTxt, acum, vCur, vPrev } = d;
   const svg   = el.querySelector('.rep-line-svg');
   const hit   = el.querySelector('#rep-hit');
   const cross = el.querySelector('#rep-cross');
@@ -572,14 +659,17 @@ function wireLineHover(el, d, x, y) {
     cross.classList.remove('hidden');
     svg.querySelectorAll('.rep-dot').forEach(dt =>
       dt.classList.toggle('rep-dot-on', Number(dt.dataset.i) === i));
-    if (p) { dotP.setAttribute('cx', x(i)); dotP.setAttribute('cy', y(p.total)); dotP.classList.remove('hidden'); }
+    if (p) { dotP.setAttribute('cx', x(i)); dotP.setAttribute('cy', y(vPrev[i])); dotP.classList.remove('hidden'); }
     else dotP.classList.add('hidden');
 
+    // Acumulado: lo que se lleva gastado hasta ese día, y aparte lo de ese día.
     const k = r ? r.key : ejeK[i];
     tip.innerHTML = `<strong>${esc(k ? bucketLabel(k, unit) : '')}</strong>
-      ${r ? `<span>${esc(fmtFull(r.total, state.moneda))}</span><span class="rep-tip-sub">${r.count} OC</span>`
+      ${r ? (acum
+              ? `<span>Llevaba ${esc(fmtFull(vCur[i], state.moneda))}</span><span class="rep-tip-sub">${unit === 'mes' ? 'Ese mes' : 'Ese día'}: ${esc(fmtFull(r.total, state.moneda))} · ${r.count} OC</span>`
+              : `<span>${esc(fmtFull(r.total, state.moneda))}</span><span class="rep-tip-sub">${r.count} OC</span>`)
            : '<span class="rep-tip-sub">Todavía no llegó</span>'}
-      ${p ? `<span class="rep-tip-prev">${esc(prevTxt)} · ${esc(bucketShort(p.key, unit))}: ${esc(fmtFull(p.total, state.moneda))}</span>` : ''}`;
+      ${p ? `<span class="rep-tip-prev">${esc(prevTxt)} · ${esc(bucketShort(p.key, unit))}: ${esc(fmtFull(vPrev[i], state.moneda))}</span>` : ''}`;
     tip.classList.remove('hidden');
 
     // Posición relativa al contenedor, sin desbordarlo.
@@ -590,7 +680,7 @@ function wireLineHover(el, d, x, y) {
     const tw = tip.offsetWidth;
     left = Math.min(Math.max(left - tw / 2, 4), box.width - tw - 4);
     tip.style.left = left + 'px';
-    const alto = Math.max(r ? r.total : 0, p ? p.total : 0);
+    const alto = Math.max(r ? vCur[i] : 0, p ? vPrev[i] : 0);
     tip.style.top  = Math.max(off + y(alto) * scale - tip.offsetHeight - 12, 4) + 'px';
   };
 
@@ -616,7 +706,11 @@ function wireLineHover(el, d, x, y) {
 // filtra sus filas con el buscador del encabezado. Lo que se pliega queda
 // guardado por navegador: el panel arranca como lo dejaste.
 
-const CARDS_LS = 'vimeco_rep_cards';
+// Clave nueva con el rediseño (las secciones cambiaron). Sin nada guardado, en
+// el teléfono arrancan plegadas las secciones de abajo: se ve el total, el
+// gráfico y las obras sin tener que bajar.
+const CARDS_LS = 'vimeco_rep_cards2';
+const PLEGADAS_TEL = ['rep-proveedores', 'rep-equipos', 'rep-responsables', 'rep-res-card'];
 
 const cardQ = {};    // texto buscado por card
 const _bars = {};    // últimas filas dibujadas por card, para refiltrar sin re-render global
@@ -628,7 +722,11 @@ function normBuscar(s) {
 }
 
 function cardsPlegadas() {
-  try { return new Set(JSON.parse(localStorage.getItem(CARDS_LS) || '[]')); }
+  try {
+    const g = localStorage.getItem(CARDS_LS);
+    if (g == null) return new Set(matchMedia('(max-width: 640px)').matches ? PLEGADAS_TEL : []);
+    return new Set(JSON.parse(g));
+  }
   catch (_) { return new Set(); }
 }
 
@@ -652,6 +750,7 @@ function setupCards() {
   document.querySelectorAll('.rep-card[data-card]').forEach(card => {
     const id   = card.dataset.card;
     const head = card.querySelector('.card-header');
+    if (!head) return;
     if (plegadas.has(id)) {
       card.classList.add('collapsed');
       if (head) head.setAttribute('aria-expanded', 'false');
@@ -802,7 +901,17 @@ function renderBars(containerId, rows, opts = {}) {
   }
 }
 
-// ---- Encabezado: hero (período + total) ----
+// ---- Encabezado: pastillas de período y moneda, total y comparación ----
+const PER_TXT = { semana: 'Semana', quincena: 'Quincena', mes: 'Mes', anio: 'Año' };
+function chipVar(v, txt) {
+  if (v == null || !isFinite(v)) return '';
+  const cls = Math.abs(v) < 0.5 ? 'eq' : v > 0 ? 'up' : 'dn';
+  const ico = cls === 'eq' ? '' : `<svg class="icon" viewBox="0 0 24 24">${cls === 'up'
+    ? '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'
+    : '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>'}</svg>`;
+  return `<span class="rp-var rp-var--${cls}" title="Gastar más se marca en ámbar; gastar menos, en verde">${ico}${esc(txt)}</span>`;
+}
+
 function renderHero(list) {
   let total = 0, count = 0;
   list.forEach(oc => {
@@ -817,7 +926,14 @@ function renderHero(list) {
   const r = rangoActual();
   const lbl = labelRango(r);
   $('hero-rango').textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
-  $('rep-per-nav').classList.toggle('rh-nav-off', !state.periodo);
+  $('rep-per-nav').classList.toggle('rp-nav-off', !state.periodo);
+  $('per-next').disabled = !state.periodo || state.pOffset <= 0;
+
+  // Pastillas del teléfono: abren la hoja con período, fechas, moneda y dólar.
+  const cal = '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+  const chev = '<svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>';
+  $('rp-per-btn').innerHTML = `${cal}${PER_TXT[state.periodo] || (r.desde ? 'Fechas' : 'Todo')}${chev}`;
+  $('rp-mon-btn').innerHTML = `${state.moneda === 'USD' ? 'US$' : '$'} · ${state.rate}${chev}`;
 
   const chips = [
     state.filtroObra   && { tipo: 'obra',   txt: 'Obra',   f: state.filtroObra },
@@ -827,23 +943,53 @@ function renderHero(list) {
   fEl.classList.toggle('hidden', !chips.length);
   fEl.innerHTML = chips.map(c => `
     <button class="rh-filtro" data-quitar="${c.tipo}" title="Quitar el filtro">
-      <span class="rh-filtro-k">${c.txt}</span>${esc(c.f.label)}
+      <span class="rh-filtro-k">${c.txt}</span><span class="rh-filtro-n">${esc(c.f.label)}</span>
       <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>`).join('');
-  $('per-next').disabled = !state.periodo || state.pOffset <= 0;
 
-  // Contexto: cantidad de OC, el tramo real de los datos cuando se mira todo
-  // el historial, y la cotización aplicada.
+  // "Gastado en octubre · al jueves 9": con el período en curso se aclara hasta
+  // qué día va, porque la comparación es contra el mismo tramo.
+  const hoy = hoy0();
+  const enCurso = r.desde && r.hasta && new Date(r.desde + 'T00:00:00') <= hoy && hoy <= new Date(r.hasta + 'T00:00:00');
+  const kTxt = !r.desde && !r.hasta ? 'Gastado en todo el historial'
+    : r.tipo === 'mes' ? `Gastado en ${MESES_LG[Number(r.desde.slice(5, 7)) - 1]}`
+    : r.tipo === 'anio' ? `Gastado en ${r.desde.slice(0, 4)}`
+    : r.tipo === 'semana' ? 'Gastado en la semana'
+    : r.tipo === 'quincena' ? 'Gastado en la quincena'
+    : 'Gastado en el rango';
+  $('rp-total-k').textContent = enCurso && r.tipo !== 'semana'
+    ? `${kTxt} · al ${DIAS_SEM[hoy.getDay()]} ${hoy.getDate()}` : kTxt;
+
   let per = '';
   const ts = list.map(o => o.timestamp || 0).filter(Boolean);
   if (!r.desde && !r.hasta && ts.length) {
     const a = monthLabel(monthKey(Math.min(...ts))), b = monthLabel(monthKey(Math.max(...ts)));
     per = ` · ${a === b ? a : `${a} – ${b}`}`;
   }
-  const cot = state.moneda === 'USD' ? ` · dólar ${state.rate}` : '';
-  $('hero-sub').textContent = `${count} OC${per}${cot}`;
+  $('hero-sub').textContent = `${count} OC${per}`;
+
+  // Comparación justa (mismo tramo del período anterior).
+  const pr = rangoComparable(r);
+  if (pr) {
+    const prev = sumaDe(ocsDeRango(pr)).total;
+    const v = variacion(total, prev);
+    const unidad = { semana: 'semana', quincena: 'quincena', mes: 'mes', anio: 'año' }[state.periodo] || 'período';
+    $('rp-var').innerHTML = chipVar(v, fmtVar(v, unidad, pr.parcial ? labelTramo(pr) : ''));
+  } else $('rp-var').innerHTML = '';
 
   return total;
+}
+
+// Datos chicos al pie del total: factura, sin factura vencida, remitos.
+function renderMini(d) {
+  const ic = (cls, path) => `<span class="rp-ic ${cls}"><svg class="icon" viewBox="0 0 24 24">${path}</svg></span>`;
+  const FILE = '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>';
+  const CLOCK = '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>';
+  const TRUCK = '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>';
+  $('rp-mini').innerHTML = !d.list.length ? '' : `
+    <span class="rp-mini-i">${ic('rp-ic--vio', FILE)}<span><b>${d.fact.con}</b> de ${d.list.length} con factura</span></span>
+    <span class="rp-mini-i${d.fact.venc ? ' rp-mini--alert' : ''}">${ic(d.fact.venc ? 'rp-ic--red' : 'rp-ic--gray', CLOCK)}<span><b>${d.fact.venc}</b> sin factura hace +${DIAS_FACTURA} días</span></span>
+    <span class="rp-mini-i">${ic('rp-ic--tea', TRUCK)}<span><b>${d.rem.con}</b> con remito</span></span>`;
 }
 
 // ===================================================
@@ -900,6 +1046,11 @@ function rangoPeriodo(tipo, off) {
     return { tipo, desde: isoDe(ini), hasta: isoDe(fin) };
   }
 
+  if (tipo === 'anio') {
+    const y = hoy.getFullYear() - off;
+    return { tipo, desde: `${y}-01-01`, hasta: `${y}-12-31` };
+  }
+
   const ini = new Date(hoy.getFullYear(), hoy.getMonth() - off, 1);
   const fin = new Date(hoy.getFullYear(), hoy.getMonth() - off + 1, 0);
   return { tipo: 'mes', desde: isoDe(ini), hasta: isoDe(fin) };
@@ -909,6 +1060,7 @@ function labelRango(r) {
   if (!r || !r.desde || !r.hasta) return 'Todo el historial';
   const [y1, m1, d1] = r.desde.split('-').map(Number);
   const [y2, m2, d2] = r.hasta.split('-').map(Number);
+  if (r.tipo === 'anio')     return `Año ${y1}`;
   if (r.tipo === 'mes')      return `${MESES_LG[m1 - 1]} de ${y1}`;
   if (r.tipo === 'quincena') return `${d1 === 1 ? '1ª' : '2ª'} quincena de ${MESES_LG[m1 - 1]} de ${y1}`;
   if (r.tipo === 'semana')   return `Semana del ${d1}/${m1} al ${d2}/${m2} de ${y2}`;
@@ -933,6 +1085,33 @@ function rangoAnterior(r) {
   const pFin = new Date(ini); pFin.setDate(ini.getDate() - 1);
   const pIni = new Date(pFin); pIni.setDate(pFin.getDate() - dias + 1);
   return { tipo: null, desde: isoDe(pIni), hasta: isoDe(pFin) };
+}
+
+// Contra qué se compara el total. Si el período está en curso, contra el mismo
+// tramo del anterior: del 1 al 9 de octubre contra del 1 al 9 de septiembre, y
+// no contra septiembre entero (eso daba "−82%" cualquier día 9).
+function hoy0() { const h = new Date(); h.setHours(0, 0, 0, 0); return h; }
+function rangoComparable(r) {
+  const p = rangoAnterior(r);
+  if (!p || !r.desde || !r.hasta) return p;
+  const hoy = hoy0();
+  const ini = new Date(r.desde + 'T00:00:00');
+  const fin = new Date(r.hasta + 'T00:00:00');
+  if (fin < hoy || hoy < ini) return p;                    // período cerrado (o futuro): entero
+  const dias = Math.round((hoy - ini) / 86400000);         // días ya corridos, sin contar hoy
+  const pIni = new Date(p.desde + 'T00:00:00');
+  const pFinTope = new Date(p.hasta + 'T00:00:00');
+  const pFin = new Date(pIni); pFin.setDate(pIni.getDate() + dias);
+  return { tipo: p.tipo, desde: p.desde, hasta: isoDe(pFin > pFinTope ? pFinTope : pFin), parcial: true };
+}
+// "1–9 de septiembre", "29/9 – 2/10": el tramo comparado, para el texto.
+function labelTramo(p) {
+  if (!p || !p.desde || !p.hasta) return '';
+  const [y1, m1, d1] = p.desde.split('-').map(Number);
+  const [y2, m2, d2] = p.hasta.split('-').map(Number);
+  if (p.tipo === 'anio') return `1/1 – ${d2}/${m2} de ${y2}`;
+  if (y1 === y2 && m1 === m2) return d1 === d2 ? `${d1} de ${MESES_LG[m1 - 1]}` : `${d1}–${d2} de ${MESES_LG[m1 - 1]}`;
+  return `${d1}/${m1} – ${d2}/${m2}`;
 }
 
 // Una OC anulada por duplicada tampoco cuenta: la reemplazó otra (js/duplicados.js).
@@ -968,17 +1147,20 @@ function variacion(actual, previo) {
   if (!previo)        return actual ? Infinity : 0;
   return ((actual - previo) / previo) * 100;
 }
-function fmtVar(v, unidad) {
-  if (v == null)   return `sin ${unidad} anterior para comparar`;
-  if (!isFinite(v)) return `la ${unidad} anterior no tuvo compras`;
+// `tramo`: con el período en curso, el tramo comparado ("1–9 de septiembre").
+const ART_UNIDAD = { semana: 'la', quincena: 'la', mes: 'el', 'año': 'el', 'período': 'el' };
+function fmtVar(v, unidad, tramo) {
+  const contra = tramo || `${unidad} anterior`;
+  if (v == null)    return `sin ${unidad} anterior para comparar`;
+  if (!isFinite(v)) return tramo ? `sin compras del ${tramo}` : `${ART_UNIDAD[unidad] || 'el'} ${unidad} anterior no tuvo compras`;
   const s = v >= 0 ? '+' : '−';
-  return `${s}${Math.abs(v).toLocaleString('es-AR', { maximumFractionDigits: 1 })}% vs. ${unidad} anterior`;
+  return `${s}${Math.abs(v).toLocaleString('es-AR', { maximumFractionDigits: 1 })}% vs. ${contra}`;
 }
 
 // Todo lo que necesitan la card y el PDF, calculado una sola vez.
 function resumenData() {
   const r     = rangoActual();
-  const prevR = rangoAnterior(r);
+  const prevR = rangoComparable(r);
   const list  = ocsDeRango(r);
 
   const { total, noConv } = sumaDe(list);
@@ -1020,9 +1202,11 @@ function resumenData() {
 
   const unidad = state.periodo === 'semana' ? 'semana'
                : state.periodo === 'quincena' ? 'quincena'
-               : state.periodo === 'mes' ? 'mes' : 'período';
+               : state.periodo === 'mes' ? 'mes'
+               : state.periodo === 'anio' ? 'año' : 'período';
+  const tramo = prevR?.parcial ? labelTramo(prevR) : '';
 
-  return { r, prevR, unidad, list, filas, total, noConv, prevSuma,
+  return { r, prevR, unidad, tramo, list, filas, total, noConv, prevSuma,
            prevCount: prevR ? prev.length : null, fact, rem, topObras, topProv };
 }
 
@@ -1134,51 +1318,31 @@ function filasVisibles(d) {
   return { terms, filas: terms.length ? d.filas.filter(({ oc }) => coincideOC(oc, terms)) : d.filas };
 }
 
-function renderResumen() {
-  const d = resumenData();
+function renderResumen(d = resumenData()) {
 
   $('res-rango').textContent = labelRango(d.r);
   syncDirBtn();
 
-  const vT = variacion(d.total, d.prevSuma);
-  const vC = variacion(d.list.length, d.prevCount);
+  $('res-titulo').textContent = state.resQ.trim() ? 'OC encontradas' : `Las ${d.list.length} OC del período`;
 
+  // El total y la comparación están arriba, en el tablero: acá va lo que
+  // describe el listado (y lo que se resume en el PDF).
   $('res-stats').innerHTML = `
-    <div class="rr-stat rr-stat--hero">
-      <span class="rr-k">Total del período</span>
-      <span class="rr-v">${fmtFull(d.total, state.moneda)}</span>
-      <span class="rr-d">${esc(fmtVar(vT, d.unidad))}</span>
-    </div>
-    <div class="rr-stat">
-      <span class="rr-k">OC emitidas</span>
-      <span class="rr-v">${d.list.length}</span>
-      <span class="rr-d">${esc(fmtVar(vC, d.unidad))}</span>
-    </div>
     <div class="rr-stat rr-stat--ok">
       <span class="rr-k">Con factura</span>
-      <span class="rr-v">${d.fact.con}</span>
+      <span class="rr-v">${d.fact.con} <small>de ${d.list.length}</small></span>
       <span class="rr-d">${fmtCompact(d.fact.mCon, state.moneda)}</span>
+    </div>
+    <div class="rr-stat ${d.fact.venc ? 'rr-stat--no' : ''}">
+      <span class="rr-k">Sin factura +${DIAS_FACTURA} días</span>
+      <span class="rr-v">${d.fact.venc}</span>
+      <span class="rr-d">${d.fact.venc ? fmtCompact(d.fact.mVenc, state.moneda) + ' a reclamar' : 'nada para reclamar'}</span>
     </div>
     <div class="rr-stat rr-stat--rem">
       <span class="rr-k">Con remito</span>
       <span class="rr-v">${d.rem.con}</span>
       <span class="rr-d">${remDetalle(d.rem)}</span>
     </div>`;
-
-  const mini = (titulo, rows) => `
-    <div class="rr-mini">
-      <div class="rr-mini-t">${titulo}</div>
-      ${rows.length ? rows.map(row => `
-        <div class="rr-mini-r">
-          <span class="rr-mini-l">${esc(row.label)}</span>
-          <span class="rr-mini-v">${fmtCompact(row.total, state.moneda)}</span>
-          <span class="rr-mini-p">${d.total ? Math.round((row.total / d.total) * 100) : 0}%</span>
-        </div>`).join('')
-      : '<div class="rep-empty">Sin datos en el período.</div>'}
-    </div>`;
-
-  $('res-tops').innerHTML = mini('Obras del período', d.topObras)
-                          + mini('Proveedores del período', d.topProv);
 
   const th = (campo, txt, cls = '') => {
     const on = state.resOrden === campo;
@@ -1259,9 +1423,9 @@ function descargarResumenPDF() {
       notas,
       kpis: [
         { lbl: 'Total del período', val: fmtCompact(d.total, state.moneda),
-          sub: fmtVar(variacion(d.total, d.prevSuma), d.unidad) },
+          sub: fmtVar(variacion(d.total, d.prevSuma), d.unidad, d.tramo) },
         { lbl: 'OC emitidas', val: String(d.list.length),
-          sub: fmtVar(variacion(d.list.length, d.prevCount), d.unidad) },
+          sub: fmtVar(variacion(d.list.length, d.prevCount), d.unidad, d.tramo) },
         { lbl: 'Con factura', val: String(d.fact.con),
           sub: fmtCompact(d.fact.mCon, state.moneda), color: [30, 125, 58] },
         { lbl: 'Con remito', val: String(d.rem.con), sub: remDetalle(d.rem), color: [22, 105, 95] }
@@ -1352,12 +1516,9 @@ function render() {
   const obras = groupAgg(list, oc => oc.obra || '—', oc => oc.obra || 'Sin obra');
 
   renderShare('rep-share', obras, total);
+  renderObras(obras, total);
 
   renderLine('rep-linea', timeSeries(list));
-
-  renderBars('rep-obras', obras,
-    { grandTotal: grand, drill: true, filtro: 'obra', hueFor: r => obraHue.get(r.key) || HUES.gris,
-      emptyMsg: 'No hay OC con obra en el rango.' });
 
   // El equipo es opcional: las OC sin equipo no son un equipo llamado "Sin
   // equipo", simplemente no pertenecen a esta vista. Los % siguen midiéndose
@@ -1366,20 +1527,15 @@ function render() {
   renderBars('rep-equipos', groupAgg(conEquipo,
       oc => oc.equipo.codigo,
       oc => equipoLabel(oc.equipo)),
-    { grandTotal: grand, drill: true, catChip: true, catSplit: true, filtro: 'equipo', hue: HUES.turquesa,
+    { grandTotal: grand, limit: 8, drill: true, catChip: true, catSplit: true, filtro: 'equipo', hue: HUES.turquesa,
       emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
 
   // Repuestos vs Mantenimiento: sólo las OC con equipo llevan categoría. Las
   // que aún no la tienen (previas a esta función) caen en "Sin categoría".
-  renderBars('rep-categorias', groupAgg(conEquipo,
-      oc => oc.equipo.categoria || 'Sin categoría',
-      oc => oc.equipo.categoria || 'Sin categoría'),
-    { grandTotal: grand, drill: true, catChip: true,
-      hueFor: r => r.key === 'Repuestos' ? HUES.azul : r.key === 'Mantenimiento' ? HUES.lavanda : HUES.gris,
-      emptyMsg: 'Ninguna OC del rango tiene equipo asignado.' });
+  renderCategorias(conEquipo);
 
   renderBars('rep-proveedores', groupAgg(list, provKey, provLabel),
-    { grandTotal: grand, limit: 10, drill: true, hue: HUES.azul,
+    { grandTotal: grand, limit: 8, drill: true, hue: HUES.azul,
       drillTitulo: oc => oc.obra || 'Sin obra', emptyMsg: 'Sin proveedores en el rango.' });
 
   renderBars('rep-responsables', groupAgg(list,
@@ -1389,7 +1545,113 @@ function render() {
 
   // Al final: resumenData() rearma el índice de proveedores para su propia
   // lista y lo deja como lo espera el resto del panel.
-  renderResumen();
+  renderBuscado();
+}
+
+// ===================================================
+//  Buscador
+// ===================================================
+// Lo más usado de Reportes: buscar un artículo y ver a cuánto se compró. Con
+// algo escrito, el tablero se corre y queda el resultado: cuánto suman las OC
+// encontradas, el precio por unidad de cada renglón (marcando el más barato)
+// y en qué obras, y abajo la tabla con esas OC.
+const PRECIOS_MAX = 8;
+let preciosTodos = false;
+
+function renderBuscado() {
+  const d = resumenData();
+  renderMini(d);
+  renderResumen(d);
+
+  const terms = terminosBusqueda(state.resQ);
+  document.body.classList.toggle('rp-buscando', terms.length > 0);
+  const box = $('rp-busca');
+  box.classList.toggle('hidden', !terms.length);
+  if (!terms.length) { box.innerHTML = ''; return; }
+
+  // Con la búsqueda abierta, la tabla de OC no puede quedar plegada.
+  const card = $('rep-res-card');
+  if (card.classList.contains('collapsed')) toggleCard(card);
+
+  const { filas } = filasVisibles(d);
+  const total = filas.reduce((s, f) => s + (f.amt || 0), 0);
+  const q = state.resQ.trim();
+  const hayRango = !!(d.r.desde || d.r.hasta);
+
+  // Renglones que coinciden, con su precio unitario. El importe de cada
+  // renglón se convierte a la moneda del reporte con la misma proporción que
+  // el total de su OC.
+  const items = [];
+  filas.forEach(({ oc, amt }) => {
+    const fac = Number(oc.total) ? (amt || 0) / Number(oc.total) : 0;
+    itemsCoincidentes(oc, terms).forEach(it => items.push({ oc, it, monto: (Number(it.total) || 0) * fac }));
+  });
+  items.sort((a, b) => (b.oc.timestamp || 0) - (a.oc.timestamp || 0));
+  const totItems = items.reduce((s, x) => s + x.monto, 0);
+
+  // "Más barato": sólo entre renglones del mismo artículo (misma descripción),
+  // misma unidad y misma moneda. Comparar FILTRO P4836 con FILTRO KX23, o $/m3
+  // con $/u, no dice nada.
+  const claveA = x => `${normBuscar(x.it.desc)}|${(x.it.unidad || '').toLowerCase()}|${x.oc.moneda === 'USD' ? 'USD' : 'ARS'}`;
+  const grupos = new Map();
+  items.filter(x => parseFloat(x.it.unitario) > 0).forEach(x => {
+    const k = claveA(x); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(x);
+  });
+  const masBaratos = new Set();
+  grupos.forEach(g => {
+    if (g.length < 2) return;
+    const min = Math.min(...g.map(x => parseFloat(x.it.unitario)));
+    if (g.some(x => parseFloat(x.it.unitario) !== min)) g.filter(x => parseFloat(x.it.unitario) === min).forEach(x => masBaratos.add(x));
+  });
+
+  const visibles = preciosTodos ? items : items.slice(0, PRECIOS_MAX);
+  const precios = items.length ? `
+    <div class="card rep-card rb-card">
+      <div class="rb-h"><span class="rp-ic rp-ic--blue">${icSvg('tag')}</span><b>Precios de «${esc(q)}»</b><span class="rep-ch-n">${items.length} renglón${items.length !== 1 ? 'es' : ''}</span></div>
+      ${visibles.map(x => {
+        const fecha = new Date(x.oc.timestamp || 0);
+        return `
+        <div class="rb-p" data-k="${esc(histKeyOf(x.oc))}" title="Ver la OC ${esc(x.oc.nroOC)}">
+          <span class="rb-d"><b>${String(fecha.getDate()).padStart(2, '0')}</b>${MESES_LG[fecha.getMonth()].slice(0, 3)} ${String(fecha.getFullYear()).slice(2)}</span>
+          <span class="rb-i"><span class="rb-desc">${resaltarTxt(x.it.desc || '', terms, esc)}</span>
+            <span class="rb-prov">${esc(x.oc.proveedor?.nombre || '—')} · ${esc(x.oc.obra || 'Sin obra')}</span></span>
+          <span class="rb-u"><b>${esc(_precioItem({ unitario: x.it.unitario }, x.oc.moneda) || '—')}</b><span>${x.it.unidad ? esc(x.it.unidad) : 'unitario'}${masBaratos.has(x) ? '<span class="rb-min">más barato</span>' : ''}</span></span>
+        </div>`;
+      }).join('')}
+      ${items.length > PRECIOS_MAX ? `<button type="button" class="rb-more" data-precios>${preciosTodos ? 'Mostrar menos' : `Ver los ${items.length}`}</button>` : ''}
+      <div class="rb-nota">Precios sin IVA, en la moneda de cada OC. Para comparar entre proveedores con más detalle: Proveedores › Artículos.</div>
+    </div>` : '';
+
+  // En qué obras se gastó lo encontrado (por renglón si se buscó un artículo).
+  const porObra = new Map();
+  (items.length ? items.map(x => ({ oc: x.oc, m: x.monto })) : filas.map(f => ({ oc: f.oc, m: f.amt || 0 })))
+    .forEach(({ oc, m }) => { const k = oc.obra || 'Sin obra'; porObra.set(k, (porObra.get(k) || 0) + m); });
+  const obrasB = [...porObra.entries()].sort((a, b) => b[1] - a[1]);
+  const base = items.length ? totItems : total;
+  const obrasHtml = obrasB.length ? `
+    <div class="card rep-card rb-card">
+      <div class="rb-h"><span class="rp-ic rp-ic--sky">${icSvg('building')}</span><b>Por obra</b><span class="rep-ch-n">${obrasB.length}</span></div>
+      ${obrasB.slice(0, 8).map(([k, m]) => `<div class="rb-ob"><span>${esc(k)}</span><b>${esc(fmtCompact(m, state.moneda))}</b><small>${base ? Math.round(m / base * 100) : 0}%</small></div>`).join('')}
+    </div>` : '';
+
+  box.innerHTML = `
+    <div class="card rep-card rb-sum">
+      <span class="rp-k">${items.length ? `«${esc(q)}» en ${esc(labelRango(d.r).toLowerCase())}` : `OC con «${esc(q)}» · ${esc(labelRango(d.r).toLowerCase())}`}</span>
+      <span class="rb-tot">${esc(fmtFull(items.length ? totItems : total, state.moneda))}</span>
+      <span class="rb-meta">${items.length ? `en ${items.length} renglón${items.length !== 1 ? 'es' : ''} de ` : ''}${filas.length} OC</span>
+      ${hayRango ? `<button type="button" class="rp-pill rp-pill--sky rb-todo" data-todo>${icSvg('search')}Buscar en todo el historial</button>` : ''}
+    </div>
+    ${filas.length ? `<div class="rb-cols">${precios || ''}${obrasHtml}</div>` : ''}`;
+
+  if (!box._wired) {
+    box._wired = true;
+    box.addEventListener('click', e => {
+      if (e.target.closest('[data-todo]')) { setPeriodo('todo'); return; }
+      if (e.target.closest('[data-precios]')) { preciosTodos = !preciosTodos; renderBuscado(); return; }
+      const p = e.target.closest('[data-k]');
+      if (p) openOCDetail(p.dataset.k);
+    });
+  }
 }
 
 // ===================================================
@@ -1818,6 +2080,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setupSegmented('seg-moneda', 'moneda');
   setupSegmented('seg-rate',   'rate');
+
+  // Teléfono: las pastillas de período y moneda abren la columna como hoja.
+  const hoja = abrir => {
+    $('rp-rail').classList.toggle('open', abrir);
+    $('rp-shade').classList.toggle('open', abrir);
+  };
+  $('rp-per-btn').addEventListener('click', () => hoja(true));
+  $('rp-mon-btn').addEventListener('click', () => hoja(true));
+  $('rp-listo').addEventListener('click', () => hoja(false));
+  $('rp-shade').addEventListener('click', () => hoja(false));
+
+  // Orden de las tarjetas de obra.
+  $('rp-obras-orden').addEventListener('click', e => {
+    const b = e.target.closest('[data-o]');
+    if (!b) return;
+    obrasOrden = b.dataset.o;
+    [...$('rp-obras-orden').children].forEach(x => x.classList.toggle('active', x === b));
+    render();
+  });
   // Tocar las fechas a mano apaga el preset de período: el resumen pasa a
   // describir el rango que puso el usuario.
   const soltarPreset = () => { state.periodo = null; state.pOffset = 0; syncPeriodoUI(); };
@@ -1845,7 +2126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-res-pdf').addEventListener('click', descargarResumenPDF);
   $('res-orden').addEventListener('change', e => setOrdenResumen(e.target.value, false));
   $('res-dir').addEventListener('click', () => { state.resDir = -state.resDir; renderResumen(); });
-  $('res-q').addEventListener('input', e => { state.resQ = e.target.value; renderResumen(); });
+  $('res-q').addEventListener('input', e => { state.resQ = e.target.value; preciosTodos = false; renderBuscado(); });
 
   // Plegado y buscador de las cards (restaura lo que quedó plegado la vez pasada).
   setupCards();
