@@ -2891,7 +2891,7 @@ async function handleGenerate() {
         .then(({ obrasFolderId, proveedoresFolderId }) => {
           if (saved && (obrasFolderId || proveedoresFolderId))
             saveDriveIds(histKey, obrasFolderId, proveedoresFolderId, numero);
-          logOCActivity(numero, driveProv, driveObra, ocData._total, obrasFolderId || proveedoresFolderId);
+          logOCActivity(numero, driveProv, driveObra, ocData._total, obrasFolderId || proveedoresFolderId, { moneda: ocData.moneda });
         })
         .catch(async () => {
           // Encolar ante CUALQUIER fallo, no sólo sin conexión: los errores de

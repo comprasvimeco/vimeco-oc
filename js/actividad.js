@@ -191,6 +191,22 @@ function docsHtml(e, oc) {
     </div>${docsListasHtml(facts, rems)}`;
 }
 
+// Hasta v288 la novedad de una OC en dólares se guardaba con "$": la moneda
+// sale de la OC.
+function detalleDe(e, oc) {
+  if (e.tipo !== 'oc' || oc?.moneda !== 'USD') return e.detalle;
+  return String(e.detalle || '').replace(/· \$ /, () => '· US$ ');
+}
+
+// Quién: en la de una OC, quién la emitió y, si pasó por autorización, quién
+// la firmó. El resto, quien registró la novedad.
+function quienDe(e, oc) {
+  if (e.tipo !== 'oc' || !oc) return e.usuario?.nombre || '—';
+  const emisor  = oc.responsable?.nombre || e.usuario?.nombre || '—';
+  const firmo   = oc.estado === 'autorizada' && oc.autorizacion?.firmante;
+  return `Emitida por ${emisor}` + (firmo ? ` · Autorizada por ${firmo}` : '');
+}
+
 // El texto se busca sobre título y detalle, que es donde viven proveedor, obra
 // y monto, más el nroOC de los eventos que lo guardan aparte y —si el evento es
 // de una OC (la OC, su factura o su remito)— la descripción de sus ítems. Cada
@@ -375,11 +391,11 @@ function render() {
           <span class="act-badge ${meta.cls}">${icSvg(meta.icon)} ${meta.label}</span>
           <div class="act-body">
             <div class="act-title">${esc(e.titulo)}</div>
-            <div class="act-detalle">${esc(e.detalle)}</div>
+            <div class="act-detalle">${esc(detalleDe(e, ocEv))}</div>
             ${dupTag ? `<div style="margin-top:.3rem;">${dupTag}</div>` : ''}
             ${docsHtml(e, ocEv)}
             ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc, terms)}
-            <div class="act-meta">${esc(e.usuario?.nombre || '—')} · ${fmtHora(e.timestamp)}</div>
+            <div class="act-meta">${esc(quienDe(e, ocEv))} · ${fmtHora(e.timestamp)}</div>
             <div class="act-actions">${ver}${verOC}${drive}${accion}${borrar}</div>
           </div>
         </div>
@@ -668,6 +684,17 @@ async function cargarPaneles(code) {
     .catch(e => console.warn('getRemitos:', e));
   await reconciliarNovedadesOC(hist);
   await reconciliarLinksOC(hist);
+  await reconciliarFechasOC(hist);
+}
+
+// Autocorrección: la tarjeta de una OC autorizada va a la hora de la firma, no
+// a la de carga; si no, la que se firmó hoy queda enterrada días atrás.
+async function reconciliarFechasOC(hist) {
+  if (typeof fecharNovedadesAutorizadas !== 'function') return;
+  const n = await fecharNovedadesAutorizadas(hist, allEvents);
+  if (!n) return;
+  allEvents.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  render();
 }
 
 // Autocorrección: tarjetas que quedaron "sin link" porque la OC se respaldó
@@ -694,9 +721,14 @@ async function reconciliarNovedadesOC(hist) {
 
   for (const oc of faltantes) {
     try {
+      // La autorizada sale cuando se firmó y a nombre de quien la firmó, como
+      // la que publica autorizaciones.js.
+      const firma = oc.estado === 'autorizada' && oc.autorizacion?.firmante
+        ? { codigo: oc.autorizacion.firmaCodigo || '', nombre: oc.autorizacion.firmante } : null;
       await logOCActivity(oc.nroOC, oc.proveedor?.nombre, oc.obra, oc.total, driveFolderId(oc), {
-        usuario:   oc.responsable,
-        timestamp: oc.timestamp
+        usuario:   firma || oc.responsable,
+        timestamp: tsNovedadOC(oc),
+        moneda:    oc.moneda
       });
     } catch (_) { /* se reintenta sola en la próxima carga */ }
   }

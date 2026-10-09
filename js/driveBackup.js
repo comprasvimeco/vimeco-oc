@@ -236,3 +236,30 @@ async function completarLinksNovedades(hist, eventos) {
   }
   return ok;
 }
+
+// Cuándo "sale" una OC en el feed: la autorizada, al firmarse, no al cargarse.
+// Una OC hecha la semana pasada y autorizada hoy es novedad de hoy.
+function tsNovedadOC(oc) {
+  const firmada = oc.estado === 'autorizada' && oc.autorizacion?.resueltoEn;
+  return firmada ? Math.max(firmada, oc.timestamp || 0) : (oc.timestamp || 0);
+}
+
+// Tarjetas de OC autorizadas que quedaron con la fecha de carga: las que
+// rellenó la reconciliación antes de v289 (cuando el aviso de la firma se
+// perdía, p. ej. al cerrar la página antes de que terminara la subida a
+// Drive). Las corre a la hora de la firma y devuelve cuántas corrigió. Muta
+// los eventos recibidos.
+async function fecharNovedadesAutorizadas(hist, eventos) {
+  if (typeof patchActividad !== 'function') return 0;
+  const porNro = new Map((hist || []).map(oc => [oc.nroOC, oc]));
+  let ok = 0;
+  for (const e of eventos || []) {
+    const oc = e.tipo === 'oc' && porNro.get(e.nroOC);
+    if (!oc || oc.estado !== 'autorizada') continue;
+    const ts = tsNovedadOC(oc);
+    if ((e.timestamp || 0) >= ts) continue;
+    try { await patchActividad(e.key, { timestamp: ts }); e.timestamp = ts; ok++; }
+    catch (_) { /* se reintenta sola en la próxima carga */ }
+  }
+  return ok;
+}

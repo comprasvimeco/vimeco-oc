@@ -585,7 +585,7 @@ async function firmarOC(oc) {
     }
 
     if (typeof logOCActivity === 'function')
-      logOCActivity(oc.nroOC, ocData.proveedor.nombre, oc.obra, oc.total, obrasId || provId);
+      logOCActivity(oc.nroOC, ocData.proveedor.nombre, oc.obra, oc.total, obrasId || provId, { moneda: oc.moneda });
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
   }

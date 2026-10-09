@@ -898,7 +898,7 @@ window._fetchConTope = function (url, opts, ms = 20000) {
         nombre: sessionStorage.getItem('responsable_name') || ''
       },
       titulo:    `OC ${nroOC} — ${proveedor || 'Sin proveedor'}`,
-      detalle:   `${obra || 'Sin obra'} · $ ${monto}`,
+      detalle:   `${obra || 'Sin obra'} · ${opts.moneda === 'USD' ? 'US$' : '$'} ${monto}`,
       driveUrl:  folderId ? `https://drive.google.com/drive/folders/${folderId}` : '',
       timestamp: opts.timestamp || Date.now()
     });
