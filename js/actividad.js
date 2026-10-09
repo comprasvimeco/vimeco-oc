@@ -2,21 +2,18 @@
 
 const $ = id => document.getElementById(id);
 
-// Ventana en la que una novedad todavía cuenta como "sin ver". El feed se puede
-// mirar hacia atrás sin límite, pero lo viejo ya no reclama atención (ni infla
-// el badge del menú).
-const UNSEEN_DAYS = 7;
-
 let allEvents     = [];          // feed completo; el rango se aplica al mostrar
 let currentFilter = 'all';
 let searchQuery   = '';
 let seenKey       = 'vimeco_actividad_vistas';
 let rangeKey      = 'vimeco_actividad_rango';
 let seen          = new Set();   // claves de eventos marcados como vistos
+let vistoHasta    = 0;           // corte: lo anterior cuenta como visto (vistasNovedades)
+let soloSinVer    = false;       // filtro de la pastilla roja
 let isSuper       = false;       // solo Administración (código 0000) puede borrar
 
 // preset: '7' | '30' | '90' | 'all' | 'custom'
-const range = { preset: '30', desde: '', hasta: '' };
+const range = { preset: '7', desde: '', hasta: '' };
 
 function esc(str) {
   return String(str || '')
@@ -58,18 +55,15 @@ function fmtHora(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
-// Un evento sólo puede estar "sin ver" mientras es reciente.
-function esReciente(e) {
-  return (Date.now() - (e.timestamp || 0)) <= UNSEEN_DAYS * 86400000;
-}
+// Una novedad vista queda vista para siempre: no vence con los días.
 function sinVer(e) {
-  return esReciente(e) && !seen.has(e.key);
+  return (e.timestamp || 0) >= vistoHasta && !seen.has(e.key);
 }
 
-// Persiste las vistas. Sólo se guardan las de eventos recientes: pasada la
-// ventana el evento ya no cuenta como sin ver, así que la clave no hace falta.
+// Persiste las vistas. Se descartan sólo las claves de novedades borradas o
+// anteriores al corte, que ya cuentan como vistas sin la clave.
 function persistSeen() {
-  const vigentes = new Set(allEvents.filter(esReciente).map(e => e.key));
+  const vigentes = new Set(allEvents.filter(e => (e.timestamp || 0) >= vistoHasta).map(e => e.key));
   const arr = [...seen].filter(k => vigentes.has(k));
   seen = new Set(arr);
   try { localStorage.setItem(seenKey, JSON.stringify(arr)); } catch (_) {}
@@ -82,17 +76,38 @@ function marcarVista(key) {
   render();
 }
 
+// Las sin ver del período elegido (sin mirar tipo ni búsqueda): lo que cuenta
+// la pastilla roja y el badge del menú.
+function sinVerDelPeriodo() {
+  const { from, to } = rangeBounds();
+  return allEvents.filter(e => {
+    const ts = e.timestamp || 0;
+    return ts >= from && ts <= to && sinVer(e);
+  });
+}
+
+// La pastilla roja también filtra: tocándola quedan sólo las sin ver.
 function updateBanner() {
-  const n = allEvents.filter(sinVer).length;
-  $('act-banner').textContent = `${n} sin ver`;
-  $('act-banner').classList.toggle('hidden', !n);
+  const n = sinVerDelPeriodo().length;
+  const b = $('act-banner');
+  b.innerHTML = `${n} sin ver` + (soloSinVer ? icSvg('x') : '');
+  b.classList.toggle('hidden', !n && !soloSinVer);
+  b.classList.toggle('on', soloSinVer);
+  b.setAttribute('aria-pressed', String(soloSinVer));
+  b.title = soloSinVer ? 'Mostrar todas' : 'Mostrar sólo las sin ver';
   $('act-ver-todas').classList.toggle('hidden', !n);
 }
 
+function toggleSinVer() {
+  soloSinVer = !soloSinVer;
+  pager.reset('act');
+  render();
+}
+
 // "Ver todas": marca como vistas todas las de la pastilla de sin ver, sin
-// importar el tipo o el período elegidos.
+// importar el tipo elegido.
 async function verTodas() {
-  const keys = allEvents.filter(sinVer).map(e => e.key);
+  const keys = sinVerDelPeriodo().map(e => e.key);
   if (!keys.length) return;
   const ok = await showConfirm('Ver todas',
     keys.length === 1 ? 'Se va a marcar como vista la novedad sin ver.'
@@ -106,14 +121,7 @@ async function verTodas() {
 
 // Límites del rango elegido, en timestamps.
 function rangeBounds() {
-  if (range.preset === 'all') return { from: 0, to: Infinity };
-  if (range.preset === 'custom') {
-    return {
-      from: range.desde ? new Date(range.desde + 'T00:00:00').getTime() : 0,
-      to:   range.hasta ? new Date(range.hasta + 'T23:59:59').getTime() : Infinity
-    };
-  }
-  return { from: Date.now() - Number(range.preset) * 86400000, to: Infinity };
+  return limitesRangoNovedades(range);
 }
 
 function rangeLabel() {
@@ -209,6 +217,7 @@ function getVisible(todosLosTipos) {
     const ts = e.timestamp || 0;
     if (ts < from || ts > to) return false;
     if (!todosLosTipos && currentFilter !== 'all' && e.tipo !== currentFilter) return false;
+    if (soloSinVer && !sinVer(e)) return false;
     return coincideTexto(e, terms);
   });
 }
@@ -257,7 +266,7 @@ function pintarTipo() {
 }
 
 function pintarPeriodo() {
-  const sel = PERIODOS.find(p => p.v === range.preset) || PERIODOS[1];
+  const sel = PERIODOS.find(p => p.v === range.preset) || PERIODOS[0];
   $('act-periodo-btn').innerHTML = icSvg('calendar') + etiqueta(sel) + CHEV();
   $('act-periodo-menu').innerHTML = PERIODOS.map(p => `
     <button type="button" class="act-opt" role="option" data-v="${p.v}" aria-selected="${p.v === sel.v}">${esc(p.nombre)}</button>`).join('');
@@ -302,7 +311,9 @@ function render() {
   pintarTipo();
 
   if (!events.length) {
-    list.innerHTML = searchQuery.trim()
+    list.innerHTML = soloSinVer
+      ? `<div class="hist-empty">No hay novedades sin ver ${esc(rangeLabel())}.</div>`
+      : searchQuery.trim()
       ? `<div class="hist-empty">No hay operaciones que coincidan con “${esc(searchQuery.trim())}” ${esc(rangeLabel())}.</div>`
       : `<div class="hist-empty">No hay operaciones ${esc(rangeLabel())}.</div>`;
     return;
@@ -320,16 +331,17 @@ function render() {
       lastDay = dk;
     }
     const meta     = tipoMeta(e.tipo);
-    const reciente = esReciente(e);
     const vista    = !sinVer(e);
     // Las acciones son las pastillas de las fichas (foc-btn), en un renglón al
     // pie de la tarjeta: Borrar queda aparte, a la derecha.
     const drive  = e.driveUrl
       ? `<a class="foc-btn foc-btn--drive act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive">${icSvg('folder')}Drive</a>`
       : '';
-    // Se marcan como vistas al abrir su documento o su carpeta, o todas juntas con
-    // "Ver todas". Fuera de la ventana de novedades la etiqueta ya no aplica.
-    const accion = reciente && vista ? `<span class="act-seen-label">${icSvg('check')} Vista</span>` : '';
+    // Se marcan como vistas con su botón, al abrir su documento o su carpeta, o
+    // todas juntas con "Ver todas".
+    const accion = vista
+      ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
+      : `<button class="foc-btn foc-btn--clear act-mark" data-key="${esc(e.key)}">${icSvg('check')}Marcar como vista</button>`;
     const borrar = isSuper
       ? `<button class="foc-btn foc-btn--del act-del" data-key="${esc(e.key)}" title="Borrar la novedad para todos">${icSvg('trash')}Borrar</button>`
       : '';
@@ -355,7 +367,7 @@ function render() {
       : anulada ? `<span class="dup-tag">${esc(textoDuplicada(ocEv))}</span>`
       : ocEv.reemplazaA?.length ? `<span class="dup-tag dup-tag--nueva">Reemplaza a OC ${esc(ocEv.reemplazaA.join(', '))}</span>`
       : '';
-    const cardCls = (!reciente ? 'act-card-old' : (vista ? 'act-card-seen' : 'act-card-unseen'))
+    const cardCls = (vista ? 'act-card-seen' : 'act-card-unseen')
       + (anulada ? ' act-card-anulada' : '');
     html += `
       <div class="hist-card act-card ${cardCls}" data-key="${esc(e.key)}">
@@ -396,6 +408,8 @@ function render() {
   // Abrir en Drive también marca como vista (sin frenar la apertura del link)
   list.querySelectorAll('.act-drive').forEach(a =>
     a.addEventListener('click', () => marcarVista(a.dataset.key)));
+  list.querySelectorAll('.act-mark').forEach(b =>
+    b.addEventListener('click', () => marcarVista(b.dataset.key)));
   list.querySelectorAll('.act-del').forEach(b =>
     b.addEventListener('click', () => borrarNovedad(b.dataset.key)));
 
@@ -557,7 +571,7 @@ function setRange(preset) {
 function onCustomDate() {
   range.desde  = $('act-desde').value;
   range.hasta  = $('act-hasta').value;
-  range.preset = (range.desde || range.hasta) ? 'custom' : '30';
+  range.preset = (range.desde || range.hasta) ? 'custom' : '7';
   pager.reset('act');
   syncRangeUI();
   persistRange();
@@ -590,8 +604,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   seenKey  = `vimeco_actividad_vistas_${code}`;
   rangeKey = `vimeco_actividad_rango_${code}`;
-  try { seen = new Set(JSON.parse(localStorage.getItem(seenKey) || '[]')); } catch (_) { seen = new Set(); }
-  try { Object.assign(range, JSON.parse(localStorage.getItem(rangeKey) || 'null') || {}); } catch (_) {}
+  ({ seen, hasta: vistoHasta } = vistasNovedades(code));
+  Object.assign(range, rangoNovedades(code));
 
   bindDesplegable('tipo', setFilter);
   bindDesplegable('periodo', setRange);
@@ -599,6 +613,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') cerrarMenus(); });
   $('act-ver-todas').innerHTML = icSvg('check') + 'Ver todas';
   $('act-ver-todas').addEventListener('click', verTodas);
+  $('act-banner').addEventListener('click', toggleSinVer);
   pintarTipo();
   $('act-search').addEventListener('input', e => {
     searchQuery = e.target.value;

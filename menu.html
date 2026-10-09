@@ -273,10 +273,14 @@
     function novedades(on) {
       show('menu-card-novedades', on);
       if (!on || typeof getActividad !== 'function') return;
-      return getActividad(7).then(evs => {
-        let seen = [];
-        try { seen = JSON.parse(localStorage.getItem('vimeco_actividad_vistas_' + _s.codigo) || '[]'); } catch (_) {}
-        badge('novedades-badge', evs.filter(e => !seen.includes(e.key)).length);
+      // Las sin ver del período elegido en Novedades, igual que la pastilla de la página.
+      return getActividad(null).then(evs => {
+        const { seen, hasta } = vistasNovedades(_s.codigo);
+        const { from, to } = limitesRangoNovedades(rangoNovedades(_s.codigo));
+        badge('novedades-badge', evs.filter(e => {
+          const ts = e.timestamp || 0;
+          return ts >= from && ts <= to && ts >= hasta && !seen.has(e.key);
+        }).length);
       }).catch(() => {});
     }
 

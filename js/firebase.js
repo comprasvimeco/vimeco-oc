@@ -968,6 +968,40 @@ window._fetchConTope = function (url, opts, ms = 20000) {
       .filter(e => e && (e.timestamp || 0) >= desde)
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   };
+
+  // Vistas de Novedades de un usuario (las comparten la página y el badge del
+  // menú): las claves marcadas y un corte, todo lo anterior cuenta como visto.
+  // Hasta v272 las vistas se descartaban a los 7 días; el corte arranca 7 días
+  // atrás la primera vez para no volver a mostrar sin ver lo que ya se vio.
+  window.vistasNovedades = function (code) {
+    let keys = [], hasta = 0;
+    try { keys = JSON.parse(localStorage.getItem('vimeco_actividad_vistas_' + code) || '[]'); } catch (_) {}
+    try { hasta = Number(localStorage.getItem('vimeco_actividad_vistas_hasta_' + code)) || 0; } catch (_) {}
+    if (!hasta) {
+      hasta = Date.now() - 7 * 86400000;
+      try { localStorage.setItem('vimeco_actividad_vistas_hasta_' + code, String(hasta)); } catch (_) {}
+    }
+    return { seen: new Set(keys), hasta };
+  };
+
+  // Período elegido en Novedades (por defecto, los últimos 7 días).
+  window.rangoNovedades = function (code) {
+    const range = { preset: '7', desde: '', hasta: '' };
+    try { Object.assign(range, JSON.parse(localStorage.getItem('vimeco_actividad_rango_' + code) || 'null') || {}); } catch (_) {}
+    return range;
+  };
+
+  // Límites del período, en timestamps.
+  window.limitesRangoNovedades = function (range) {
+    if (range.preset === 'all') return { from: 0, to: Infinity };
+    if (range.preset === 'custom') {
+      return {
+        from: range.desde ? new Date(range.desde + 'T00:00:00').getTime() : 0,
+        to:   range.hasta ? new Date(range.hasta + 'T23:59:59').getTime() : Infinity
+      };
+    }
+    return { from: Date.now() - Number(range.preset) * 86400000, to: Infinity };
+  };
 })();
 
 // ─── Módulo Personal (Jefe de Obra) ──────────────────

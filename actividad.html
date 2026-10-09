@@ -15,6 +15,12 @@
     .act-unseen { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 999px;
       background: #fde6e6; color: #b02a2a; font-size: .76rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .act-unseen::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
+    /* La pastilla filtra: tocándola quedan sólo las sin ver (la cruz la apaga). */
+    button.act-unseen { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
+    button.act-unseen:hover { border-color: #f0b4b4; }
+    .act-unseen.on { background: #d64545; color: #fff; }
+    .act-unseen.on::before { background: #fff; }
+    .act-unseen .icon { width: 12px; height: 12px; }
     .act-head .act-ver-todas { margin-left: auto; font-size: .72rem; padding: .26rem .65rem; white-space: nowrap; }
     .act-head .act-ver-todas .icon { width: 12px; height: 12px; }
     .act-search { width: 100%; border-radius: 12px; margin-bottom: .7rem; }
@@ -64,8 +70,6 @@
     .act-card-unseen { border-left: 3px solid var(--primary, #1a3a5c); }
     .act-card-seen { background: #eef7f1; }
     .act-card-seen .act-title, .act-card-seen .act-detalle { color: var(--gray-500); }
-    /* Fuera de la ventana de novedades: es historial, no reclama atención. */
-    .act-card-old .act-title, .act-card-old .act-detalle { color: var(--gray-500); }
     .act-row { display: flex; align-items: flex-start; gap: .7rem; }
     .act-badge {
       display: inline-flex; align-items: center; gap: .3rem; flex: 0 0 auto;
@@ -139,7 +143,7 @@
 
     <div class="act-head">
       <h1>Novedades</h1>
-      <span id="act-banner" class="act-unseen hidden"></span>
+      <button type="button" id="act-banner" class="act-unseen hidden" aria-pressed="false"></button>
       <button class="foc-btn foc-btn--clear act-ver-todas hidden" id="act-ver-todas"></button>
     </div>
 
