@@ -352,14 +352,13 @@
   const dots = o => `<span class="ar-dots" title="${DOCS.map(([t, n]) => n + (docsDe(o, t).length ? ': sí' : ': falta')).join(' · ')}">` +
     DOCS.map(([t]) => `<span class="ar-dot ${t} ${docsDe(o, t).length ? 'on' : ''}"></span>`).join('') + `</span>`;
   const leyenda = `<div class="ar-ley">${DOCS.map(([t, n]) => `<span><span class="ar-dot on ${t}"></span>${n}</span>`).join('')}<span><span class="ar-dot"></span>Falta</span></div>`;
-  // La pendiente dice a quién se le pidió la firma.
-  function etiquetaEstado(o) {
-    if (!CERRADA.includes(o.estado)) return '';
-    if (o.estado === 'pendiente') {
-      const quien = o.h.autorizacion && o.h.autorizacion.solicitadoA && o.h.autorizacion.solicitadoA.nombre;
-      return `<span class="ar-est ar-est--pend">Esperando autorización${quien ? ' de ' + esc(quien) : ''}</span>`;
-    }
-    return `<span class="ar-est">${esc(o.estado.charAt(0).toUpperCase() + o.estado.slice(1))}</span>`;
+  const etiquetaEstado = o => CERRADA.includes(o.estado)
+    ? `<span class="ar-est ${o.estado === 'pendiente' ? 'ar-est--pend' : ''}">${esc(o.estado.charAt(0).toUpperCase() + o.estado.slice(1))}</span>` : '';
+  // Sólo en la ficha, al lado de «Pendiente»: a quién se le pidió la firma.
+  function etiquetaAutorizacion(o) {
+    if (o.estado !== 'pendiente') return '';
+    const quien = o.h.autorizacion && o.h.autorizacion.solicitadoA && o.h.autorizacion.solicitadoA.nombre;
+    return `<span class="ar-est ar-est--pend">Esperando autorización${quien ? ' de ' + esc(quien) : ''}</span>`;
   }
 
   function nivel2(f) {
@@ -508,7 +507,7 @@
     const extra = [o.h.fecha || fecha(o.ts), total, o.h.responsable && o.h.responsable.nombre ? 'emitió ' + o.h.responsable.nombre : ''].filter(Boolean).join(' · ');
     const nArch = archivosDe(o).length;
     const peso = archivosDe(o).reduce((s, a) => s + (Number(a.size) || 0), 0);
-    return `<div class="ar-fh"><h2>OC ${esc(o.nro)}${etiquetaEstado(o)}</h2>
+    return `<div class="ar-fh"><h2>OC ${esc(o.nro)}${etiquetaEstado(o)}${etiquetaAutorizacion(o)}</h2>
         <p><b>${esc(o.prov || 'Sin proveedor')}</b> · ${esc(o.obra || 'Sin obra')}</p>
         <p>${esc(extra)}</p>
         <div class="ar-acts"><button type="button" class="ar-act" data-subir="otro">${icSvg('plus')}Agregar archivo</button>
