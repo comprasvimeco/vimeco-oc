@@ -202,8 +202,10 @@
     });
   }
 
-  // Lo que hay en la carpeta y no es de ninguna OC conocida. Si la carpeta es
-  // sólo de esta OC, es suyo; si la comparte, va aparte (`extras`).
+  // Lo que hay en la carpeta y no es de ninguna OC conocida. Si el nombre trae
+  // el número de una OC de la carpeta, es de esa. Si no, y la carpeta es sólo
+  // de esta OC, es suyo; si la comparte, no se muestra entre sus archivos: va
+  // aparte (`extras`), plegado, para asignárselo a mano.
   function repartir(o, files) {
     const otras = (porCarpeta.get(o.folder) || []).filter(id => id !== o.id).map(id => ocs.get(id)).filter(Boolean);
     const conocidos = new Set();
@@ -217,7 +219,9 @@
       const d = { id: f.id, fileId: f.id, ocId: o.id, tipo: tipoPorNombre(f.name), nombre: f.name, size: Number(f.size) || 0,
         mime: f.mimeType, ts: Date.parse(f.createdTime) || 0, folderId: o.folder, deDrive: true };
       docsReg.set(d.id, d);
-      if (otras.length) o.extras.push(d);
+      const duenio = [o, ...otras].find(x => x.nro && f.name.includes(x.nro));
+      if (duenio) { if (duenio === o) o.docs.push(d); }
+      else if (otras.length) o.extras.push(d);
       else o.docs.push(d);
     });
   }
@@ -378,7 +382,7 @@
       ${vis.length ? leyenda : ''}`;
   }
 
-  function itemHtml(a, conOC) {
+  function itemHtml(a, conOC, asignable) {
     const [cls, lbl] = tile(a);
     const o = conOC && ocs.get(a.ocId);
     const meta = [o ? 'OC ' + o.nro : '', fecha(a.ts), a.size ? fmtPeso(a.size) : '', a.por].filter(Boolean).join(' · ');
@@ -388,6 +392,7 @@
         <span class="ar-r-tx"><b>${esc(a.nombre)}</b>
           <small><span class="ar-tipo ar-tipo--${esc(a.tipo)}">${esc(NOMBRE_TIPO[a.tipo] || 'Otro')}</span>${esc(a.sinArchivo ? 'sin archivo' : meta)}</small></span>
       </button>
+      ${asignable ? `<button type="button" class="ar-asig" data-asignar="${esc(a.id)}">Es de esta OC</button>` : ''}
     </div>`;
   }
 
@@ -482,9 +487,13 @@
         h += `<a class="ar-falta" href="${t === 'factura' ? 'facturas.html' : 'remitos.html'}">${icSvg('plus')}Falta ${n.toLowerCase()}<b>Cargar en ${t === 'factura' ? 'Facturas' : 'Remitos'}</b></a>`;
     });
     h += o.docs.filter(a => !a.noEsta && !DOCS.some(([t]) => t === a.tipo)).map(a => itemHtml(a)).join('');
-    const ext = o.extras && o.extras.length ? `<div class="ar-lbl">En la misma carpeta de Drive<i>${plural(o.extras.length, 'archivo', 'archivos')}</i></div>
-      <div class="ar-rows">${o.extras.map(a => itemHtml(a)).join('')}</div>
-      <p class="ar-nota">La carpeta «${esc(fechaCarpeta(o))} | ${esc(o.prov || 'Sin proveedor')}» la comparte con ${o.compartida.length === 1 ? 'la OC' : 'las OC'} ${esc(o.compartida.join(', '))}: estos archivos pueden ser de cualquiera.</p>` : '';
+    // Lo de la carpeta compartida que no se sabe de qué OC es: plegado y fuera
+    // de la lista, con la opción de asignarlo.
+    const ext = o.extras && o.extras.length ? `<details class="ar-sinasig">
+        <summary>${icSvg('info')}${plural(o.extras.length, 'archivo', 'archivos')} de la carpeta de Drive sin OC asignada</summary>
+        <p class="ar-nota">La carpeta «${esc(fechaCarpeta(o))} | ${esc(o.prov || 'Sin proveedor')}» la comparte con ${o.compartida.length === 1 ? 'la OC' : 'las OC'} ${esc(o.compartida.join(', '))} y no se sabe de cuál es cada uno. Si alguno es de esta OC, asignáselo: pasa a su lista y deja de aparecer en las otras.</p>
+        <div class="ar-rows">${o.extras.map(a => itemHtml(a, false, true)).join('')}</div>
+      </details>` : '';
     const t = Number(o.h.total) || 0;
     const total = t ? (o.h.moneda === 'USD' ? 'US$ ' : '$ ') + t.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
     const extra = [o.h.fecha || fecha(o.ts), total, o.h.responsable && o.h.responsable.nombre ? 'emitió ' + o.h.responsable.nombre : ''].filter(Boolean).join(' · ');
@@ -495,9 +504,9 @@
         <p>${esc(extra)}</p>
         <div class="ar-acts"><button type="button" class="ar-act" data-subir="otro">${icSvg('plus')}Agregar archivo</button>
           ${o.folder ? `<a class="ar-act" href="https://drive.google.com/drive/folders/${esc(o.folder)}" target="_blank" rel="noopener">${icSvg('folder')}Carpeta en Drive</a>` : ''}</div></div>
-      ${entregaOC(o)}
       <div class="ar-lbl">${plural(nArch, 'archivo', 'archivos')}<i>${peso ? fmtPeso(peso) : ''}</i></div>
-      <div class="ar-rows">${h}</div>${ext}
+      <div class="ar-rows">${h}</div>
+      ${entregaOC(o)}${ext}
       ${c && c.error ? `<p class="ar-nota">No se pudo mirar la carpeta en Drive: el PDF y el presupuesto pueden estar y no figurar.</p>` : ''}`;
   }
 
@@ -540,6 +549,26 @@
   }
 
   // ---- Subir a la OC abierta ----
+  // Un archivo de la carpeta compartida pasa a ser de la OC abierta: se anota
+  // como adjunto, igual que lo que se sube desde acá.
+  async function asignar(id) {
+    const o = ocs.get(st.oc), a = docsReg.get(id);
+    if (!o || !a || !a.fileId) return;
+    const registro = { tipo: tipoPorNombre(a.nombre) === 'factura' ? 'factura' : 'otro', nombre: a.nombre,
+      ts: a.ts || Date.now(), por: nombreUsuario, fileId: a.fileId, folderId: a.folderId || o.folder };
+    try {
+      await registrarAdjuntoOC(o.nro, registro);
+    } catch (e) {
+      console.error('asignar:', e);
+      toast('No se pudo asignar el archivo. Revisá la conexión.', 'error');
+      return;
+    }
+    o.h.adjuntos = o.h.adjuntos || {};
+    o.h.adjuntos['local_' + Date.now()] = registro;
+    armar(); pintarUso(); pintar(true);
+    toast('Listo: el archivo quedó en la OC ' + o.nro + '.', 'success');
+  }
+
   // El presupuesto (queda anotado en la OC como `fuenteUrl`, igual que al pedir
   // autorización) u otro archivo (queda en `adjuntos`, igual que en Facturas).
   // Facturas y remitos se cargan en sus pantallas, que además guardan los datos
@@ -947,6 +976,7 @@
       else if ('inc' in d) { st.inc = !st.inc; pintar(); }
       else if (d.subir) elegirArchivo(d.subir);
       else if (d.ent) verEntrega(d.ent);
+      else if (d.asignar) asignar(d.asignar);
       else if (t.id === 'ar-mas') { limite += PAGINA; pintar(); }
     });
     $('ar-file').addEventListener('change', e => subir(e.target.files && e.target.files[0]));

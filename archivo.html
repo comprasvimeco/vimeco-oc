@@ -151,6 +151,14 @@
     .ar-falta:hover { border-color: var(--tono-2); }
     .ar-falta--info { border-style: solid; border-color: var(--line); }
     .ar-nota { font-size: .76rem; color: var(--ink-2); margin: .55rem .3rem 0; }
+    .ar-sinasig { margin: .9rem .2rem 0; }
+    .ar-sinasig summary { display: flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--ink-2); cursor: pointer; list-style: none; padding: .2rem 0; }
+    .ar-sinasig summary::-webkit-details-marker { display: none; }
+    .ar-sinasig summary .icon { width: 14px; height: 14px; flex: none; }
+    .ar-sinasig[open] summary { color: var(--ink); font-weight: 600; }
+    .ar-sinasig .ar-nota { margin: .2rem 0 .5rem; }
+    .ar-asig { flex: none; border: 0; background: var(--tono-soft); color: var(--tono); font: inherit; font-size: .74rem; font-weight: 700; padding: .35rem .6rem; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+    .ar-asig:hover { background: var(--tono); color: #fff; }
 
     .ar-mas { display: block; margin: 1rem auto 0; border: 1.5px solid var(--line); background: var(--surface); color: var(--tono); font: inherit; font-weight: 600; font-size: .88rem; padding: .55rem 1.1rem; border-radius: 12px; cursor: pointer; }
     .ar-ph { color: var(--ink-2); font-size: .9rem; text-align: center; padding: 3rem 1rem; }
