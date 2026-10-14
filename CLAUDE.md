@@ -45,6 +45,13 @@ EQUIPOS/{Código - Descripción}/archivos   ← documentación de cada equipo (f
 IDs de OBRAS/PROVEEDORES/CAJAS/EQUIPOS se cachean en Firebase `/drive_config/`.
 Los documentos de cada equipo se indexan en `/equipos_docs/{key}` (`folderId` + `archivos`).
 
+**Archivo** (`archivo.html` + `js/archivo.js`, permiso `archivo`, siempre para `0000`) muestra los
+archivos de Compras por mes, obra o proveedor → OC → archivos, con la estética de la pantalla Archivo
+de Leva. No tiene índice propio: se arma con `/historial` (carpetas, `fuenteUrl`, `adjuntos`) y
+`/remitos` (`drive`), y lista en Drive sólo la carpeta de OBRAS de las OC que se ven (para encontrar
+el PDF `OC_{nro}_…` y el presupuesto). Esa carpeta la comparten las OC del mismo proveedor y día: lo
+que no se puede atribuir va en «En la misma carpeta de Drive». El visor baja con `bajarDriveArchivo`.
+
 `CAJAS` y `PERSONAL` originalmente vivían dentro de COMPRAS. Una migración única
 best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags
 `/drive_config/cajasMovedOut` y `personalMovedOut`) las mueve al padre de COMPRAS.
@@ -66,6 +73,7 @@ best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags
 - `menu.html` (raíz) → dos secciones: **Compras** (`compras.html`) y **Caja** (`caja.html`)
 - `compras.html` → submenú: Órdenes de Compra (`app.html`), Facturas (`facturas.html`), Historial (`historial.html`)
 - El logo/header de las páginas de Compras vuelve a `compras.html`; el de Caja vuelve a `menu.html`
+- `menu.html` → **Archivo** (`archivo.html`), para `0000` y el permiso `archivo`.
 - `menu.html` → **Proveedores** (`proveedores.html`, para todos): ficha editable de cada proveedor, artículos
   comprados con el último precio y comparación por artículo. Lo tildado abre `app.html` precargado vía
   `sessionStorage.oc_desde_proveedor` (`loadOCDesdeProveedor`). Todos ven precios por unidad; no se muestran

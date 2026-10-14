@@ -23,10 +23,11 @@ const PERMS = {
   reportes:   { t: 'rep', ic: 'trend',    n: 'Reportes',       d: 'Gasto por obra, equipo y proveedor.' },
   novedades:  { t: 'nov', ic: 'info',     n: 'Novedades',      d: 'Feed de OC, remitos y facturas que se cargan.' },
   jefeTaller: { t: 'tal', ic: 'tool',     n: 'Jefe de Taller', d: 'Equipos: datos, foto y repuestos de cada equipo.' },
+  archivo:    { t: 'arc', ic: 'folder',   n: 'Archivo',        d: 'Todos los archivos de Compras: OC, presupuestos, facturas y remitos, por mes, obra o proveedor.' },
   admin:      { t: 'adm', ic: 'settings', n: 'Admin',          d: 'Funciones de admin (incluida la Caja de todos), salvo el menú de Administración.' }
 };
-const ORDEN_PILLS = ['admin', 'caja', 'jefeObra', 'personal', 'jefeTaller', 'reportes', 'novedades'];
-const CAMPOS = ['caja', 'admin', 'jefeObra', 'personal', 'jefeTaller', 'reportes', 'novedades'];
+const ORDEN_PILLS = ['admin', 'caja', 'jefeObra', 'personal', 'jefeTaller', 'reportes', 'novedades', 'archivo'];
+const CAMPOS = ['caja', 'admin', 'jefeObra', 'personal', 'jefeTaller', 'reportes', 'novedades', 'archivo'];
 
 let allUsuarios = [];
 let allObras    = [];      // todas, con su `jefes`
@@ -306,7 +307,7 @@ function renderFicha() {
     der = cuentaHtml(u);
   } else {
     izq = `<div class="us-card"><div class="us-sec-h"><b>Compras y obras</b></div>${prowHtml('jefeObra')}${obrasHtml(u)}${prowHtml('personal', ' sub')}</div>
-      <div class="us-card"><div class="us-sec-h"><b>Módulos</b></div>${prowHtml('caja')}${prowHtml('reportes')}${prowHtml('novedades')}${prowHtml('jefeTaller')}</div>`;
+      <div class="us-card"><div class="us-sec-h"><b>Módulos</b></div>${prowHtml('caja')}${prowHtml('reportes')}${prowHtml('novedades')}${prowHtml('jefeTaller')}${prowHtml('archivo')}</div>`;
     der = autorizaHtml(u) +
       `<div class="us-card"><div class="us-sec-h"><span class="us-sq t-adm">${icSvg('settings')}</span><b>Administración</b></div>${prowHtml('admin')}</div>` +
       cuentaHtml(u);

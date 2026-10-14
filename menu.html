@@ -194,6 +194,15 @@
       <div class="menu-card-title">Reportes</div>
       <div class="menu-card-sub">Gasto por obra y equipo</div>
     </a>
+    <a href="archivo.html" class="menu-card" id="menu-card-archivo" data-tone="indigo" style="display:none">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+        </svg>
+      </div>
+      <div class="menu-card-title">Archivo</div>
+      <div class="menu-card-sub">OC, presupuestos, facturas y remitos</div>
+    </a>
     <a href="administracion.html" class="menu-card" id="menu-card-admin" data-tone="gray" style="display:none">
       <div class="menu-card-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -317,7 +326,7 @@
     } catch (_) {}
 
     if (_s.codigo === '0000') {
-      ['menu-card-caja', 'menu-card-personal', 'menu-card-equipos', 'menu-card-reportes', 'menu-card-admin']
+      ['menu-card-caja', 'menu-card-personal', 'menu-card-equipos', 'menu-card-reportes', 'menu-card-archivo', 'menu-card-admin']
         .forEach(id => show(id, true));
       tareas.push(novedades(true));
     } else {
@@ -329,6 +338,7 @@
           show('menu-card-personal', u.admin || tienePersonal(u));
           show('menu-card-equipos', u.jefeTaller);
           show('menu-card-reportes', u.admin || u.reportes);
+          show('menu-card-archivo', u.archivo);
           return novedades(u.novedades != null ? u.novedades : u.admin);
         }).catch(() => {}));
       }

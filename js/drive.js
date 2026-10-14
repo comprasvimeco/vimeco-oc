@@ -16,6 +16,7 @@
     window.trashDriveFile       = noDrive;
     window.listDriveFolderFiles = noDrive;
     window.findFileInFolder     = noDrive;
+    window.bajarDriveArchivo    = noDrive;
     return;
   }
 
@@ -37,7 +38,8 @@
   const _nativeFetch      = window.fetch.bind(window);
 
   function fetch(url, opts) {
-    const ms   = String(url).includes('/upload/') ? _FETCH_TIMEOUT_UP : _FETCH_TIMEOUT;
+    // Las bajadas del visor (alt=media) también llevan el margen largo.
+    const ms   = /\/upload\/|alt=media/.test(String(url)) ? _FETCH_TIMEOUT_UP : _FETCH_TIMEOUT;
     const ctrl = new AbortController();
     const to   = setTimeout(() => ctrl.abort(), ms);
     return _nativeFetch(url, { ...(opts || {}), signal: ctrl.signal })
@@ -1098,5 +1100,23 @@
       pageToken = j.nextPageToken || '';
     } while (pageToken);
     return out;
+  };
+
+  // Contenido de un archivo, para el visor de Archivo (archivo.html). Los
+  // documentos nativos de Google (planillas, docs) no se pueden bajar tal cual:
+  // devuelven `nativo` y el visor ofrece abrirlos en Drive.
+  window.bajarDriveArchivo = async function (fileId) {
+    const token = await getAccessToken();
+    const base  = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`;
+    const m = await fetch(base + '?fields=name,mimeType,size,trashed', { headers: { Authorization: `Bearer ${token}` } });
+    if (m.status === 404) throw new Error('no existe');
+    if (!m.ok) throw new Error(`Drive meta (${m.status})`);
+    const meta = await m.json();
+    if (meta.trashed) throw new Error('no existe');
+    if (/^application\/vnd\.google-apps\./.test(meta.mimeType))
+      return { nativo: true, nombre: meta.name, mime: meta.mimeType };
+    const r = await fetch(base + '?alt=media', { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw new Error(`Drive download (${r.status})`);
+    return { blob: await r.blob(), nombre: meta.name, mime: meta.mimeType };
   };
 })();
