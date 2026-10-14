@@ -541,6 +541,154 @@
     setTimeout(() => URL.revokeObjectURL(u), 30000);
   }
 
+  // ── Zoom del visor ──
+  // z = 1 es «ajustado»: la imagen o cada página del PDF entera a la vista. Cada item es
+  // { el, w, h, max? } con el tamaño natural; acá se le fija el tamaño en pantalla (it.k = escala).
+  const Z_MIN = 1, Z_MAX = 6;
+  function zoomVisor(est, items, alCambiar) {
+    const $c = est.el.querySelector('.vis-c');
+    const cs = getComputedStyle($c);
+    const padW = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padH = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const bar = document.createElement('div');
+    bar.className = 'vis-zm';
+    bar.innerHTML = `<button type="button" data-z="-" aria-label="Alejar">−</button>`
+      + `<button type="button" data-z="0" title="Ajustar a la pantalla">100%</button>`
+      + `<button type="button" data-z="+" aria-label="Acercar">+</button>`;
+    est.el.appendChild(bar);
+    const [bMenos, bAjustar, bMas] = bar.querySelectorAll('button');
+    let z = 1;
+
+    function aplicar() {
+      const cw = $c.clientWidth - padW, ch = $c.clientHeight - padH;
+      items.forEach(it => {
+        it.fit = Math.min(cw / it.w, ch / it.h, it.max || Infinity);
+        it.k = it.fit * z;
+        it.el.style.width  = Math.round(it.w * it.k) + 'px';
+        it.el.style.height = Math.round(it.h * it.k) + 'px';
+      });
+      bAjustar.textContent = Math.round(z * 100) + '%';
+      bMenos.disabled = z <= Z_MIN + 0.001;
+      bMas.disabled = z >= Z_MAX - 0.001;
+      if (alCambiar) alCambiar.luego();
+    }
+    // Cambia el zoom dejando quieto el punto (cx, cy) de la pantalla, relativo a $c.
+    function fijar(nz, cx = $c.clientWidth / 2, cy = $c.clientHeight / 2, desde) {
+      const p = desde || { x: ($c.scrollLeft + cx) / z, y: ($c.scrollTop + cy) / z };
+      z = Math.min(Z_MAX, Math.max(Z_MIN, nz));
+      aplicar();
+      $c.scrollLeft = p.x * z - cx;
+      $c.scrollTop  = p.y * z - cy;
+    }
+    const rel = (x, y) => { const r = $c.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; };
+    const alternar = (x, y) => { const q = rel(x, y); fijar(z > 1.05 ? 1 : 2.5, q.x, q.y); };
+
+    bMenos.onclick = () => fijar(z / 1.5);
+    bMas.onclick = () => fijar(z * 1.5);
+    bAjustar.onclick = () => fijar(1);
+
+    // Ctrl + rueda (también el pellizco del touchpad) hace zoom; la rueda sola scrollea.
+    $c.addEventListener('wheel', e => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const q = rel(e.clientX, e.clientY);
+      fijar(z * Math.exp(-e.deltaY * 0.01), q.x, q.y);
+    }, { passive: false });
+
+    // Pellizco con dos dedos y doble toque.
+    let pinza = null, toque = null, ultimoToque = 0;
+    const medio = t => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
+    $c.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        const m = rel(medio(e.touches).x, medio(e.touches).y);
+        pinza = { d: dist(e.touches), z, p: { x: ($c.scrollLeft + m.x) / z, y: ($c.scrollTop + m.y) / z } };
+        toque = null;
+      } else if (e.touches.length === 1) {
+        const t = e.touches[0];
+        toque = { x: t.clientX, y: t.clientY, movido: false };
+      }
+    }, { passive: true });
+    $c.addEventListener('touchmove', e => {
+      if (pinza && e.touches.length === 2) {
+        e.preventDefault();
+        const m = medio(e.touches), q = rel(m.x, m.y);
+        fijar(pinza.z * dist(e.touches) / pinza.d, q.x, q.y, pinza.p);
+      } else if (toque) {
+        const t = e.touches[0];
+        if (Math.hypot(t.clientX - toque.x, t.clientY - toque.y) > 10) toque.movido = true;
+      }
+    }, { passive: false });
+    $c.addEventListener('touchend', e => {
+      if (e.touches.length < 2) pinza = null;
+      if (e.touches.length || !toque || toque.movido) { if (!e.touches.length) toque = null; return; }
+      const ahora = Date.now();
+      if (ahora - ultimoToque < 300) { e.preventDefault(); alternar(toque.x, toque.y); ultimoToque = 0; }
+      else ultimoToque = ahora;
+      est.ultimoTouch = ahora;
+      toque = null;
+    }, { passive: false });
+    $c.addEventListener('dblclick', e => {
+      if (Date.now() - (est.ultimoTouch || 0) < 800) return;   // ya lo manejó el doble toque
+      alternar(e.clientX, e.clientY);
+    });
+
+    const alRedimensionar = () => fijar(z);
+    window.addEventListener('resize', alRedimensionar);
+    est.off.push(() => window.removeEventListener('resize', alRedimensionar));
+    est.zoom = { mas: () => fijar(z * 1.5), menos: () => fijar(z / 1.5), ajustar: () => fijar(1) };
+    aplicar();
+  }
+
+  // Dibuja las páginas del PDF: las que están cerca de la vista a la resolución del zoom, el
+  // resto a la de «ajustado» (para no llenar la memoria con 20 páginas a 6×).
+  function pintorPdf(est, pags) {
+    const $c = est.el.querySelector('.vis-c');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Tope de píxeles por canvas: iOS no dibuja canvas de más de ~16 M px.
+    const escala = (it, k) => Math.min(k * dpr, Math.sqrt(12e6 / (it.w * it.h)));
+    async function pintar(it, s) {
+      it.s = s;
+      if (it.tarea) it.tarea.cancel();
+      const vp = it.pag.getViewport({ scale: s });
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const t = it.tarea = it.pag.render({ canvasContext: cv.getContext('2d'), viewport: vp });
+      try { await t.promise; } catch (_) { return; }   // cancelada por un zoom más nuevo
+      if (it.tarea !== t || _abierto !== est) return;
+      it.tarea = null;
+      const viejo = it.el.firstChild;
+      it.el.replaceChildren(cv);
+      if (viejo) viejo.width = viejo.height = 0;      // libera la memoria del canvas anterior
+    }
+    let corriendo = false, otraVez = false;
+    async function afinar() {
+      if (corriendo) { otraVez = true; return; }
+      corriendo = true;
+      try {
+        do {
+          otraVez = false;
+          const r = $c.getBoundingClientRect();
+          const cerca = it => {
+            const b = it.el.getBoundingClientRect();
+            return b.bottom > r.top - r.height && b.top < r.bottom + r.height;
+          };
+          // Primero las que se ven, después el resto.
+          const orden = [...pags.filter(cerca), ...pags.filter(it => !cerca(it))];
+          for (const it of orden) {
+            if (_abierto !== est || otraVez) break;
+            const quiero = escala(it, cerca(it) ? it.k : it.fit);
+            if (!it.s || Math.abs(quiero - it.s) / it.s > 0.15) await pintar(it, quiero);
+          }
+        } while (otraVez && _abierto === est);
+      } finally { corriendo = false; }
+    }
+    let timer = 0;
+    afinar.luego = () => { clearTimeout(timer); timer = setTimeout(afinar, 180); };
+    est.off.push(() => { clearTimeout(timer); pags.forEach(it => it.tarea && it.tarea.cancel()); });
+    return afinar;
+  }
+
   const _bajados = new Map();   // fileId → { blob, nombre, mime } mientras la página esté abierta
   let _abierto = null;
 
@@ -562,7 +710,7 @@
       <div class="vis-c"><div class="vis-msg"><span>Abriendo…</span><div class="vis-bar"><i></i></div></div></div>`;
     document.body.appendChild(el);
     document.body.style.overflow = 'hidden';
-    const est = { el, urls: [] };
+    const est = { el, urls: [], off: [] };
     _abierto = est;
     try { history.pushState({ visor: 1, archivo: 1 }, ''); est.conHistoria = true; } catch (_) {}
 
@@ -599,25 +747,31 @@
 
       if (/^image\//.test(mime)) {
         const u = URL.createObjectURL(blob); est.urls.push(u);
-        $c.innerHTML = `<img src="${u}" alt="${esc(nombre)}">`;
+        const img = new Image();
+        img.alt = nombre; img.draggable = false; img.src = u;
+        try { await img.decode(); } catch (_) {}
+        if (_abierto !== est) return;
+        $c.replaceChildren(img);
+        // max: una imagen chica no se agranda más que su tamaño real al ajustar.
+        zoomVisor(est, [{ el: img, w: img.naturalWidth || 1, h: img.naturalHeight || 1, max: 1 }]);
       } else if (mime === 'application/pdf') {
         const pdfjs = await cargarPdfjs();
         const doc = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
         if (_abierto !== est) return;
-        $c.innerHTML = '';
-        const w = Math.min($c.clientWidth - 24, 1000);
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const pags = [];
         for (let n = 1; n <= doc.numPages; n++) {
           const pag = await doc.getPage(n);
           if (_abierto !== est) return;
           const vp0 = pag.getViewport({ scale: 1 });
-          const vp  = pag.getViewport({ scale: (w / vp0.width) * dpr });
-          const cv  = document.createElement('canvas');
-          cv.width = vp.width; cv.height = vp.height;
-          cv.style.width = Math.round(vp.width / dpr) + 'px';
-          $c.appendChild(cv);
-          await pag.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+          const div = document.createElement('div');
+          div.className = 'vis-p';
+          pags.push({ el: div, w: vp0.width, h: vp0.height, pag });
         }
+        $c.replaceChildren(...pags.map(p => p.el));
+        const afinar = pintorPdf(est, pags);
+        zoomVisor(est, pags, afinar);
+        $c.addEventListener('scroll', afinar.luego, { passive: true });
+        afinar();
       } else {
         $c.innerHTML = `<div class="vis-msg"><span>Este tipo de archivo no se puede ver acá.</span>
           <button type="button" class="vis-dl">Descargar</button></div>`;
@@ -637,12 +791,21 @@
     const e = _abierto;
     if (!e) return;
     _abierto = null;
+    e.off.forEach(f => f());
     e.urls.forEach(u => URL.revokeObjectURL(u));
     e.el.remove();
     document.body.style.overflow = '';
     if (e.conHistoria && !sinHistoria) { try { history.back(); } catch (_) {} }
   }
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && _abierto) cerrarVisor(); });
+  document.addEventListener('keydown', e => {
+    if (!_abierto) return;
+    if (e.key === 'Escape') return cerrarVisor();
+    const zm = _abierto.zoom;
+    if (!zm || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === '+' || e.key === '=') zm.mas();
+    else if (e.key === '-') zm.menos();
+    else if (e.key === '0') zm.ajustar();
+  });
 
   // ---- Arranque ----
 

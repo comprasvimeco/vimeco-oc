@@ -152,9 +152,18 @@
     .vis-b { flex: none; width: 40px; height: 40px; border: 0; border-radius: 12px; background: rgba(255,255,255,.08); color: #fff; display: grid; place-items: center; cursor: pointer; text-decoration: none; }
     .vis-b:hover { background: rgba(255,255,255,.16); }
     .vis-b .icon { width: 19px; height: 19px; }
-    .vis-c { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; }
-    .vis-c img { max-width: 100%; height: auto; border-radius: 6px; background: #fff; }
-    .vis-c canvas { max-width: 100%; height: auto; background: #fff; border-radius: 4px; box-shadow: 0 4px 18px rgba(0,0,0,.4); }
+    .vis-c { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 12px 72px; touch-action: pan-x pan-y; }
+    /* margin auto (y no align-items: center) para que, con zoom, se pueda scrollear hasta el borde izquierdo */
+    .vis-c > * { flex: none; margin-inline: auto; }
+    .vis-c > img:only-child, .vis-c > .vis-p:only-child { margin-block: auto; }
+    .vis-c img { display: block; border-radius: 6px; background: #fff; user-select: none; -webkit-user-drag: none; }
+    .vis-p { background: #fff; border-radius: 4px; box-shadow: 0 4px 18px rgba(0,0,0,.4); overflow: hidden; }
+    .vis-p canvas { display: block; width: 100%; height: 100%; }
+    .vis-zm { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(22,17,46,.88); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+    .vis-zm button { width: 40px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: #fff; font: inherit; font-size: 1.25rem; line-height: 1; cursor: pointer; }
+    .vis-zm button[data-z="0"] { width: auto; min-width: 60px; font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .vis-zm button:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+    .vis-zm button:disabled { opacity: .35; cursor: default; }
     .vis-msg { margin: auto; text-align: center; color: #D8D3F5; font-size: .92rem; display: flex; flex-direction: column; align-items: center; gap: .9rem; padding: 1rem; }
     .vis-bar { width: 180px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
     .vis-bar i { display: block; height: 100%; width: 30%; background: #8B7CF6; animation: visCarga 1.1s ease-in-out infinite; }
