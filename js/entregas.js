@@ -3,9 +3,12 @@
  * Dos libros, los dos se pisan a sí mismos en cada sincronización:
  *   COMPRAS/OBRAS/{Obra}/Control de entregas - {Obra}.xlsx   (Resumen / Detalle / Remitos)
  *   …/{fecha | Proveedor}/Entregas - OC {nro}.xlsx           (detalle de esa OC)
+ * Al lado de cada uno va el mismo nombre en .pdf (entregasPDF.js): el Excel es
+ * para filtrar y sumar, el PDF para ver de un vistazo qué llegó y qué falta.
  *
- * Requiere: drive.js (uploadOrUpdateFile, getObraFolderId). XLSX se carga
- * diferido desde CDN, igual que en caja.js y personal-obra.js.
+ * Requiere: drive.js (uploadOrUpdateFile, getObraFolderId) y, para los PDF,
+ * entregasPDF.js. XLSX se carga diferido desde CDN, igual que en caja.js y
+ * personal-obra.js.
  */
 (function () {
   'use strict';
@@ -289,41 +292,75 @@
     return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   }
 
+  const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const nombreObra = (obra, ext) => `Control de entregas - ${limpio(obra || 'Sin obra')}.${ext}`;
+  const nombreOC   = (oc, ext)   => `Entregas - OC ${limpio(oc.nroOC)}.${ext}`;
+
+  // ── Para descargar desde la app (Archivo) ─────────────────────────────────
+
+  // { blob, nombre } del Excel de una OC o de una obra, con lo cargado ahora.
+  window.entregasExcelOC = async function (oc, remitos) {
+    await ensureXLSX();
+    return { blob: aBlob(libroOC(oc, remitos || [])), nombre: nombreOC(oc, 'xlsx') };
+  };
+  window.entregasExcelObra = async function (obra, ocs, remitos) {
+    await ensureXLSX();
+    return { blob: aBlob(libroObra(obra, ocs || [], remitos || [])), nombre: nombreObra(obra, 'xlsx') };
+  };
+  window.nombreEntregasPdf = { oc: oc => nombreOC(oc, 'pdf'), obra: obra => nombreObra(obra, 'pdf') };
+
   // ── Sincronización a Drive ────────────────────────────────────────────────
 
   /*
-   * Regenera y sube las dos planillas de una OC recién actualizada:
-   *   - la de su obra (todas las OC de esa obra)
-   *   - la de la OC (su carpeta en OBRAS y en PROVEEDORES)
+   * Regenera y sube las planillas (Excel + PDF) de una OC recién actualizada:
+   *   - las de su obra (todas las OC de esa obra)
+   *   - las de la OC (su carpeta en OBRAS y en PROVEEDORES)
    *
    * `ocs` son todas las OC elegibles; `remitos`, todos los remitos. Devuelve
-   * { obra: bool, oc: bool } con qué se pudo subir: el llamador la invoca en
-   * segundo plano y no debería romperse porque falle Drive.
+   * { obra: bool, oc: bool } con qué Excel se pudo subir: el llamador la invoca
+   * en segundo plano y no debería romperse porque falle Drive. El PDF es un
+   * extra: si falla, se anota en la consola y el Excel cuenta igual.
    */
   window.sincronizarEntregas = async function ({ oc, ocs, remitos }) {
     await ensureXLSX();
     const obra    = oc.obra || 'Sin obra';
-    const deObra  = (ocs || []).filter(o => (o.obra || 'Sin obra') === obra);
+    // Las anuladas no esperan material: sólo cuentan si ya tienen remitos
+    // (igual que en la lista de Remitos).
+    const deObra  = (ocs || []).filter(o => (o.obra || 'Sin obra') === obra &&
+      (o.estado !== 'anulada' || (remitos || []).some(r => r.nroOC === o.nroOC)));
     const hecho   = { obra: false, oc: false };
+    const conPdf  = typeof entregasPdfOC === 'function';
 
-    // Planilla de la obra
+    // Planillas de la obra
     try {
-      const blob = aBlob(libroObra(obra, deObra, remitos || []));
       const fid  = await getObraFolderId(obra);
-      await uploadOrUpdateFile(blob, `Control de entregas - ${limpio(obra)}.xlsx`,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fid);
+      const blob = aBlob(libroObra(obra, deObra, remitos || []));
+      await uploadOrUpdateFile(blob, nombreObra(obra, 'xlsx'), XLSX_MIME, fid);
       hecho.obra = true;
+      if (conPdf) {
+        try {
+          const pdf = await entregasPdfObra(obra, deObra, remitos || []);
+          await uploadOrUpdateFile(pdf, nombreObra(obra, 'pdf'), 'application/pdf', fid);
+        } catch (e) { console.error('PDF de obra:', e); }
+      }
     } catch (e) { console.error('planilla de obra:', e); }
 
-    // Planilla de la OC, en las dos carpetas donde vive la orden
+    // Planillas de la OC, en las dos carpetas donde vive la orden
     const carpetas = [oc.drive_folder_obras_id, oc.drive_folder_proveedores_id].filter(Boolean);
     if (carpetas.length) {
-      const blob   = aBlob(libroOC(oc, remitos || []));
-      const nombre = `Entregas - OC ${limpio(oc.nroOC)}.xlsx`;
-      const res = await Promise.allSettled(carpetas.map(fid => uploadOrUpdateFile(
-        blob, nombre, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fid)));
+      const blob = aBlob(libroOC(oc, remitos || []));
+      const res = await Promise.allSettled(carpetas.map(fid =>
+        uploadOrUpdateFile(blob, nombreOC(oc, 'xlsx'), XLSX_MIME, fid)));
       hecho.oc = res.some(r => r.status === 'fulfilled');
       res.filter(r => r.status === 'rejected').forEach(r => console.error('planilla de OC:', r.reason));
+      if (conPdf) {
+        try {
+          const pdf = await entregasPdfOC(oc, remitos || []);
+          const rp = await Promise.allSettled(carpetas.map(fid =>
+            uploadOrUpdateFile(pdf, nombreOC(oc, 'pdf'), 'application/pdf', fid)));
+          rp.filter(r => r.status === 'rejected').forEach(r => console.error('PDF de OC:', r.reason));
+        } catch (e) { console.error('PDF de OC:', e); }
+      }
     }
 
     return hecho;

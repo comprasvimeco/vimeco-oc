@@ -111,6 +111,22 @@
     .ar-act { display: inline-flex; align-items: center; gap: .35rem; border: 0; background: var(--surface); box-shadow: var(--shadow-leva); color: var(--tono); font: inherit; font-size: .8rem; font-weight: 600; padding: .5rem .8rem; border-radius: 10px; cursor: pointer; text-decoration: none; }
     .ar-act .icon { width: 15px; height: 15px; }
 
+    /* Tarjeta de entrega: qué llegó y qué falta. Abre el PDF; al lado, el Excel. */
+    .ar-ent { --e-fg: #6B658F; --e-bg: var(--sunk); display: flex; gap: .45rem; margin: 0 0 .4rem; }
+    .ar-ent--parcial { --e-fg: #9A5B00; --e-bg: #FFF1D9; }
+    .ar-ent--completa { --e-fg: var(--menta-fg); --e-bg: var(--menta-bg); }
+    .ar-ent--sin { --e-fg: var(--rosa-fg); --e-bg: var(--rosa-bg); }
+    .ar-ent-ver { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .45rem .7rem; text-align: left; border: 0; background: var(--surface); box-shadow: var(--shadow-leva); border-left: 4px solid var(--e-fg); border-radius: 12px; padding: .65rem .8rem; font: inherit; color: var(--ink); cursor: pointer; }
+    .ar-ent-ver:hover { background: var(--e-bg); }
+    .ar-ent-tx b { display: block; font-size: .9rem; color: var(--e-fg); }
+    .ar-ent-tx small { display: block; font-size: .76rem; color: var(--ink-2); margin-top: .1rem; }
+    .ar-ent-bar { grid-column: 1 / -1; grid-row: 2; height: 7px; border-radius: 99px; background: var(--line); overflow: hidden; }
+    .ar-ent-bar i { display: block; height: 100%; border-radius: inherit; background: var(--e-fg); }
+    .ar-ent-cta { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; font-weight: 700; color: var(--tono); }
+    .ar-ent-cta .icon, .ar-ent-xls .icon { width: 15px; height: 15px; }
+    .ar-ent-xls { flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; border: 0; background: var(--surface); box-shadow: var(--shadow-leva); border-radius: 12px; padding: 0 .8rem; font: inherit; font-size: .72rem; font-weight: 700; color: var(--menta-fg); cursor: pointer; }
+    .ar-ent-xls:hover { background: var(--menta-bg); }
+
     /* Archivos */
     .ar-item { display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem .55rem .8rem; border-top: 1px solid var(--line); }
     .ar-item:first-child { border-top: 0; }
@@ -223,6 +239,8 @@
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/drive.js"></script>
+<script src="js/entregas.js"></script>
+<script src="js/entregasPDF.js"></script>
 <script src="js/archivo.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

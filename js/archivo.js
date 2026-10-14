@@ -208,7 +208,9 @@
     const otras = (porCarpeta.get(o.folder) || []).filter(id => id !== o.id).map(id => ocs.get(id)).filter(Boolean);
     const conocidos = new Set();
     [o, ...otras].forEach(x => x.docs.forEach(d => { if (d.fileId) conocidos.add(d.fileId); }));
-    const sueltos = files.filter(f => !conocidos.has(f.id) && !/^OC_/.test(f.name) && !f.name.startsWith('_'));
+    // Las planillas «Entregas - OC …» que sube Remitos no se listan: acá se
+    // arman al momento con la tarjeta de entrega (siempre al día).
+    const sueltos = files.filter(f => !conocidos.has(f.id) && !/^OC_/.test(f.name) && !f.name.startsWith('_') && !/^Entregas - OC /.test(f.name));
     o.extras = [];
     o.compartida = otras.map(x => x.nro);
     sueltos.forEach(f => {
@@ -361,6 +363,7 @@
     pedirCarpetas(vis);
     return `<div class="ar-fh"><h2>${esc(nombreCarpeta(f, st.v))}</h2>
         <p>${plural(todas.length, 'OC', 'OC')} · ${plural(n, 'archivo', 'archivos')}</p></div>
+      ${st.v === 'obra' ? entregaObra(f) : ''}
       <div class="ar-bar"><div class="ar-seg ar-seg--sm" role="group" aria-label="Ordenar OC">${opciones.map(([k, nom]) =>
         `<button type="button" data-orden="${k}" aria-pressed="${k === st.orden}">${nom}</button>`).join('')}</div>
         <button type="button" class="ar-tog" data-inc aria-pressed="${st.inc}">Sin factura o remito</button></div>
@@ -386,6 +389,78 @@
           <small><span class="ar-tipo ar-tipo--${esc(a.tipo)}">${esc(NOMBRE_TIPO[a.tipo] || 'Otro')}</span>${esc(a.sinArchivo ? 'sin archivo' : meta)}</small></span>
       </button>
     </div>`;
+  }
+
+  // ---- Entregas: qué llegó y qué falta (PDF para mirar, Excel para trabajar) ----
+
+  const ESTADO_ENT = { sin: 'Sin entregas', parcial: 'Entrega parcial', completa: 'Entregada' };
+  const todosRemitos = () => [].concat(...Object.values(remitosOC));
+  // Las OC de una obra que esperan entregas (las mismas que lista Remitos): las
+  // anuladas, sólo si ya tienen remitos.
+  const ocsDeObra = f => [...ocs.values()].filter(o => (o.obra || 'Sin obra') === f && !SIN_PDF.includes(o.estado) &&
+    (o.estado !== 'anulada' || (remitosOC[o.nro] || []).length)).map(o => o.h);
+  const esperaEntrega = o => (o.h.items || []).length && (!CERRADA.includes(o.estado) || (remitosOC[o.nro] || []).length);
+
+  function tarjetaEntrega(e, titulo, sub) {
+    const w = e.estado === 'sin' ? 0 : Math.max(4, Math.min(100, e.pct));
+    return `<div class="ar-ent ar-ent--${e.estado}">
+      <button type="button" class="ar-ent-ver" data-ent="pdf" title="Ver en PDF qué llegó y qué falta">
+        <span class="ar-ent-tx"><b>${esc(titulo)}</b><small>${esc(sub)}</small></span>
+        <span class="ar-ent-bar"><i style="width:${w}%"></i></span>
+        <span class="ar-ent-cta">${icSvg('eye')}Ver</span>
+      </button>
+      <button type="button" class="ar-ent-xls" data-ent="xls" title="Descargar la planilla Excel">${icSvg('sheet')}Excel</button>
+    </div>`;
+  }
+
+  function entregaOC(o) {
+    if (!esperaEntrega(o) || typeof calcEntrega !== 'function') return '';
+    const e = calcEntrega(o.h, remitosOC[o.nro] || []);
+    const n = e.pedido.length, ok = e.pedido.filter((p, i) => e.recibido[i] >= p).length;
+    const sub = e.estado === 'completa' ? `Llegó todo · ${plural(e.remitos.length, 'remito', 'remitos')}`
+      : e.estado === 'sin' ? `Todavía no llegó nada (${plural(n, 'renglón', 'renglones')})`
+      : `Faltan ${n - ok} de ${plural(n, 'renglón', 'renglones')} · ${plural(e.remitos.length, 'remito', 'remitos')}`;
+    return `<div class="ar-lbl">Entrega</div>` + tarjetaEntrega(e, `${ESTADO_ENT[e.estado]} · ${e.pct}%`, sub);
+  }
+
+  function entregaObra(f) {
+    if (typeof calcEntrega !== 'function') return '';
+    const lista = ocsDeObra(f).filter(h => (h.items || []).length);
+    if (!lista.length) return '';
+    const es = lista.map(h => calcEntrega(h, remitosOC[h.nroOC] || []));
+    const ped = es.reduce((s, e) => s + e.impPedido, 0), rec = es.reduce((s, e) => s + e.impRecib, 0);
+    const pct = ped > 0 ? Math.round(rec / ped * 100) : Math.round(es.reduce((s, e) => s + e.pct, 0) / es.length);
+    const pend = es.filter(e => e.estado !== 'completa').length;
+    const estado = !pend ? 'completa' : es.some(e => e.estado !== 'sin') ? 'parcial' : 'sin';
+    return tarjetaEntrega({ estado, pct }, `Control de entregas · ${pct}%`,
+      pend ? `${pend} de ${plural(lista.length, 'OC', 'OC')} ${pend === 1 ? 'espera' : 'esperan'} material` : `Las ${plural(lista.length, 'OC', 'OC')} están entregadas`);
+  }
+
+  // El PDF se arma con lo que ya está cargado (no baja nada de Drive) y se
+  // abre en el visor; el Excel se descarga.
+  async function verEntrega(tipo) {
+    const o = st.oc && ocs.get(st.oc);
+    const cur = document.querySelector('.ar-fd[aria-current="true"]');
+    const f = st.f || (cur ? cur.dataset.f : '');
+    if (!o && !f) return;
+    try {
+      if (tipo === 'pdf') {
+        const nombre = o ? nombreEntregasPdf.oc(o.h) : nombreEntregasPdf.obra(f);
+        abrirArchivo({
+          nombre,
+          generar: async () => ({
+            blob: o ? await entregasPdfOC(o.h, remitosOC[o.nro] || []) : await entregasPdfObra(f, ocsDeObra(f), todosRemitos()),
+            nombre, mime: 'application/pdf'
+          })
+        });
+      } else {
+        const x = o ? await entregasExcelOC(o.h, remitosOC[o.nro] || []) : await entregasExcelObra(f, ocsDeObra(f), todosRemitos());
+        descargar(x.blob, x.nombre);
+      }
+    } catch (e) {
+      console.error('verEntrega:', e);
+      toast('No se pudo armar el ' + (tipo === 'pdf' ? 'PDF' : 'Excel') + ' de entregas.', 'error');
+    }
   }
 
   function nivel3(id) {
@@ -420,6 +495,7 @@
         <p>${esc(extra)}</p>
         <div class="ar-acts"><button type="button" class="ar-act" data-subir="otro">${icSvg('plus')}Agregar archivo</button>
           ${o.folder ? `<a class="ar-act" href="https://drive.google.com/drive/folders/${esc(o.folder)}" target="_blank" rel="noopener">${icSvg('folder')}Carpeta en Drive</a>` : ''}</div></div>
+      ${entregaOC(o)}
       <div class="ar-lbl">${plural(nArch, 'archivo', 'archivos')}<i>${peso ? fmtPeso(peso) : ''}</i></div>
       <div class="ar-rows">${h}</div>${ext}
       ${c && c.error ? `<p class="ar-nota">No se pudo mirar la carpeta en Drive: el PDF y el presupuesto pueden estar y no figurar.</p>` : ''}`;
@@ -716,16 +792,21 @@
 
     const $t = el.querySelector('.vis-t'), $c = el.querySelector('.vis-c');
     el.querySelector('[data-a="x"]').onclick = () => cerrarVisor();
+    const bDrive = el.querySelector('[data-a="drive"]');
     try {
-      // Los archivos viejos sólo tienen carpeta y nombre: se lo busca.
-      if (!d.fileId && d.folderId && d.nombre) d.fileId = await findFileInFolder(d.folderId, d.nombre);
-      if (!d.fileId) throw new Error('no existe');
-      const bDrive = el.querySelector('[data-a="drive"]');
-      bDrive.href = `https://drive.google.com/file/d/${d.fileId}/view`;
-      bDrive.classList.remove('hidden');
+      let x;
+      // `generar`: un PDF armado al momento (el control de entregas), no está en Drive.
+      if (d.generar) x = await d.generar();
+      else {
+        // Los archivos viejos sólo tienen carpeta y nombre: se lo busca.
+        if (!d.fileId && d.folderId && d.nombre) d.fileId = await findFileInFolder(d.folderId, d.nombre);
+        if (!d.fileId) throw new Error('no existe');
+        bDrive.href = `https://drive.google.com/file/d/${d.fileId}/view`;
+        bDrive.classList.remove('hidden');
 
-      let x = _bajados.get(d.fileId);
-      if (!x) { x = await bajarDriveArchivo(d.fileId); if (!x.nativo) _bajados.set(d.fileId, x); }
+        x = _bajados.get(d.fileId);
+        if (!x) { x = await bajarDriveArchivo(d.fileId); if (!x.nativo) _bajados.set(d.fileId, x); }
+      }
       if (_abierto !== est) return;
       $t.querySelector('b').textContent = x.nombre;
       if (x.nativo) {
@@ -865,6 +946,7 @@
       else if (d.orden) { st.orden = d.orden; pintar(); }
       else if ('inc' in d) { st.inc = !st.inc; pintar(); }
       else if (d.subir) elegirArchivo(d.subir);
+      else if (d.ent) verEntrega(d.ent);
       else if (t.id === 'ar-mas') { limite += PAGINA; pintar(); }
     });
     $('ar-file').addEventListener('change', e => subir(e.target.files && e.target.files[0]));
