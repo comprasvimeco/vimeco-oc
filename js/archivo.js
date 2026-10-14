@@ -352,8 +352,15 @@
   const dots = o => `<span class="ar-dots" title="${DOCS.map(([t, n]) => n + (docsDe(o, t).length ? ': sí' : ': falta')).join(' · ')}">` +
     DOCS.map(([t]) => `<span class="ar-dot ${t} ${docsDe(o, t).length ? 'on' : ''}"></span>`).join('') + `</span>`;
   const leyenda = `<div class="ar-ley">${DOCS.map(([t, n]) => `<span><span class="ar-dot on ${t}"></span>${n}</span>`).join('')}<span><span class="ar-dot"></span>Falta</span></div>`;
-  const etiquetaEstado = o => CERRADA.includes(o.estado)
-    ? `<span class="ar-est ${o.estado === 'pendiente' ? 'ar-est--pend' : ''}">${esc(o.estado.charAt(0).toUpperCase() + o.estado.slice(1))}</span>` : '';
+  // La pendiente dice a quién se le pidió la firma.
+  function etiquetaEstado(o) {
+    if (!CERRADA.includes(o.estado)) return '';
+    if (o.estado === 'pendiente') {
+      const quien = o.h.autorizacion && o.h.autorizacion.solicitadoA && o.h.autorizacion.solicitadoA.nombre;
+      return `<span class="ar-est ar-est--pend">Esperando autorización${quien ? ' de ' + esc(quien) : ''}</span>`;
+    }
+    return `<span class="ar-est">${esc(o.estado.charAt(0).toUpperCase() + o.estado.slice(1))}</span>`;
+  }
 
   function nivel2(f) {
     const todas = [...ocs.values()].filter(o => claveOC(o, st.v) === f);
@@ -372,10 +379,12 @@
         `<button type="button" data-orden="${k}" aria-pressed="${k === st.orden}">${nom}</button>`).join('')}</div>
         <button type="button" class="ar-tog" data-inc aria-pressed="${st.inc}">Sin factura o remito</button></div>
       ${vis.length ? `<div class="ar-rows">` + vis.map(o => {
-        const sub = [st.v === 'mes' ? o.obra : '', fecha(o.ts), plural(archivosDe(o).length, 'archivo', 'archivos')].filter(Boolean).join(' · ');
-        return `<button type="button" class="ar-r" data-oc="${esc(o.id)}" aria-current="${o.id === st.oc}">
-          <span class="ar-r-n">${esc(o.nro)}</span>
-          <span class="ar-r-tx"><b>${esc((otra === 'obra' ? o.obra : o.prov) || '—')}${etiquetaEstado(o)}</b><small>${esc(sub)}</small></span>
+        // Tres renglones: N° (con fecha y estado), proveedor, obra · quien la emitió.
+        const sub = [o.obra || 'Sin obra', o.h.responsable && o.h.responsable.nombre].filter(Boolean).join(' · ');
+        return `<button type="button" class="ar-r ar-r--oc" data-oc="${esc(o.id)}" aria-current="${o.id === st.oc}">
+          <span class="ar-r-tx">
+            <span class="ar-r-l1"><span class="ar-r-n">${esc(o.nro)}</span><span class="ar-r-f">${esc(fecha(o.ts))}</span>${etiquetaEstado(o)}</span>
+            <b>${esc(o.prov || 'Sin proveedor')}</b><small>${esc(sub)}</small></span>
           ${dots(o)}${icSvg('chevron', 'ar-chev')}</button>`;
       }).join('') + `</div>` : `<div class="ar-ph">Todas las OC de esta carpeta tienen factura y remito.</div>`}
       ${l.length > limite ? `<button type="button" class="ar-mas" id="ar-mas">Ver ${Math.min(PAGINA, l.length - limite)} más</button>` : ''}
