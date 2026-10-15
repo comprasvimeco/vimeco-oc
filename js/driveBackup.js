@@ -21,6 +21,7 @@ function esObraPrueba(oc) {
 function esProveedorPrueba(oc) {
   return (oc.proveedor?.nombre || '').trim().toLowerCase() === 'x';
 }
+const esOCPrueba = oc => esObraPrueba(oc) || esProveedorPrueba(oc);
 
 // Clave del registro en /historial (así se guarda en saveOCToHistory).
 function histKeyOf(oc) { return (oc.nroOC || '').replace(/-/g, ''); }

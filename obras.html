@@ -13,6 +13,8 @@
     body { --arq-bg: #fdf0dc; --arq: #8a5a0b; --vial-bg: #e8eefc; --vial: #2c4fa8; --ofi-bg: #efebfd; --ofi: #5a45a8;
       --obr-bg: #e8eef7; --obr: #234870; --per-bg: #fbeedd; --per: #8a4f0d; --rep-bg: #e0f0fb; --rep: #0e6a96; }
     .ob-page { max-width: 1180px; margin: 0 auto; padding: 1rem 1rem 5rem; }
+    /* Presupuesto y plazo (styles.css → .pres-*): la columna de la ficha es angosta, va de a un campo. */
+    #ob-pres .pres-two { grid-template-columns: minmax(0, 1fr); }
 
     .ob-ttl-row { display: flex; align-items: center; gap: .45rem; margin: .3rem 0 .85rem; flex-wrap: wrap; }
     .ob-ttl { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; }
@@ -289,6 +291,7 @@
 <script src="js/ui.js"></script>
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
+<script src="js/presupuesto.js"></script>
 <script src="js/obras.js"></script>
 </body>
 </html>

@@ -1915,3 +1915,30 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
   .eq-dlg-ov { padding: 0; align-items: flex-end; }
   .eq-dlg { border-radius: 20px 20px 0 0; max-height: 94dvh; padding-bottom: calc(.9rem + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Presupuesto y plazo de una obra (js/presupuesto.js, traído de Leva): ficha de Obras y
+   la ventana de la ficha de obra en Reportes. */
+.pres-two { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 .75rem; }
+@media (min-width: 480px) { .pres-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.pres-fld { margin-bottom: .6rem; min-width: 0; }
+.pres-fld > label, .pres-fld > .lb { display: block; font-size: .74rem; font-weight: 600; color: var(--gray-500); margin-bottom: .25rem; }
+.pres-fld .form-control { width: 100%; }
+.pres-num { font-variant-numeric: tabular-nums; }
+.pres-seg { display: flex; gap: 3px; padding: 3px; border-radius: 12px; background: var(--gray-100); }
+.pres-seg button { flex: 1; font: inherit; font-size: .8rem; font-weight: 600; padding: .45rem .5rem; border: 0; border-radius: 9px;
+  min-width: 0; background: none; color: var(--gray-500); cursor: pointer; white-space: nowrap; }
+.pres-seg button.on { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(20, 20, 40, .12); }
+.pres-plazo { display: flex; gap: .4rem; }
+.pres-plazo .form-control { width: 4.5rem; flex: none; text-align: center; }
+.pres-plazo .pres-seg { flex: 1; min-width: 0; }
+.pres-hint { font-size: .78rem; color: var(--gray-500); line-height: 1.4; margin: -.2rem 0 .7rem; }
+.pres-hint:empty { display: none; }
+.pres-mal { color: #a0283e; font-weight: 600; }
+.pres-rub { border-top: 1px solid var(--gray-200); padding-top: .7rem; }
+.pres-rub-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: .45rem; }
+.pres-rub-h b { font-size: .88rem; color: var(--gray-900); }
+.pres-rub-h small { font-size: .74rem; color: var(--gray-500); }
+.pres-rub-r { display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem; }
+.pres-rub-r span { flex: 1; min-width: 0; font-size: .86rem; color: var(--gray-700); overflow-wrap: anywhere; }
+.pres-rub-r .form-control { width: 9.5rem; flex: none; text-align: right; padding: .45rem .7rem; }
+.pres-rub .pres-hint { margin: .3rem 0 0; }

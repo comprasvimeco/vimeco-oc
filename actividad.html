@@ -102,6 +102,14 @@
     .act-pick[class*="act-t-"] { border-color: transparent; }
     .foc-btn--fact { background: #f1e8fb; color: #6b3fa0; }   /* los tonos de las pastillas del Historial */
     .foc-btn--rem  { background: #fbeedd; color: #8a4f0d; }
+
+    /* ---- Datos para corregir (js/novedadesDatos.js): el panel de duplicadas de Historial ---- */
+    button.dup-oc-nro { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; text-align: left;
+      cursor: pointer; text-decoration: underline; text-decoration-color: transparent; }
+    button.dup-oc-nro:hover { text-decoration-color: currentColor; }
+    .datos-mover { display: flex; gap: .45rem; align-items: center; }
+    .datos-mover select { flex: 1; min-width: 0; }
+    .datos-mover .foc-btn { white-space: nowrap; }
     .act-seen-label {
       display: inline-flex; align-items: center; gap: .25rem; padding: 0 .3rem;
       font-size: .74rem; font-weight: 700; color: #1b6b3a;
@@ -152,6 +160,10 @@
     <div id="act-sinrespaldo" class="act-alert hidden"></div>
 
     <div id="act-pendientes" class="act-pend hidden"></div>
+
+    <!-- Datos para corregir (js/novedadesDatos.js): duplicadas y OC con una obra fuera de la lista -->
+    <div id="act-dup" class="dup-panel hidden"></div>
+    <div id="act-sueltas" class="dup-panel hidden"></div>
 
     <input type="search" id="act-search" class="hist-search act-search"
            placeholder="Buscar por artículo, proveedor, obra, responsable, N° OC…">
@@ -231,5 +243,6 @@
 <script src="js/buscarOC.js"></script>
 <script src="js/duplicados.js"></script>
 <script src="js/actividad.js"></script>
+<script src="js/novedadesDatos.js"></script>
 </body>
 </html>

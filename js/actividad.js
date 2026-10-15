@@ -515,6 +515,7 @@ function abrirFicha(oc) {
     `<div id="foc-docs">${docsListasHtml(facts, rems)}</div>` + fichaInfoHtml(cmp.info) + comparacionHtml(cmp.cambios));
   // La ficha del remito se abre encima de ésta.
   bindDocsOC(modal, oc, facts, rems, { encima: true });
+  if (typeof datosFicha === 'function') datosFicha(oc);   // «Eliminar», si puede (novedadesDatos.js)
 
   // Drive: sólo si la OC ya tiene su carpeta registrada. A las que no tienen
   // PDF (pendientes, rechazadas, canceladas) no se les reclama el respaldo.
@@ -683,6 +684,7 @@ async function cargarPaneles(code) {
   histAll        = hist;
   ocPorNro       = new Map(hist.map(oc => [oc.nroOC, oc]));
   render();   // ahora las tarjetas ofrecen la ficha y la búsqueda alcanza los ítems
+  if (typeof datosCargar === 'function') datosCargar(hist);   // duplicadas y obras sueltas (novedadesDatos.js)
   sinRespaldoOCs = ocsSinRespaldo(hist);
   pendientesOCs  = ocsPendientes(hist);
   renderSinRespaldo();

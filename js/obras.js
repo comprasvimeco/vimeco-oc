@@ -1,7 +1,8 @@
 /* VIMECO S.A. — Gestión de Obras (solo 0000)
    Lista agrupada por categoría con buscador y filtros a la izquierda y la
    ficha de la obra a la derecha (en el teléfono, una a la vez, con ?o=clave en
-   la URL). La ficha junta uso, datos, Personal y rubros; se guarda todo junto
+   la URL). La ficha junta uso, datos, Personal, rubros y presupuesto y plazo
+   (js/presupuesto.js, traído de Leva para Reportes); se guarda todo junto
    con la barra de abajo, que aparece sólo si hay cambios. */
 
 const $ = id => document.getElementById(id);
@@ -33,6 +34,7 @@ let selKey      = null;
 let orig        = null;    // estado guardado de la ficha abierta
 let draft       = null;    // lo que se está editando
 let editRubro   = -1;      // índice del rubro que se está renombrando
+let presAbierto = false;   // la tarjeta de presupuesto, desplegada aunque esté vacía
 
 // ---- Uso de cada obra ----
 // Las OC, los remitos y los egresos de Caja guardan el NOMBRE de la obra (no la
@@ -261,9 +263,11 @@ function estadoDe(o) {
     jornada: c.jornadaHoras ?? 8, comida: Number(c.valorComida) || 0,
     jefes: Object.keys(o.jefes || {}).sort(),
     rubros: rubrosList(o.rubros).map(r => ({ id: r.id, nombre: r.nombre })),
-    rubrosCerrados: !!o.rubrosCerrados && rubrosList(o.rubros).length > 0
+    rubrosCerrados: !!o.rubrosCerrados && rubrosList(o.rubros).length > 0,
+    pres: presEdicion(o)
   };
 }
+const idsRubros = e => e.rubros.map(r => r.id);
 function cambios() {
   if (!orig || !draft) return [];
   const out = [];
@@ -276,6 +280,7 @@ function cambios() {
   const rk = l => JSON.stringify(l.map(r => [r.id, r.nombre.trim()]));
   if (rk(draft.rubros) !== rk(orig.rubros)) out.push('rubros');
   if (draft.rubrosCerrados !== orig.rubrosCerrados) out.push('rubrosCerrados');
+  if (presClave(draft.pres, idsRubros(draft)) !== presClave(orig.pres, idsRubros(orig))) out.push('presupuesto');
   return out;
 }
 const hayCambios = () => cambios().length > 0;
@@ -360,6 +365,19 @@ function rubrosHtml() {
     <div class="ob-rub-new"><input type="text" id="ob-rub-nuevo" class="form-control" placeholder="Nuevo rubro, ej: Instalación eléctrica"><button type="button" class="foc-btn foc-btn--clear" id="ob-rub-add">${icSvg('plus')}Agregar</button></div></div>`;
 }
 
+// Presupuesto y plazo (js/presupuesto.js): vacío, sólo la invitación a cargarlo.
+function presupuestoHtml() {
+  const vacio = presVacio(draft.pres) && presVacio(orig.pres);
+  const head = `<div class="ob-sec-h"><span class="ob-sq sm t-rep">${icSvg('dollar')}</span><b>Presupuesto y plazo</b></div>
+    <div class="ob-hint" style="margin-top:0">Opcional. De compras: lo que pasa por OC. Con ellos, Reportes muestra cuánto del presupuesto se usó y si la obra gasta más rápido de lo que avanza el plazo.</div>`;
+  if (vacio && !presAbierto) {
+    return `<div class="ob-card" id="ob-pres">${head}
+      <div style="margin-top:.7rem"><button type="button" class="foc-btn foc-btn--gen" id="ob-pres-abrir">${icSvg('plus')}Cargar presupuesto</button></div></div>`;
+  }
+  return `<div class="ob-card" id="ob-pres">${head}<div style="margin-top:.7rem">${presFormHtml(draft.pres, draft.rubros)}</div>
+    ${presVacio(draft.pres) ? '' : `<div style="margin-top:.8rem"><button type="button" class="foc-btn foc-btn--del" id="ob-pres-quitar">${icSvg('trash')}Quitar presupuesto y plazo</button></div>`}</div>`;
+}
+
 function estadoHtml(o) {
   return `<div class="ob-card">${o.activa
     ? `<div><button type="button" class="foc-btn foc-btn--del" id="ob-toggle">${icSvg('power')}Desactivar obra</button></div><div class="ob-hint">Deja de aparecer al hacer una OC, un remito o un egreso de Caja. Lo cargado queda.</div>`
@@ -382,7 +400,8 @@ function renderFicha() {
   if (sinMov(o)) meta.push(marcasHtml(o).match(/<span class="ob-pm t-warn">.*?<\/span>/)?.[0] || '');
   const head = `<div class="ob-card"><div class="ob-fhead">${catSq({ ...o, categoria: c }, ' lg')}
     <div class="id"><div class="nm">${esc(draft.nombre.trim() || o.nombre)}</div><div class="meta">${meta.join('')}</div></div></div></div>`;
-  cont.innerHTML = head + `<div class="ob-fcols"><div>${usoHtml(o)}${datosHtml()}${personalHtml()}</div><div>${rubrosHtml()}${estadoHtml(o)}</div></div>`;
+  cont.innerHTML = head + `<div class="ob-fcols"><div>${usoHtml(o)}${datosHtml()}${personalHtml()}</div><div>${rubrosHtml()}${presupuestoHtml()}${estadoHtml(o)}</div></div>`;
+  presPintarCalc(draft.pres, draft.rubros, cont);
   pintarBarra();
   if (editRubro >= 0) { const i = $('ob-rub-edit'); if (i) { i.focus(); i.select(); } }
 }
@@ -396,6 +415,7 @@ async function abrirFicha(key, { push = true } = {}) {
   orig  = o ? estadoDe(o) : null;
   draft = o ? JSON.parse(JSON.stringify(orig)) : null;
   editRubro = -1;
+  presAbierto = false;
   renderLista();
   renderFicha();
   if (o) mostrarFicha(true, push);
@@ -422,6 +442,7 @@ function deshacer() {
   if (!orig) return;
   draft = JSON.parse(JSON.stringify(orig));
   editRubro = -1;
+  presAbierto = false;
   renderFicha();
 }
 
@@ -450,6 +471,8 @@ async function guardarFicha() {
   if (otra) { showToast(`Ya hay otra obra que se llama "${otra.nombre}".`, 'error'); renderFicha(); return; }
   if (draft.rubros.some(r => !r.nombre.trim())) { showToast('Hay rubros sin nombre.', 'error'); renderFicha(); return; }
   const ch = new Set(cambios());
+  const pres = ch.has('presupuesto') ? presNodos(draft.pres, idsRubros(draft)) : null;
+  if (pres && pres.error) { showToast(pres.error, 'error'); return; }
 
   // Renombrar: las OC, remitos y egresos guardan el nombre y pasan al nuevo.
   let r = null;
@@ -489,6 +512,7 @@ async function guardarFicha() {
     // Sin rubros no hay lista que cerrar: el flag no puede quedar en true.
     f.rubrosCerrados = !!(draft.rubros.length && draft.rubrosCerrados);
   }
+  if (pres) { f.presupuesto = pres.presupuesto; f.plazo = pres.plazo; }
 
   const btn = $('ob-save');
   btn.disabled = true;
@@ -524,6 +548,7 @@ function onFichaInput(e) {
   if (t.id === 'ob-jornada') draft.jornada = t.value === '' ? 0 : parseFloat(t.value);
   if (t.id === 'ob-comida') draft.comida = parsePesos(t.value);
   if (t.id === 'ob-rub-edit' && draft.rubros[editRubro]) draft.rubros[editRubro].nombre = t.value;
+  if (presOnInput(draft.pres, t)) presPintarCalc(draft.pres, draft.rubros, $('ob-ficha'));
   pintarBarra();
 }
 function onFichaChange(e) {
@@ -537,6 +562,9 @@ function onFichaChange(e) {
 async function onFichaClick(e) {
   const b = e.target.closest('button');
   if (!b) return;
+  if (presOnClick(draft.pres, b)) { renderFicha(); return; }
+  if (b.id === 'ob-pres-abrir') { presAbierto = true; renderFicha(); $('pres-total')?.focus(); return; }
+  if (b.id === 'ob-pres-quitar') { draft.pres = presEdicion(null); presAbierto = !presVacio(orig.pres); renderFicha(); return; }
   if (b.dataset.cat) {
     draft.categoria = draft.categoria === b.dataset.cat ? null : b.dataset.cat;
     renderFicha();
@@ -565,6 +593,7 @@ async function onFichaClick(e) {
 }
 function onFichaFocusOut(e) {
   const t = e.target;
+  presOnBlur(t);
   if (t.id === 'ob-comida') t.value = draft.comida ? fmtMiles(draft.comida) : '';
   if (t.id === 'ob-rub-edit') {
     const r = draft.rubros[editRubro];
@@ -760,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ficha.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     if (e.target.id === 'ob-rub-nuevo') { e.preventDefault(); agregarRubro(); }
-    else if (['ob-nom', 'ob-lugar', 'ob-jornada', 'ob-comida', 'ob-rub-edit'].includes(e.target.id)) { e.preventDefault(); e.target.blur(); }
+    else if (['ob-nom', 'ob-lugar', 'ob-jornada', 'ob-comida', 'ob-rub-edit'].includes(e.target.id) || e.target.classList.contains('pres-num')) { e.preventDefault(); e.target.blur(); }
   });
 
   $('ob-undo').addEventListener('click', deshacer);

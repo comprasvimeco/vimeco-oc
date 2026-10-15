@@ -61,6 +61,7 @@ const STATIC_ASSETS = [
   BASE + '/js/scanner.js',
   BASE + '/actividad.html',
   BASE + '/js/actividad.js',
+  BASE + '/js/novedadesDatos.js',
   BASE + '/personal-config.html',
   BASE + '/js/personal-config.js',
   BASE + '/personal.html',
@@ -75,6 +76,10 @@ const STATIC_ASSETS = [
   BASE + '/assets/fonts/geist.woff2',
   BASE + '/assets/fonts/plus-jakarta-sans.woff2',
   BASE + '/js/reportes.js',
+  BASE + '/js/reportesObras.js',
+  BASE + '/js/reportesTablero.js',
+  BASE + '/js/reportesResumen.js',
+  BASE + '/js/presupuesto.js',
   BASE + '/js/resumenPDF.js',
   BASE + '/js/dolar.js',
   BASE + '/js/push.js'

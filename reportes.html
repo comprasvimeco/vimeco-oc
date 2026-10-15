@@ -9,586 +9,270 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .rep-wrap { max-width: 1240px; margin: 0 auto; padding: 1.1rem 1rem 3rem; }
-
-    /* ---- Cabecera: título + pastillas (celeste de Reportes) ---- */
-    .rp-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-bottom: .85rem; }
-    .rp-t { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .25rem 0 0; white-space: nowrap; line-height: 1.2; }
-    .rp-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .34rem .75rem; border-radius: 999px;
-      background: var(--white); border: 1px solid var(--gray-200); color: var(--primary-dark);
-      font: inherit; font-size: .82rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
-    .rp-pill .icon { width: 14px; height: 14px; color: var(--gray-500); flex: none; }
-    .rp-pill--sky { background: #e0f0fb; border-color: transparent; color: #0e6a96; }
-    .rp-pill--sky .icon { color: #0e6a96; }
-    .rp-nav { display: inline-flex; align-items: center; background: var(--white); border: 1px solid var(--gray-200); border-radius: 999px; }
-    .rp-nav span { font-size: .82rem; font-weight: 700; color: var(--primary-dark); white-space: nowrap; }
-    .rp-nav.rp-nav-off span { padding: .34rem .8rem; }
-    .rp-arrow { width: 30px; height: 30px; border: none; background: none; border-radius: 999px; padding: 0;
-      display: inline-grid; place-items: center; color: var(--gray-500); cursor: pointer; }
-    .rp-arrow:hover:not(:disabled) { background: var(--gray-100); color: var(--primary-dark); }
-    .rp-arrow:disabled { color: var(--gray-300); cursor: default; }
-    .rp-arrow .icon { width: 15px; height: 15px; }
-    .rp-nav.rp-nav-off .rp-arrow { display: none; }
-    /* Filtro por obra / equipo: pastilla celeste con la cruz para quitarlo. */
-    .rp-filtros { display: contents; }
-    .rp-filtros.hidden { display: none; }
-    .rh-filtro { display: inline-flex; align-items: center; gap: .4rem; max-width: 100%; background: #0e6a96; color: #fff;
-      border: none; border-radius: 999px; padding: .34rem .6rem .34rem .8rem; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
-    .rh-filtro-k { font-size: .66rem; font-weight: 600; opacity: .8; }
-    .rh-filtro-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16rem; }
-    .rh-filtro .icon { width: 13px; height: 13px; flex: none; }
-
-    /* ---- Columna de período y moneda (escritorio) / hoja (teléfono) ---- */
-    .rp-layout { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 1.1rem; align-items: start; }
-    .rp-rail { position: sticky; top: .8rem; display: flex; flex-direction: column; gap: .7rem; }
-    .rp-box { background: var(--white); border-radius: 14px; padding: .8rem .85rem;
-      box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); }
-    .rp-h { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); margin-bottom: .45rem; }
-    .rp-h2 { margin-top: .8rem; }
-    .rp-opts { display: flex; flex-wrap: wrap; gap: .3rem; }
-    .rp-opts button { border: none; border-radius: 999px; padding: .3rem .7rem; background: var(--gray-100); color: var(--gray-600);
-      font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
-    .rp-opts button:hover { background: #e9edf2; }
-    .rp-opts button.active { background: #e0f0fb; color: #0e6a96; box-shadow: inset 0 0 0 1px #b9dcf0; }
-    .rp-dates { display: grid; grid-template-columns: 1fr; gap: .4rem; }
-    .rp-dates label { display: flex; flex-direction: column; gap: .15rem; font-size: .68rem; font-weight: 700; color: var(--gray-500); }
-    .rp-dates input { padding: .38rem .5rem; border: 1px solid var(--gray-300); border-radius: 9px; font: inherit; font-size: .82rem;
-      color: var(--gray-700); background: var(--white); }
-    .rp-hint { font-size: .72rem; color: var(--gray-500); margin-top: .5rem; line-height: 1.4; }
-    .rp-hint strong { color: var(--gray-700); }
-    .rp-grab, .rp-shade, .rp-listo { display: none; }
-    .rp-only-tel { display: none; }
-
-    /* ---- Buscador ---- */
-    .rp-q { display: flex; align-items: center; gap: .6rem; background: var(--white); border: 2px solid #cfe6f4; border-radius: 14px;
-      padding: .15rem .9rem; margin-bottom: .9rem; cursor: text; box-shadow: 0 6px 18px -12px rgba(20,121,168,.5); }
-    .rp-q:focus-within { border-color: #7fbfe3; }
-    .rp-q > .icon { width: 18px; height: 18px; color: #0e6a96; flex: none; }
-    .rp-q input { flex: 1; min-width: 0; border: none; outline: none; background: none; font: inherit; font-size: .95rem; padding: .6rem 0; color: var(--gray-800); }
-
-    /* ---- Total + evolución ---- */
-    .rp-main { min-width: 0; }
-    .rp-dash { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; }
-    .rp-sum { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 1rem; padding: 1rem 1.1rem; }
-    .rp-sum-l { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
-    .rp-k { font-size: .78rem; font-weight: 700; color: var(--gray-500); }
-    .rp-v { font-size: 2rem; font-weight: 800; color: var(--primary-dark); line-height: 1.1; letter-spacing: -.01em; word-break: break-word; font-variant-numeric: tabular-nums; }
-    .rp-s { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; font-size: .82rem; color: var(--gray-500); margin-top: .15rem; }
-    .rp-var { display: inline-flex; align-items: center; gap: .25rem; font-size: .74rem; font-weight: 700; border-radius: 999px; padding: .16rem .55rem; white-space: nowrap; }
-    .rp-var .icon { width: 11px; height: 11px; }
-    .rp-var--up { background: #fbeedd; color: #8a4f0d; }
-    .rp-var--dn { background: #dff3e5; color: #1a7f3c; }
-    .rp-var--eq { background: var(--gray-100); color: var(--gray-600); }
-    .rp-mini { display: flex; flex-direction: column; gap: .35rem; margin-top: .8rem; padding-top: .7rem; border-top: 1px solid var(--gray-100); }
-    .rp-mini-i { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--gray-600); }
-    .rp-mini-i b { color: var(--primary-dark); font-variant-numeric: tabular-nums; }
-    .rp-mini-i .rp-ic { width: 24px; height: 24px; border-radius: 7px; }
-    .rp-mini-i .rp-ic .icon { width: 12px; height: 12px; }
-    .rp-mini-i.rp-mini--alert b { color: #b02a2a; }
-    .rp-sum-r { min-width: 0; }
-    .rp-sum-h { display: flex; align-items: center; margin-bottom: .2rem; }
-    .rp-sum-t { font-size: .84rem; font-weight: 700; color: var(--primary-dark); }
-    .rp-sum-h .rep-line-leg { margin: 0 0 0 auto; }
-
-    /* Íconos de sección en cuadrado pastel */
-    .rp-ic { width: 28px; height: 28px; border-radius: 8px; display: inline-grid; place-items: center; flex: none; }
-    .rp-ic .icon { width: 14px; height: 14px; }
-    .rp-ic--sky  { background: #e0f0fb; color: #0e6a96; }
-    .rp-ic--blue { background: #e8eef7; color: #234870; }
-    .rp-ic--tea  { background: #dcf3ef; color: #16695f; }
-    .rp-ic--gray { background: #eef0f3; color: #4b5563; }
-    .rp-ic--amb  { background: #fbeedd; color: #8a4f0d; }
-    .rp-ic--vio  { background: #f1e8fb; color: #6b3fa0; }
-    .rp-ic--red  { background: #fde6e6; color: #b02a2a; }
-
-    .rp-grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
-
-    /* ---- Obras: una tarjeta por obra ---- */
-    .ob-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .7rem; }
-    .ob-t { display: flex; flex-direction: column; gap: .4rem; text-align: left; background: var(--white); border: 1px solid var(--gray-200);
-      border-top: 3px solid var(--h-mark, var(--gray-300)); border-radius: 12px; padding: .65rem .75rem .55rem; font: inherit; cursor: pointer;
-      min-width: 0; transition: box-shadow .15s, transform .15s; }
-    .ob-t:hover { box-shadow: 0 8px 20px -12px rgba(26,58,92,.45); transform: translateY(-1px); }
-    .ob-t.on { background: #f3f9fd; border-color: #7fbfe3; }
-    .ob-h { display: flex; align-items: center; gap: .5rem; min-width: 0; }
-    .ob-n { min-width: 0; flex: 1; }
-    .ob-n b { display: block; color: var(--primary-dark); font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ob-n span { font-size: .72rem; color: var(--gray-500); }
-    .ob-m { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-    .ob-m b { font-size: 1.25rem; font-weight: 800; color: var(--primary-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .ob-p { font-size: .72rem; color: var(--gray-500); font-weight: 600; }
-    .ob-s { width: 132px; }
-    .ob-s svg { display: block; }
-    .ob-ms { display: flex; justify-content: space-between; font-size: .6rem; color: var(--gray-400); margin-top: 2px; }
-    .ob-f { display: flex; align-items: center; justify-content: space-between; gap: .4rem; border-top: 1px solid var(--gray-100); padding-top: .4rem; }
-    .ob-st { display: inline-flex; align-items: center; gap: .3rem; font-size: .7rem; font-weight: 700; border-radius: 999px; padding: .14rem .55rem; white-space: nowrap; }
-    .ob-st--venc { background: #fde6e6; color: #b02a2a; }
-    .ob-st--venc::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; }
-    .ob-st--sin  { background: var(--gray-100); color: var(--gray-600); }
-    .ob-st--ok   { background: #dff3e5; color: #1a7f3c; }
-    .ob-go { font-size: .74rem; font-weight: 700; color: #0e6a96; display: inline-flex; align-items: center; gap: .1rem; white-space: nowrap; }
-    .ob-go .icon { width: 12px; height: 12px; }
-    .ob-more { grid-column: 1 / -1; justify-self: center; background: #e0f0fb; color: #0e6a96; border: none; border-radius: 999px;
-      padding: .35rem 1rem; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
-    .rp-orden { display: inline-flex; gap: .25rem; }
-    .rp-orden button { border: none; border-radius: 999px; padding: .26rem .65rem; background: var(--gray-100); color: var(--gray-600);
-      font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
-    .rp-orden button.active { background: #e0f0fb; color: #0e6a96; }
-
-    /* Repuestos / Mantenimiento: una línea arriba de los equipos */
-    .rp-catsum { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .5rem; }
-    .rp-catsum:empty { display: none; }
-    .rp-cat { display: inline-flex; align-items: center; gap: .35rem; font-size: .76rem; font-weight: 700; border-radius: 999px; padding: .2rem .65rem; }
-    .rp-cat b { font-variant-numeric: tabular-nums; }
-    .rp-cat--rep { background: #e8eef7; color: #234870; }
-    .rp-cat--man { background: #f1e8fb; color: #6b3fa0; }
-    .rp-cat--sin { background: var(--gray-100); color: var(--gray-600); }
-
-    /* ---- Resultado de la búsqueda ---- */
-    .rp-busca { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; }
-    .rb-sum { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .9rem 1.1rem; }
-    .rb-sum .rp-k { width: 100%; }
-    .rb-tot { font-size: 1.6rem; font-weight: 800; color: var(--primary-dark); font-variant-numeric: tabular-nums; }
-    .rb-meta { font-size: .84rem; color: var(--gray-500); }
-    .rb-todo { margin-left: auto; }
-    .rb-cols { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
-    .rb-card { padding: .9rem 1rem; }
-    .rb-h { display: flex; align-items: center; gap: .5rem; margin-bottom: .55rem; }
-    .rb-h b { color: var(--primary-dark); font-size: .95rem; }
-    .rb-h .rep-ch-n { margin-left: .1rem; }
-    .rb-p { display: grid; grid-template-columns: 3.1rem minmax(0, 1fr) auto; gap: .2rem .6rem; align-items: center;
-      padding: .45rem .3rem; border-bottom: 1px solid var(--gray-100); cursor: pointer; border-radius: 8px; }
-    .rb-p:last-child { border-bottom: none; }
-    .rb-p:hover { background: #f3f9fd; }
-    .rb-d { font-size: .74rem; color: var(--gray-500); font-variant-numeric: tabular-nums; line-height: 1.2; }
-    .rb-d b { display: block; font-size: .95rem; color: var(--primary-dark); }
-    .rb-i { min-width: 0; }
-    .rb-i .rb-desc { display: block; font-size: .84rem; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rb-i .rb-prov { display: block; font-size: .74rem; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rb-u { text-align: right; white-space: nowrap; }
-    .rb-u b { display: block; font-size: .9rem; color: var(--primary-dark); font-variant-numeric: tabular-nums; }
-    .rb-u span { font-size: .7rem; color: var(--gray-500); }
-    .rb-min { display: inline-block; font-size: .64rem; font-weight: 700; background: #dff3e5; color: #1a7f3c; border-radius: 999px; padding: 0 .4rem; margin-left: .3rem; }
-    .rb-more { display: block; margin: .5rem auto 0; background: #e0f0fb; color: #0e6a96; border: none; border-radius: 999px;
-      padding: .3rem .9rem; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
-    .rb-ob { display: flex; align-items: center; gap: .5rem; padding: .4rem 0; border-bottom: 1px solid var(--gray-100); font-size: .84rem; }
-    .rb-ob:last-child { border-bottom: none; }
-    .rb-ob span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--gray-700); }
-    .rb-ob b { color: var(--primary-dark); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .rb-ob small { color: var(--gray-500); font-size: .72rem; min-width: 2.6rem; text-align: right; }
-    .rb-nota { font-size: .74rem; color: var(--gray-500); margin-top: .5rem; }
-    .rp-buscando .rp-dash, .rp-buscando .rp-grid2 { display: none; }
-    #rep-res-card + .rp-grid2 { margin-top: 1rem; }
-    .rp-pdf { padding: .34rem .75rem; font-size: .8rem; }
-    .rr-v small { font-size: .74rem; font-weight: 600; color: var(--gray-500); }
-    .rr-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-
-    /* ---- OC duplicadas ---- */
-    /* Tono de alerta ámbar para separarla de las tarjetas
-       de análisis: es algo a corregir, no a leer. */
-    #rep-dup-card { border: 1px solid #f0dca8; }
-    #rep-dup-card .card-header { background: #fff8ec; border-bottom: 1px solid #f0dca8; }
-    #rep-dup-card .card-title { color: #8a5a00; }
-    #rep-dup-card .rep-chev { color: #b8860b; }
-    #rep-dup-card.collapsed > .card-header { border-bottom: none; }
-    .rep-dup-count { font-size: .74rem; font-weight: 700; color: #8a5a00; }
-    .rep-dup-g { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .5rem .6rem; margin-bottom: .6rem; }
-    .rep-dup-g:last-child { margin-bottom: 0; }
-    .rep-dup-head { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem;
-      flex-wrap: wrap; margin-bottom: .4rem; }
-    .rep-dup-prov { font-size: .84rem; font-weight: 800; color: var(--gray-700); }
-    .rep-dup-meta { font-size: .74rem; color: var(--gray-500); font-variant-numeric: tabular-nums; }
-    .rep-dup-oc { display: flex; align-items: center; gap: .5rem; padding: .3rem 0;
-      border-top: 1px solid var(--gray-100); }
-    .rep-dup-ver { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start;
-      gap: .1rem; background: none; border: none; padding: .2rem; cursor: pointer; text-align: left; border-radius: 6px; }
-    .rep-dup-ver:hover { background: #eef3fa; }
-    .rep-dup-nro { font-family: 'Courier New', monospace; font-size: .76rem; font-weight: 700; color: var(--primary); }
-    /* Monto de cada OC a la derecha y, debajo, cuánto difiere de la primera del grupo. */
-    .rep-dup-monto { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: .05rem; }
-    .rep-dup-tot { font-size: .84rem; font-weight: 800; color: var(--gray-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .rep-dup-dif { font-size: .7rem; color: var(--gray-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .rep-dup-sub { font-size: .72rem; color: var(--gray-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-    .rep-dup-del { flex-shrink: 0; }
-    .rep-dup-foot { display: flex; justify-content: flex-end; padding-top: .45rem; border-top: 1px solid var(--gray-100); }
-    @media print { #rep-dup-card { break-inside: avoid; } .rep-dup-del, .rep-dup-foot { display: none !important; } }
-
-    /* ---- Secciones ---- */
-    /* Las tarjetas grandes (hero de análisis) van a ancho completo, apiladas.
-       Los rankings secundarios van en una grilla masonry (columnas que se
-       rellenan por altura) para que no queden huecos al lado de una tarjeta
-       corta — lo que pasaba con "Repuestos vs Mant." al lado de "Gasto Equipo". */
-    .rep-sections { display: flex; flex-direction: column; gap: 1.25rem; }
-    .rep-card { margin-bottom: 0; }
-    .rep-masonry { column-count: 2; column-gap: 1.25rem; }
-    .rep-masonry > .rep-card { break-inside: avoid; display: inline-block; width: 100%;
-      vertical-align: top; margin: 0 0 1.25rem; }
-    .rep-card .card-header { background: var(--white); border-bottom: 1px solid var(--gray-200); }
-    .rep-card .card-title { font-size: .9rem; }
-    .rep-card .card-body { padding: 1rem 1.15rem; }
-
-    /* ---- Cards desplegables (mismo idioma que el acordeón de la OC) ---- */
-    .rep-card[data-card] > .card-header { cursor: pointer; user-select: none; gap: .5rem .8rem; flex-wrap: wrap; }
-    .rep-card[data-card] > .card-header:focus-visible { outline: 2px solid var(--primary-light); outline-offset: -2px; }
-    .rep-chev { display: inline-flex; color: var(--primary-light); transition: transform .2s ease; }
-    .rep-chev .icon { width: 15px; height: 15px; display: block; }
-    .rep-card.collapsed .rep-chev { transform: rotate(-90deg); }
-    .rep-card.collapsed > .card-header { border-bottom: none; }
-    .rep-card.collapsed > .card-body { display: none; }
-    /* Buscador y controles se van con el cuerpo: no sirven de nada plegados. */
-    .rep-card.collapsed .rep-ch-r { display: none; }
-    /* Contador de filas: cuántas hay, cuántas se muestran, cuántas matchean. */
-    .rep-ch-n { font-size: .68rem; font-weight: 700; color: var(--gray-500); white-space: nowrap;
-      border: 1px solid var(--gray-200); border-radius: 999px; padding: .05rem .45rem; }
-    .rep-ch-r { display: inline-flex; align-items: center; gap: .5rem; }
-    .rep-q { width: 160px; max-width: 42vw; cursor: text; user-select: text; padding: .3rem .55rem; font: inherit; font-size: .78rem;
-      color: var(--gray-700); background: var(--white); border: 1px solid var(--gray-300); border-radius: var(--radius); }
-    .rep-q:focus { outline: 2px solid var(--primary-light); outline-offset: -1px; }
-
-    /* ---- Participación por obra (part-to-whole) ---- */
-    /* Tonos suaves con burbujas de texto, como las pastillas de factura. Los
-       colores vienen por variable (--h-mark / --h-bg / --h-ink) desde el JS. */
-    .rep-share-track { display: flex; gap: 3px; height: 34px; margin-bottom: 1.1rem; }
-    .rep-share-seg { min-width: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden;
-      background: var(--h-mark); border-radius: 6px; transition: filter .15s, transform .15s; }
-    .rep-share-seg:first-child { border-radius: 10px 6px 6px 10px; }
-    .rep-share-seg:last-child  { border-radius: 6px 10px 10px 6px; }
-    .rep-share-seg:only-child  { border-radius: 10px; }
-    .rep-share-seg:hover { filter: brightness(1.06); transform: translateY(-1px); }
-    .rep-share-seg[data-obra], .rep-share-pick { cursor: pointer; }
-    .rep-share-pick:hover .rep-share-lbl { color: var(--primary); }
-    /* El % va escrito directo sobre el color, en blanco con una sombra mínima para que se lea. */
-    .rep-share-pill { white-space: nowrap; color: #fff; font-size: .74rem; font-weight: 800; font-variant-numeric: tabular-nums;
-      letter-spacing: .01em; text-shadow: 0 1px 2px rgba(15,30,50,.28); }
-    .rep-share-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .15rem 1.4rem; }
-    .rep-share-item { display: flex; align-items: center; gap: .55rem; font-size: .83rem; min-width: 0;
-      padding: .4rem 0; border-bottom: 1px solid var(--gray-100); }
-    .rep-share-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; background: var(--h-mark);
-      box-shadow: 0 0 0 3px var(--h-bg); }
-    .rep-share-lbl { color: var(--gray-700); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
-    .rep-share-val { color: var(--gray-500); font-size: .76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .rep-share-pct { background: var(--h-bg); color: var(--h-ink); font-weight: 700; font-size: .74rem;
-      font-variant-numeric: tabular-nums; border-radius: 999px; padding: .08rem .5rem; min-width: 3.3rem; text-align: center; }
-    /* "Otras N obras": se despliega para ver cuáles son. */
-    .rep-share-otras { width: 100%; background: none; border: none; border-bottom: 1px solid var(--gray-100);
-      font: inherit; font-size: .83rem; text-align: left; cursor: pointer; border-radius: 0; }
-    .rep-share-otras:hover .rep-share-lbl { color: var(--primary); }
-    .rep-share-otras .rep-share-lbl { text-decoration: underline dotted var(--gray-400); text-underline-offset: 3px; }
-    .rep-share-chev { display: inline-flex; color: var(--gray-400); transition: transform .18s; }
-    .rep-share-chev .icon { width: 13px; height: 13px; }
-    .rep-share-otras.open .rep-share-chev { transform: rotate(90deg); }
-    .rep-share-rest { margin-top: .6rem; background: #f8fafd; border: 1px solid var(--gray-100); border-left: 3px solid #b8c0cc;
-      border-radius: 10px; padding: .25rem .8rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 1.4rem; }
-    .rep-share-rest-i { display: flex; align-items: center; gap: .55rem; font-size: .8rem; padding: .35rem 0; min-width: 0;
-      border-bottom: 1px solid #edf1f6; }
-    .rep-share-rest-p { font-size: .72rem; font-weight: 700; color: #4b5563; font-variant-numeric: tabular-nums; min-width: 2.8rem; text-align: right; }
-
-    /* ---- Evolución mensual ---- */
-    .rep-line { position: relative; }
-    .rep-line-svg { display: block; max-width: 100%; }
-    .rep-grid { stroke: var(--gray-200); stroke-width: 1; }
-    .rep-axis { fill: var(--gray-500); font-size: 10px; font-family: inherit; }
-    .rep-line-svg .rep-line { fill: none; stroke: #2557a7; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-    .rep-dot { fill: #2557a7; stroke: var(--white); stroke-width: 2; }
-    .rep-dot-last { fill: var(--accent, #c8a852); }
-    .rep-line-svg .rep-line-prev { fill: none; stroke: #9aa5b4; stroke-width: 1.6; stroke-dasharray: 5 4;
-      stroke-linejoin: round; stroke-linecap: round; }
-    .rep-dot-prev { fill: #fff; stroke: #9aa5b4; stroke-width: 2; }
-    .rep-line-leg { display: flex; gap: 1.1rem; justify-content: flex-end; font-size: .74rem; color: var(--gray-600);
-      font-weight: 600; margin-bottom: .3rem; }
-    .rep-leg-i { display: inline-flex; align-items: center; gap: .4rem; }
-    .rep-leg-cur  { width: 18px; height: 3px; border-radius: 2px; background: #2557a7; }
-    .rep-leg-prev { width: 18px; height: 0; border-top: 2px dashed #9aa5b4; }
-    .rep-tip-prev { color: rgba(255,255,255,.72); font-size: .7rem; margin-top: .15rem;
-      padding-top: .2rem; border-top: 1px solid rgba(255,255,255,.18); }
-    .rep-dot-on { r: 5.5; }
-    .rep-cross { stroke: var(--gray-300); stroke-width: 1; }
-    .rep-tip {
-      position: absolute; pointer-events: none; z-index: 5;
-      background: var(--gray-900, #111827); color: #fff; border-radius: 6px;
-      padding: .4rem .6rem; font-size: .76rem; line-height: 1.35;
-      display: flex; flex-direction: column; white-space: nowrap;
-      box-shadow: var(--shadow);
+    /* ===== Reportes (rediseño traído de Leva) =====
+       Todo color sale de un token, con los tonos de VIMECO. Las obras de los
+       gráficos: las cuatro que más gastaron, con colores distinguibles para
+       daltonismo; el resto, «Otras» en gris. */
+    body.rx-page {
+      --ink: #1a3a5c; --ink-2: #64708a; --surface: #ffffff; --sunk: #f1f4f9; --line: #e2e7ef;
+      --lila: #2557a7; --lila-deep: #234870; --lila-soft: #e3ecf8;
+      --menta-bg: #ddf5e8; --menta-fg: #1d6b45; --durazno-bg: #ffe7d6; --durazno-fg: #9a4a16; --rosa-bg: #fbe1e6; --rosa-fg: #a0283e;
+      --shadow-leva: 0 1px 2px rgba(26,58,92,.06), 0 8px 22px -12px rgba(26,58,92,.28);
+      --font-display: 'Segoe UI', system-ui, -apple-system, sans-serif; --font-texto: var(--font-display);
+      --s1: #2557a7; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --otros: #a9b1c2;
+      --gris-bg: #eceff4; --gris-fg: #5b6478;
     }
-    .rep-tip strong { font-weight: 700; }
-    .rep-tip-sub { color: rgba(255,255,255,.65); font-size: .7rem; }
+    /* Los botones de la ventana y la ficha, con los tonos de la ficha de OC */
+    .foc-btn--sec  { background: var(--gray-100); color: var(--gray-700); }
+    .foc-btn--main { background: var(--primary); color: #fff; }
+    .foc-btn--oc   { background: #e8eef7; color: var(--primary); }
+    .foc-btn--fac  { background: #f1e8fb; color: #6b3fa0; }
 
-    /* ---- Barras de ranking ---- */
-    /* Grid [rango | cuerpo]: la pastilla de rango y el cuerpo quedan alineados
-       en todas las filas, sin importar el largo de la etiqueta. */
-    .rep-bar-row { display: grid; grid-template-columns: auto 1fr; gap: .7rem;
-      align-items: start; padding: .6rem .5rem; border-radius: var(--radius); }
-    .rep-bar-row + .rep-bar-row { border-top: 1px solid var(--gray-100); }
-    .rep-clickable { cursor: pointer; transition: background .12s; }
-    .rep-clickable:hover { background: #f2f6fb; }
-    .rep-open { background: #f2f6fb; }
-    /* Rango: burbuja del tono de la fila (--h-bg / --h-ink, desde el JS). */
-    .rep-bar-rank { width: 26px; height: 26px; border-radius: 50%; display: inline-flex;
-      align-items: center; justify-content: center; font-size: .74rem; font-weight: 800;
-      line-height: 1; font-variant-numeric: tabular-nums; flex: 0 0 auto; margin-top: 1px;
-      color: var(--h-ink, var(--primary)); background: var(--h-bg, #e6eefb); }
-    .rep-bar-body { min-width: 0; }
-    .rep-bar-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .45rem; }
-    .rep-caret { color: var(--primary-light); display: inline-flex; flex: 0 0 auto;
-      transition: transform .18s var(--ease-spring, ease); }
-    .rep-caret .icon { width: 13px; height: 13px; }
-    .rep-open .rep-caret { transform: rotate(90deg); }
-    .rep-bar-label { flex: 1; font-size: .9rem; color: var(--gray-800); font-weight: 700;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.01em; }
-    /* Embudo: filtra todo el reporte por esa obra / equipo. */
-    .rep-filt { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-      width: 24px; height: 24px; border-radius: 50%; border: none; padding: 0; cursor: pointer;
-      background: transparent; color: var(--gray-300); transition: background .12s, color .12s; }
-    .rep-filt .icon { width: 13px; height: 13px; }
-    .rep-filt:hover { background: var(--h-bg, #e8eefc); color: var(--h-ink, var(--primary)); }
-    .rep-filt.on { background: var(--h-bg, #e8eefc); color: var(--h-ink, var(--primary)); }
-    .rep-bar-val { font-size: .95rem; font-weight: 800; color: var(--gray-800); white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-    .rep-bar-track { background: #f1f3f7; border-radius: 999px; height: 8px; overflow: hidden; }
-    /* Un tono por serie (o por obra, igual que en la participación). */
-    .rep-bar-fill { height: 100%; border-radius: 999px; background: var(--h-mark, #6f9fe6);
-      animation: repGrow .55s var(--ease-spring, cubic-bezier(.22,1,.36,1)) both; transform-origin: left; }
-    @keyframes repGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-    @media (prefers-reduced-motion: reduce) { .rep-bar-fill { animation: none; } }
-    .rep-bar-sub { font-size: .72rem; color: var(--gray-500); margin-top: .35rem; font-variant-numeric: tabular-nums; }
-    .rep-bar-pct { font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
-      color: var(--h-ink, var(--primary)); background: var(--h-bg, #e6eefb);
-      border-radius: 999px; padding: .08rem .5rem; min-width: 2.9rem; text-align: center; }
+    .rx-main { max-width: none; padding: 0; }
+    #rx-tabla { overflow-x: auto; }
+    .rx { max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem 3rem; display: flex; flex-direction: column; gap: 1rem; }
+    .rx h1 { font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; color: var(--ink); margin: 0; }
+    .rx h3 { font-family: var(--font-display); font-size: 1.02rem; font-weight: 700; color: var(--ink); margin: 0; }
+    .rx-muted { color: var(--ink-2); font-size: .84rem; }
+    .rx-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rx-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+    .rx-row > * { min-width: 0; }
 
-    /* ---- Drill-down: cada OC abre su ficha ---- */
-    /* Panel claro con el acento del tono de la fila; una línea por OC. */
-    .rep-drill { margin: .65rem 0 .15rem; }
-    .rep-ocs { background: #f8fafd; border: 1px solid var(--gray-100); border-left: 3px solid var(--h-mark, var(--gray-300));
-      border-radius: 10px; overflow: hidden; }
-    .rep-oc { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .5rem .75rem;
-      background: none; border: none; font: inherit; text-align: left; cursor: pointer; transition: background .12s; }
-    .rep-oc + .rep-oc { border-top: 1px solid #edf1f6; }
-    .rep-oc:hover { background: var(--h-bg, #eef3fa); }
-    .rep-oc-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-    .rep-oc-t { font-size: .82rem; font-weight: 600; color: var(--gray-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rep-oc-s { font-size: .7rem; color: var(--gray-500); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rep-oc-total { font-size: .84rem; font-weight: 700; color: var(--gray-800); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .rep-oc-go { display: inline-flex; color: var(--gray-300); }
-    .rep-oc-go .icon { width: 14px; height: 14px; }
-    .rep-oc:hover .rep-oc-go { color: var(--h-ink, var(--primary)); }
-    .rep-oc-more { display: block; margin: .45rem auto 0; background: var(--h-bg, #e8eefc); color: var(--h-ink, var(--primary));
-      border: none; border-radius: 999px; padding: .25rem .9rem; font: inherit; font-size: .74rem; font-weight: 700; cursor: pointer; }
-    .rep-oc-more:hover { filter: brightness(.97); }
-    .rep-chip { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; }
-    .rep-catsum { display: flex; flex-wrap: wrap; gap: .5rem .9rem; padding: .1rem .1rem .55rem; }
-    .rep-catsum-i { display: inline-flex; align-items: center; gap: .35rem; font-size: .82rem; color: var(--gray-600); }
-    .rep-catsum-i b { color: var(--gray-800); font-weight: 700; }
+    /* ---- Cabecera: período, mes, filtros y el total ---- */
+    .rx-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.25rem; }
+    .rx-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+    .rx-seg { display: inline-flex; background: var(--sunk); border-radius: 10px; padding: 3px; gap: 3px; }
+    .rx-seg button { border: 0; background: none; color: var(--ink-2); font: inherit; font-size: .86rem; font-weight: 600;
+      padding: .4rem .85rem; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+    .rx-seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(26,58,92,.14); }
+    .rx-mes { display: flex; align-items: center; gap: .5rem; }
+    .rx-mes button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 32px; height: 32px;
+      border-radius: 9px; font-size: 1.15rem; line-height: 1; cursor: pointer; }
+    .rx-mes button:disabled { opacity: .35; cursor: default; }
+    .rx-mes b { font-family: var(--font-display); min-width: 8.5em; text-align: center; color: var(--ink); }
+    .rx-chip { display: inline-flex; align-items: center; gap: .35rem; border: 0; border-radius: 999px; padding: .32rem .75rem;
+      background: var(--lila-deep); color: #fff; font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; max-width: 100%; }
+    .rx-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rx-tot { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+    .rx-tot .v { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .rx-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: .14rem .6rem; font-size: .76rem; font-weight: 600; white-space: nowrap; }
+    .rx-ok   { background: var(--menta-bg); color: var(--menta-fg); }
+    .rx-warn { background: var(--durazno-bg); color: var(--durazno-fg); }
+    .rx-off  { background: var(--gris-bg); color: var(--gris-fg); }
 
-
-    .rep-empty { color: var(--gray-500); font-size: .85rem; padding: .5rem 0; }
-    .rep-loading { text-align: center; color: var(--gray-500); padding: 3.5rem 1rem; }
-
-    /* ---- Resumen del período ---- */
-    /* Card titular: totales del rango, obras/proveedores y el listado de OC
-       con su estado de factura. Es lo mismo que sale en el PDF. */
-    .rr-head { display: flex; justify-content: space-between; align-items: center; gap: .6rem .9rem; flex-wrap: wrap; }
-    .rr-head-l { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; min-width: 0; }
-    .rr-range { font-size: .8rem; color: var(--gray-500); font-weight: 600; }
-
-    .rr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: .7rem; margin-bottom: 1.1rem; }
-    .rr-stat { display: flex; flex-direction: column; gap: .1rem; padding: .65rem .8rem;
-      border: 1px solid var(--gray-200); border-left: 3px solid var(--gray-300); border-radius: var(--radius); }
-    .rr-k { font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; }
-    .rr-v { font-size: 1.25rem; font-weight: 800; color: var(--gray-800); line-height: 1.15; word-break: break-word; }
-    .rr-d { font-size: .7rem; color: var(--gray-500); font-variant-numeric: tabular-nums; }
-    .rr-stat--hero { border-left-color: var(--primary); }
-    .rr-stat--hero .rr-v { color: var(--primary); }
-    .rr-stat--ok   { border-left-color: #1e7d3a; }
-    .rr-stat--ok .rr-v { color: #1e7d3a; }
-    .rr-stat--no   { border-left-color: #b02a2a; }
-    .rr-stat--no .rr-v { color: #b02a2a; }
-    .rr-stat--warn { border-left-color: #9a6a00; background: #fff8ec; }
-    .rr-stat--rem  { border-left-color: #2aa89a; }
-    .rr-stat--rem .rr-v { color: #16695f; }
-    .rr-stat--warn .rr-v { color: #9a6a00; }
-
-    .rr-tops { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-bottom: 1.1rem; }
-    .rr-mini { border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; }
-    .rr-mini-t { background: #f4f7fb; border-bottom: 1px solid var(--gray-200); padding: .4rem .7rem;
-      font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-600); font-weight: 700; }
-    .rr-mini-r { display: grid; grid-template-columns: 1fr auto auto; gap: .6rem; align-items: baseline;
-      padding: .35rem .7rem; font-size: .82rem; }
-    .rr-mini-r + .rr-mini-r { border-top: 1px solid var(--gray-100); }
-    .rr-mini-l { color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rr-mini-v { font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; }
-    .rr-mini-p { font-size: .72rem; color: var(--gray-400); font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
-    .rr-mini .rep-empty { padding: .5rem .7rem; }
-
-    .rr-list { overflow-x: auto; }
-    /* table-layout fijo: los nombres largos de proveedor/obra se cortan con
-       puntos suspensivos en vez de estirar la tabla (el nombre completo queda
-       en el title, y la ficha de la OC está a un clic). */
-    .rr-tbl { width: 100%; min-width: 620px; border-collapse: collapse; font-size: .8rem; table-layout: fixed; }
-    .rr-tbl th { text-align: left; font-size: .64rem; text-transform: uppercase; letter-spacing: .05em;
-      color: var(--gray-500); border-bottom: 1px solid var(--gray-300); padding: .4rem .5rem; white-space: nowrap; }
-    .rr-tbl td { padding: .45rem .5rem; border-bottom: 1px solid var(--gray-100); color: var(--gray-700);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .rr-tbl th:nth-child(1), .rr-tbl td:nth-child(1) { width: 7%; }
-    .rr-tbl th:nth-child(2), .rr-tbl td:nth-child(2) { width: 13%; }
-    .rr-tbl th:nth-child(3), .rr-tbl td:nth-child(3) { width: 26%; }
-    .rr-tbl th:nth-child(4), .rr-tbl td:nth-child(4) { width: 21%; }
-    .rr-tbl th:nth-child(5), .rr-tbl td:nth-child(5) { width: 13%; }
-    .rr-tbl th:nth-child(6), .rr-tbl td:nth-child(6) { width: 11%; }
-    .rr-tbl th:nth-child(7), .rr-tbl td:nth-child(7) { width: 9%; }
-    /* Tipo: etiqueta chica (.cat-tag, en styles.css) con el equipo o la línea de la obra. */
-    .rr-tbl th.rr-c-eq, .rr-tbl td.rr-c-eq { padding-left: .9rem; }
-    .rr-tbl .rr-n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--gray-800); }
-    .rr-nro { font-family: 'Courier New', monospace; font-weight: 700; color: var(--primary); }
-    .rr-row { cursor: pointer; transition: background .12s; }
-    /* Filas alternadas para seguir la línea a lo ancho de la tabla. Van por
-       clase (no nth-child) porque una OC con ítems encontrados ocupa dos filas. */
-    .rr-row.rr-alt { background: #f5f8fc; }
-    .rr-row:hover, .rr-row:focus-visible { background: #e6eefb; outline: none; }
-    /* Renglones que explican la coincidencia de la búsqueda, pegados a su OC y
-       alineados a las columnas: descripción bajo Proveedor, precio bajo Importe. */
-    .rr-row.rr-row-main.rr-has-hits td { border-bottom: none; }
-    .rr-row-hit td { padding-top: 0; padding-bottom: .3rem; border-bottom: none; font-size: .74rem; }
-    .rr-row-main + .rr-row-hit td { padding-top: .05rem; }
-    .rr-row-hit + .rr-row-main td { border-top: 1px solid var(--gray-100); }
-    .rr-hit-desc span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      color: #2c4fa8; font-weight: 600; border-left: 2px solid #b9cbee; padding-left: .5rem; }
-    .rr-tbl td.rr-hit-precio { font-weight: 600; color: var(--gray-600); font-size: .72rem; }
-    .rr-hit-more { color: var(--gray-500); font-style: italic; }
-
-    .rr-search { display: flex; align-items: center; gap: .7rem; margin-bottom: .6rem; }
-    .rr-search .hist-search { max-width: 420px; font-size: .84rem; padding: .45rem .75rem; }
-    .rr-search-n { font-size: .74rem; color: var(--gray-500); font-weight: 600; white-space: nowrap; }
-    /* Encabezados que ordenan: el activo lleva la flecha de dirección. */
-    .rr-tbl th[data-sort] { cursor: pointer; user-select: none; transition: color .12s; }
-    .rr-tbl th[data-sort]:hover { color: var(--primary); }
-    .rr-tbl th.rr-sorted { color: var(--primary); }
-    .rr-arr { display: inline-block; margin-left: .25rem; font-size: .7rem; }
-    .rr-sort-l { font-size: .7rem; color: var(--gray-500); font-weight: 600; white-space: nowrap; }
-    .rr-sort { padding: .3rem .5rem; font: inherit; font-size: .78rem; color: var(--gray-700); background: var(--white);
-      border: 1px solid var(--gray-300); border-radius: var(--radius); cursor: pointer; }
-    /* Invierte el sentido del orden (en el celular no hay encabezados que tocar). */
-    .rr-dir { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: 0 0 auto;
-      border: 1px solid var(--gray-300); border-radius: var(--radius); background: var(--white); color: var(--primary);
-      cursor: pointer; padding: 0; transition: background .12s; }
-    .rr-dir:hover { background: #e8eefc; }
-    .rr-dir .icon { width: 15px; height: 15px; transition: transform .18s; }
-    .rr-dir.desc .icon { transform: rotate(180deg); }
-    .rr-f { display: inline-block; padding: .05rem .45rem; border-radius: 999px; font-size: .68rem; font-weight: 700; white-space: nowrap; }
-    .rr-f--con   { background: #e3f5e8; color: #1e7d3a; }
-    .rr-f--sin   { background: #fde6e6; color: #b02a2a; }
-    .rr-f--otros { background: #fff4e0; color: #9a6a00; }
-
-    .rr-foot { margin-top: .9rem; }
-    .rr-foot-n { font-size: .74rem; color: var(--gray-500); }
-
-    @media (max-width: 900px) {
-      .rr-tops { grid-template-columns: 1fr; }
-      .rr-c-resp { display: none; }
+    /* ---- Grilla: en el celular, una columna ---- */
+    .rx-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+    .rx-col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+    .rx-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.1rem;
+      box-shadow: var(--shadow-leva); display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+    @media (min-width: 1000px) {
+      .rx { padding: 1.5rem 1.75rem 3rem; }
+      .rx-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1.1rem; }
+      .rx-c7 { grid-column: span 7; } .rx-c5 { grid-column: span 5; } .rx-c4 { grid-column: span 4; } .rx-c8 { grid-column: span 8; }
     }
-    /* Celular: cada OC del resumen es una tarjetita en vez de una fila que se
-       desliza de costado. Proveedor e importe arriba, obra y tipo al medio, y
-       fecha · N° · responsable abajo. El orden se elige con "Ordenar por". */
-    @media (max-width: 640px) {
-      .rr-tbl { min-width: 0; display: block; }
-      .rr-tbl thead { display: none; }
-      .rr-tbl tbody { display: block; }
-      .rr-tbl tr.rr-row-main { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto;
-        grid-template-areas: "prov prov prov imp" "obra obra obra tipo" "fecha nro resp resp";
-        column-gap: .5rem; row-gap: .1rem; padding: .6rem .7rem; border-top: 1px solid var(--gray-100); }
-      .rr-tbl tr.rr-row-main td { width: auto !important; padding: 0; border: none !important; min-width: 0; }
-      .rr-tbl tr.rr-row-main td:nth-child(1) { grid-area: fecha; font-size: .7rem; color: var(--gray-500); }
-      .rr-tbl tr.rr-row-main td:nth-child(2) { grid-area: nro; font-size: .7rem; }
-      .rr-tbl tr.rr-row-main td:nth-child(3) { grid-area: prov; font-weight: 700; color: var(--gray-800); font-size: .85rem; }
-      .rr-tbl tr.rr-row-main td:nth-child(4) { grid-area: obra; font-size: .76rem; color: var(--gray-600); }
-      .rr-tbl tr.rr-row-main td:nth-child(5) { grid-area: resp; display: block; font-size: .7rem; color: var(--gray-500); text-align: right; }
-      .rr-tbl tr.rr-row-main td:nth-child(6) { grid-area: imp; font-size: .88rem; align-self: center; }
-      .rr-tbl tr.rr-row-main td:nth-child(7) { grid-area: tipo; justify-self: end; padding: 0; }
-      .rr-tbl tr.rr-row-main.rr-has-hits { padding-bottom: .25rem; }
-      /* Ítems encontrados: descripción y precio en una línea, dentro de la tarjeta. */
-      .rr-tbl tr.rr-row-hit { display: flex; align-items: baseline; gap: .6rem; padding: .1rem .7rem .3rem; }
-      .rr-tbl tr.rr-row-hit td { padding: 0; width: auto !important; }
-      .rr-tbl tr.rr-row-hit td.rr-hit-pad { display: none; }
-      .rr-tbl tr.rr-row-hit td.rr-hit-desc { flex: 1; min-width: 0; }
-      .rr-tbl tr.rr-row-hit td.rr-hit-precio { flex: 0 0 auto; }
-      .rr-row-hit + .rr-row-main td { border-top: none !important; }
-    }
+    .rx-empty { color: var(--ink-2); font-size: .88rem; padding: .5rem 0; }
 
-    /* Ficha de la OC: estilos compartidos en css/styles.css (también la usa la vista previa de app.html). */
-    .rem-chip--completa { background: #e3f5e8; color: #1e7d3a; }
-    .rem-chip--parcial  { background: #fff4e0; color: #9a6a00; }
-    .rem-chip--sin      { background: #eef0f3; color: #4b5563; }
+    /* ---- Acumulado por semana ---- */
+    .rx-chart { position: relative; }
+    .rx-chart svg { display: block; overflow: visible; touch-action: pan-y; }
+    .rx-chart svg text { fill: var(--ink-2); font-family: var(--font-texto); font-size: 11px; }
+    .rx-tip { position: absolute; top: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+      padding: 9px 11px; font-size: .82rem; box-shadow: 0 8px 24px -10px rgba(26,58,92,.35); min-width: 180px; z-index: 3; }
+    .rx-tip b { display: block; margin-bottom: 3px; }
+    .rx-tip .tr { display: flex; justify-content: space-between; gap: 14px; font-variant-numeric: tabular-nums; }
+    .rx-tip .tr span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14em; }
+    .rx-tip .tt { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; font-weight: 700; }
+    .rx-sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: baseline; flex: none; }
+    .rx-ley { display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-size: .8rem; color: var(--ink); }
 
-    /* ---- Modal unificar obras ---- */
-    .mmg-group { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: .7rem .8rem; margin-bottom: .8rem; }
-    .mmg-head { display: flex; align-items: center; gap: .5rem; font-size: .82rem; font-weight: 600; color: var(--gray-700); }
-    .mmg-head .mmg-to { flex: 1; padding: .35rem .5rem; font-weight: 700; }
-    .mmg-from { list-style: none; margin: .55rem 0 0; padding: 0 0 0 1.7rem; }
-    .mmg-from li { font-size: .8rem; color: var(--gray-600); padding: .15rem 0; display: flex; justify-content: space-between; gap: .5rem; }
-    .mmg-cnt { font-size: .72rem; color: var(--gray-400); white-space: nowrap; }
+    /* ---- Torta por obra ---- */
+    .rx-donut { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 1rem; align-items: center; }
+    .rx-donut svg path { cursor: pointer; }
+    @media (max-width: 420px) { .rx-donut { grid-template-columns: minmax(0, 1fr); justify-items: center; } .rx-donut .rx-lg { width: 100%; } }
+    .rx-lg { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .rx-it { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .75rem; padding: 6px 8px; border-radius: 8px;
+      font-size: .88rem; align-items: baseline; cursor: pointer; border: 0; background: none; font-family: inherit; color: var(--ink); text-align: left; }
+    .rx-it .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rx-it:hover, .rx-hb:hover { background: var(--sunk); }
+    .rx-mas { border: 0; background: none; color: var(--lila-deep); font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer; padding: 4px 8px; text-align: left; }
+    .rx-dim { opacity: .35; }
 
-    /* ---- Tarjetas con la estética de pastillas ---- */
-    .rep-card { border: none; border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); overflow: visible; }
-    .rep-card .card-header { border-radius: 14px 14px 0 0; border-bottom-color: var(--gray-100); padding: .7rem 1rem; }
-    .rep-card.collapsed > .card-header { border-radius: 14px; }
-    .rep-card .card-title { display: inline-flex; align-items: center; gap: .5rem; font-size: .95rem; font-weight: 700; color: var(--primary-dark); }
-    .rep-card .card-body { padding: .85rem 1rem 1rem; }
-    .rep-chev { color: var(--gray-400); }
-    .rp-sum.rep-card { padding: 1rem 1.1rem; }
+    /* ---- Barras por responsable / equipo ---- */
+    .rx-bars { display: flex; flex-direction: column; gap: 2px; }
+    .rx-hb { display: flex; flex-direction: column; gap: 5px; padding: 7px 8px; border-radius: 8px; cursor: pointer;
+      border: 0; background: none; font: inherit; color: var(--ink); text-align: left; width: 100%; }
+    .rx-hb .rx-row { font-size: .88rem; }
+    .rx-hb .rx-row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rx-hb .tr2 { height: 8px; background: var(--sunk); border-radius: 4px; overflow: hidden; }
+    .rx-hb .tr2 i { display: block; height: 100%; background: var(--lila); border-radius: 0 4px 4px 0; }
+    .rx-hb.eq .tr2 i { background: var(--s3); }
+    .rx-cats { display: flex; flex-wrap: wrap; gap: .4rem; }
 
-    @media (max-width: 999px) {
-      .rp-layout { grid-template-columns: minmax(0, 1fr); }
-      .rp-only-tel { display: inline-flex; }
-      /* La columna pasa a ser una hoja que sube desde abajo. */
-      .rp-rail { position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 300; background: var(--white);
-        border-radius: 18px 18px 0 0; padding: .6rem 1rem calc(1rem + env(safe-area-inset-bottom)); gap: 0;
-        max-height: 88vh; overflow-y: auto; box-shadow: 0 -12px 34px rgba(13,21,32,.22);
-        transform: translateY(105%); visibility: hidden; transition: transform .22s ease, visibility 0s linear .22s; }
-      .rp-rail.open { transform: none; visibility: visible; transition: transform .22s ease; }
-      .rp-grab { display: block; width: 40px; height: 4px; border-radius: 999px; background: var(--gray-300); margin: 0 auto .6rem; }
-      .rp-box { box-shadow: none; padding: .5rem 0; border-radius: 0; }
-      .rp-box + .rp-box { border-top: 1px solid var(--gray-100); }
-      .rp-dates { grid-template-columns: 1fr 1fr; }
-      .rp-listo { display: block; margin-top: .7rem; border: none; border-radius: 999px; background: #1479a8; color: #fff;
-        font: inherit; font-weight: 700; padding: .65rem; cursor: pointer; }
-      .rp-shade { position: fixed; inset: 0; z-index: 299; background: rgba(13,21,32,.4); }
-      .rp-shade.open { display: block; }
-      .rp-sum { grid-template-columns: minmax(0, 1fr); }
+    /* ---- Todas las OC: tabla en escritorio, tarjetas en el celular ---- */
+    .rx-buscar { display: flex; gap: .5rem; }
+    .rx-inp { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px;
+      padding: .55rem .75rem; font: inherit; font-size: .92rem; }
+    .rx-inp:focus { outline: 2px solid var(--lila); outline-offset: 1px; }
+    .rx-sel { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: .5rem .6rem; font: inherit; font-size: .88rem; }
+    table.rx-oc { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    table.rx-oc th { text-align: left; font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); font-weight: 600;
+      padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; user-select: none; }
+    table.rx-oc th[data-sort] { cursor: pointer; }
+    table.rx-oc th[data-sort]:hover { color: var(--ink); }
+    table.rx-oc td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink); }
+    table.rx-oc tbody tr { cursor: pointer; }
+    table.rx-oc tbody tr:hover td { background: var(--sunk); }
+    table.rx-oc .r { text-align: right; }
+    table.rx-oc .sub { color: var(--ink-2); font-size: .8rem; margin-top: 1px; }
+    table.rx-oc .nro { font-weight: 700; white-space: nowrap; }
+    table.rx-oc mark { background: var(--durazno-bg); color: inherit; border-radius: 3px; padding: 0 1px; }
+    .rx-sort-tel { display: none; }
+    @media (max-width: 760px) {
+      .rx-sort-tel { display: block; }
+      table.rx-oc thead { display: none; }
+      table.rx-oc, table.rx-oc tbody { display: block; }
+      table.rx-oc tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px .75rem; padding: 10px 4px;
+        border-bottom: 1px solid var(--line); }
+      table.rx-oc td { display: block; padding: 0; border: 0; }
+      table.rx-oc td.c-prov { grid-column: 1; grid-row: 1; font-weight: 600; }
+      table.rx-oc td.c-imp  { grid-column: 2; grid-row: 1; }
+      table.rx-oc td.c-obra { grid-column: 1; grid-row: 2; }
+      table.rx-oc td.c-fac  { grid-column: 2; grid-row: 2; text-align: right; }
+      table.rx-oc td.c-nro  { grid-column: 1 / -1; grid-row: 3; color: var(--ink-2); font-size: .8rem; }
+      table.rx-oc td.c-nro .sub, table.rx-oc td.c-nro .nro { display: inline; font-weight: 600; }
+      table.rx-oc td.c-nro .sub::before { content: ' · '; }
+      table.rx-oc td.c-resp { display: none; }
+      table.rx-oc tbody tr:hover td { background: none; }
     }
-    @media (max-width: 820px) {
-      .rp-grid2 { grid-template-columns: minmax(0, 1fr); }
-      .rb-cols { grid-template-columns: minmax(0, 1fr); }
-    }
-    @media (max-width: 640px) {
-      .rep-wrap { padding: .8rem .6rem 3rem; }
-      .rp-t { font-size: 1.25rem; }
-      .rp-v { font-size: 1.75rem; }
-      .ob-grid { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
-      /* En el teléfono cada obra es un renglón ancho: datos a la izquierda, los 6 meses a la derecha. */
-      .ob-t { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .6rem; row-gap: .3rem; }
-      .ob-h, .ob-f { grid-column: 1 / -1; }
-      .ob-s { grid-row: 2; grid-column: 2; align-self: end; }
-      .rep-card .card-header { padding: .65rem .8rem; }
-      .rep-card .card-body { padding: .75rem .8rem .85rem; }
-      .rep-ch-r { width: 100%; }
-      .rep-ch-r .rep-q { flex: 1; width: auto; max-width: none; }
-      .rp-orden { flex: 1; }
-      .rb-sum .rb-todo { margin-left: 0; }
-    }
+    .rx-foot { font-size: .78rem; color: var(--ink-2); }
+    .rx-pdf { margin-left: auto; }
 
-    /* ---- Impresión desde el navegador (Ctrl+P) ---- */
-    @media print {
-      @page { size: A4 portrait; margin: 12mm; }
-      body { background: #fff; }
-      .app-header, .rp-rail, .rp-q, .rp-only-tel, .rp-arrow, .modal-overlay, .toast-container,
-      #btn-merge-obras, .rep-loading, #btn-res-pdf, .rep-q, .rep-chev, .rp-orden { display: none !important; }
-      .rp-layout { display: block; }
-      .app-main, .rep-wrap { padding: 0; max-width: none; }
-      .rep-card { break-inside: avoid; box-shadow: none; border: 1px solid var(--gray-200); }
-      .rep-bar-fill { animation: none; }
-      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    /* ===== Pestañas (paso 3) ===== */
+    .rx-top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .25rem 2rem; border-bottom: 1px solid var(--line); }
+    .rx-top[hidden] { display: none; }
+    .rx-top h1 { padding-bottom: .6rem; }
+    .rx-tabs { display: flex; gap: 4px; }
+    .rx-tabs[hidden] { display: none; }
+    .rx-tabs button { border: 0; background: none; font: inherit; font-weight: 600; color: var(--ink-2); padding: .6rem 1rem .7rem;
+      cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; }
+    .rx-tabs button:hover { color: var(--ink); }
+    .rx-tabs button[aria-selected="true"] { color: var(--lila-deep); border-bottom-color: var(--lila-deep); }
+    @media (max-width: 640px) { .rx-top { gap: 0; } .rx-tabs { width: 100%; } .rx-tabs button { flex: 1; } }
+
+    /* ===== Obras y ficha de obra (paso 3) ===== */
+    .rx-bad  { background: var(--rosa-bg); color: var(--rosa-fg); }
+    .rx-lila { background: var(--lila-soft); color: var(--lila-deep); }
+    @media (min-width: 1000px) { .rx-c6 { grid-column: span 6; } }
+    .rx-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .rx-ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .rx-ell2 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rx-k { font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+    .rx-mid { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rx-big { font-family: var(--font-display); font-weight: 800; font-size: 2.1rem; letter-spacing: -.02em; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .rx-big2 { font-size: 1.7rem; }
+    @media (max-width: 520px) { .rx-big { font-size: 1.75rem; } .rx-big2 { font-size: 1.5rem; } }
+    .rx .rx-h3o { font-size: 1.12rem; }
+    .rx-frase { font-size: .92rem; color: var(--ink); }
+    .rx-go { cursor: pointer; transition: border-color .15s; }
+    .rx-go:hover { border-color: var(--lila); }
+    .rx-go:focus-visible { outline: 2px solid var(--lila); outline-offset: 2px; }
+    .rx-chip2 { border: 1px solid var(--line); background: var(--sunk); color: var(--ink); border-radius: 999px; padding: .3rem .7rem;
+      font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+    .rx-chip2:hover:not(:disabled) { border-color: var(--lila); }
+    .rx-chip2:disabled { opacity: .45; cursor: default; }
+    .rx-track { position: relative; height: 10px; background: var(--sunk); border-radius: 6px; }
+    .rx-track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--lila); }
+    .rx-track b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); border-radius: 2px; }
+    .rx-legend { display: flex; justify-content: space-between; gap: .75rem; font-size: .78rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .rx-crumbs { display: flex; gap: .5rem; align-items: center; color: var(--ink-2); font-size: .88rem; min-width: 0; }
+    .rx-crumbs button { border: 0; background: none; color: var(--lila-deep); font: inherit; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap; }
+    .rx-fhead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem 1.25rem; }
+    .rx .rx-fhead h1 { font-size: 1.8rem; overflow-wrap: anywhere; }
+    .rx-list { display: flex; flex-direction: column; }
+    .rx-list > * + * { border-top: 1px solid var(--line); }
+    .rx-li { padding: .5rem 0; font-size: .9rem; }
+    .rx-rbs { display: flex; flex-direction: column; gap: 4px; }
+    .rx-rb { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 10px; border: 1.5px solid transparent;
+      background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; width: 100%; }
+    .rx-rb:hover { background: var(--sunk); }
+    .rx-rb.sel { border-color: var(--lila); background: var(--sunk); }
+    .rx-rb .rx-row { font-size: .92rem; }
+    .rx-rbar { position: relative; height: 14px; display: block; }
+    .rx-rbar > span { position: absolute; display: block; }
+    .rx-rbar .bud { top: 0; bottom: 0; left: 0; border: 1.5px dashed var(--ink-2); border-radius: 4px; opacity: .55; }
+    .rx-rbar .g { top: 2px; bottom: 2px; left: 0; background: var(--lila); border-radius: 3px; min-width: 2px; }
+    .rx-rbar .g.solo { background: var(--otros); }
+    .rx-rbar .g.sin { background: repeating-linear-gradient(45deg, var(--otros) 0 4px, transparent 4px 7px); }
+    .rx-rbar .ov { top: 2px; bottom: 2px; background: var(--rosa-fg); border-radius: 0 3px 3px 0; }
+    .rx-ley2 { font-size: .78rem; white-space: nowrap; }
+    @media (min-width: 1000px) { .rx-panel { position: sticky; top: 12px; } }
+    .rx-ocr { display: flex; flex-direction: column; gap: .45rem; padding: .55rem 0; }
+    .rx-ocb { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; border: 0; background: none; font: inherit;
+      color: var(--ink); text-align: left; cursor: pointer; padding: .15rem .3rem; margin: 0 -.3rem; border-radius: 8px; font-size: .9rem; }
+    .rx-ocb:hover { background: var(--sunk); }
+    .rx-ocb .rx-num { font-weight: 600; }
+    .rx-mgrp { display: flex; flex-direction: column; gap: .25rem; }
+    .rx-mgrp + .rx-mgrp { margin-top: .75rem; }
+    .rx-modal { max-width: 560px; }
+    .rx-mh { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); }
+    .rx-mh h2 { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; color: var(--ink); margin: .1rem 0 0; }
+    .rx-x { border: 0; background: var(--sunk); color: var(--ink); width: 32px; height: 32px; border-radius: 9px; cursor: pointer; flex: none;
+      display: inline-flex; align-items: center; justify-content: center; }
+    .rx-x .icon { width: 16px; height: 16px; }
+    #rx-mb { display: flex; flex-direction: column; gap: .75rem; overflow: auto; }
+    #rx-mf { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    #rx-mf.hidden { display: none; }
+    .rx-cargando { color: var(--ink-2); padding: 2rem 0; text-align: center; }
+    button:focus-visible, [data-f]:focus-visible, th[data-sort]:focus-visible, tr[data-oc]:focus-visible { outline: 2px solid var(--lila); outline-offset: 2px; }
+    /* ===== Tablero (paso 4) ===== */
+    @media (min-width: 1000px) { .rx-c12 { grid-column: 1 / -1; } }
+    .rx-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    @media (min-width: 1000px) { .rx-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.1rem; } }
+    .rx-kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: .85rem 1rem; box-shadow: var(--shadow-leva);
+      display: flex; flex-direction: column; gap: .2rem; min-width: 0; font: inherit; color: var(--ink); text-align: left; }
+    .rx-kpi .v { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rx-kpi .rx-muted { font-size: .8rem; }
+    @media (max-width: 520px) { .rx-kpi { padding: .7rem .8rem; } .rx-kpi .v { font-size: 1.2rem; } .rx-kpi .rx-k { font-size: .66rem; } }
+    .rx-tbcol { cursor: pointer; }
+    .rx-tbcol:hover { fill: var(--sunk); }
+    #rx-tbm rect:not(.rx-tbcol), #rx-tbm text { pointer-events: none; }
+    .rx-tbo { display: flex; flex-direction: column; gap: .35rem; padding: .65rem .4rem; border: 0; background: none; font: inherit; color: var(--ink);
+      text-align: left; cursor: pointer; width: 100%; border-radius: 8px; }
+    .rx-tbo:hover { background: var(--sunk); }
+    .rx-tbo .rx-row { font-size: .9rem; }
+    .rx-tbr { display: flex; flex-direction: column; gap: .5rem; }
+    .rx .rx-tbn { padding: 0; color: var(--ink); font-size: .95rem; align-self: flex-start; }
+    .rx .rx-tbn:hover { color: var(--lila-deep); }
+    .rx-mx { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+    @media (max-width: 520px) { .rx-mx { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: .4rem; } }
+    .rx-cel { border: 0; border-radius: 10px; padding: .6rem .75rem; display: flex; justify-content: space-between; align-items: baseline; gap: .5rem;
+      font: inherit; font-weight: 700; cursor: pointer; text-align: left; min-width: 0; }
+    .rx-cel .cn { font-size: .8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rx-cel:hover { filter: brightness(.96); }
+    .rx-tbh { flex-wrap: wrap; }
+    @media (max-width: 520px) {
+      .rx-cel { flex-direction: column; align-items: stretch; gap: 2px; padding: .45rem .55rem; }
+      .rx-cel .cn { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
+      .rx-tbh .rx-cats { width: 100%; }
     }
+    .rx-kpi:focus-visible, .rx-cel:focus-visible, .rx-tbo:focus-visible { outline: 2px solid var(--lila); outline-offset: 2px; }
+    /* ===== Resumen (paso 5) ===== */
+    .rx-intro { display: flex; flex-direction: column; gap: .5rem; padding: .35rem .25rem 0; }
+    .rx-lead { font-family: var(--font-display); font-size: 1.28rem; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; color: var(--ink); margin: 0; max-width: 34ch; }
+    .rx-lead em { font-style: normal; color: var(--lila-deep); white-space: nowrap; }
+    @media (min-width: 1000px) { .rx-lead { font-size: 1.7rem; line-height: 1.28; letter-spacing: -.015em; } }
+    .rx-alert { display: flex; gap: .85rem; align-items: flex-start; padding: .75rem .6rem; border: 0; background: none; font: inherit;
+      color: var(--ink); text-align: left; cursor: pointer; width: 100%; border-radius: 8px; }
+    .rx-alert:hover { background: var(--sunk); }
+    .rx-alert:focus-visible { outline: 2px solid var(--lila); outline-offset: 2px; }
+    .rx-alert .t { font-weight: 600; font-size: 1rem; line-height: 1.35; }
+    .rx-alert .s { color: var(--ink-2); font-size: .88rem; }
+    .rx-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: .4rem; flex: none; }
+    .rx-dot-bad { background: var(--rosa-fg); } .rx-dot-warn { background: var(--durazno-fg); } .rx-dot-info { background: var(--lila); }
+    .rx-psvg { display: block; }
   </style>
 </head>
-<body>
+<body class="rx-page">
 
 <header class="app-header">
   <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
@@ -603,230 +287,53 @@
   </div>
 </header>
 
-<main class="app-main">
-  <div class="rep-wrap">
-
-    <!-- Cabecera: título + período + moneda. En escritorio el período y la moneda
-         se eligen en la columna de la izquierda; en el teléfono, en una hoja. -->
-    <div class="rp-head">
-      <h1 class="rp-t">Reportes</h1>
-      <button type="button" class="rp-pill rp-pill--sky rp-only-tel" id="rp-per-btn" aria-label="Elegir período"></button>
-      <div class="rp-nav rp-nav-off" id="rep-per-nav">
-        <button class="rp-arrow" id="per-prev" title="Período anterior" aria-label="Período anterior"><svg class="icon" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
-        <span id="hero-rango">—</span>
-        <button class="rp-arrow" id="per-next" title="Período siguiente" aria-label="Período siguiente"><svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
-      </div>
-      <button type="button" class="rp-pill rp-only-tel" id="rp-mon-btn" aria-label="Moneda y dólar"></button>
-      <div class="rp-filtros hidden" id="rep-filtros"></div>
+<main class="app-main rx-main">
+  <div class="rx">
+    <div class="rx-top" id="rx-top">
+      <h1>Reportes</h1>
+      <div class="rx-tabs" id="rx-tabs" role="tablist" aria-label="Reportes" hidden></div>
     </div>
-
-    <div class="rp-layout">
-      <!-- Período, fechas, moneda y dólar -->
-      <div class="rp-shade" id="rp-shade"></div>
-      <aside class="rp-rail" id="rp-rail" aria-label="Período y moneda">
-        <div class="rp-grab" aria-hidden="true"></div>
-        <div class="rp-box">
-          <div class="rp-h">Período</div>
-          <div class="rp-opts" id="seg-periodo" role="group" aria-label="Período">
-            <button data-per="semana">Semana</button>
-            <button data-per="quincena">Quincena</button>
-            <button data-per="mes">Mes</button>
-            <button data-per="anio">Año</button>
-            <button data-per="todo">Todo</button>
-          </div>
-          <div class="rp-h rp-h2">O fechas a mano</div>
-          <div class="rp-dates">
-            <label>Desde<input type="date" id="rep-desde"></label>
-            <label>Hasta<input type="date" id="rep-hasta"></label>
-          </div>
-        </div>
-        <div class="rp-box">
-          <div class="rp-h">Ver en</div>
-          <div class="rp-opts" id="seg-moneda">
-            <button data-val="ARS" class="active">Pesos</button>
-            <button data-val="USD">Dólares</button>
-          </div>
-          <div class="rp-h rp-h2">Dólar para convertir</div>
-          <div class="rp-opts" id="seg-rate">
-            <button data-val="oficial" class="active">Oficial</button>
-            <button data-val="blue">Blue</button>
-          </div>
-          <div class="rp-hint" id="rep-dolar-hoy"></div>
-          <div class="rp-hint">Cada OC se convierte con el dólar del día en que se emitió.</div>
-        </div>
-        <button type="button" class="rp-listo rp-only-tel" id="rp-listo">Listo</button>
-      </aside>
-
-      <div class="rp-main">
-        <label class="rp-q">
-          <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="search" id="res-q" placeholder="Buscar artículo, proveedor, obra, responsable o N° OC…" aria-label="Buscar en el reporte" autocomplete="off">
-          <span class="rr-search-n" id="res-q-n"></span>
-        </label>
-
-        <div id="rep-loading" class="rep-loading">Cargando órdenes de compra…</div>
-
-        <div id="rep-content" class="hidden">
-
-          <!-- Resultado de la búsqueda: reemplaza al tablero mientras hay algo escrito -->
-          <section class="rp-busca hidden" id="rp-busca"></section>
-
-          <div class="rp-dash" id="rp-dash">
-            <!-- Total + evolución -->
-            <div class="card rep-card rp-sum">
-              <div class="rp-sum-l">
-                <span class="rp-k" id="rp-total-k">Total gastado</span>
-                <span class="rp-v" id="kpi-total">—</span>
-                <span class="rp-s"><span id="hero-sub"></span><span id="rp-var"></span></span>
-                <div class="rp-mini" id="rp-mini"></div>
-              </div>
-              <div class="rp-sum-r">
-                <div class="rp-sum-h"><span class="rp-sum-t" id="rep-linea-title">Evolución</span></div>
-                <div class="rep-line" id="rep-linea"></div>
-              </div>
-            </div>
-
-            <div class="card rep-card rep-full hidden" id="rep-dup-card" data-card="rep-dup">
-              <div class="card-header" tabindex="0" aria-expanded="true">
-                <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span><span class="rp-ic rp-ic--amb"><svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></span>OC duplicadas</span>
-                <span class="rep-dup-count" id="rep-dup-count"></span>
-              </div>
-              <div class="card-body" id="rep-dup"></div>
-            </div>
-
-            <!-- Obras: participación + una tarjeta por obra -->
-            <div class="card rep-card" data-card="rep-obras">
-              <div class="card-header" tabindex="0" aria-expanded="true">
-                <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span><span class="rp-ic rp-ic--sky"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>Obras<span class="rep-ch-n" id="rp-obras-n"></span></span>
-                <span class="rep-ch-r">
-                  <span class="rp-orden" id="rp-obras-orden" role="group" aria-label="Ordenar obras">
-                    <button data-o="gasto" class="active">Más gasto</button>
-                    <button data-o="subio">Más subió</button>
-                    <button data-o="factura">Sin factura</button>
-                  </span>
-                  <button class="btn btn-outline btn-sm" id="btn-merge-obras">Unificar obras</button>
-                </span>
-              </div>
-              <div class="card-body">
-                <div id="rep-share"></div>
-                <div class="ob-grid" id="rep-obras"></div>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Tabla general: todas las OC del período (y lo que sale en el PDF) -->
-          <div class="card rep-card rep-full" id="rep-res-card" data-card="rep-res-card">
-            <div class="card-header rr-head" tabindex="0" aria-expanded="true">
-              <div class="rr-head-l">
-                <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span><span class="rp-ic rp-ic--blue"><svg class="icon" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span><span id="res-titulo">Las OC del período</span></span>
-                <span class="rr-range" id="res-rango">—</span>
-              </div>
-              <span class="rep-ch-r">
-                <label class="rr-sort-l" for="res-orden">Ordenar por</label>
-                <select class="rr-sort" id="res-orden">
-                  <option value="fecha">Fecha</option>
-                  <option value="importe">Importe</option>
-                  <option value="obra">Obra</option>
-                  <option value="responsable">Responsable</option>
-                  <option value="proveedor">Proveedor</option>
-                </select>
-                <button type="button" class="rr-dir" id="res-dir"></button>
-                <button class="foc-btn foc-btn--edit rp-pdf" id="btn-res-pdf" title="Descargar el resumen en PDF"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PDF</button>
-              </span>
-            </div>
-            <div class="card-body">
-              <div class="rr-stats" id="res-stats"></div>
-              <div class="rr-list" id="res-list"></div>
-              <div class="rr-foot">
-                <span class="rr-foot-n">Sólo OC emitidas y autorizadas. Los importes de cada fila van en la moneda original de la OC.</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Rankings: después de la tabla general (se ocultan mientras se busca) -->
-          <div class="rp-grid2">
-            <div class="card rep-card" data-card="rep-proveedores">
-              <div class="card-header" tabindex="0" aria-expanded="true">
-                <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span><span class="rp-ic rp-ic--blue"><svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg></span>Proveedores<span class="rep-ch-n" data-count></span></span>
-                <span class="rep-ch-r"><input type="search" class="rep-q" placeholder="Buscar proveedor…" aria-label="Buscar proveedor"></span>
-              </div>
-              <div class="card-body" id="rep-proveedores"></div>
-            </div>
-
-            <div class="card rep-card" data-card="rep-equipos">
-              <div class="card-header" tabindex="0" aria-expanded="true">
-                <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span><span class="rp-ic rp-ic--tea"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>Equipos<span class="rep-ch-n" data-count></span></span>
-                <span class="rep-ch-r"><input type="search" class="rep-q" placeholder="Buscar equipo o patente…" aria-label="Buscar equipo"></span>
-              </div>
-              <div class="card-body">
-                <div class="rp-catsum" id="rep-categorias"></div>
-                <div id="rep-equipos"></div>
-              </div>
-            </div>
-
-            <div class="card rep-card" data-card="rep-responsables">
-              <div class="card-header" tabindex="0" aria-expanded="true">
-                <span class="card-title"><span class="rep-chev"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span><span class="rp-ic rp-ic--gray"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>Responsables<span class="rep-ch-n" data-count></span></span>
-                <span class="rep-ch-r"><input type="search" class="rep-q" placeholder="Buscar responsable…" aria-label="Buscar responsable"></span>
-              </div>
-              <div class="card-body" id="rep-responsables"></div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
+    <div id="rx-app" class="rx-col"><div class="rx-cargando">Cargando órdenes de compra…</div></div>
   </div>
 </main>
 
-<!-- Modal: Ficha de la OC -->
-<div class="modal-overlay hidden" id="modal-oc">
+<!-- ===== Ventana de Reportes: presupuesto y plazo, OC sin rubro. Va antes que la
+     ficha de OC para que ésta, que se abre desde acá, quede encima. ===== -->
+<div class="modal-overlay hidden" id="modal-rx">
+  <div class="modal rx-modal" role="dialog" aria-modal="true" aria-labelledby="rx-mt">
+    <div class="rx-mh">
+      <div><span class="rx-k" id="rx-mk"></span><h2 id="rx-mt"></h2></div>
+      <button type="button" class="rx-x" id="rx-mx" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="rx-mb"></div>
+    <div class="modal-footer foc-foot hidden" id="rx-mf"></div>
+  </div>
+</div>
+
+<!-- ===== Ficha de la OC (la misma de Novedades, Historial y la vista previa) ===== -->
+<div class="modal-overlay hidden" id="modal-preview">
   <div class="modal foc-modal">
     <div class="foc-head">
       <div class="foc-head-l">
         <span class="foc-kicker">Orden de compra</span>
-        <span class="foc-nro" id="foc-title">—</span>
-        <div class="foc-chips" id="foc-estado"></div>
+        <span class="foc-nro" id="preview-title">—</span>
+        <div class="foc-chips" id="preview-chips"></div>
       </div>
       <div class="foc-head-r">
         <span class="foc-kicker">Total</span>
-        <span class="foc-total" id="foc-total">—</span>
+        <span class="foc-total" id="preview-total">—</span>
       </div>
-      <button class="foc-x" id="foc-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <button class="foc-x" id="modal-preview-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="modal-body" id="foc-body"></div>
+    <div class="modal-body" id="preview-body"></div>
     <div class="modal-footer foc-foot">
-      <button class="foc-btn foc-btn--del" id="foc-delete" title="Eliminar la OC del historial">
-        <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Eliminar</button>
+      <a class="foc-btn foc-btn--pdf" id="preview-pdf" target="_blank" rel="noopener" title="Abrir el PDF de la OC">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Ver PDF</a>
       <div class="foc-foot-r">
-        <span class="foc-nodrive hidden" id="foc-nodrive">Respaldo en Drive pendiente</span>
-        <a class="foc-btn foc-btn--drive hidden" id="foc-drive" target="_blank" rel="noopener" title="Abrir la carpeta de la OC en Drive">
+        <span class="foc-nodrive hidden" id="preview-nodrive">Respaldo en Drive pendiente</span>
+        <a class="foc-btn foc-btn--drive hidden" id="preview-drive" target="_blank" rel="noopener" title="Abrir la carpeta de la OC en Drive">
           <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Drive</a>
-        <button class="foc-btn foc-btn--pdf" id="foc-pdf" title="Ver el PDF de la OC">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>PDF</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: Unificar obras -->
-<div class="modal-overlay hidden" id="modal-merge">
-  <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">Unificar obras</span>
-      <button class="modal-close" id="mmg-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:.83rem;color:var(--gray-600);margin-bottom:.9rem;">
-        Cada variante se reasignará al nombre destino. Revisá y desmarcá las que no correspondan.
-      </p>
-      <div id="mmg-groups"></div>
-      <div id="mmg-error" class="alert alert-error hidden"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="mmg-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="mmg-apply">Aplicar fusiones</button>
     </div>
   </div>
 </div>
@@ -850,6 +357,10 @@
 <script src="js/resumenPDF.js"></script>
 <script src="js/buscarOC.js"></script>
 <script src="js/duplicados.js"></script>
+<script src="js/presupuesto.js"></script>
 <script src="js/reportes.js"></script>
+<script src="js/reportesObras.js"></script>
+<script src="js/reportesTablero.js"></script>
+<script src="js/reportesResumen.js"></script>
 </body>
 </html>

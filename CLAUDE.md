@@ -73,6 +73,20 @@ hasta subirlos o descartarlos a propósito (vence a los 7 días): salir sin quer
 - Cada **Egreso** se imputa a una **obra** (obligatoria, lista de `/obras` activas). Los egresos
   previos a v146 no tienen obra: se muestran como "—" y suman en "Sin obra" en el Excel.
 
+## Reportes (rediseño traído de Leva)
+
+`reportes.html` con pestañas **Resumen** (admins abren acá: frase de 30 días y «Para mirar»), **Tablero**,
+**Obras** (+ ficha de obra con `?ficha={key}`) y **Explorar** (período, gráficos y lista de OC; `?obra=` / `?equipo=`).
+JS: `reportes.js` (Explorar y ficha de OC), `reportesObras.js` (pestañas, navegación, obras y su ficha),
+`reportesTablero.js`, `reportesResumen.js` (con `tests/resumen.test.js`). Sólo OC firmes, desde el corte de Drive
+y sin las de prueba (`esOCPrueba` en `driveBackup.js`); totales en pesos al oficial de cada OC.
+- **Presupuesto y plazo** de obra (`js/presupuesto.js`, `tests/presupuesto.test.js`): `/obras/{k}/presupuesto`
+  `{moneda, total, rubros?}` y `/obras/{k}/plazo` `{inicio, n, unidad}`, opcionales. Se cargan en la ficha de Obras
+  y en la ficha de obra de Reportes. Estilos `.pres-*` en `styles.css`.
+- Lo operativo que estaba en Reportes (OC duplicadas, «Unificar obras», eliminar OC) pasó a **Novedades**
+  (`js/novedadesDatos.js`). Salieron la pestaña Proveedores, la moneda USD/blue y el rango libre.
+  Los egresos de Caja no suman al gasto de obra en Reportes (sólo OC).
+
 ## Navegación
 
 - `menu.html` (raíz) → dos secciones: **Compras** (`compras.html`) y **Caja** (`caja.html`)
