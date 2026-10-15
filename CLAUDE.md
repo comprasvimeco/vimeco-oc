@@ -57,6 +57,10 @@ que no se puede atribuir va en «En la misma carpeta de Drive». El visor baja c
 best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags
 `/drive_config/cajasMovedOut` y `personalMovedOut`) las mueve al padre de COMPRAS.
 
+**Borrador de archivos** (`js/borradorArchivo.js`, traído de Leva): el archivo elegido en Facturas y el remito
+a medio cargar (foto + N°, fecha, observaciones, cantidades) quedan en IndexedDB del dispositivo, por usuario,
+hasta subirlos o descartarlos a propósito (vence a los 7 días): salir sin querer de la pantalla no los pierde.
+
 ## Caja Chica — lógica por mes
 
 - Todo filtrado por mes (sin opción "Todos los movimientos")

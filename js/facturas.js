@@ -165,8 +165,11 @@ function asegurarTipo(oc) {
 
 // ---- Archivo ----
 
+// Queda guardado en el dispositivo hasta subirlo (ver borradorArchivo.js): si se
+// sale de la pantalla sin querer, al volver sigue cargado.
 function setFile(file) {
   currentFile = file;
+  borradorArchivo.guardar('facturas', { file, raw: rawFile });
   $('fac-drop-main').classList.add('hidden');
   $('file-name').textContent = file.name;
   $('file-size').textContent = `${(file.size / 1024).toFixed(0)} KB`;
@@ -201,6 +204,7 @@ function mostrarPreview(file) {
 }
 
 function resetZone() {
+  borradorArchivo.borrar('facturas');
   currentFile = null;
   rawFile     = null;
   if (filePrevUrl) { URL.revokeObjectURL(filePrevUrl); filePrevUrl = null; }
@@ -460,7 +464,11 @@ async function subirAOC(file, oc) {
 async function doAttachPick(file, oc) {
   if (!file || !oc) return;
   pendingOC = null;
+  // Mientras sube también queda guardado: si se sale antes de que termine (o
+  // falla), al volver está en la bandeja para elegirle la OC de nuevo.
+  borradorArchivo.guardar('facturas', { file, raw: null });
   if (await subirAOC(file, oc)) {
+    borradorArchivo.borrar('facturas');
     toast(`${tipoCarga === 'factura' ? 'Factura cargada' : 'Archivo cargado'} en OC ${oc.nroOC}`, 'success');
   }
 }
@@ -511,6 +519,7 @@ function showAIResults(extracted, matches) {
 async function doAttach(file, oc) {
   const subida = await subirAOC(file, oc);
   if (!subida) return;
+  borradorArchivo.borrar('facturas');
   $('import-zone').classList.add('hidden');
   $('card-result').classList.add('hidden');
   $('success-detail').textContent = `${subida.name} → OC ${oc.nroOC} (${oc.proveedor?.nombre || ''})`;
@@ -628,8 +637,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Archivo compartido por share target → queda cargado en la bandeja
+  // Si no, el que quedó a medio cargar la vez anterior.
   const sharedFile = await checkShareFile();
   if (sharedFile) setFile(sharedFile);
+  else {
+    const b = await borradorArchivo.leer('facturas');
+    if (b && !currentFile) {
+      rawFile = b.raw || null;
+      setFile(b.file);
+      toast('Retomamos el archivo que estabas cargando.', 'info');
+    }
+  }
 
   // Botones de selección
   const fileInput   = $('file-input');

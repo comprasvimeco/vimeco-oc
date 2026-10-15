@@ -428,6 +428,56 @@ function cerrarModal() {
   modalOC = null;
 }
 
+// Cerrar a mano con la foto ya puesta tira el remito a medio cargar: se pregunta.
+async function cancelarModal() {
+  if (modalFile && !await showConfirm('Descartar el remito',
+    'Se pierde la foto y lo que cargaste de este remito.',
+    { boton: 'Descartar', tono: 'del', icono: 'trash' })) return;
+  cerrarModal();
+}
+
+// ---- Borrador: el remito a medio cargar queda en el dispositivo ----
+// Con la foto puesta, el formulario se guarda (ver borradorArchivo.js) con cada
+// cambio: si se sale de la pantalla sin querer, al volver se reabre igual. Se
+// borra al guardar el remito, al quitar la foto o al descartarlo.
+
+let _borradorTimer = 0;
+
+function guardarBorradorRemito() {
+  clearTimeout(_borradorTimer);
+  if (!modalOC || !modalFile) return;
+  const oc = modalOC, file = modalFile, raw = modalRawFile;
+  _borradorTimer = setTimeout(() => {
+    const cant = {};
+    document.querySelectorAll('.rem-item-input').forEach(inp => { cant[inp.dataset.idx] = inp.value; });
+    borradorArchivo.guardar('remitos', {
+      file, raw, nroOC: oc.nroOC, cant,
+      nro: $('rem-nro').value, fecha: $('rem-fecha').value, obs: $('rem-obs').value
+    });
+  }, 400);
+}
+
+function borrarBorradorRemito() {
+  clearTimeout(_borradorTimer);
+  borradorArchivo.borrar('remitos');
+}
+
+async function retomarBorradorRemito() {
+  const b  = await borradorArchivo.leer('remitos');
+  const oc = b && allOCs.find(o => o.nroOC === b.nroOC);
+  if (!oc) return;   // sin conexión no hay OC: queda para la próxima
+  abrirModal(oc);
+  $('rem-nro').value   = b.nro || '';
+  $('rem-fecha').value = b.fecha || hoyISO();
+  $('rem-obs').value   = b.obs || '';
+  document.querySelectorAll('.rem-item-input').forEach(inp => {
+    if (b.cant?.[inp.dataset.idx] != null) inp.value = b.cant[inp.dataset.idx];
+  });
+  modalRawFile = b.raw || null;
+  setFoto(b.file);
+  toast('Retomamos el remito que estabas cargando.', 'info');
+}
+
 // ---- Estado del formulario: pasos, marcas por renglón y pie ----
 
 const FALTA_SEC = { foto: 'rv-sec-foto', nro: 'rv-sec-datos', fecha: 'rv-sec-datos', items: 'rv-sec-items' };
@@ -454,6 +504,7 @@ function marcaRenglon(q, pend) {
 
 function refrescarForm() {
   if (!modalOC) return;
+  guardarBorradorRemito();
   const inputs = [...document.querySelectorAll('.rem-item-input')];
   let todo = inputs.length > 0, nada = inputs.length > 0, quedan = 0;
   inputs.forEach(inp => {
@@ -581,6 +632,7 @@ function setFoto(file) {
 }
 
 function limpiarFoto() {
+  if (modalFile) borrarBorradorRemito();
   modalFile = modalRawFile = null;
   if (modalPrevUrl) { URL.revokeObjectURL(modalPrevUrl); modalPrevUrl = null; }
   $('rem-file').value   = '';
@@ -1083,8 +1135,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('rem-search').addEventListener('input', () => { pager.reset('remoc'); pager.reset('remlist'); renderLista(); });
 
   // Formulario
-  $('modal-remito-close').addEventListener('click', cerrarModal);
-  $('btn-rem-cancelar').addEventListener('click', cerrarModal);
+  $('modal-remito-close').addEventListener('click', cancelarModal);
+  $('btn-rem-cancelar').addEventListener('click', cancelarModal);
   $('btn-rem-guardar').addEventListener('click', guardarRemito);
   $('btn-rem-todo').addEventListener('click',   () => setCantidades('todo'));
   $('btn-rem-vaciar').addEventListener('click', () => setCantidades('vaciar'));
@@ -1095,6 +1147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('rem-items').addEventListener('input', refrescarForm);
   $('rem-nro').addEventListener('input', refrescarForm);
   $('rem-fecha').addEventListener('input', refrescarForm);
+  $('rem-obs').addEventListener('input', guardarBorradorRemito);
   $('rv-estado').addEventListener('click', () => {
     const faltan = faltantesRemito();
     if (faltan.length) mostrarFaltantes(faltan);
@@ -1127,6 +1180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await cargarDatos();
     renderTodo();
+    await retomarBorradorRemito();
   } catch (e) {
     console.error('cargarDatos:', e);
     $('rem-oc-list').innerHTML = '<div class="rv-panel"><div class="rv-vacio">Sin conexión. Abrí Remitos con red al menos una vez.</div></div>';
