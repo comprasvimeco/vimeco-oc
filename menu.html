@@ -62,7 +62,6 @@
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <button class="btn btn-sm btn-outline" id="btn-logout">Salir</button>
   </div>
 </header>
 
@@ -250,10 +249,6 @@
     document.getElementById('menu-saludo').textContent = _h < 13 ? 'Buen día' : _h < 20 ? 'Buenas tardes' : 'Buenas noches';
     document.getElementById('menu-fecha').textContent =
       new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-    document.getElementById('btn-logout').addEventListener('click', () => {
-      localStorage.removeItem('vimeco_session');
-      window.location.href = 'index.html';
-    });
     const show = (id, on) => { document.getElementById(id).style.display = on ? '' : 'none'; };
     const badge = (id, n) => {
       const b = document.getElementById(id);

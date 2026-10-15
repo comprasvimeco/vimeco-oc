@@ -112,6 +112,10 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 .header-title { font-size: .88rem; color: rgba(255,255,255,.65); font-weight: 400; margin-left: .25rem; border-left: 1px solid rgba(255,255,255,.25); padding-left: .85rem; }
 .header-user { display: flex; align-items: center; gap: 1rem; }
 .user-badge { display: flex; align-items: center; gap: .5rem; background: rgba(255,255,255,.12); border-radius: 20px; padding: .3rem .85rem; font-size: .82rem; }
+/* La pastilla del nombre abre el Perfil (js/ui.js) */
+.user-badge--perfil { cursor: pointer; transition: background .15s; }
+.user-badge--perfil:hover { background: rgba(255,255,255,.22); }
+.user-badge--perfil:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .user-code { font-weight: 700; color: var(--accent); }
 
 .app-main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }

@@ -28,13 +28,6 @@
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <div class="hdr-menu-wrap">
-      <button class="btn btn-sm btn-outline" id="btn-menu" title="Menú"><svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-      <div class="hdr-dropdown hidden" id="hdr-dropdown">
-        <button class="hdr-drop-item" id="btn-firma"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Mi firma</button>
-        <div class="hdr-drop-version">v301</div>
-      </div>
-    </div>
     <button class="btn btn-sm btn-outline btn-icon" aria-label="Volver" title="Volver" onclick="window.location.href='compras.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
 </header>
@@ -420,26 +413,6 @@
         <button class="foc-btn foc-btn--edit" id="modal-preview-close2" title="Volver al formulario"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Editar</button>
         <button class="foc-btn foc-btn--gen" id="modal-preview-generate"><svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Generar</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ===== MODAL: Firma (mismo lienzo que en Autorizaciones) ===== -->
-<div class="modal-overlay hidden" id="modal-firma">
-  <div class="confirm-box confirm-box--ok confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="firma-title">
-    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
-    <div class="confirm-title" id="firma-title">Tu firma</div>
-    <p class="confirm-msg">Dibujala una vez: queda guardada para que puedas firmar las próximas OC.</p>
-    <div class="firma-pad">
-      <canvas id="firma-canvas"></canvas>
-    </div>
-    <div class="firma-pie">
-      <span>Con el dedo o el mouse</span>
-      <button type="button" class="foc-btn foc-btn--clear" id="btn-firma-limpiar"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Borrar</button>
-    </div>
-    <div class="confirm-btns">
-      <button type="button" class="foc-btn foc-btn--clear" id="modal-firma-close">Cancelar</button>
-      <button type="button" class="foc-btn foc-btn--gen" id="btn-firma-guardar"></button>
     </div>
   </div>
 </div>

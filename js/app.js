@@ -125,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-clear-file').addEventListener('click', clearFile);
   $('btn-add-impuesto').addEventListener('click', addImpuestoRow);
   $('verif-banner-close').addEventListener('click', hideVerifBanner);
-  setupMenu();
   setupIVAToggle();
   setupMonedaToggle();
 
@@ -189,7 +188,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (r) irAFaltante(r.dataset.id);
   });
 
-  setupFirmaModalButtons();
   setupImportButtons();
   const obrasListas = setupObraCombo();
   setupRubroCombo();
@@ -209,8 +207,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   retryDriveQueue().catch(() => {});
   window.addEventListener('online', () => retryDriveQueue().catch(() => {}));
 
-  // Si la lectura tarda y el usuario dibujó su firma mientras tanto, no pisarla.
-  getFirma(code).then(f => { if (!firmaBase64) firmaBase64 = f || null; }).catch(() => {});
+  // La firma y el nombre que va debajo se editan en el Perfil (perfil.html).
+  getFirma(code).then(f => { firmaBase64 = f || null; }).catch(() => {});
+  cargarNombreOC(code).catch(() => {});
 
   // Retoma la OC que quedó a medio cargar (o la base pedida desde el Historial).
   arrancarBorrador(obrasListas);
@@ -320,104 +319,6 @@ function updateMonedaLabels() {
   set('th-precio-unit', 'Precio Unit.');
   set('th-importe',     'Importe');
   set('th-monto',       'Monto');
-}
-
-// ---- Menú de usuario ----
-function setupMenu() {
-  const btnMenu   = $('btn-menu');
-  const dropdown  = $('hdr-dropdown');
-
-  btnMenu.addEventListener('click', e => {
-    e.stopPropagation();
-    dropdown.classList.toggle('hidden');
-  });
-  document.addEventListener('click', () => dropdown.classList.add('hidden'));
-  dropdown.addEventListener('click', e => e.stopPropagation());
-
-  $('btn-firma').addEventListener('click', () => {
-    dropdown.classList.add('hidden');
-    openFirmaModal();
-  });
-}
-
-// ---- Firma ----
-let _firmaDrawing = false, _firmaLX = 0, _firmaLY = 0;
-
-function openFirmaModal() {
-  const canvas = $('firma-canvas');
-  const ctx    = canvas.getContext('2d');
-
-  if (!canvas._ready) {
-    canvas.width  = 560;
-    canvas.height = 200;
-    canvas._ready = true;
-
-    function pos(e) {
-      const r  = canvas.getBoundingClientRect();
-      const sx = canvas.width  / r.width;
-      const sy = canvas.height / r.height;
-      const s  = e.touches ? e.touches[0] : e;
-      return { x: (s.clientX - r.left) * sx, y: (s.clientY - r.top) * sy };
-    }
-    function stroke(e) {
-      const p = pos(e);
-      ctx.beginPath(); ctx.moveTo(_firmaLX, _firmaLY); ctx.lineTo(p.x, p.y); ctx.stroke();
-      _firmaLX = p.x; _firmaLY = p.y;
-    }
-
-    canvas.addEventListener('mousedown',  e => { _firmaDrawing = true;  const p = pos(e); _firmaLX = p.x; _firmaLY = p.y; });
-    canvas.addEventListener('mousemove',  e => { if (_firmaDrawing) stroke(e); });
-    canvas.addEventListener('mouseup',    () => _firmaDrawing = false);
-    canvas.addEventListener('mouseleave', () => _firmaDrawing = false);
-    canvas.addEventListener('touchstart', e => { e.preventDefault(); _firmaDrawing = true;  const p = pos(e); _firmaLX = p.x; _firmaLY = p.y; }, { passive: false });
-    canvas.addEventListener('touchmove',  e => { e.preventDefault(); if (_firmaDrawing) stroke(e); }, { passive: false });
-    canvas.addEventListener('touchend',   () => _firmaDrawing = false);
-  }
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#1a3a5c';
-  ctx.lineWidth = 2.5;
-  ctx.lineCap   = 'round';
-  ctx.lineJoin  = 'round';
-
-  if (firmaBase64) {
-    const img = new Image();
-    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    img.src = firmaBase64;
-  }
-
-  $('modal-firma').classList.remove('hidden');
-}
-
-const BTN_GUARDAR_FIRMA = () => icSvg('checkSm') + 'Guardar firma';
-
-function setupFirmaModalButtons() {
-  $('btn-firma-guardar').innerHTML = BTN_GUARDAR_FIRMA();
-  $('modal-firma-close').addEventListener('click', () => $('modal-firma').classList.add('hidden'));
-  $('btn-firma-limpiar').addEventListener('click', () => {
-    const canvas = $('firma-canvas');
-    const ctx    = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  });
-  $('btn-firma-guardar').addEventListener('click', async () => {
-    const canvas = $('firma-canvas');
-    const base64 = canvas.toDataURL('image/png');
-    const btn    = $('btn-firma-guardar');
-    btn.disabled = true; btn.textContent = 'Guardando…';
-    try {
-      const code = sessionStorage.getItem('responsable_code');
-      await saveFirma(code, base64);
-      firmaBase64 = base64;
-      $('modal-firma').classList.add('hidden');
-      toast('Firma guardada.', 'success');
-    } catch {
-      toast('Error al guardar la firma.', 'error');
-    } finally {
-      btn.disabled = false; btn.innerHTML = BTN_GUARDAR_FIRMA();
-    }
-  });
 }
 
 // logOCActivity vive en firebase.js (la usan también autorizaciones.js y la
@@ -2495,6 +2396,8 @@ function buildOCData(numero, firma = null) {
     fecha:    formatDateDisplay(new Date()),
     moneda:   monedaUSD ? 'USD' : 'ARS',
     ejecutor: sessionStorage.getItem('responsable_name'),
+    // Debajo de la firma (o en «Autorizado por») va el nombre del Perfil; si firma otro desde Autorizaciones, se pisa.
+    _firmante: nombreOCGuardado(sessionStorage.getItem('responsable_code')) || sessionStorage.getItem('responsable_name'),
     proveedor: {
       nombre:           proveedor,
       cuit:             $('cuit-proveedor').value.trim()          || '—',

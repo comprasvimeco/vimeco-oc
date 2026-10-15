@@ -18,8 +18,8 @@ MSG=$(cat "$COMMIT_MSG_FILE")
 echo "$MSG" | grep -qE '[[:space:]]v[0-9]{3}[[:space:]]' && exit 0
 echo "$MSG" | grep -q '\[skip ci\]'                       && exit 0
 
-# Leer versión actual de app.html (la que el CI va a incrementar)
-CURRENT=$(grep -o 'hdr-drop-version">v[0-9]*' app.html 2>/dev/null | grep -o '[0-9]*$')
+# Leer versión actual del menú principal (la que el CI va a incrementar)
+CURRENT=$(grep -o 'class="menu-version"[^>]*>v[0-9]*' menu.html 2>/dev/null | grep -o '[0-9]*$')
 [ -z "$CURRENT" ] && exit 0
 
 # Próxima versión (la que va a quedar deployada)

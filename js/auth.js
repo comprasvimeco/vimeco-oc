@@ -95,6 +95,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function saveSession(codigo, nombre) {
+    // El nombre del Perfil que va debajo de la firma, para tenerlo aunque la OC se arme sin conexión.
+    if (typeof recordarNombreOC === 'function') recordarNombreOC(codigo, String((currentUser && currentUser.nombreOC) || '').trim());
     localStorage.setItem('vimeco_session', JSON.stringify({ codigo, nombre }));
     localStorage.setItem('responsable_code', codigo);
     localStorage.setItem('responsable_name', nombre);

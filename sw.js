@@ -6,6 +6,7 @@ const BASE = '/vimeco-oc';
 const STATIC_ASSETS = [
   BASE + '/index.html',
   BASE + '/menu.html',
+  BASE + '/perfil.html',
   BASE + '/compras.html',
   BASE + '/administracion.html',
   BASE + '/app.html',
@@ -19,6 +20,7 @@ const STATIC_ASSETS = [
   BASE + '/js/duplicados.js',
   BASE + '/js/gemini.js',
   BASE + '/js/ocCalc.js',
+  BASE + '/js/perfil.js',
   BASE + '/js/ocGenerator.js',
   BASE + '/js/fichaOC.js',
   BASE + '/js/fichaRemito.js',

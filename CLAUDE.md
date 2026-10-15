@@ -4,7 +4,7 @@
 
 El hook `.githooks/prepare-commit-msg` **inyecta automáticamente** el número de versión deployada en cada commit. No es necesario calcularlo manualmente.
 
-El hook lee la versión actual de `app.html` (`hdr-drop-version`), suma 1, y la inserta en el mensaje:
+El hook lee la versión actual de `menu.html` (`menu-version`), suma 1, y la inserta en el mensaje:
 
 ```
 feat: descripción  →  feat: v081 descripción
@@ -16,7 +16,7 @@ git config core.hooksPath .githooks
 ```
 
 ### Regla de proceso para commits
-1. **Siempre hacer `git pull --rebase` antes de `git commit`** para asegurar que la versión leída en `app.html` es la última bumpeada por CI.
+1. **Siempre hacer `git pull --rebase` antes de `git commit`** para asegurar que la versión leída en `menu.html` es la última bumpeada por CI.
 2. El hook se encarga del número; solo escribir la descripción en el mensaje.
 
 ---
@@ -25,9 +25,10 @@ git config core.hooksPath .githooks
 
 PWA estática (HTML/CSS/JS). Deploy en GitHub Pages vía GitHub Actions (`deploy.yml`).
 
-- `build.js` — incrementa versión en `app.html` y `caja.html`, inyecta secrets
-- `deploy.yml` — hace `git add app.html caja.html sw.js` después del build y commitea el bump
-- Versión sincronizada: `app.html` y `caja.html` siempre tienen el mismo número
+- `build.js` — incrementa la versión en `menu.html` (la fuente) y copia el número a `caja.html`, `perfil.html` e `index.html`; inyecta secrets
+- `deploy.yml` — hace `git add app.html caja.html menu.html index.html sw.js` después del build y commitea el bump
+  (`perfil.html` no está en la lista: el sitio publicado lleva su número, pero en el repo queda uno atrás)
+- Versión sincronizada: todas esas páginas tienen siempre el mismo número. `app.html` no muestra versión
 
 ## Drive — estructura de carpetas
 
@@ -74,6 +75,12 @@ best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags
 - `compras.html` → submenú: Órdenes de Compra (`app.html`), Facturas (`facturas.html`), Historial (`historial.html`)
 - El logo/header de las páginas de Compras vuelve a `compras.html`; el de Caja vuelve a `menu.html`
 - `menu.html` → **Archivo** (`archivo.html`), para `0000` y el permiso `archivo`.
+- **Perfil** (`perfil.html` + `js/perfil.js`, traído de Leva): se entra tocando la pastilla del nombre en el
+  header de cualquier pantalla (`js/ui.js`). Tiene la firma (`/firmas/{código}`, antes en el menú ☰ de la OC),
+  «Tu nombre en las OC» (`/usuarios/{código}/nombreOC`, va debajo de la firma en el PDF; las listas siguen con
+  `nombre`; caché en `localStorage` vía `nombreOCGuardado`), qué puede hacer cada uno, notificaciones y
+  Cerrar sesión (ya no está en el menú). Al autorizar se guarda `autorizacion.firmanteOC` (el nombre del PDF).
+  `app.html` ya no tiene menú ☰ ni versión.
 - `menu.html` → **Proveedores** (`proveedores.html`, para todos): ficha editable de cada proveedor, artículos
   comprados con el último precio y comparación por artículo. Lo tildado abre `app.html` precargado vía
   `sessionStorage.oc_desde_proveedor` (`loadOCDesdeProveedor`). Todos ven precios por unidad; no se muestran

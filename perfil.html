@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>VIMECO S.A. — Mi perfil</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    /* Estética del Perfil de Leva: sus fuentes, tonos y tarjetas, sólo dentro
+       de la página (el header sigue siendo el de VIMECO). */
+    @font-face { font-family: 'Geist'; src: url('assets/fonts/geist.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Plus Jakarta Sans'; src: url('assets/fonts/plus-jakarta-sans.woff2') format('woff2'); font-weight: 200 800; font-style: normal; font-display: swap; }
+    .pf-main {
+      --surface: #FFFFFF; --sunk: #F3F0FD; --ink: #231C4A; --ink-2: #6B658F; --line: #E8E4F7;
+      --lila: #8B7CF6; --lila-deep: #5B47E0; --lila-soft: #ECE8FE;
+      --menta-bg: #DDF5E8; --menta-fg: #1D6B45; --rosa-bg: #FBE1E6; --rosa-fg: #A0283E;
+      --fac-bg: #F3E6FB; --fac-fg: #7A3A9E; --gris-bg: #F1F1F4;
+      --shadow-leva: 0 1px 2px rgba(56,40,140,.06), 0 8px 22px -12px rgba(56,40,140,.28);
+      --font-texto: 'Geist', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --font-display: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+    }
+    .pf-main { max-width: 560px; margin: 0 auto; padding: 1.25rem 1rem 3rem; display: grid; gap: .85rem; font-family: var(--font-texto); color: var(--ink); }
+
+    /* Cabecera: iniciales, nombre y lo que sos en la empresa */
+    .pf-hero { background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-leva); padding: 1.4rem 1rem 1.1rem;
+      display: grid; justify-items: center; text-align: center; gap: .2rem; position: relative; overflow: hidden; }
+    .pf-hero::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 64px; background: linear-gradient(120deg, #E3EAF4, #D3DFEE); }
+    .pf-hero > * { position: relative; }
+    .pf-av { width: 80px; height: 80px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; color: #fff;
+      background: linear-gradient(135deg, #2a5a8c, #1a3a5c); box-shadow: 0 0 0 4px var(--surface), 0 6px 18px -6px rgba(26,58,92,.55); }
+    .pf-nombre { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--ink); margin-top: .55rem; }
+    .pf-cod { color: var(--ink-2); font-size: .85rem; }
+    .pf-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; margin-top: .55rem; }
+    .pf-chip { font-size: .74rem; font-weight: 600; border-radius: 20px; padding: .2rem .65rem; background: var(--sunk); color: var(--ink-2); }
+    .pf-chip--adm { background: var(--lila-soft); color: var(--lila-deep); }
+    .pf-chip--aut { background: var(--fac-bg); color: var(--fac-fg); }
+
+    .pf-card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow-leva); padding: 1rem; display: grid; gap: .75rem; }
+    .pf-card-h { display: flex; align-items: center; gap: .7rem; }
+    .pf-card-h b { font-size: .97rem; color: var(--ink); }
+    .pf-card-h small { display: block; font-size: .78rem; font-weight: 400; color: var(--ink-2); }
+    .pf-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
+    .pf-ic .icon, .pf-ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .pf-ic--oc  { background: var(--lila-soft); color: var(--lila-deep); }
+    .pf-ic--new { background: var(--menta-bg); color: var(--menta-fg); }
+    .pf-ic--aut { background: var(--fac-bg); color: var(--fac-fg); }
+    .pf-ic--sec { background: var(--gris-bg); color: var(--ink-2); }
+    .pf-ic--del { background: var(--rosa-bg); color: var(--rosa-fg); }
+    .pf-hint { font-size: .8rem; color: var(--ink-2); margin: 0; }
+    .pf-hint b { color: var(--ink); }
+
+    /* Nombre en las OC */
+    .pf-field { display: grid; gap: .3rem; }
+    .pf-field label { font-size: .78rem; font-weight: 600; color: var(--ink-2); }
+    .pf-field-row { display: flex; gap: .5rem; align-items: center; }
+    .pf-field input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--ink); border: 1.5px solid var(--line); border-radius: 11px; padding: .55rem .7rem; background: var(--surface); }
+    .pf-field input:focus { outline: none; border-color: var(--lila); box-shadow: 0 0 0 3px var(--lila-soft); }
+
+    /* Firma y cómo sale en el pie de la OC (imita el PDF: siempre en claro) */
+    .pf-firma { border: 1.5px dashed #D6CFF5; border-radius: 12px; background: #fff; height: 110px; display: grid; place-items: center; overflow: hidden; }
+    .pf-firma img { max-width: 80%; max-height: 100px; }
+    .pf-firma-vacia { font-size: .84rem; color: var(--ink-2); text-align: center; padding: 0 1rem; }
+    .pf-lbl { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+    .pf-pie { border: 1px solid #CFCAD9; border-radius: 4px; background: #fff; color-scheme: light; display: grid; grid-template-columns: 1fr 1fr 1.25fr; font-family: Arial, Helvetica, sans-serif; color: #333; }
+    .pf-pie > div { padding: 6px 7px 7px; border-right: 1px solid #CFCAD9; min-height: 92px; display: flex; flex-direction: column; min-width: 0; }
+    .pf-pie > div:last-child { border-right: 0; align-items: center; }
+    .pf-pie .t { font-size: 7.5px; font-weight: 700; color: #3A3A40; align-self: stretch; margin-bottom: 4px; }
+    .pf-pie .v { font-size: 8px; color: #777; }
+    .pf-pie .raya { margin-top: auto; border-top: .5px solid #999; align-self: stretch; margin-inline: 4px; }
+    .pf-pie .ac { font-size: 7px; color: #777; text-align: center; padding-top: 2px; }
+    .pf-pie img { max-width: 90%; height: 38px; object-fit: contain; }
+    .pf-pie .fn { font-size: 8px; color: #555; text-align: center; overflow-wrap: anywhere; }
+
+    /* Qué podés hacer */
+    .pf-lista { display: grid; }
+    .pf-fila { display: flex; gap: .65rem; align-items: center; padding: .6rem 0; border-top: 1px solid var(--line); font-size: .88rem; color: var(--ink); }
+    .pf-fila:first-child { border-top: 0; padding-top: 0; }
+    .pf-fila .pf-ic { width: 30px; height: 30px; border-radius: 9px; }
+    .pf-fila .pf-ic .icon, .pf-fila .pf-ic svg { width: 15px; height: 15px; }
+    .pf-fila > span:not(.pf-ic) { min-width: 0; flex: 1; }
+    .pf-fila small { display: block; color: var(--ink-2); font-size: .77rem; }
+    .pf-fila .foc-btn { flex-shrink: 0; }
+
+    .pf-salir { display: flex; align-items: center; gap: .7rem; width: 100%; background: var(--surface); border: 0; border-radius: 16px; box-shadow: var(--shadow-leva);
+      padding: .8rem 1rem; font: inherit; font-size: .92rem; font-weight: 600; color: var(--rosa-fg); cursor: pointer; }
+    .pf-salir:hover { background: #FFF7F8; }
+    .pf-salir:focus-visible { outline: 2px solid var(--lila-deep); outline-offset: 2px; }
+    .pf-salir .pf-ic { width: 30px; height: 30px; border-radius: 9px; }
+    .perfil-version { text-align: center; color: #ABA6C7; font-size: .72rem; }
+  </style>
+</head>
+<body data-perfil>
+
+<header class="app-header">
+  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Mi perfil</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
+  </div>
+</header>
+
+<main class="pf-main">
+  <section class="pf-hero">
+    <span class="pf-av" id="pf-av" aria-hidden="true"></span>
+    <div class="pf-nombre" id="pf-nombre"></div>
+    <div class="pf-cod" id="pf-cod"></div>
+    <div class="pf-chips" id="pf-chips"></div>
+  </section>
+
+  <!-- Firma (/firmas/{código}) -->
+  <section class="pf-card">
+    <div class="pf-card-h"><span class="pf-ic pf-ic--new"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+      <b>Tu firma<small>La que sale cuando firmás una OC</small></b></div>
+    <div class="pf-firma" id="pf-firma"><span class="pf-firma-vacia">Cargando…</span></div>
+    <div><button type="button" class="foc-btn foc-btn--clear" id="pf-firma-dibujar"></button></div>
+    <div class="pf-lbl">Así sale en el pie de la OC</div>
+    <div class="pf-pie" aria-label="Pie del PDF de la OC">
+      <div><span class="t">Condiciones de Pago:</span><span class="v">30 días f.f.</span></div>
+      <div><span class="t">Conformidad del Proveedor:</span><span class="raya"></span><span class="ac">Firma y Aclaración</span></div>
+      <div><span class="t">Autorizado por VIMECO S.A.:</span><span id="pf-pie-firma"></span><span class="fn" id="pf-pie-nombre"></span><span class="raya"></span><span class="ac">Firma y Sello</span></div>
+    </div>
+  </section>
+
+  <!-- Nombre en las OC (/usuarios/{código}/nombreOC) -->
+  <section class="pf-card">
+    <div class="pf-card-h"><span class="pf-ic pf-ic--oc"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+      <b>Tu nombre en las OC<small>Va debajo de tu firma en el PDF</small></b></div>
+    <div class="pf-field">
+      <label for="pf-nombre-oc">Cómo querés que salga</label>
+      <div class="pf-field-row">
+        <input id="pf-nombre-oc" maxlength="60" autocomplete="off" spellcheck="false">
+        <button type="button" class="foc-btn foc-btn--gen hidden" id="pf-nombre-guardar"></button>
+      </div>
+    </div>
+    <p class="pf-hint" id="pf-nombre-hint"></p>
+  </section>
+
+  <!-- Qué podés hacer (sólo para ver: lo define el 0000 en Usuarios) -->
+  <section class="pf-card">
+    <div class="pf-card-h"><span class="pf-ic pf-ic--aut"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11l-3 3-2-2"/></svg></span>
+      <b>Qué podés hacer<small id="pf-permisos-sub">Lo define el administrador en Usuarios</small></b></div>
+    <div class="pf-lista" id="pf-permisos"><div class="pf-fila"><span>Cargando…</span></div></div>
+  </section>
+
+  <!-- Notificaciones (js/push.js) -->
+  <section class="pf-card hidden" id="pf-push-card">
+    <div class="pf-fila" style="padding:0">
+      <span class="pf-ic pf-ic--sec"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span>
+      <span><b>Notificaciones</b><small id="pf-push-txt"></small></span>
+      <button type="button" class="foc-btn foc-btn--edit hidden" id="pf-push-btn">Activar</button>
+    </div>
+  </section>
+
+  <button type="button" class="pf-salir" id="pf-salir"><span class="pf-ic pf-ic--del"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>Cerrar sesión</button>
+  <div class="perfil-version">VIMECO OC v301</div>
+</main>
+
+<!-- ===== MODAL: Firma (mismo lienzo que en Autorizaciones) ===== -->
+<div class="modal-overlay hidden" id="modal-firma">
+  <div class="confirm-box confirm-box--ok confirm-box--wide" role="dialog" aria-modal="true" aria-labelledby="firma-title">
+    <span class="confirm-ic"><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+    <div class="confirm-title" id="firma-title">Tu firma</div>
+    <p class="confirm-msg">Dibujala una vez: queda guardada para que puedas firmar las próximas OC.</p>
+    <div class="firma-pad">
+      <canvas id="firma-canvas"></canvas>
+    </div>
+    <div class="firma-pie">
+      <span>Con el dedo o el mouse</span>
+      <button type="button" class="foc-btn foc-btn--clear" id="btn-firma-limpiar"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Borrar</button>
+    </div>
+    <div class="confirm-btns">
+      <button type="button" class="foc-btn foc-btn--clear" id="modal-firma-close">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--gen" id="btn-firma-guardar"></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/push.js"></script>
+<script src="js/perfil.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then(reg => reg.update()).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+  }
+</script>
+</body>
+</html>

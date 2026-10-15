@@ -224,9 +224,25 @@ function _hdrInitials(name) {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+function _vimecoSesion() {
+  try { return JSON.parse(localStorage.getItem('vimeco_session')) || null; } catch (_) { return null; }
+}
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('hdr-name');
   if (!el) return;
+  // Con sesión, la pastilla del nombre abre el Perfil (firma, nombre en las OC, salir).
+  const badge = el.closest('.user-badge');
+  const s = _vimecoSesion();
+  if (badge && s && s.codigo && !document.body.hasAttribute('data-perfil')) {
+    badge.classList.add('user-badge--perfil');
+    badge.setAttribute('role', 'link');
+    badge.setAttribute('tabindex', '0');
+    badge.setAttribute('title', 'Tu perfil');
+    badge.setAttribute('aria-label', 'Tu perfil');
+    const ir = () => { location.href = 'perfil.html'; };
+    badge.addEventListener('click', ir);
+    badge.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ir(); } });
+  }
   const sync = () => {
     const t = el.textContent.trim();
     el.setAttribute('data-initials', (t && t !== '—') ? _hdrInitials(t) : '');

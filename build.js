@@ -1,25 +1,28 @@
 const fs = require('fs');
 
-// Increment version once (from app.html) and write the same number to both files
-const versionRe = /(<div class="hdr-drop-version">v)(\d+)(<\/div>)/;
+// La fuente de la versión es el menú principal (etiqueta chica bajo las tarjetas):
+// se incrementa una vez ahí y el mismo número va a Caja, Perfil y el ingreso.
+const menuVersionRe = /(<div class="menu-version"[^>]*>v)(\d+)(<\/div>)/;
 let nextVersion;
-let appHtml = fs.readFileSync('app.html', 'utf8');
-appHtml = appHtml.replace(versionRe, (_, pre, num, post) => {
+let menuHtml = fs.readFileSync('menu.html', 'utf8');
+menuHtml = menuHtml.replace(menuVersionRe, (_, pre, num, post) => {
   nextVersion = String(parseInt(num, 10) + 1).padStart(3, '0');
   console.log(`Version bumped: v${num} → v${nextVersion}`);
   return `${pre}${nextVersion}${post}`;
 });
-fs.writeFileSync('app.html', appHtml);
+fs.writeFileSync('menu.html', menuHtml);
 
+// En el menú ☰ de Caja
+const versionRe = /(<div class="hdr-drop-version">v)(\d+)(<\/div>)/;
 let cajaHtml = fs.readFileSync('caja.html', 'utf8');
 cajaHtml = cajaHtml.replace(versionRe, (_, pre, _num, post) => `${pre}${nextVersion}${post}`);
 fs.writeFileSync('caja.html', cajaHtml);
 
-// Misma versión en el menú principal (etiqueta chica bajo las tarjetas)
-const menuVersionRe = /(<div class="menu-version"[^>]*>v)(\d+)(<\/div>)/;
-let menuHtml = fs.readFileSync('menu.html', 'utf8');
-menuHtml = menuHtml.replace(menuVersionRe, (_, pre, _num, post) => `${pre}${nextVersion}${post}`);
-fs.writeFileSync('menu.html', menuHtml);
+// Y al pie del Perfil
+const perfilVersionRe = /(<div class="perfil-version">VIMECO OC v)(\d+)(<\/div>)/;
+let perfilHtml = fs.readFileSync('perfil.html', 'utf8');
+perfilHtml = perfilHtml.replace(perfilVersionRe, (_, pre, _num, post) => `${pre}${nextVersion}${post}`);
+fs.writeFileSync('perfil.html', perfilHtml);
 
 // Y al pie del ingreso
 const loginVersionRe = /(<div class="lg-version">v)(\d+)(<\/div>)/;

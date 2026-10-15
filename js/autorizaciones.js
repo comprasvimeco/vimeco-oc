@@ -8,6 +8,8 @@ let misPedidos  = [];      // OC cuya autorización pedí yo (para ver el estado
 let resueltas   = [];      // OC que ya autoricé o rechacé yo
 let myCode      = '';
 let myName      = '';
+// Nombre que va debajo de la firma: el de «Tu nombre en las OC» del Perfil, o el de siempre.
+const miNombreOC = () => nombreOCGuardado(myCode) || myName;
 let myFirma     = null;    // base64 de mi firma (o null si no tengo)
 let currentOC   = null;    // OC abierta en la vista previa
 let pendingSign = null;    // OC a firmar tras dibujar firma en el momento
@@ -510,7 +512,7 @@ async function firmarOC(oc) {
     if (!(await siguePendiente(oc))) return;
     const ocData = ocDataFromRecord(oc);
     ocData._firma    = myFirma;   // firma del autorizador
-    ocData._firmante = myName;    // nombre del autorizador bajo la firma
+    ocData._firmante = miNombreOC();   // nombre del autorizador bajo la firma (el del Perfil)
     // ocData.ejecutor queda igual = creador de la OC
 
     let blob;
@@ -528,6 +530,7 @@ async function firmarOC(oc) {
       resueltoEn:  Date.now(),
       firmaCodigo: myCode,
       firmante:    myName,
+      firmanteOC:  miNombreOC(),   // el que salió en el PDF; `firmante` es el de las listas
       motivoRechazo: null
     };
 
@@ -756,6 +759,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // mientras tanto el usuario dibujó la suya, no pisarla: con la conexión lenta
   // esta respuesta llegaba después de guardarla y volvía a pedirla.
   getFirma(myCode).then(f => { if (!myFirma) myFirma = f || null; }).catch(() => {});
+  cargarNombreOC(myCode).catch(() => {});
 
   // Cargar ambas bandejas: lo que me piden firmar y lo que yo pedí.
   try {

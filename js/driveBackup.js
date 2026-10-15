@@ -133,7 +133,7 @@ async function ocDataDe(oc) {
   };
 
   if (oc.estado === 'autorizada' && oc.autorizacion) {
-    ocData._firmante = oc.autorizacion.firmante || ocData.ejecutor;
+    ocData._firmante = oc.autorizacion.firmanteOC || oc.autorizacion.firmante || ocData.ejecutor;
     if (oc.autorizacion.firmaCodigo && typeof getFirma === 'function') {
       try { ocData._firma = await getFirma(oc.autorizacion.firmaCodigo); } catch (_) {}
     }

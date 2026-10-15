@@ -759,6 +759,23 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
+
+  // Nombre con el que cada uno firma las OC (Perfil → «Tu nombre en las OC»):
+  // va debajo de la firma en el PDF. Las listas siguen con `nombre`. Queda en
+  // caché porque el PDF se arma también sin conexión; vacío = se usa `nombre`.
+  const _kNombreOC = codigo => 'vimeco_nombre_oc:' + codigo;
+  window.nombreOCGuardado = function (codigo) {
+    try { return localStorage.getItem(_kNombreOC(codigo)) || ''; } catch (_) { return ''; }
+  };
+  window.recordarNombreOC = function (codigo, nombre) {
+    try { nombre ? localStorage.setItem(_kNombreOC(codigo), nombre) : localStorage.removeItem(_kNombreOC(codigo)); } catch (_) {}
+  };
+  window.cargarNombreOC = async function (codigo) {
+    const u = await getUsuario(codigo);
+    const n = String((u && u.nombreOC) || '').trim();
+    recordarNombreOC(codigo, n);
+    return n;
+  };
 })();
 
 // ─── Caja Chica ──────────────────────────────────────

@@ -73,7 +73,7 @@ function ocDataFromRecord(oc) {
 async function ocDataParaPdf(oc) {
   const data = ocDataFromRecord(oc);
   if (oc.estado === 'autorizada' && oc.autorizacion) {
-    data._firmante = oc.autorizacion.firmante || data.ejecutor;
+    data._firmante = oc.autorizacion.firmanteOC || oc.autorizacion.firmante || data.ejecutor;
     if (oc.autorizacion.firmaCodigo && typeof getFirma === 'function') {
       try { data._firma = await getFirma(oc.autorizacion.firmaCodigo); } catch (_) {}
     }
