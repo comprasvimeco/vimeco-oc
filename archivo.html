@@ -245,6 +245,25 @@
   <input type="file" id="ar-file" class="hidden" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx">
 </main>
 
+<!-- ===== MODAL: Ficha de la OC (la misma que el Historial; acá sin PDF) ===== -->
+<div class="modal-overlay hidden" id="modal-preview">
+  <div class="modal foc-modal">
+    <div class="foc-head">
+      <div class="foc-head-l">
+        <span class="foc-kicker">Orden de compra</span>
+        <span class="foc-nro" id="preview-title">—</span>
+        <div class="foc-chips" id="preview-chips"></div>
+      </div>
+      <div class="foc-head-r">
+        <span class="foc-kicker">Total</span>
+        <span class="foc-total" id="preview-total">—</span>
+      </div>
+      <button class="foc-x" id="modal-preview-close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body" id="preview-body"></div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <script src="js/icons.js"></script>
@@ -254,6 +273,8 @@
 <script src="js/drive.js"></script>
 <script src="js/entregas.js"></script>
 <script src="js/entregasPDF.js"></script>
+<script src="js/ocGenerator.js"></script>
+<script src="js/fichaOC.js"></script>
 <script src="js/archivo.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

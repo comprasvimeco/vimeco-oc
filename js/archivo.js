@@ -510,13 +510,33 @@
     return `<div class="ar-fh"><h2>OC ${esc(o.nro)}${etiquetaEstado(o)}${etiquetaAutorizacion(o)}</h2>
         <p><b>${esc(o.prov || 'Sin proveedor')}</b> · ${esc(o.obra || 'Sin obra')}</p>
         <p>${esc(extra)}</p>
-        <div class="ar-acts"><button type="button" class="ar-act" data-subir="otro">${icSvg('plus')}Agregar archivo</button>
+        <div class="ar-acts"><button type="button" class="ar-act" data-ficha="1">${icSvg('eye')}Ver ficha</button>
+          <button type="button" class="ar-act" data-subir="otro">${icSvg('plus')}Agregar archivo</button>
           ${o.folder ? `<a class="ar-act" href="https://drive.google.com/drive/folders/${esc(o.folder)}" target="_blank" rel="noopener">${icSvg('folder')}Carpeta en Drive</a>` : ''}</div></div>
       <div class="ar-lbl">${plural(nArch, 'archivo', 'archivos')}<i>${peso ? fmtPeso(peso) : ''}</i></div>
       <div class="ar-rows">${h}</div>
       ${entregaOC(o)}${ext}
       ${c && c.error ? `<p class="ar-nota">No se pudo mirar la carpeta en Drive: el PDF y el presupuesto pueden estar y no figurar.</p>` : ''}`;
   }
+
+  // ---- Ficha de la OC ----
+  // La misma del Historial (js/fichaOC.js), también para las pendientes: muestra
+  // lo cargado, sin PDF.
+  function abrirFicha() {
+    const o = ocs.get(st.oc);
+    if (!o) return;
+    const data = ocDataFromRecord(o.h);
+    const resp = o.h.responsable && o.h.responsable.nombre ? `<span class="foc-chip">${esc(o.h.responsable.nombre)}</span>` : '';
+    const todas = Object.values(historial).filter(h => h && h.nroOC).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const cmp = checkOCHistorial(data, todas, o.h.timestamp);
+    pintarFichaOC(data, estadoChipFicha(o.h) + resp, fichaInfoHtml(cmp.info) + comparacionHtml(cmp.cambios));
+    $('modal-preview').classList.remove('hidden');
+  }
+  function cerrarFicha() {
+    $('modal-preview').classList.add('hidden');
+    $('preview-body').innerHTML = '';
+  }
+  const fichaAbierta = () => !$('modal-preview').classList.contains('hidden');
 
   // Día con el que se nombró la carpeta de Drive de la OC (UTC, como al emitirla).
   const fechaCarpeta = o => new Date(o.ts || Date.now()).toISOString().slice(0, 10);
@@ -982,12 +1002,16 @@
       else if (d.irOc) { const o = ocs.get(d.irOc); $('ar-q').value = ''; ir({ f: claveOC(o, st.v), oc: o.id }); }
       else if (d.orden) { st.orden = d.orden; pintar(); }
       else if ('inc' in d) { st.inc = !st.inc; pintar(); }
+      else if (d.ficha) abrirFicha();
       else if (d.subir) elegirArchivo(d.subir);
       else if (d.ent) verEntrega(d.ent);
       else if (d.asignar) asignar(d.asignar);
       else if (t.id === 'ar-mas') { limite += PAGINA; pintar(); }
     });
     $('ar-file').addEventListener('change', e => subir(e.target.files && e.target.files[0]));
+    $('modal-preview-close').addEventListener('click', cerrarFicha);
+    $('modal-preview').addEventListener('click', e => { if (e.target.id === 'modal-preview') cerrarFicha(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !_abierto && fichaAbierta()) cerrarFicha(); });
     window.addEventListener('popstate', () => {
       if (_abierto) { _abierto.conHistoria = false; cerrarVisor(); return; }
       leerUrl(); pintar();
