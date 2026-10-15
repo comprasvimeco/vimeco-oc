@@ -134,17 +134,29 @@ window.verImagen = function (src) {
     lb.setAttribute('role', 'dialog');
     lb.setAttribute('aria-modal', 'true');
     lb.innerHTML =
+      '<button type="button" class="img-lightbox-close img-lightbox-print" aria-label="Imprimir" title="Imprimir">' + icSvg('print') + '</button>' +
       '<button type="button" class="img-lightbox-close" aria-label="Cerrar">' + icSvg('x') + '</button>' +
       '<img alt="Comprobante">';
     document.body.appendChild(lb);
     const img = lb.querySelector('img');
+    lb.querySelector('.img-lightbox-print').addEventListener('click', e => {
+      e.stopPropagation();
+      imprimirImagenes([img.src], { margen: '10mm' });
+    });
     const cerrar = () => {
       lb.classList.add('hidden');
       lb.classList.remove('zoom');
       img.removeAttribute('src');
       document.removeEventListener('keydown', lb._onKey, true);
     };
-    lb._onKey = e => { if (e.key === 'Escape') { e.stopImmediatePropagation(); cerrar(); } };
+    lb._onKey = e => {
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); cerrar(); }
+      // Ctrl+P imprime la foto, no la página de atrás.
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        imprimirImagenes([img.src], { margen: '10mm' });
+      }
+    };
     lb.addEventListener('click', e => {
       if (e.target !== img) return cerrar();
       // Ampliar centrado en el punto tocado (proporción dentro de la foto).
@@ -161,6 +173,58 @@ window.verImagen = function (src) {
   lb.querySelector('img').src = src;
   lb.classList.remove('hidden');
   document.addEventListener('keydown', lb._onKey, true);
+};
+
+/*
+ * Imprime imágenes, una por hoja y cada una entera en la hoja (una foto, o las
+ * páginas de un PDF ya dibujadas por el visor de Archivo). Se arman en un iframe
+ * oculto y se imprime ése: un PDF dentro de un iframe no se imprime en Android
+ * ni en iOS, una imagen sí. Cada fuente es una URL o un Blob.
+ *
+ *   await imprimirImagenes([url | blob, …], { margen: '10mm', titulo })
+ */
+window.imprimirImagenes = async function (fuentes, opts = {}) {
+  const viejo = document.getElementById('print-frame');
+  if (viejo) viejo.remove();
+  const urls = [];
+  const fr = document.createElement('iframe');
+  fr.id = 'print-frame';
+  fr.setAttribute('aria-hidden', 'true');
+  fr.tabIndex = -1;
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(fr);
+  const limpiar = () => { fr.remove(); urls.forEach(u => URL.revokeObjectURL(u)); };
+
+  const d = fr.contentDocument;
+  d.open();
+  d.write('<!doctype html><html><head><meta charset="utf-8"><title></title><style>'
+    + '@page { margin: ' + (opts.margen || '0') + '; }'
+    + 'html, body { margin: 0; padding: 0; }'
+    + '.h { height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden;'
+    + ' break-after: page; page-break-after: always; }'
+    + '.h:last-child { break-after: auto; page-break-after: auto; }'
+    + 'img { display: block; max-width: 100%; max-height: 100%; }'
+    + '</style></head><body></body></html>');
+  d.close();
+  d.title = opts.titulo || '';
+  fuentes.forEach(f => {
+    const src = f instanceof Blob ? URL.createObjectURL(f) : f;
+    if (f instanceof Blob) urls.push(src);
+    const h = d.createElement('div');
+    h.className = 'h';
+    const img = d.createElement('img');
+    img.src = src;
+    h.appendChild(img);
+    d.body.appendChild(h);
+  });
+  await Promise.all([...d.images].map(i => i.decode().catch(() => {})));
+
+  const w = fr.contentWindow;
+  // En la compu print() espera a que se cierre el diálogo; en el teléfono vuelve
+  // enseguida y avisa con afterprint. Si no llega, se limpia en la próxima impresión.
+  w.addEventListener('afterprint', () => setTimeout(limpiar, 1000));
+  w.focus();
+  w.print();
 };
 
 /*

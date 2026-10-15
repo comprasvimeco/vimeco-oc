@@ -822,6 +822,42 @@
     return afinar;
   }
 
+  // ── Imprimir ──
+  // Se imprimen imágenes (imprimirImagenes, en ui.js): el PDF se vuelve a dibujar
+  // página por página a ~180 dpi, aparte de lo que se ve en pantalla.
+  async function paginasParaImprimir(est, pags) {
+    const out = [];
+    for (const it of pags) {
+      if (_abierto !== est) return null;
+      const s = Math.min(2.5, Math.sqrt(12e6 / (it.w * it.h)));
+      const vp = it.pag.getViewport({ scale: s });
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+      await it.pag.render({ canvasContext: ctx, viewport: vp }).promise;
+      out.push(await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.92)));
+      cv.width = cv.height = 0;
+    }
+    return out;
+  }
+
+  function botonImprimir(est, fuentes, opts) {
+    const b = est.el.querySelector('[data-a="print"]');
+    b.classList.remove('hidden');
+    b.onclick = async () => {
+      if (b.disabled) return;
+      b.disabled = true;
+      try {
+        const f = await fuentes();
+        if (f && _abierto === est) await imprimirImagenes(f, opts);
+      } catch (e) {
+        console.error('imprimir:', e);
+        toast('No se pudo preparar la impresión.', 'error');
+      } finally { b.disabled = false; }
+    };
+  }
+
   const _bajados = new Map();   // fileId → { blob, nombre, mime } mientras la página esté abierta
   let _abierto = null;
 
@@ -835,6 +871,7 @@
     el.innerHTML = `
       <div class="vis-hd">
         <div class="vis-t"><b>${esc(d.nombre)}</b><span></span></div>
+        <button type="button" class="vis-b hidden" data-a="print" title="Imprimir" aria-label="Imprimir">${icSvg('print')}</button>
         <button type="button" class="vis-b hidden" data-a="share" title="Compartir" aria-label="Compartir">${icSvg('share')}</button>
         <button type="button" class="vis-b hidden" data-a="down" title="Descargar" aria-label="Descargar"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
         <a class="vis-b hidden" data-a="drive" target="_blank" rel="noopener" title="Abrir en Drive" aria-label="Abrir en Drive">${icSvg('maximize')}</a>
@@ -892,6 +929,7 @@
         $c.replaceChildren(img);
         // max: una imagen chica no se agranda más que su tamaño real al ajustar.
         zoomVisor(est, [{ el: img, w: img.naturalWidth || 1, h: img.naturalHeight || 1, max: 1 }]);
+        botonImprimir(est, async () => [blob], { margen: '10mm', titulo: nombre });
       } else if (mime === 'application/pdf') {
         const pdfjs = await cargarPdfjs();
         const doc = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
@@ -910,6 +948,8 @@
         zoomVisor(est, pags, afinar);
         $c.addEventListener('scroll', afinar.luego, { passive: true });
         afinar();
+        // Sin margen: el PDF ya trae los suyos.
+        botonImprimir(est, () => paginasParaImprimir(est, pags), { titulo: nombre });
       } else {
         $c.innerHTML = `<div class="vis-msg"><span>Este tipo de archivo no se puede ver acá.</span>
           <button type="button" class="vis-dl">Descargar</button></div>`;
@@ -938,6 +978,13 @@
   document.addEventListener('keydown', e => {
     if (!_abierto) return;
     if (e.key === 'Escape') return cerrarVisor();
+    // Ctrl+P imprime el archivo, no la página de atrás.
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      const b = _abierto.el.querySelector('[data-a="print"]');
+      if (!b.classList.contains('hidden')) b.click();
+      return;
+    }
     const zm = _abierto.zoom;
     if (!zm || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === '+' || e.key === '=') zm.mas();

@@ -915,6 +915,8 @@ body:not(.login-page) .app-main { animation: fadeIn .35s var(--ease-spring) both
   display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
 .img-lightbox-close .icon { width: 22px; height: 22px; }
+.img-lightbox .img-lightbox-print { right: calc(.75rem + 42px + .5rem); }
+.img-lightbox-print .icon { width: 20px; height: 20px; }
 .scan-preview-actions { display: flex; gap: .5rem; }
 .btn-sm { padding: .4rem .75rem; font-size: .8rem; }
 
