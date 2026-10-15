@@ -670,50 +670,6 @@ function measureFooterHeight(doc, data) {
 }
 
 /* =====================================================
-   NÚMERO EN LETRAS — español argentino
-   ===================================================== */
-function numberToWords(monto) {
-  const entero   = Math.floor(Math.abs(monto));
-  const centavos = Math.round((Math.abs(monto) - entero) * 100);
-
-  const UNI = [
-    '', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve',
-    'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis',
-    'diecisiete', 'dieciocho', 'diecinueve', 'veinte'
-  ];
-  const DEC = ['','','veinti','treinta','cuarenta','cincuenta',
-               'sesenta','setenta','ochenta','noventa'];
-  const CEN = ['','ciento','doscientos','trescientos','cuatrocientos',
-               'quinientos','seiscientos','setecientos','ochocientos','novecientos'];
-
-  function grupo(n) {
-    if (!n)        return '';
-    if (n <= 20)   return UNI[n];
-    if (n < 30)    return n === 21 ? 'veintiún' : DEC[2] + UNI[n - 20];
-    if (n < 100)   { const d = Math.floor(n / 10), u = n % 10; return DEC[d] + (u ? ' y ' + UNI[u] : ''); }
-    if (n === 100) return 'cien';
-    const c = Math.floor(n / 100), r = n % 100;
-    return CEN[c] + (r ? ' ' + grupo(r) : '');
-  }
-
-  function miles(n) {
-    if (!n) return 'cero';
-    const M = Math.floor(n / 1000000);
-    const K = Math.floor((n % 1000000) / 1000);
-    const R = n % 1000;
-    let s = '';
-    if (M) s += (M === 1 ? 'un millón' : grupo(M) + ' millones') + (K || R ? ' ' : '');
-    if (K) s += (K === 1 ? 'mil'        : grupo(K) + ' mil')       + (R      ? ' ' : '');
-    if (R) s += grupo(R);
-    return s.trim();
-  }
-
-  let res = miles(entero);
-  if (centavos > 0) res += ` con ${miles(centavos)} centavo${centavos === 1 ? '' : 's'}`;
-  return res;
-}
-
-/* =====================================================
    HELPERS
    ===================================================== */
 

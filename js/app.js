@@ -1637,21 +1637,10 @@ function normalizeItem(it) {
   };
 }
 
-function calcSubtotal() {
-  return items.reduce((s, it) =>
-    s + (parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0), 0);
-}
-
-function calcGravado() {
-  return roundCents(Math.max(0,
-    calcSubtotal() - roundCents(descuento.monto || 0) - roundCents(noGravado.monto || 0)
-  ));
-}
-
-function calcTotal() {
-  const sumImp = impuestos.reduce((s, imp) => s + (imp.monto || 0), 0);
-  return roundCents(calcGravado() + sumImp);
-}
+// Las cuentas están en js/ocCalc.js (con tests); acá sólo se les pasa el estado.
+function calcSubtotal() { return OCCalc.subtotal(items); }
+function calcGravado()  { return OCCalc.gravado(calcSubtotal(), descuento.monto, noGravado.monto); }
+function calcTotal()    { return OCCalc.total(calcGravado(), noGravado.monto, impuestos); }
 
 function renderTable() {
   if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
@@ -1671,7 +1660,7 @@ function renderTableDesktop() {
   empty.classList.add('hidden');
 
   items.forEach((item, idx) => {
-    const sub = (parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0);
+    const sub = OCCalc.totalItem(item);
     const tr  = document.createElement('tr');
     tr.dataset.idx = idx;
     if (verifRowWarnings[idx]) tr.classList.add('item-row-warn');
@@ -1725,7 +1714,7 @@ function renderTableMobile() {
   container.style.display = 'block';
 
   items.forEach((item, idx) => {
-    const sub  = (parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0);
+    const sub  = OCCalc.totalItem(item);
     const card = document.createElement('div');
     card.className   = verifRowWarnings[idx] ? 'item-card item-row-warn' : 'item-card';
     card.dataset.idx = idx;
@@ -1759,7 +1748,7 @@ function renderTableMobile() {
     const priceInput = card.querySelector('.item-card-price');
 
     function updateCardTotal() {
-      const s = (parseFloat(items[idx].cantidad) || 0) * (parseFloat(items[idx].precio_unitario) || 0);
+      const s = OCCalc.totalItem(items[idx]);
       totalVal.textContent = fmtMoneyDisplay(s);
       recalcTotales();
     }
@@ -1806,7 +1795,7 @@ function onItemInput(e) {
   if (field === 'cantidad' || field === 'precio_unitario') {
     items[idx][field] = parseArgFloat(input.value);
     if (ivaActive && field === 'precio_unitario') delete items[idx]._precio_original;
-    const sub = (parseFloat(items[idx].cantidad) || 0) * (parseFloat(items[idx].precio_unitario) || 0);
+    const sub = OCCalc.totalItem(items[idx]);
     tr.querySelector('.col-subtotal').textContent = fmtMoneyDisplay(sub);
     recalcTotales();
   } else {
@@ -1831,7 +1820,7 @@ function onNumBlur(e) {
   const field = input.dataset.field;
   items[idx][field] = 0;
   input.value = '0';
-  const sub = (parseFloat(items[idx].cantidad) || 0) * (parseFloat(items[idx].precio_unitario) || 0);
+  const sub = OCCalc.totalItem(items[idx]);
   tr.querySelector('.col-subtotal').textContent = fmtMoneyDisplay(sub);
   recalcTotales();
 }
@@ -1848,11 +1837,9 @@ function addEmptyRow() {
 }
 
 // ---- Totales ----
-function roundCents(n) { return Math.round(n * 100) / 100; }
 
 function recalcTotales() {
   const subtotal = calcSubtotal();
-  const gravado  = calcGravado();
 
   $('val-subtotal').textContent = fmtMoneyDisplay(subtotal);
 
@@ -1865,12 +1852,16 @@ function recalcTotales() {
     $('monto-nogravado').value = fmtMoneyDisplay(noGravado.monto);
   }
 
+  // Después de actualizar descuento y no gravado: si no, los impuestos salen
+  // sobre la base anterior al último cambio.
+  const gravado = calcGravado();
+
   $('val-gravado').textContent = fmtMoneyDisplay(gravado);
 
   const rows = $('impuestos-tbody').querySelectorAll('tr[data-idx]');
   impuestos.forEach((imp, idx) => {
     if (imp.pct != null && imp.pct > 0) {
-      imp.monto = roundCents(gravado * imp.pct / 100);
+      imp.monto = OCCalc.montoImpuesto(imp, gravado);
       const montoInput = rows[idx]?.querySelector('.imp-monto');
       if (montoInput) montoInput.value = fmtMoneyDisplay(imp.monto);
     }
@@ -2523,7 +2514,7 @@ function buildOCData(numero, firma = null) {
       unidad:   it.unidad      || '—',
       cant:     it.cantidad,
       unitario: it.precio_unitario,
-      total:    roundCents((parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0))
+      total:    OCCalc.totalItem(it)
     })),
     observaciones: $('observaciones').value.trim() || '',
     // El rubro no se concatena a `ubicacion`: ese campo es el nombre de obra que
@@ -3340,15 +3331,6 @@ function fmtMoneyDisplay(n) {
 function fmtInput(n) {
   const v = parseFloat(n) || 0;
   return v === 0 ? '0' : String(v);
-}
-function parseArgFloat(val) {
-  if (typeof val === 'number') return val;
-  const s = String(val || '').trim();
-  const hasCommaDecimal = /,\d{1,2}$/.test(s);
-  const n = hasCommaDecimal
-    ? parseFloat(s.replace(/\./g, '').replace(',', '.'))
-    : parseFloat(s.replace(/,/g, ''));
-  return isNaN(n) ? 0 : n;
 }
 function formatBytes(bytes) {
   if (bytes < 1024)    return bytes + ' B';

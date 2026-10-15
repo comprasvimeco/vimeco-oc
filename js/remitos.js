@@ -26,25 +26,17 @@ const recientes   = new Set();   // OC con un remito cargado en esta visita: que
 
 // ---- Formato ----
 
-// Misma regla que parseArgFloat en app.js (coma decimal sólo si cierra el
-// número): mantenerlas iguales o el mismo tipeo daría cantidades distintas
-// según la pantalla.
-function parseQty(val) {
-  if (typeof val === 'number') return val;
-  const s = String(val || '').trim();
-  const n = /,\d{1,2}$/.test(s)
-    ? parseFloat(s.replace(/\./g, '').replace(',', '.'))
-    : parseFloat(s.replace(/,/g, ''));
-  return isNaN(n) ? 0 : n;
-}
+// La misma regla que la OC (parseArgFloat, js/ocCalc.js): si no, el mismo
+// tipeo daría cantidades distintas según la pantalla.
+function parseQty(val) { return parseArgFloat(val); }
 
 function fmtQty(n) {
   return (parseFloat(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 });
 }
 
 // Valor para meter DENTRO de un input: sin separador de miles. fmtQty formatea
-// 1000 como "1.000" y parseQty lo leería como 1 (el punto es separador de miles
-// sólo cuando hay coma decimal). Mismo par fmtInput/parseArgFloat que app.js.
+// 1000 como "1.000" y parseQty lo leería como 1 (un solo punto es decimal).
+// Mismo par fmtInput/parseArgFloat que app.js.
 function fmtInput(n) {
   const v = parseFloat(n) || 0;
   return v === 0 ? '0' : String(v);
