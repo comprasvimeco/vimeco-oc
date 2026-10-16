@@ -97,7 +97,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   function saveSession(codigo, nombre) {
     // El nombre del Perfil que va debajo de la firma, para tenerlo aunque la OC se arme sin conexión.
     if (typeof recordarNombreOC === 'function') recordarNombreOC(codigo, String((currentUser && currentUser.nombreOC) || '').trim());
-    localStorage.setItem('vimeco_session', JSON.stringify({ codigo, nombre }));
+    // v: 2 → armada de una sola persona (ver el control de sesión en ui.js).
+    localStorage.setItem('vimeco_session', JSON.stringify({ codigo, nombre, v: 2 }));
     localStorage.setItem('responsable_code', codigo);
     localStorage.setItem('responsable_name', nombre);
     try { localStorage.setItem(LS_ULTIMO, JSON.stringify({ codigo, ts: Date.now() })); } catch (_) {}
@@ -141,6 +142,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     pintarSeguir();
     pintarLista();
     pasoQuien.classList.remove('hidden');
+    // Lo deja el control de sesión de ui.js cuando cierra una sesión que no cuadra.
+    const aviso = sessionStorage.getItem('vimeco_login_aviso');
+    if (aviso) { sessionStorage.removeItem('vimeco_login_aviso'); showError(aviso); }
     if (esEscritorio()) buscar.focus();
   }
 
@@ -276,11 +280,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnLogin.textContent = 'Verificando…';
     // Se relee la persona: si quien administra le reseteó la contraseña
     // mientras la pantalla estaba abierta, pasa a crear una nueva.
+    // Todo sale de `elegido`: si mientras se espera se toca «Cambiar» y otra persona,
+    // no se mezcla el código de una con la contraseña y el nombre de la otra.
+    const elegido = currentUser;
     let fresco = null;
-    try { fresco = await getUsuario(currentUser.codigo); } catch (_) {}
+    try { fresco = await getUsuario(elegido.codigo); } catch (_) {}
+    if (currentUser !== elegido) return;
     if (fresco) {
       if (!fresco.activo) { showError('Este usuario está desactivado. Avisale a quien administra.'); volver(); return; }
-      currentUser = { codigo: currentUser.codigo, ...fresco };
+      currentUser = { ...fresco, codigo: elegido.codigo };
       if (!currentUser.passwordHash) {
         btnLogin.disabled = false;
         modoContrasena();
@@ -290,6 +298,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     const hash = await hashPassword(pwd);
+    if (currentUser.codigo !== elegido.codigo) return;
     if (hash !== currentUser.passwordHash) {
       showError('Contraseña incorrecta. Probá de nuevo.');
       volver();

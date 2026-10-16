@@ -291,6 +291,83 @@ function _hdrInitials(name) {
 function _vimecoSesion() {
   try { return JSON.parse(localStorage.getItem('vimeco_session')) || null; } catch (_) { return null; }
 }
+
+// Cierra la sesión de este dispositivo del todo: la guardada, las copias viejas
+// (responsable_code/name, que muchas pantallas leen primero), "Seguir como …" y,
+// si el aviso push de este equipo era de esa persona, su token.
+function cerrarSesionVimeco({ aviso, olvidar } = {}) {
+  const s = _vimecoSesion();
+  try {
+    const p = JSON.parse(localStorage.getItem('vimeco_push_token'));
+    if (olvidar && s && p && p.codigo === s.codigo && p.id && typeof FIREBASE_CONFIG !== 'undefined') {
+      fetch(FIREBASE_CONFIG.databaseURL + '/usuarios/' + p.codigo + '/pushTokens/' + p.id + '.json',
+        { method: 'DELETE', keepalive: true }).catch(() => {});
+      localStorage.removeItem('vimeco_push_token');
+    }
+  } catch (_) {}
+  try {
+    ['vimeco_session', 'responsable_code', 'responsable_name'].forEach(k => localStorage.removeItem(k));
+    if (olvidar) localStorage.removeItem('vimeco_ultimo_ingreso');
+    ['responsable_code', 'responsable_name'].forEach(k => sessionStorage.removeItem(k));
+    if (aviso) sessionStorage.setItem('vimeco_login_aviso', aviso);
+  } catch (_) {}
+  location.href = 'index.html';
+}
+
+/*
+ * vimeco_session es la única fuente de quién está usando la app. Las copias de
+ * sessionStorage/localStorage se pisan con ella al abrir cada pantalla: si no, una
+ * pestaña o un ingreso viejo podía quedar con el código de otra persona.
+ * Después se coteja con /usuarios: el ingreso viejo (antes de v268) leía el código
+ * del desplegable y el nombre de otra consulta, y si se cambiaba de persona rápido
+ * quedaban mezclados (código de uno, nombre y contraseña de otro) para siempre.
+ * Las sesiones de antes de este control (sin `v`) cuyo nombre no coincide con el
+ * de su código vuelven a pedir el ingreso; las nuevas sólo toman el nombre al día.
+ */
+(function () {
+  const s = _vimecoSesion();
+  if (!s || !s.codigo) return;
+  try {
+    sessionStorage.setItem('responsable_code', s.codigo);
+    sessionStorage.setItem('responsable_name', s.nombre || '');
+    localStorage.setItem('responsable_code', s.codigo);
+    localStorage.setItem('responsable_name', s.nombre || '');
+  } catch (_) {}
+
+  const norm = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  window.addEventListener('load', async () => {
+    if (typeof FIREBASE_CONFIG === 'undefined') return;
+    let u;
+    try {
+      const r = await fetch(FIREBASE_CONFIG.databaseURL + '/usuarios/' + s.codigo + '.json', { cache: 'no-store' });
+      if (!r.ok) return;
+      u = await r.json();
+    } catch (_) { return; }   // sin conexión: se sigue con lo guardado
+    if (!u || !u.activo) {
+      cerrarSesionVimeco({ olvidar: true, aviso: 'Tu usuario no está activo. Avisale a quien administra.' });
+      return;
+    }
+    const igual = norm(u.nombre) === norm(s.nombre);
+    if (!s.v && !igual) {
+      cerrarSesionVimeco({ olvidar: true, aviso: 'Por seguridad, volvé a elegir tu usuario y poner tu contraseña.' });
+      return;
+    }
+    if (s.v && igual) return;
+    const viejo = s.nombre;
+    const nueva = { ...s, nombre: u.nombre, v: 2 };
+    try {
+      localStorage.setItem('vimeco_session', JSON.stringify(nueva));
+      sessionStorage.setItem('responsable_name', u.nombre);
+      localStorage.setItem('responsable_name', u.nombre);
+    } catch (_) {}
+    if (viejo !== u.nombre) {
+      ['hdr-name', 'menu-nombre', 'pf-nombre'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.textContent.trim() === viejo) el.textContent = u.nombre;
+      });
+    }
+  });
+})();
 document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('hdr-name');
   if (!el) return;

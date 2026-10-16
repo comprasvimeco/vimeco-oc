@@ -236,8 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ok = await showConfirm('Cerrar sesión', 'Para volver a entrar vas a tener que elegir tu usuario y poner la contraseña.',
       { boton: 'Cerrar sesión', tono: 'del', icono: 'logout' });
     if (!ok) return;
-    localStorage.removeItem('vimeco_session');
-    location.href = 'index.html';
+    cerrarSesionVimeco();
   });
 
   // Lo que ya se sabe se muestra enseguida; la base lo completa.
