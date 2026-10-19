@@ -65,6 +65,8 @@ window.ic = {
   mail:    '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
   store:   '<path d="M3 9l1.5-5h15L21 9"/><path d="M3 9h18v1.5a3 3 0 01-6 0 3 3 0 01-6 0 3 3 0 01-6 0z"/><path d="M5 13v8h14v-8"/><path d="M10 21v-5h4v5"/>',
   eyeOff:  '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><path d="M14.12 14.12a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
+  // El triángulo de Google Drive, con sus colores (no toma el color del texto).
+  drive:   '<polygon points="12 9.5 4.8 21.5 1.2 15.5 8.4 3.5" style="fill:#0F9D58;stroke:none"/><polygon points="15.6 15.5 8.4 3.5 15.6 3.5 22.8 15.5" style="fill:#F4B400;stroke:none"/><polygon points="8.4 15.5 22.8 15.5 19.2 21.5 4.8 21.5" style="fill:#4285F4;stroke:none"/>',
 };
 
 window.icSvg = function(name, cls) {

@@ -45,7 +45,7 @@ function _frModal() {
     <div class="modal-footer foc-foot">
       <div class="foc-foot-r">
         <button class="foc-btn foc-btn--pdf" id="frem-archivo" title="Abrir la foto del remito">${icSvg('file')}Ver archivo</button>
-        <a class="foc-btn foc-btn--drive" id="frem-drive" target="_blank" rel="noopener" title="Abrir la carpeta de la OC en Drive">${icSvg('folder')}Carpeta</a>
+        <a class="foc-btn foc-btn--drive" id="frem-drive" target="_blank" rel="noopener" title="Abrir la carpeta de la OC en Drive">${icSvg('drive')}Carpeta</a>
       </div>
       <button class="foc-btn foc-btn--del" id="frem-borrar" title="Borrar el remito">${icSvg('trash')}Borrar</button>
     </div>

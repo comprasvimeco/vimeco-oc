@@ -11,6 +11,7 @@ let seen          = new Set();   // claves de eventos marcados como vistos
 let vistoHasta    = 0;           // corte: lo anterior cuenta como visto (vistasNovedades)
 let soloSinVer    = false;       // filtro de la pastilla roja
 let isSuper       = false;       // solo Administración (código 0000) puede borrar
+let puedeArchivo  = false;       // 0000 o permiso `archivo`: botón para abrir la OC en Archivo
 
 // preset: '7' | '30' | '90' | 'all' | 'custom'
 const range = { preset: '7', desde: '', hasta: '' };
@@ -351,7 +352,7 @@ function render() {
     // Las acciones son las pastillas de las fichas (foc-btn), en un renglón al
     // pie de la tarjeta: Borrar queda aparte, a la derecha.
     const drive  = e.driveUrl
-      ? `<a class="foc-btn foc-btn--drive act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive">${icSvg('folder')}Drive</a>`
+      ? `<a class="foc-btn foc-btn--drive act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive">${icSvg('drive')}Drive</a>`
       : '';
     // Se marcan como vistas con su botón, al abrir su documento o su carpeta, o
     // todas juntas con "Ver todas".
@@ -373,6 +374,10 @@ function render() {
               : fac  ? verBtn('fact', 'fact', 'file', 'Ver factura')
               : ocEv ? verBtn('oc', 'edit', 'eye', e.tipo === 'oc' ? 'Ver ficha' : 'Ver OC')
               : '';
+    // La carpeta de la OC en Archivo (archivo.html?nro=…), con sus archivos a la vista.
+    const archivo = puedeArchivo && ocEv?.nroOC
+      ? `<a class="foc-btn foc-btn--edit act-archivo" data-key="${esc(e.key)}" href="archivo.html?nro=${encodeURIComponent(ocEv.nroOC)}" title="Ver los archivos de la OC ${esc(ocEv.nroOC)} en Archivo">${icSvg('folder')}Archivo</a>`
+      : '';
     const verOC = (rem || fac) && ocEv
       ? `<button class="foc-btn foc-btn--edit act-oc" title="Ver la ficha de la OC ${esc(ocEv.nroOC)}">${icSvg('eye')}Ver OC</button>`
       : '';
@@ -402,7 +407,7 @@ function render() {
             ${docsHtml(e, ocEv)}
             ${hitsHtml(ocEv, itemsCoincidentes(ocEv, terms), esc, terms)}
             <div class="act-meta">${esc(quienDe(e, ocEv))} · ${fmtHora(e.timestamp)}</div>
-            <div class="act-actions">${ver}${verOC}${drive}${accion}${anular}${borrar}</div>
+            <div class="act-actions">${ver}${verOC}${archivo}${drive}${accion}${anular}${borrar}</div>
           </div>
         </div>
       </div>`;
@@ -430,8 +435,8 @@ function render() {
     if (oc && e.tipo === 'oc') bindDocsOC(card, oc, facturasDeOC(oc), remitosPorOC[oc.nroOC] || []);
   });
 
-  // Abrir en Drive también marca como vista (sin frenar la apertura del link)
-  list.querySelectorAll('.act-drive').forEach(a =>
+  // Abrir en Drive o en Archivo también marca como vista (sin frenar la apertura del link)
+  list.querySelectorAll('.act-drive, .act-archivo').forEach(a =>
     a.addEventListener('click', () => marcarVista(a.dataset.key)));
   list.querySelectorAll('.act-mark').forEach(b =>
     b.addEventListener('click', () => marcarVista(b.dataset.key)));
@@ -617,10 +622,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Novedades: 0000 o permiso `novedades`. Quien nunca lo tuvo asignado entra
   // si es admin, que era el criterio antes de que existiera el permiso propio.
   let puedeVer = code === '0000';
+  puedeArchivo = puedeVer;
   if (!puedeVer) {
     try {
       const u = await getUsuario(code);
       puedeVer = !!(u && (u.novedades != null ? u.novedades : u.admin));
+      puedeArchivo = !!(u && u.archivo);
     } catch (_) {}
   }
   if (!puedeVer) { window.location.href = 'menu.html'; return; }
@@ -807,7 +814,7 @@ function renderSinRespaldo() {
     <div class="act-alert-sub">Su PDF no quedó archivado en Drive, o se archivó pero no se registró dónde.</div>
     <div class="act-alert-list">${chips}</div>
     <div class="act-alert-actions">
-      <button class="btn btn-sm btn-secondary" id="act-resubir">${icSvg('folder')} Resubir a Drive</button>
+      <button class="btn btn-sm btn-secondary" id="act-resubir">${icSvg('drive')} Resubir a Drive</button>
     </div>`;
 
   $('act-resubir').addEventListener('click', resubirTodas);
@@ -838,7 +845,7 @@ async function resubirTodas() {
 
   sinRespaldoOCs = list.filter(oc => !driveFolderId(oc));
   btn.disabled = false;
-  btn.innerHTML = icSvg('folder') + ' Resubir a Drive';
+  btn.innerHTML = icSvg('drive') + ' Resubir a Drive';
   renderSinRespaldo();
 
   // Recién ahora estas OC tienen carpeta: sus tarjetas pueden mostrar el link.

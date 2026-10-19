@@ -512,7 +512,7 @@
         <p>${esc(extra)}</p>
         <div class="ar-acts"><button type="button" class="ar-act" data-ficha="1">${icSvg('eye')}Ver ficha</button>
           <button type="button" class="ar-act" data-subir="otro">${icSvg('plus')}Agregar archivo</button>
-          ${o.folder ? `<a class="ar-act" href="https://drive.google.com/drive/folders/${esc(o.folder)}" target="_blank" rel="noopener">${icSvg('folder')}Carpeta en Drive</a>` : ''}</div></div>
+          ${o.folder ? `<a class="ar-act" href="https://drive.google.com/drive/folders/${esc(o.folder)}" target="_blank" rel="noopener">${icSvg('drive')}Carpeta en Drive</a>` : ''}</div></div>
       <div class="ar-lbl">${plural(nArch, 'archivo', 'archivos')}<i>${peso ? fmtPeso(peso) : ''}</i></div>
       <div class="ar-rows">${h}</div>
       ${entregaOC(o)}${ext}
@@ -754,6 +754,11 @@
     }, { passive: false });
     $c.addEventListener('touchend', e => {
       if (e.touches.length < 2) pinza = null;
+      // Deslizar de costado sin zoom pasa al archivo anterior o al siguiente.
+      if (!e.touches.length && toque && toque.movido && est.ir && z <= 1.05 && e.changedTouches.length) {
+        const t = e.changedTouches[0], dx = t.clientX - toque.x, dy = t.clientY - toque.y;
+        if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy)) { toque = null; est.ir(dx < 0 ? 1 : -1); return; }
+      }
       if (e.touches.length || !toque || toque.movido) { if (!e.touches.length) toque = null; return; }
       const ahora = Date.now();
       if (ahora - ultimoToque < 300) { e.preventDefault(); alternar(toque.x, toque.y); ultimoToque = 0; }
@@ -769,7 +774,7 @@
     const alRedimensionar = () => fijar(z);
     window.addEventListener('resize', alRedimensionar);
     est.off.push(() => window.removeEventListener('resize', alRedimensionar));
-    est.zoom = { mas: () => fijar(z * 1.5), menos: () => fijar(z / 1.5), ajustar: () => fijar(1) };
+    est.zoom = { mas: () => fijar(z * 1.5), menos: () => fijar(z / 1.5), ajustar: () => fijar(1), z: () => z };
     aplicar();
   }
 
@@ -861,28 +866,57 @@
   const _bajados = new Map();   // fileId → { blob, nombre, mime } mientras la página esté abierta
   let _abierto = null;
 
+  // La pastilla grande del visor: qué es el archivo.
+  const TIPO_VISOR = { oc: 'Orden de Compra', presupuesto: 'Presupuesto', factura: 'Factura', remito: 'Remito', planilla: 'Planilla', otro: 'Otro archivo' };
+  // Los archivos de la OC que se recorren con las flechas, en el orden de nivel3.
+  function navegables(o) {
+    const ver = a => !a.noEsta && !a.sinArchivo;
+    return [...DOCS.flatMap(([t]) => o.docs.filter(a => a.tipo === t && ver(a))),
+      ...o.docs.filter(a => ver(a) && !DOCS.some(([t]) => t === a.tipo))];
+  }
+
   async function abrirArchivo(d) {
     if (!d || d.sinArchivo) return;
+    // Pasar de un archivo a otro con las flechas reusa la entrada del historial:
+    // el botón Atrás cierra el visor de una, no archivo por archivo.
+    const heredaHistoria = !!(_abierto && _abierto.conHistoria);
+    if (heredaHistoria) _abierto.conHistoria = false;
     cerrarVisor(true);
+    const o = d.ocId && ocs.get(d.ocId);
+    const lista = o && !d.generar ? navegables(o) : [];
+    const pos = lista.findIndex(a => a.id === d.id);
+    const cuenta = pos >= 0 && lista.length > 1 ? (pos + 1) + ' de ' + lista.length : '';
+    const tipo = TIPO_VISOR[d.tipo];
     const el = document.createElement('div');
     el.className = 'vis';
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-modal', 'true');
     el.innerHTML = `
       <div class="vis-hd">
-        <div class="vis-t"><b>${esc(d.nombre)}</b><span></span></div>
+        ${tipo ? `<span class="vis-tipo vis-tipo--${esc(d.tipo)}">${esc(tipo)}</span>` : ''}
+        <div class="vis-t"><b>${esc(d.nombre)}</b><span>${esc(cuenta)}</span></div>
         <button type="button" class="vis-b hidden" data-a="print" title="Imprimir" aria-label="Imprimir">${icSvg('print')}</button>
         <button type="button" class="vis-b hidden" data-a="share" title="Compartir" aria-label="Compartir">${icSvg('share')}</button>
         <button type="button" class="vis-b hidden" data-a="down" title="Descargar" aria-label="Descargar"><svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-        <a class="vis-b hidden" data-a="drive" target="_blank" rel="noopener" title="Abrir en Drive" aria-label="Abrir en Drive">${icSvg('maximize')}</a>
+        <a class="vis-b hidden" data-a="drive" target="_blank" rel="noopener" title="Abrir en Drive" aria-label="Abrir en Drive">${icSvg('drive')}</a>
         <button type="button" class="vis-b" data-a="x" title="Cerrar" aria-label="Cerrar">${icSvg('x')}</button>
       </div>
-      <div class="vis-c"><div class="vis-msg"><span>Abriendo…</span><div class="vis-bar"><i></i></div></div></div>`;
+      <div class="vis-c"><div class="vis-msg"><span>Abriendo…</span><div class="vis-bar"><i></i></div></div></div>
+      ${cuenta ? `
+      <button type="button" class="vis-nav vis-nav--prev" data-a="prev" title="Archivo anterior" aria-label="Archivo anterior" ${pos ? '' : 'disabled'}>${icSvg('chevL')}</button>
+      <button type="button" class="vis-nav vis-nav--next" data-a="next" title="Archivo siguiente" aria-label="Archivo siguiente" ${pos < lista.length - 1 ? '' : 'disabled'}>${icSvg('chevR')}</button>` : ''}`;
     document.body.appendChild(el);
     document.body.style.overflow = 'hidden';
     const est = { el, urls: [], off: [] };
     _abierto = est;
-    try { history.pushState({ visor: 1, archivo: 1 }, ''); est.conHistoria = true; } catch (_) {}
+    if (heredaHistoria) est.conHistoria = true;
+    else { try { history.pushState({ visor: 1, archivo: 1 }, ''); est.conHistoria = true; } catch (_) {} }
+    // Las flechas (también ← → y deslizar de costado) pasan al anterior o al siguiente.
+    if (cuenta) {
+      est.ir = paso => { const otro = lista[pos + paso]; if (otro) abrirArchivo(otro); };
+      el.querySelector('[data-a="prev"]').onclick = () => est.ir(-1);
+      el.querySelector('[data-a="next"]').onclick = () => est.ir(1);
+    }
 
     const $t = el.querySelector('.vis-t'), $c = el.querySelector('.vis-c');
     el.querySelector('[data-a="x"]').onclick = () => cerrarVisor();
@@ -909,7 +943,7 @@
         return;
       }
       const { blob, nombre, mime } = x;
-      $t.querySelector('span').textContent = fmtPeso(blob.size);
+      $t.querySelector('span').textContent = [cuenta, fmtPeso(blob.size)].filter(Boolean).join(' · ');
       const bDown = el.querySelector('[data-a="down"]');
       bDown.classList.remove('hidden');
       bDown.onclick = () => descargar(blob, nombre);
@@ -983,6 +1017,11 @@
       e.preventDefault();
       const b = _abierto.el.querySelector('[data-a="print"]');
       if (!b.classList.contains('hidden')) b.click();
+      return;
+    }
+    if (_abierto.ir && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      // Con zoom, las flechas mueven la imagen, como siempre.
+      if (!_abierto.zoom || _abierto.zoom.z() <= 1.05) { e.preventDefault(); _abierto.ir(e.key === 'ArrowLeft' ? -1 : 1); }
       return;
     }
     const zm = _abierto.zoom;

@@ -246,7 +246,7 @@ function filaRemito(r, terms) {
     <div class="rv-est">${estado}<span class="rv-n-items">${plural(n, 'ítem', 'ítems')}</span></div>
     <div class="rv-acts">
       ${r.key ? `<button type="button" class="foc-btn foc-btn--clear rv-ib btn-ver-remito" data-key="${escHtml(r.key)}" title="Ver el remito" aria-label="Ver el remito">${icSvg('eye')}</button>` : ''}
-      ${r.drive?.url ? `<a class="foc-btn foc-btn--drive rv-ib rv-desk" href="${escHtml(r.drive.url)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive" aria-label="Abrir la carpeta en Drive">${icSvg('folder')}</a>` : ''}
+      ${r.drive?.url ? `<a class="foc-btn foc-btn--drive rv-ib rv-desk" href="${escHtml(r.drive.url)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive" aria-label="Abrir la carpeta en Drive">${icSvg('drive')}</a>` : ''}
     </div>
   </div>`;
 }

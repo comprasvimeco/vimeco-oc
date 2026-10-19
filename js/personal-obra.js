@@ -131,7 +131,7 @@ function renderCuadrilla() {
           ${cat ? `<span class="po-mini">${esc(cat)}</span>` : ''}
           ${p.dni ? `<span>DNI ${esc(p.dni)}</span>` : ''}
           ${dniPills(p)}
-          ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" title="Carpeta del DNI en Drive" aria-label="Carpeta del DNI en Drive">${icSvg('folder')}</a>` : ''}
+          ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" title="Carpeta del DNI en Drive" aria-label="Carpeta del DNI en Drive">${icSvg('drive')}</a>` : ''}
           ${otras.length ? `<span>También en ${esc(otras.join(', '))}</span>` : ''}
         </div>
       </div>

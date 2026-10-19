@@ -256,7 +256,7 @@ function renderPadron() {
         ${av}
         <div class="pad-info">
           <div class="pad-name">${esc(p.apellido)}, ${esc(p.nombre)}
-            ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">${icSvg('folder')}</a>` : ''}
+            ${p.dniFolderUrl ? `<a href="${esc(p.dniFolderUrl)}" target="_blank" rel="noopener" class="dni-folder" title="Carpeta DNI en Drive">${icSvg('drive')}</a>` : ''}
             ${p.activo === false ? '<span style="font-size:.72rem;color:#b91c1c">(inactivo)</span>' : ''}</div>
           <div class="pad-meta">
             ${categoriaLabel(p) ? `<span class="pad-cat">${esc(categoriaLabel(p))}</span> ` : ''}
