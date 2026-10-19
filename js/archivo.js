@@ -303,7 +303,7 @@
     $('ar-cols').classList.toggle('hidden', !!q);
     $('ar-crumbs').classList.toggle('hidden', !!q || !st.f);
     $('ar-res').classList.toggle('hidden', !q);
-    if (q) { pintarBusqueda(q); return; }
+    if (q) { pintarBusqueda(q); armarAbc(); return; }
 
     if (st.oc && !ocs.has(st.oc)) st.oc = '';
     const lista1 = carpetas(st.v);
@@ -325,6 +325,7 @@
       aLaVista($('ar-c2'), $('ar-c2').querySelector('.ar-r--oc[aria-current="true"]'));
     }
     if (st.oc) pedirCarpetas([ocs.get(st.oc)]);
+    armarAbc();
   }
 
   // En la compu cada columna es sticky (posicionada): el offsetTop de lo de
@@ -337,16 +338,78 @@
   }
 
   // ---- Barra de letras (Por proveedor) ----
+  // Es la barra de desplazamiento de la lista: el tirador marca lo que se ve,
+  // cada letra está a la altura donde empieza su inicial (corridas lo justo
+  // para que no se pisen) y se resalta la de lo que está arriba de todo.
+  // Tocar una letra salta a ella; deslizar recorre la lista pasando por cada
+  // letra justo cuando el dedo está encima.
 
   const letraDe = k => {
     const c = k.normalize('NFD').replace(/[̀-ͯ]/g, '').charAt(0).toUpperCase();
     return /[A-Z]/.test(c) ? c : '#';
   };
+
+  // Compu: se desplaza la columna. Teléfono: la página (debajo del header).
+  function desplazador() {
+    if (ancho.matches) {
+      const c = $('ar-c1');
+      return { pos: el => el.offsetTop - 6, total: c.scrollHeight, vista: c.clientHeight, get: () => c.scrollTop, set: v => { c.scrollTop = v; } };
+    }
+    return { pos: el => el.getBoundingClientRect().top + scrollY - 72, total: document.documentElement.scrollHeight, vista: innerHeight,
+      get: () => scrollY, set: v => scrollTo(0, v) };
+  }
+
+  let abc = null;   // { el, sc, H, max, th, an: [{ l, b, a, y }], activa }
+  function armarAbc() {
+    const el = $('ar-c1').querySelector('.ar-abc');
+    const ve = !!el && !$('ar-cols').classList.contains('hidden') && getComputedStyle($('ar-c1')).display !== 'none';
+    document.documentElement.classList.toggle('ar-sin-barra', ve && !ancho.matches);
+    $('ar-c1').classList.toggle('ar-col--abc', ve);
+    abc = null;
+    if (!ve) return;
+    if (ancho.matches) el.style.height = Math.max(0, $('ar-c1').clientHeight - 8) + 'px';
+    const sc = desplazador(), H = el.clientHeight, max = Math.max(1, sc.total - sc.vista);
+    const th = Math.min(H, Math.max(28, H * sc.vista / sc.total));
+    const bs = [...el.querySelectorAll('[data-letra]')];
+    const paso = Math.min(17, H / bs.length);
+    const an = bs.map(b => {
+      const a = Math.max(0, Math.min(max, sc.pos($('ar-c1').querySelector(`.ar-fd[data-ini="${b.dataset.letra}"]`))));
+      return { l: b.dataset.letra, b, a, y: th / 2 + a / max * (H - th) };
+    });
+    an.forEach((x, i) => { x.y = Math.max(x.y, paso / 2, i ? an[i - 1].y + paso : 0); });
+    for (let i = an.length - 1; i >= 0; i--) an[i].y = Math.min(an[i].y, i < an.length - 1 ? an[i + 1].y - paso : H - paso / 2);
+    an.forEach(x => { x.b.style.top = (x.y - paso / 2) + 'px'; x.b.style.height = paso + 'px'; });
+    el.querySelector('.ar-abc-th').style.height = th + 'px';
+    abc = { el, sc, H, max, th, an, activa: '' };
+    seguirAbc();
+  }
+
+  function seguirAbc() {
+    if (!abc || !abc.el.isConnected) return;
+    const s = abc.sc.get();
+    abc.el.querySelector('.ar-abc-th').style.transform = `translateY(${Math.min(1, s / abc.max) * (abc.H - abc.th)}px)`;
+    let act = abc.an[0];
+    abc.an.forEach(x => { if (x.a <= s + 4) act = x; });
+    if (act.l !== abc.activa) {
+      abc.an.forEach(x => x.b.classList.toggle('on', x === act));
+      abc.activa = act.l;
+      const bu = abc.el.querySelector('.ar-abc-bu');
+      bu.textContent = act.l;
+      bu.style.top = act.y + 'px';
+    }
+  }
+
+  // Altura en la barra → desplazamiento, por tramos entre las letras.
+  function desplDeY(y) {
+    const p = [{ y: 0, a: 0 }, ...abc.an, { y: abc.H, a: abc.max }];
+    for (let i = 1; i < p.length; i++)
+      if (y <= p[i].y) return p[i - 1].a + (p[i].a - p[i - 1].a) * (p[i].y > p[i - 1].y ? (y - p[i - 1].y) / (p[i].y - p[i - 1].y) : 1);
+    return abc.max;
+  }
+
   function irALetra(l) {
-    const el = $('ar-c1').querySelector(`.ar-fd[data-ini="${l}"]`);
-    if (!el) return;
-    if (ancho.matches) $('ar-c1').scrollTop = el.offsetTop - 6;
-    else el.scrollIntoView({ block: 'start' });
+    const x = abc && abc.an.find(z => z.l === l);
+    if (x) { abc.sc.set(x.a); seguirAbc(); }
   }
 
   function pintarMigas(f) {
@@ -357,7 +420,7 @@
   }
 
   function nivel1(lista, f) {
-    // Por proveedor, una barra con las iniciales: tocar o deslizar salta a la letra.
+    // Por proveedor, la barra de desplazamiento lleva las iniciales.
     const letras = [];
     const ini = st.v === 'prov' ? k => {
       if (k === 'Sin proveedor') return '';
@@ -373,8 +436,9 @@
         <b>${esc(nombreCarpeta(k, st.v))}</b><small>${plural(l.length, 'OC', 'OC')} · ${plural(n, 'archivo', 'archivos')}</small>
         <em class="${inc ? '' : 'ok'}">${inc ? plural(inc, 'sin factura o remito', 'sin factura o remito') : 'Todo cargado'}</em></button>`;
     }).join('');
-    const abc = letras.length > 1 ? `<div class="ar-abc-w"><nav class="ar-abc" aria-label="Ir a la letra">${letras.sort((a, b) => (a === '#') - (b === '#') || a.localeCompare(b))
-      .map(c => `<button type="button" data-letra="${c}">${c}</button>`).join('')}</nav></div>` : '';
+    // En el orden de la lista (los que empiezan con número van primero).
+    const abc = letras.length > 1 ? `<div class="ar-abc-w"><nav class="ar-abc" aria-label="Ir a la letra"><span class="ar-abc-th"></span>${letras
+      .map(c => `<button type="button" data-letra="${c}">${c}</button>`).join('')}<span class="ar-abc-bu" aria-hidden="true"></span></nav></div>` : '';
     return abc + `<div class="ar-lbl">${DIMS[st.v]}<i>${plural(lista.length, 'carpeta', 'carpetas')}</i></div>` +
       (lista.length ? `<div class="ar-fgrid${abc ? ' ar-fgrid--abc' : ''}">${grid}</div>` : `<div class="ar-ph">Todavía no hay OC.</div>`);
   }
@@ -1151,25 +1215,29 @@
       else if (d.asignar) asignar(d.asignar);
       else if (t.id === 'ar-mas') { limite += PAGINA; pintar(); }
     });
-    // Deslizar el dedo (o el mouse apretado) por la barra de letras va saltando.
+    // Arrastrar por la barra de letras (dedo o mouse) recorre la lista.
     $('ar-c1').addEventListener('pointerdown', e => {
-      const abc = e.target.closest('.ar-abc'); if (!abc) return;
+      const el = e.target.closest('.ar-abc'); if (!el || !abc) return;
       e.preventDefault();
-      abc.setPointerCapture(e.pointerId);
-      let ultima = '';
-      const mover = ev => {
-        const r = abc.getBoundingClientRect();
-        const x = ev.clientX >= r.left && ev.clientX <= r.right ? ev.clientX : r.left + r.width / 2;
-        const b = document.elementFromPoint(x, ev.clientY);
-        const l = b && b.closest && b.closest('[data-letra]');
-        if (l && l.dataset.letra !== ultima) { ultima = l.dataset.letra; irALetra(ultima); }
+      el.setPointerCapture(e.pointerId);
+      el.classList.add('arrastra');
+      // El tamaño en pantalla puede no ser el de CSS (zoom en monitores grandes).
+      const mover = ev => { const r = el.getBoundingClientRect(); abc.sc.set(desplDeY((ev.clientY - r.top) * abc.H / r.height)); seguirAbc(); };
+      const letra = e.target.closest('[data-letra]');
+      if (letra) irALetra(letra.dataset.letra); else mover(e);
+      const fin = () => {
+        el.classList.remove('arrastra');
+        el.removeEventListener('pointermove', mover); el.removeEventListener('pointerup', fin); el.removeEventListener('pointercancel', fin);
       };
-      const fin = () => { abc.removeEventListener('pointermove', mover); abc.removeEventListener('pointerup', fin); abc.removeEventListener('pointercancel', fin); };
-      mover(e);
-      abc.addEventListener('pointermove', mover);
-      abc.addEventListener('pointerup', fin);
-      abc.addEventListener('pointercancel', fin);
+      el.addEventListener('pointermove', mover);
+      el.addEventListener('pointerup', fin);
+      el.addEventListener('pointercancel', fin);
     });
+    const alDesplazar = () => requestAnimationFrame(seguirAbc);
+    $('ar-c1').addEventListener('scroll', alDesplazar, { passive: true });
+    window.addEventListener('scroll', alDesplazar, { passive: true });
+    window.addEventListener('resize', () => armarAbc());
+    if (document.fonts) document.fonts.ready.then(() => armarAbc());
     $('ar-file').addEventListener('change', e => subir(e.target.files && e.target.files[0]));
     $('modal-preview-close').addEventListener('click', cerrarFicha);
     $('modal-preview').addEventListener('click', e => { if (e.target.id === 'modal-preview') cerrarFicha(); });

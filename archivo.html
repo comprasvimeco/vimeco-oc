@@ -80,16 +80,30 @@
     .ar-fd[aria-current="true"] { box-shadow: 0 0 0 2px var(--tono), var(--shadow-leva); }
     .ar-fd { scroll-margin-top: 72px; }
 
-    /* Barra de letras (Por proveedor). Teléfono: fija al borde derecho. Compu: pegada arriba
-       a la derecha de la columna (el envoltorio sticky de alto 0 la deja quieta al scrollear). */
-    .ar-abc { position: fixed; right: 2px; top: calc(50% + 30px); transform: translateY(-50%); z-index: 5; display: flex; flex-direction: column; align-items: stretch; max-height: calc(100dvh - 100px); overflow: hidden; padding: 4px 1px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-leva); touch-action: none; user-select: none; }
-    .ar-abc button { flex: 0 1 auto; min-height: 0; border: 0; background: transparent; font: inherit; font-size: .68rem; font-weight: 700; line-height: 1.2; color: var(--tono); padding: 1px 5px; border-radius: 6px; cursor: pointer; }
-    .ar-abc button:hover { background: var(--tono-soft); }
-    .ar-fgrid--abc { padding-right: 16px; }
+    /* Barra de letras (Por proveedor): reemplaza a la barra de desplazamiento. Riel fino, tirador
+       con lo que se ve, letras donde empieza cada inicial (las ubica archivo.js) y la actual
+       resaltada; al arrastrar, una burbuja con la letra. Teléfono: borde derecho de la pantalla.
+       Compu: dentro de la columna (el envoltorio sticky de alto 0 la deja quieta al scrollear). */
+    .ar-abc { position: fixed; right: 0; top: 68px; bottom: 8px; z-index: 5; width: 22px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+    .ar-abc::before { content: ''; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 2px; margin-left: -1px; border-radius: 2px; background: var(--line); }
+    .ar-abc-th { position: absolute; left: 1px; right: 1px; top: 0; border-radius: 11px; background: var(--tono-soft); box-shadow: inset 0 0 0 1px rgba(59,68,168,.16); will-change: transform; }
+    .ar-abc button { position: absolute; left: 0; right: 0; display: grid; place-items: center; padding: 0; border: 0; background: transparent; font: inherit; font-size: .62rem; font-weight: 700; line-height: 1; color: var(--ink-2); cursor: pointer; isolation: isolate; transition: color .15s; }
+    .ar-abc button::before { content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--tono); transform: scale(0); transition: transform .22s cubic-bezier(.3, 1.6, .5, 1); z-index: -1; }
+    .ar-abc button.on { color: #fff; }
+    .ar-abc button.on::before { transform: scale(1); }
+    .ar-abc button:hover:not(.on) { color: var(--tono); }
+    .ar-abc-bu { position: absolute; right: 30px; top: 0; width: 46px; height: 46px; margin-top: -23px; display: grid; place-items: center; border-radius: 50%; background: var(--tono); color: #fff; font-family: var(--font-display); font-size: 1.35rem; font-weight: 800; box-shadow: 0 6px 18px rgba(59,68,168,.35); opacity: 0; transform: scale(.5) translateX(12px); transition: opacity .15s, transform .18s cubic-bezier(.3, 1.4, .5, 1), top .12s ease-out; pointer-events: none; }
+    .ar-abc.arrastra .ar-abc-bu { opacity: 1; transform: none; }
+    .ar-abc.arrastra .ar-abc-th { background: #CED2F8; }
+    .ar-fgrid--abc, .ar-col--abc .ar-lbl { padding-right: 14px; }
+    html.ar-sin-barra { scrollbar-width: none; }
+    html.ar-sin-barra::-webkit-scrollbar { display: none; }
     @media (min-width: 960px) {
       .ar-abc-w { position: sticky; top: 0; height: 0; z-index: 2; }
-      .ar-abc { position: absolute; right: 0; top: 2rem; transform: none; max-height: calc(100dvh / var(--z, 1) - 4rem); }
-      .ar-fgrid--abc { padding-right: 26px; }
+      .ar-abc { position: absolute; top: 4px; bottom: auto; right: -2px; }
+      .ar-col--abc { scrollbar-width: none; }
+      .ar-col--abc::-webkit-scrollbar { display: none; }
+      .ar-fgrid--abc, .ar-col--abc .ar-lbl { padding-right: 24px; }
     }
     @media (min-width: 960px) {
       .ar-fgrid { grid-template-columns: 1fr; gap: .4rem; }
