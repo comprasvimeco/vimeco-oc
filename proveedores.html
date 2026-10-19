@@ -252,7 +252,14 @@
     @media (max-width: 760px) {
       .pv-t { font-size: 1.2rem; }
       .pv-btn-txt { display: none; }
+      /* Los filtros de la lista, en una línea también en el teléfono: sin las cantidades
+         (el total ya está en «N con compras») y más compactos. */
+      #vista-prov .pv-chips { flex-wrap: nowrap; gap: .3rem; }
+      #vista-prov .pv-chip { padding: .32rem .7rem; font-size: .78rem; }
+      #vista-prov .pv-chip b { display: none; }
+      #vista-prov .pv-seg button { padding: .32rem .5rem; font-size: .72rem; }
     }
+    @media (max-width: 359px) { #vista-prov .pv-chips { flex-wrap: wrap; } }
   </style>
 </head>
 <body>
