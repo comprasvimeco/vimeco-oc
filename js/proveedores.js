@@ -65,7 +65,8 @@ const S = {
   abierto: null,             // key del proveedor en la ficha
   artOrden: null, artQ: '', grupoAbierto: null,
   per: '90',
-  artSel: null,              // artículo elegido en la pestaña Artículos (descripción normalizada)
+  cmpAbiertos: null,         // renglones de la comparación con sus compras desplegadas (null: se arma al pintar)
+  artSel: null,             // artículo elegido en la pestaña Artículos (descripción normalizada)
   arts: null,                // { per, lista }: los artículos del período, ya juntados
   scrollLista: 0,            // en el teléfono, dónde estaba la lista al abrir la ficha o la comparación
   sel: { key: null, items: new Map() },   // artículos tildados (de un solo proveedor)
@@ -276,13 +277,19 @@ function ordenItems(p, items) {
     : (a, b) => b.ts - a.ts || b.n - a.n);
 }
 
+// Las compras de un artículo a un proveedor, de la más nueva a la más vieja.
+// Cantidad y obra, sólo de las tuyas (o todas, si sos admin).
+function histHtml(g) {
+  const veCant = c => c.mia || S.veTodo;
+  return `<div class="pv-hist">${g.compras.map(c => `<div><span>${fmtFecha(c.ts)}</span>
+      <span>${veCant(c) ? esc(`${c.cant.toLocaleString('es-AR')} ${g.unidad}${c.obra ? ' · ' + c.obra : ''}`) : ''}${c.mia ? ' <span class="mini mini--ind">vos</span>' : ''}</span>
+      <b>${fmtMonto(c.precio, g.moneda)}</b></div>`).join('')}</div>`;
+}
+
 function filaItem(p, g) {
   const sel = S.sel.items.has(g.id);
   const abierto = S.grupoAbierto === g.id;
-  const veCant = c => c.mia || S.veTodo;
-  const hist = abierto ? `<div class="pv-hist">${g.compras.map(c => `<div><span>${fmtFecha(c.ts)}</span>
-      <span>${veCant(c) ? esc(`${c.cant.toLocaleString('es-AR')} ${g.unidad}${c.obra ? ' · ' + c.obra : ''}`) : ''}${c.mia ? ' <span class="mini mini--ind">vos</span>' : ''}</span>
-      <b>${fmtMonto(c.precio, g.moneda)}</b></div>`).join('')}</div>` : '';
+  const hist = abierto ? histHtml(g) : '';
   return `<div class="pv-it${sel ? ' sel' : ''}" data-g="${esc(g.id)}" tabindex="0" aria-expanded="${abierto}">
     <button type="button" class="pv-ck" data-ck="${esc(g.id)}" aria-pressed="${sel}" aria-label="Tildar ${esc(g.desc)}">${icSvg('checkSm')}</button>
     <div style="min-width:0"><div class="pv-it-d">${resaltarTxt(g.desc, S.tItems, esc)}</div>
@@ -460,6 +467,9 @@ function pintarArtCmp() {
     if (sel != null ? g.nd !== sel : !toks.every(t => g.nd.includes(t))) return;
     if (pasaPer(g)) rows.push({ p, g });
   }));
+  // Las compras de cada proveedor se despliegan tocando el renglón; con un solo
+  // artículo elegido arrancan desplegadas (es lo que se vino a comparar).
+  if (!S.cmpAbiertos) S.cmpAbiertos = new Set(sel != null ? rows.map(r => r.g.id) : []);
   const nuevo = rows.reduce((x, r) => (!x || r.g.ts > x.g.ts ? r : x), null);
   const titulo = sel != null ? esc(nuevo ? nuevo.g.desc : sel) : `Todo lo que dice «${esc(qTxt)}»`;
   const nProv = new Set(rows.map(r => r.p.key)).size;
@@ -493,12 +503,14 @@ function pintarArtCmp() {
         const sel = S.sel.items.has(r.g.id);
         const dim = S.sel.items.size && S.sel.key !== r.p.key;
         const d = datosDe(r.p);
-        return `<div class="pv-cmp${sel ? ' sel' : ''}${dim ? ' dim' : ''}" data-cg="${esc(r.g.id)}" data-pk="${esc(r.p.key)}" tabindex="0">
+        const abierto = S.cmpAbiertos.has(r.g.id);
+        return `<div class="pv-cmp${sel ? ' sel' : ''}${dim ? ' dim' : ''}" data-cg="${esc(r.g.id)}" data-pk="${esc(r.p.key)}" tabindex="0" aria-expanded="${abierto}">
           <button type="button" class="pv-ck" data-ck="${esc(r.g.id)}" data-pk="${esc(r.p.key)}" aria-pressed="${sel}" aria-label="Tildar">${icSvg('checkSm')}</button>
           <div style="min-width:0"><button type="button" class="pv-cmp-p" data-abrir="${esc(r.p.key)}">${esc(d.nombre)}</button>
             <div class="pv-cmp-d">${resaltarTxt(r.g.desc, toks, esc)}</div>
-            <div class="pv-it-s"><span>${fmtFecha(r.g.ts)}</span><span>· ${r.g.n} ${r.g.n === 1 ? 'compra' : 'compras'}</span>${r === best ? '<span class="pv-best">Más barato reciente</span>' : ''}${viejoHtml(r.g)}</div></div>
-          <div class="pv-it-p"><b>${fmtMonto(r.g.precio, r.g.moneda)}</b><small>por ${esc(r.g.unidad)} s/IVA</small></div></div>`;
+            <div class="pv-it-s"><span>${fmtFecha(r.g.ts)}</span><span>· ${r.g.n} ${r.g.n === 1 ? 'compra' : 'compras'}</span>${trendHtml(r.g)}${r === best ? '<span class="pv-best">Más barato reciente</span>' : ''}${viejoHtml(r.g)}</div></div>
+          <div class="pv-it-p"><b>${fmtMonto(r.g.precio, r.g.moneda)}</b><small>por ${esc(r.g.unidad)} s/IVA</small></div>
+          ${abierto ? histHtml(r.g) : ''}</div>`;
       }).join('')}</div>`;
   }).join('');
   box.innerHTML = volver + cab + html + (rows.length > MAX ? `<div class="pv-hint" style="border-radius:12px">${icSvg('info')}Se muestran ${MAX} de ${rows.length}: sumá otra palabra para afinar.</div>` : '');
@@ -508,6 +520,7 @@ function pintarArtCmp() {
 // reemplaza a la lista (como la ficha del proveedor).
 function abrirArticulo(nd, { push = true } = {}) {
   S.artSel = nd;
+  S.cmpAbiertos = null;
   marcarArticulo();
   pintarArtCmp();
   const chico = innerWidth < 1000;
@@ -838,7 +851,7 @@ function enlazar() {
   });
 
   // Escribir vuelve a la comparación de todo lo buscado.
-  $('q-art').addEventListener('input', () => { S.artSel = null; $('art-lista').scrollTop = 0; pintarArtLista(); pintarArtCmp(); });
+  $('q-art').addEventListener('input', () => { S.artSel = null; S.cmpAbiertos = null; $('art-lista').scrollTop = 0; pintarArtLista(); pintarArtCmp(); });
   document.querySelectorAll('[data-per]').forEach(b => b.addEventListener('click', () => { S.per = b.dataset.per; pintarArtLista(); pintarArtCmp(); }));
   $('art-lista').addEventListener('click', e => {
     const r = e.target.closest('[data-nd]');
@@ -848,12 +861,19 @@ function enlazar() {
     if (e.target.closest('#art-volver')) { volverALista(); return; }
     const ab = e.target.closest('[data-abrir]');
     if (ab) { verPestana(false, { foco: false }); abrirFicha(ab.dataset.abrir); return; }
+    const ck = e.target.closest('[data-ck]');
+    if (ck) { tildar(ck.dataset.pk, ck.dataset.ck); return; }
+    if (e.target.closest('.pv-hist')) return;
     const r = e.target.closest('[data-cg]');
-    if (r) tildar(r.dataset.pk, r.dataset.cg);
+    if (r) {
+      const id = r.dataset.cg;
+      if (!S.cmpAbiertos.delete(id)) S.cmpAbiertos.add(id);
+      pintarArtCmp();
+    }
   });
   $('art-res').addEventListener('keydown', e => {
     const r = e.target.closest?.('.pv-cmp');
-    if (r && e.target === r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tildar(r.dataset.pk, r.dataset.cg); }
+    if (r && e.target === r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); r.click(); }
   });
 
   $('sel-limpiar').addEventListener('click', () => { S.sel.items.clear(); S.sel.key = null; repintarSeleccion(); });
