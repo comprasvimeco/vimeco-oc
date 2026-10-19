@@ -43,6 +43,7 @@ const STATIC_ASSETS = [
   BASE + '/historial.html',
   BASE + '/proveedores.html',
   BASE + '/js/proveedores.js',
+  BASE + '/js/barraLetras.js',
   BASE + '/js/historial.js',
   BASE + '/js/driveQueue.js',
   BASE + '/facturas.html',

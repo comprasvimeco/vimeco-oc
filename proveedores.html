@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="VIMECO OC">
   <style>
     /* ===== Proveedores (índigo, el tono del módulo en el menú) ===== */
-    .pv-main { max-width: 1180px; padding-bottom: 6rem; }
+    .pv-main { max-width: 1240px; padding-bottom: 6rem; }
     .hidden { display: none !important; }
     .pv-ttl { display: flex; align-items: center; gap: .45rem; margin-bottom: .8rem; flex-wrap: wrap; }
     .pv-t { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; }
@@ -45,14 +45,56 @@
     .pv-chip[aria-pressed="true"] { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
     .pv-chip[aria-pressed="true"] b { background: #ffffff2b; color: #fff; }
     .pv-chip .icon { width: 13px; height: 13px; }
-    .pv-chip--orden { margin-left: auto; }
+    .pv-chips .pv-seg { margin-left: auto; }
 
     .pv-md { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; align-items: start; }
+    .pv-scroll { position: relative; }
+    /* En la compu la página ocupa justo el alto de la pantalla debajo del header (60px): la
+       página no se desplaza, la lista y la ficha (o la comparación) por dentro. */
     @media (min-width: 1000px) {
-      .pv-md { grid-template-columns: 340px minmax(0, 1fr); }
-      .pv-md--art { grid-template-columns: minmax(0, 1fr); }
-      .pv-lista-col { position: sticky; top: .75rem; max-height: calc(100vh - 1.5rem); display: flex; flex-direction: column; }
-      .pv-lista-col .pv-panel { overflow-y: auto; min-height: 0; }
+      .pv-main { display: flex; flex-direction: column; height: calc((100dvh - 60px) / var(--z, 1)); padding-bottom: .75rem; box-sizing: border-box; }
+      .pv-main.con-sel { padding-bottom: 4.8rem; }
+      .pv-md { flex: 1; min-height: 0; grid-template-columns: 340px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+      .pv-md--art { grid-template-columns: 400px minmax(0, 1fr); }
+      .pv-lista-col { display: flex; flex-direction: column; min-height: 0; }
+      .pv-lista-w { flex: 1; min-height: 0; position: relative; }
+      .pv-scroll { max-height: 100%; overflow-y: auto; scrollbar-width: thin; }
+      .pv-ficha-col, .pv-cmp-col { min-height: 0; overflow-y: auto; padding: 2px 6px 1rem 2px; scrollbar-width: thin; }
+    }
+    /* Monitores grandes: la página entera se agranda (como el zoom del navegador) y ocupa el ancho.
+       Con zoom, los dvh y los px también se multiplican: por eso la altura de la página divide por --z. */
+    @media (min-width: 1400px) {
+      .pv-main { --z: 1.15; zoom: var(--z); max-width: 1500px; padding-inline: 1.5rem; }
+      .pv-md { grid-template-columns: 360px minmax(0, 1fr); gap: 1.1rem; }
+      .pv-md--art { grid-template-columns: 440px minmax(0, 1fr); }
+    }
+    @media (min-width: 1700px) { .pv-main { --z: 1.3; } }
+    @media (min-width: 2200px) { .pv-main { --z: 1.45; } }
+
+    /* Barra de letras (js/barraLetras.js): reemplaza a la barra de desplazamiento de la lista en
+       orden alfabético. Letras a la izquierda; riel y tirador a la derecha, sin pasar por encima.
+       Teléfono: fija al borde derecho de la pantalla. Compu: al costado de la lista. */
+    .pv-abc { position: fixed; right: 0; top: 68px; bottom: 8px; z-index: 5; width: 30px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+    .pv-main.con-sel .pv-abc { bottom: 76px; }
+    .pv-abc::before { content: ''; position: absolute; right: 5px; top: 4px; bottom: 4px; width: 2px; border-radius: 2px; background: var(--gray-200); }
+    .abc-th { position: absolute; right: 2px; width: 8px; top: 0; border-radius: 4px; background: #c9cdf3; will-change: transform; transition: background .15s; }
+    .pv-abc button { position: absolute; left: 0; width: 18px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; font: inherit; font-size: .62rem; font-weight: 700; line-height: 1; color: var(--gray-500); cursor: pointer; isolation: isolate; transition: color .15s; }
+    .pv-abc button::before { content: ''; position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #4a52c4; transform: scale(0); transition: transform .22s cubic-bezier(.3, 1.6, .5, 1); z-index: -1; }
+    .pv-abc button.on { color: #fff; }
+    .pv-abc button.on::before { transform: scale(1); }
+    .pv-abc button:hover:not(.on) { color: #4a52c4; }
+    .abc-bu { position: absolute; right: 38px; top: 0; width: 46px; height: 46px; margin-top: -23px; display: grid; place-items: center; border-radius: 50%; background: #4a52c4; color: #fff; font-size: 1.35rem; font-weight: 800; box-shadow: 0 6px 18px rgba(63,70,166,.35); opacity: 0; transform: scale(.5) translateX(12px); transition: opacity .15s, transform .18s cubic-bezier(.3, 1.4, .5, 1), top .12s ease-out; pointer-events: none; }
+    .pv-abc.arrastra .abc-bu { opacity: 1; transform: none; }
+    .pv-abc.arrastra .abc-th, .pv-abc:hover .abc-th { background: #6b72d6; }
+    /* Teléfono: toda la página deja libre el carril de la barra (si no, pisa el título y las pestañas). */
+    html.abc-sin-barra .pv-main { padding-right: 34px; }
+    html.abc-sin-barra { scrollbar-width: none; }
+    html.abc-sin-barra::-webkit-scrollbar { display: none; }
+    .abc-sin-nativa { scrollbar-width: none; }
+    .abc-sin-nativa::-webkit-scrollbar { display: none; }
+    @media (min-width: 1000px) {
+      .pv-abc { position: absolute; top: 4px; bottom: 4px; right: -4px; }
+      .pv-lista-w.con-abc { padding-right: 28px; }
     }
     .pv-panel { background: var(--white); border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); overflow: hidden; }
     .pv-card { background: var(--white); border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); padding: .85rem .9rem; }
@@ -71,6 +113,12 @@
     .pv-r { text-align: right; white-space: nowrap; }
     .pv-r b { display: block; font-size: .82rem; color: var(--gray-700); }
     .pv-r small { font-size: .68rem; color: var(--gray-400); font-weight: 600; }
+    .pv-row--art { grid-template-columns: minmax(0, 1fr) auto; }
+    .pv-row--art .pv-n { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
+    .pv-row--art .pv-s { display: block; margin-top: .1rem; }
+    .pv-row--todo { grid-template-columns: 22px minmax(0, 1fr); background: #fafbff; }
+    .pv-row--todo .icon { width: 18px; height: 18px; color: #4a52c4; }
+    .pv-art-h { margin-bottom: .75rem; }
     .pv-sep { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); background: var(--gray-100); padding: .35rem .8rem; }
     .pv-hint { display: flex; align-items: center; gap: .5rem; font-size: .76rem; color: var(--gray-500); padding: .6rem .75rem; background: #fafbfc; border-top: 1px solid var(--gray-200); }
     .pv-hint .icon { width: 14px; height: 14px; color: var(--gray-400); flex: none; }
@@ -143,7 +191,7 @@
 
     /* Barra de selección */
     .pv-selbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--white); border-top: 1px solid var(--gray-200);
-      padding: .6rem max(.8rem, calc((100vw - 1180px) / 2 + 1rem)) calc(.6rem + env(safe-area-inset-bottom, 0px)); display: flex; gap: .7rem; align-items: center; box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); }
+      padding: .6rem max(.8rem, calc((100vw - 1240px) / 2 + 1rem)) calc(.6rem + env(safe-area-inset-bottom, 0px)); display: flex; gap: .7rem; align-items: center; box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); }
     .pv-selbar .n { flex: 1; min-width: 0; font-size: .8rem; color: var(--gray-600); line-height: 1.25; }
     .pv-selbar .n b { color: var(--primary-dark); display: block; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pv-selbar .pv-btn { padding: .62rem 1rem; font-size: .88rem; }
@@ -190,8 +238,10 @@
     .pv-back .icon { width: 15px; height: 15px; }
 
     @media (max-width: 999px) {
-      .pv-main.ver-ficha .pv-lista-col, .pv-main.ver-ficha .pv-tabs { display: none; }
+      .pv-main.ver-ficha #vista-prov .pv-lista-col, .pv-main.ver-ficha .pv-tabs { display: none; }
       .pv-main:not(.ver-ficha) .pv-ficha-col { display: none; }
+      .pv-main.ver-art #vista-art .pv-lista-col, .pv-main.ver-art .pv-tabs { display: none; }
+      .pv-main:not(.ver-art) .pv-cmp-col { display: none; }
     }
     @media (min-width: 1000px) { .pv-back { display: none; } }
     @media (max-width: 760px) {
@@ -233,24 +283,35 @@
       <div class="pv-chips">
         <button type="button" class="pv-chip" id="f-mios" aria-pressed="true">Míos <b id="n-mios">0</b></button>
         <button type="button" class="pv-chip" id="f-todos" aria-pressed="false">De todos <b id="n-todos">0</b></button>
-        <button type="button" class="pv-chip pv-chip--orden" id="f-orden"></button>
+        <div class="pv-seg" id="f-orden" role="group" aria-label="Ordenar">
+          <button type="button" data-orden="frec">Frecuentes</button><button type="button" data-orden="rec">Recientes</button><button type="button" data-orden="az">A–Z</button>
+        </div>
       </div>
-      <div class="pv-panel" id="lista"><div class="pv-vacio">Cargando proveedores…</div></div>
+      <div class="pv-lista-w">
+        <div class="pv-panel pv-scroll" id="lista"><div class="pv-vacio">Cargando proveedores…</div></div>
+        <nav class="pv-abc hidden" id="abc-prov" aria-label="Ir a la letra"></nav>
+      </div>
     </div>
     <div class="pv-ficha-col" id="ficha-col">
       <div class="pv-card pv-vacio" id="ficha-vacia">Elegí un proveedor de la lista para ver sus datos y lo que se le compró.</div>
     </div>
   </div>
 
-  <!-- Artículos: buscar y comparar entre proveedores -->
-  <div class="hidden" id="vista-art">
-    <div class="pv-search"><span data-ic="search"></span><input type="search" id="q-art" placeholder="Buscar un artículo (p. ej. cemento, disco 9, hierro 8)" autocomplete="off"></div>
-    <div class="pv-chips">
-      <button type="button" class="pv-chip" data-per="90" aria-pressed="true">Últimos 90 días</button>
-      <button type="button" class="pv-chip" data-per="mias" aria-pressed="false">Mis compras</button>
-      <button type="button" class="pv-chip" data-per="todo" aria-pressed="false">Todo</button>
+  <!-- Artículos: todo lo comprado (A–Z) + la comparación entre proveedores -->
+  <div class="pv-md pv-md--art hidden" id="vista-art">
+    <div class="pv-lista-col">
+      <div class="pv-search"><span data-ic="search"></span><input type="search" id="q-art" placeholder="Buscar un artículo (p. ej. cemento, disco 9, hierro 8)" autocomplete="off"></div>
+      <div class="pv-chips">
+        <button type="button" class="pv-chip" data-per="90" aria-pressed="true">Últimos 90 días</button>
+        <button type="button" class="pv-chip" data-per="mias" aria-pressed="false">Mis compras</button>
+        <button type="button" class="pv-chip" data-per="todo" aria-pressed="false">Todo</button>
+      </div>
+      <div class="pv-lista-w">
+        <div class="pv-panel pv-scroll" id="art-lista"></div>
+        <nav class="pv-abc hidden" id="abc-art" aria-label="Ir a la letra"></nav>
+      </div>
     </div>
-    <div id="art-res"><div class="pv-card pv-vacio">Escribí lo que buscás y se comparan los precios de todos los proveedores que lo vendieron.</div></div>
+    <div class="pv-cmp-col" id="art-res"></div>
   </div>
 </main>
 
@@ -321,6 +382,7 @@
 <script src="js/config.js"></script>
 <script src="js/firebase.js"></script>
 <script src="js/buscarOC.js"></script>
+<script src="js/barraLetras.js"></script>
 <script src="js/proveedores.js"></script>
 </body>
 </html>

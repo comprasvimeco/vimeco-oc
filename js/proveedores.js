@@ -65,6 +65,9 @@ const S = {
   abierto: null,             // key del proveedor en la ficha
   artOrden: null, artQ: '', grupoAbierto: null,
   per: '90',
+  artSel: null,              // artículo elegido en la pestaña Artículos (descripción normalizada)
+  arts: null,                // { per, lista }: los artículos del período, ya juntados
+  scrollLista: 0,            // en el teléfono, dónde estaba la lista al abrir la ficha o la comparación
   sel: { key: null, items: new Map() },   // artículos tildados (de un solo proveedor)
   empujado: false,           // la ficha del teléfono sumó una entrada al historial del navegador
   tProv: [], tItems: [],     // lo buscado en la lista y en los artículos de la ficha (se resalta)
@@ -145,6 +148,7 @@ function construir() {
     });
   });
   S.provs = map;
+  S.arts = null;
 }
 
 // Datos a mostrar: los de la base y, si falta alguno, los de la última OC.
@@ -165,12 +169,17 @@ function ordenar(lista) {
   const mios = S.quien === 'mios';
   const cnt = p => mios ? p.mias : p.n;
   const ult = p => mios ? p.ultMia : p.ult;
+  if (S.orden === 'az') {
+    const nom = new Map(lista.map(p => [p, norm(datosDe(p).nombre)]));
+    return lista.sort((a, b) => nom.get(a).localeCompare(nom.get(b), 'es'));
+  }
   return lista.sort(S.orden === 'frec'
     ? (a, b) => cnt(b) - cnt(a) || ult(b) - ult(a)
     : (a, b) => ult(b) - ult(a) || cnt(b) - cnt(a));
 }
 
-function filaProv(p) {
+// `ini`: el renglón donde empieza una inicial lleva data-ini (la barra de letras salta ahí).
+function filaProv(p, ini = '') {
   const d = datosDe(p);
   // Con el buscador aparecen también proveedores sin compras tuyas: ahí van los de todos.
   const mios = S.quien === 'mios' && p.mias > 0;
@@ -178,12 +187,12 @@ function filaProv(p) {
   if (p.n) {
     const cnt = mios ? `${p.mias} ${p.mias === 1 ? 'tuya' : 'tuyas'}` : `${p.n} OC`;
     const f = fmtCorta(mios ? p.ultMia : p.ult);
-    der = S.orden === 'frec' ? `<b>${cnt}</b><small>últ. ${f}</small>` : `<b>${f}</b><small>${cnt}</small>`;
+    der = S.orden !== 'rec' ? `<b>${cnt}</b><small>últ. ${f}</small>` : `<b>${f}</b><small>${cnt}</small>`;
   } else {
     der = '<small>Sin compras</small>';
   }
   const sub = [d.cuit || '', d.localidad || ''].filter(Boolean).join(' · ');
-  return `<button type="button" class="pv-row${S.abierto === p.key ? ' on' : ''}" data-key="${esc(p.key)}">
+  return `<button type="button" class="pv-row${S.abierto === p.key ? ' on' : ''}" data-key="${esc(p.key)}"${ini}>
     <span class="pv-av ${tonoDe(p.key)}">${esc(iniciales(d.nombre))}</span>
     <span style="min-width:0"><span class="pv-n" style="display:block">${resaltarTxt(d.nombre, S.tProv, esc)}</span>
       <span class="pv-s" style="display:block">${d.cuit ? resaltarTxt(sub, S.tProv, esc) : `<span class="mini mini--warn">Sin CUIT</span> ${esc(d.localidad)}`}</span></span>
@@ -197,14 +206,14 @@ function pintarLista() {
   $('n-todos').textContent = conCompras.length;
   $('f-mios').setAttribute('aria-pressed', S.quien === 'mios');
   $('f-todos').setAttribute('aria-pressed', S.quien === 'todos');
-  $('f-orden').innerHTML = icSvg('clock') + (S.orden === 'frec' ? 'Más frecuentes' : 'Más recientes');
-  $('f-orden').title = 'Cambiar a ' + (S.orden === 'frec' ? 'más recientes' : 'más frecuentes');
+  $('f-orden').querySelectorAll('[data-orden]').forEach(b => b.setAttribute('aria-pressed', b.dataset.orden === S.orden));
   $('pv-cuenta').textContent = `${conCompras.length} con compras`;
   $('pv-cuenta').classList.remove('hidden');
 
   const q = norm($('q-prov').value);
   S.tProv = terminosBusqueda(q);
   let html = '';
+  const letras = [];
   if (q) {
     // Buscando: se busca en toda la base. Primero los que tienen compras.
     const toks = q.split(' ');
@@ -217,15 +226,18 @@ function pintarLista() {
     const con = ordenar(res.filter(p => p.n)), sin = res.filter(p => !p.n)
       .sort((a, b) => datosDe(a).nombre.localeCompare(datosDe(b).nombre));
     if (!res.length) html = '<div class="pv-vacio">No hay proveedores con ese nombre, CUIT o código.</div>';
-    if (con.length) html += `<div class="pv-sep">Con compras · ${con.length}</div>` + con.slice(0, S.limite).map(filaProv).join('');
-    if (sin.length) html += `<div class="pv-sep">En la base, sin compras · ${sin.length}</div>` + sin.slice(0, S.limite).map(filaProv).join('');
+    if (con.length) html += `<div class="pv-sep">Con compras · ${con.length}</div>` + con.slice(0, S.limite).map(p => filaProv(p)).join('');
+    if (sin.length) html += `<div class="pv-sep">En la base, sin compras · ${sin.length}</div>` + sin.slice(0, S.limite).map(p => filaProv(p)).join('');
     if (con.length > S.limite || sin.length > S.limite) html += '<button type="button" class="pv-mas" id="ver-mas">Mostrar más</button>';
   } else {
     const lista = ordenar(conCompras.filter(p => S.quien === 'todos' || p.mias));
     if (!lista.length) {
       html = `<div class="pv-vacio">${S.quien === 'mios' ? 'Todavía no emitiste OC. En "De todos" están los proveedores de toda la empresa.' : 'Todavía no hay OC.'}</div>`;
+    } else if (S.orden === 'az') {
+      // En orden alfabético va la lista entera: la recorre la barra de letras.
+      html = lista.map(p => filaProv(p, iniDe(datosDe(p).nombre, letras))).join('');
     } else {
-      html = lista.slice(0, S.limite).map(filaProv).join('');
+      html = lista.slice(0, S.limite).map(p => filaProv(p)).join('');
       if (lista.length > S.limite) html += '<button type="button" class="pv-mas" id="ver-mas">Mostrar más</button>';
     }
     html += `<div class="pv-hint">${icSvg('info')}<span>${S.quien === 'mios'
@@ -233,6 +245,15 @@ function pintarLista() {
       : `Los de las OC de toda la empresa. El buscador también encuentra los ${(todos.length - conCompras.length).toLocaleString('es-AR')} de la base sin compras.`}</span></div>`;
   }
   $('lista').innerHTML = html;
+  barraProv.poner(letras, l => $('lista').querySelector(`[data-ini="${l}"]`));
+}
+
+// Primera vez que aparece una inicial en la lista: se anota y el renglón la marca.
+function iniDe(txt, letras) {
+  const c = letraDe(txt);
+  if (letras.includes(c)) return '';
+  letras.push(c);
+  return ` data-ini="${c}"`;
 }
 
 // ─── Ficha ──────────────────────────────────────────────
@@ -339,43 +360,114 @@ function abrirFicha(key, { push = true } = {}) {
   const chico = innerWidth < 1000;
   $('pv-main').classList.add('ver-ficha');
   const url = '?p=' + encodeURIComponent(key);
-  if (push && chico && !S.empujado) { history.pushState({ p: key }, '', url); S.empujado = true; }
+  if (push && chico && !S.empujado) { S.scrollLista = scrollY; history.pushState({ p: key }, '', url); S.empujado = true; }
   else history.replaceState({ p: key }, '', url);
   if (chico) scrollTo(0, 0);
+  else $('ficha-col').scrollTop = 0;
+  barraProv.armar();
 }
 
-// Volver a la lista en el teléfono: si la ficha se abrió desde la lista, con el
-// "atrás" del navegador (así también funciona el botón de Android).
+// Volver a la lista en el teléfono: si la ficha (o la comparación) se abrió desde
+// la lista, con el "atrás" del navegador (así también funciona el botón de Android).
 function volverALista() {
   if (S.empujado) history.back();
-  else { history.replaceState(null, '', location.pathname); cerrarFicha(); }
+  else {
+    history.replaceState(enArticulos() ? { t: 'art' } : null, '', location.pathname);
+    cerrarFicha(); cerrarArticulo();
+  }
 }
 
 function cerrarFicha() {
   S.empujado = false;
   $('pv-main').classList.remove('ver-ficha');
   if (innerWidth < 1000) { S.abierto = null; pintarLista(); }
+  barraProv.armar();
 }
 
-// ─── Comparar por artículo ──────────────────────────────
-function pintarArticulos() {
-  const box = $('art-res');
-  const q = norm($('q-art').value);
+// ─── Artículos: todo lo comprado (A–Z) y la comparación ─
+const pasaPer = g => !(S.per === '90' && g.dias > 90) && !(S.per === 'mias' && !g.mias);
+const enArticulos = () => !$('vista-art').classList.contains('hidden');
+
+// Para ordenar se saltea el código del proveedor del principio: «[106] VITE BETON…»
+// «001207 - CINTA…» y «1120808:NIPLE…» van en la V, la C y la N.
+const sinCodigo = nd => nd.replace(/^(\s*([[(][^\])]*[\])]|[\w./-]*\d[\w./-]*(\s+-\s+|:))[\s:-]*)+/, '') || nd;
+
+// Cada artículo (por su descripción normalizada) con los proveedores que lo
+// vendieron en el período; muestra el texto y el precio de la compra más nueva.
+function listaArticulos() {
+  if (S.arts?.per === S.per) return S.arts.lista;
+  const m = new Map();
+  S.provs.forEach(p => p.items.forEach(g => {
+    if (!pasaPer(g)) return;
+    let a = m.get(g.nd);
+    if (!a) m.set(g.nd, a = { nd: g.nd, orden: sinCodigo(g.nd), g, provs: new Set(), n: 0 });
+    a.provs.add(p.key);
+    a.n += g.n;
+    if (g.ts > a.g.ts) a.g = g;
+  }));
+  const lista = [...m.values()].sort((a, b) => a.orden.localeCompare(b.orden, 'es'));
+  S.arts = { per: S.per, lista };
+  return lista;
+}
+
+function pintarArtLista() {
   document.querySelectorAll('[data-per]').forEach(b => b.setAttribute('aria-pressed', b.dataset.per === S.per));
-  if (q.length < 2) {
-    box.innerHTML = '<div class="pv-card pv-vacio">Escribí lo que buscás y se comparan los precios de todos los proveedores que lo vendieron.</div>';
+  const qTxt = $('q-art').value.trim();
+  const q = norm(qTxt);
+  const toks = q ? q.split(' ') : [];
+  const lista = listaArticulos().filter(a => toks.every(t => a.nd.includes(t)));
+  const letras = [];
+  let html = '';
+  if (q.length >= 2 && lista.length > 1) {
+    html += `<button type="button" class="pv-row pv-row--todo${S.artSel == null ? ' on' : ''}" data-nd="">${icSvg('search')}
+      <span style="min-width:0"><span class="pv-n" style="display:block">Comparar todo lo que dice «${esc(qTxt)}»</span>
+        <span class="pv-s" style="display:block">${lista.length} artículos juntos</span></span></button>`;
+  }
+  html += lista.map(a => {
+    const np = a.provs.size;
+    return `<button type="button" class="pv-row pv-row--art${S.artSel === a.nd ? ' on' : ''}" data-nd="${esc(a.nd)}"${iniDe(a.orden, letras)}>
+      <span style="min-width:0"><span class="pv-n">${resaltarTxt(a.g.desc, toks, esc)}</span>
+        <span class="pv-s">${np} ${np === 1 ? 'proveedor' : 'proveedores'} · ${a.n} ${a.n === 1 ? 'compra' : 'compras'} · últ. ${fmtCorta(a.g.ts)}</span></span>
+      <span class="pv-r"><b>${fmtMonto(a.g.precio, a.g.moneda)}</b><small>por ${esc(a.g.unidad)}</small></span></button>`;
+  }).join('');
+  if (!lista.length) {
+    html = `<div class="pv-vacio">${q ? `No hay compras de "${esc(qTxt)}"` : 'No hay compras'}${S.per === '90' ? ' en los últimos 90 días. Probá con "Todo".' : '.'}</div>`;
+  }
+  $('art-lista').innerHTML = html;
+  barraArt.poner(letras, l => $('art-lista').querySelector(`[data-ini="${l}"]`));
+}
+
+// Lo elegido en la lista, sin volver a pintarla entera (puede ser larga).
+function marcarArticulo() {
+  const sel = S.artSel ?? '';
+  $('art-lista').querySelectorAll('[data-nd]').forEach(r => r.classList.toggle('on', r.dataset.nd === sel));
+}
+
+// La comparación: el artículo elegido o, si no hay, todo lo que coincide con lo buscado.
+function pintarArtCmp() {
+  const box = $('art-res');
+  const qTxt = $('q-art').value.trim();
+  const q = norm(qTxt);
+  const sel = S.artSel;
+  const volver = `<button type="button" class="pv-back" id="art-volver">${icSvg('chevL')}Artículos</button>`;
+  if (sel == null && q.length < 2) {
+    box.innerHTML = volver + '<div class="pv-card pv-vacio">Elegí un artículo de la lista para comparar lo que cobró cada proveedor, o escribí arriba para comparar todo lo que coincida.</div>';
     return;
   }
-  const toks = q.split(' ');
+  const toks = sel == null ? q.split(' ') : [];
   const rows = [];
   S.provs.forEach(p => p.items.forEach(g => {
-    if (!toks.every(t => g.nd.includes(t))) return;
-    if (S.per === '90' && g.dias > 90) return;
-    if (S.per === 'mias' && !g.mias) return;
-    rows.push({ p, g });
+    if (sel != null ? g.nd !== sel : !toks.every(t => g.nd.includes(t))) return;
+    if (pasaPer(g)) rows.push({ p, g });
   }));
+  const nuevo = rows.reduce((x, r) => (!x || r.g.ts > x.g.ts ? r : x), null);
+  const titulo = sel != null ? esc(nuevo ? nuevo.g.desc : sel) : `Todo lo que dice «${esc(qTxt)}»`;
+  const nProv = new Set(rows.map(r => r.p.key)).size;
+  const cab = `<div class="pv-card pv-art-h"><div class="pv-fh-n">${titulo}</div><div class="pv-fh-p">
+    <span class="mini">${nProv} ${nProv === 1 ? 'proveedor' : 'proveedores'}</span>
+    ${S.per === '90' ? '<span class="mini">Últimos 90 días</span>' : S.per === 'mias' ? '<span class="mini mini--ind">Tus compras</span>' : ''}</div></div>`;
   if (!rows.length) {
-    box.innerHTML = `<div class="pv-card pv-vacio">No hay compras de "${esc($('q-art').value.trim())}"${S.per === '90' ? ' en los últimos 90 días. Probá con "Todo".' : '.'}</div>`;
+    box.innerHTML = volver + cab + `<div class="pv-card pv-vacio">No hay compras${sel == null ? ` de "${esc(qTxt)}"` : ''}${S.per === '90' ? ' en los últimos 90 días. Probá con "Todo".' : ' en este período.'}</div>`;
     return;
   }
   // Se compara dentro de la misma unidad y moneda; el más barato reciente se marca.
@@ -409,7 +501,30 @@ function pintarArticulos() {
           <div class="pv-it-p"><b>${fmtMonto(r.g.precio, r.g.moneda)}</b><small>por ${esc(r.g.unidad)} s/IVA</small></div></div>`;
       }).join('')}</div>`;
   }).join('');
-  box.innerHTML = html + (rows.length > MAX ? `<div class="pv-hint" style="border-radius:12px">${icSvg('info')}Se muestran ${MAX} de ${rows.length}: sumá otra palabra para afinar.</div>` : '');
+  box.innerHTML = volver + cab + html + (rows.length > MAX ? `<div class="pv-hint" style="border-radius:12px">${icSvg('info')}Se muestran ${MAX} de ${rows.length}: sumá otra palabra para afinar.</div>` : '');
+}
+
+// `nd` null: la comparación de todo lo buscado. En el teléfono la comparación
+// reemplaza a la lista (como la ficha del proveedor).
+function abrirArticulo(nd, { push = true } = {}) {
+  S.artSel = nd;
+  marcarArticulo();
+  pintarArtCmp();
+  const chico = innerWidth < 1000;
+  $('pv-main').classList.add('ver-art');
+  const st = { t: 'art', a: nd ?? '' };
+  if (push && chico && !S.empujado) { S.scrollLista = scrollY; history.pushState(st, ''); S.empujado = true; }
+  else if (chico) history.replaceState(st, '');
+  if (chico) scrollTo(0, 0);
+  else $('art-res').scrollTop = 0;
+  barraArt.armar();
+}
+
+function cerrarArticulo() {
+  S.empujado = false;
+  $('pv-main').classList.remove('ver-art');
+  if (innerWidth < 1000 && S.artSel != null) { S.artSel = null; marcarArticulo(); pintarArtCmp(); }
+  barraArt.armar();
 }
 
 // ─── Selección de artículos ─────────────────────────────
@@ -448,7 +563,10 @@ function repintarSeleccion() {
     $('sel-s').textContent = datosDe(S.provs.get(S.sel.key)).nombre;
   }
   if (S.abierto) { const p = S.provs.get(S.abierto); if (p) pintarItems(p); }
-  if (!$('vista-art').classList.contains('hidden')) pintarArticulos();
+  if (enArticulos()) pintarArtCmp();
+  // En la compu la barra de abajo achica las columnas.
+  $('pv-main').classList.toggle('con-sel', !!n);
+  barraProv.armar(); barraArt.armar();
 }
 
 // ─── Armar la OC ────────────────────────────────────────
@@ -632,34 +750,65 @@ async function guardarEdicion() {
 }
 
 // ─── Pestañas ───────────────────────────────────────────
-function verPestana(art) {
+function verPestana(art, { foco = true } = {}) {
   $('tab-prov').setAttribute('aria-selected', !art);
   $('tab-art').setAttribute('aria-selected', art);
   $('vista-prov').classList.toggle('hidden', art);
   $('vista-art').classList.toggle('hidden', !art);
-  if (art) { pintarArticulos(); $('q-art').focus(); }
+  if (art) {
+    pintarArtLista(); pintarArtCmp();
+    // En el teléfono el teclado taparía la lista.
+    if (foco && innerWidth >= 1000) $('q-art').focus();
+  }
+  barraProv.armar(); barraArt.armar();
+}
+
+// Tocar una pestaña: la URL queda con lo que se ve (la ficha, en Proveedores).
+function elegirPestana(art) {
+  verPestana(art);
+  const p = !art && S.abierto;
+  history.replaceState(art ? { t: 'art' } : p ? { p } : null, '', p ? '?p=' + encodeURIComponent(p) : location.pathname);
 }
 
 // ─── Arranque ───────────────────────────────────────────
+// Las barras de letras de las dos listas (en la compu, la lista se desplaza por dentro).
+const anchoCompu = window.matchMedia('(min-width: 1000px)');
+const barraProv = barraLetras($('abc-prov'), { caja: $('lista'), ancho: anchoCompu });
+const barraArt = barraLetras($('abc-art'), { caja: $('art-lista'), ancho: anchoCompu });
+
 function enlazar() {
   document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icSvg(el.dataset.ic); });
   $('btn-back').addEventListener('click', () => {
-    if ($('pv-main').classList.contains('ver-ficha') && innerWidth < 1000) volverALista();
+    const m = $('pv-main').classList;
+    if ((m.contains('ver-ficha') || m.contains('ver-art')) && innerWidth < 1000) volverALista();
     else window.location.href = 'menu.html';
   });
   window.addEventListener('popstate', e => {
-    if (e.state?.p && S.provs.has(e.state.p)) abrirFicha(e.state.p, { push: false });
-    else { cerrarFicha(); scrollTo(0, 0); }
+    const st = e.state || {};
+    if (st.p && S.provs.has(st.p)) { verPestana(false, { foco: false }); abrirFicha(st.p, { push: false }); }
+    else if (st.a != null) { verPestana(true, { foco: false }); abrirArticulo(st.a || null, { push: false }); }
+    else {
+      cerrarFicha(); cerrarArticulo();
+      verPestana(st.t === 'art', { foco: false });
+      scrollTo(0, S.scrollLista);
+    }
   });
 
-  $('tab-prov').addEventListener('click', () => verPestana(false));
-  $('tab-art').addEventListener('click', () => verPestana(true));
+  $('tab-prov').addEventListener('click', () => elegirPestana(false));
+  $('tab-art').addEventListener('click', () => elegirPestana(true));
   $('btn-nuevo').addEventListener('click', () => abrirEdicion(null));
 
   $('q-prov').addEventListener('input', () => { S.limite = 60; pintarLista(); });
   $('f-mios').addEventListener('click', () => { S.quien = 'mios'; S.limite = 60; guardarPref(); pintarLista(); });
   $('f-todos').addEventListener('click', () => { S.quien = 'todos'; S.limite = 60; guardarPref(); pintarLista(); });
-  $('f-orden').addEventListener('click', () => { S.orden = S.orden === 'frec' ? 'rec' : 'frec'; guardarPref(); pintarLista(); });
+  $('f-orden').addEventListener('click', e => {
+    const b = e.target.closest('[data-orden]');
+    if (!b || b.dataset.orden === S.orden) return;
+    S.orden = b.dataset.orden; S.limite = 60; guardarPref();
+    $('lista').scrollTop = 0;
+    if (innerWidth < 1000) scrollTo(0, 0);
+    pintarLista();
+  });
   $('lista').addEventListener('click', e => {
     if (e.target.closest('#ver-mas')) { S.limite += 120; pintarLista(); return; }
     const r = e.target.closest('.pv-row');
@@ -688,11 +837,17 @@ function enlazar() {
     if (it && e.target === it && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); it.click(); }
   });
 
-  $('q-art').addEventListener('input', pintarArticulos);
-  document.querySelectorAll('[data-per]').forEach(b => b.addEventListener('click', () => { S.per = b.dataset.per; pintarArticulos(); }));
+  // Escribir vuelve a la comparación de todo lo buscado.
+  $('q-art').addEventListener('input', () => { S.artSel = null; $('art-lista').scrollTop = 0; pintarArtLista(); pintarArtCmp(); });
+  document.querySelectorAll('[data-per]').forEach(b => b.addEventListener('click', () => { S.per = b.dataset.per; pintarArtLista(); pintarArtCmp(); }));
+  $('art-lista').addEventListener('click', e => {
+    const r = e.target.closest('[data-nd]');
+    if (r) abrirArticulo(r.dataset.nd || null);
+  });
   $('art-res').addEventListener('click', e => {
+    if (e.target.closest('#art-volver')) { volverALista(); return; }
     const ab = e.target.closest('[data-abrir]');
-    if (ab) { verPestana(false); abrirFicha(ab.dataset.abrir); return; }
+    if (ab) { verPestana(false, { foco: false }); abrirFicha(ab.dataset.abrir); return; }
     const r = e.target.closest('[data-cg]');
     if (r) tildar(r.dataset.pk, r.dataset.cg);
   });
