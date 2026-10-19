@@ -318,7 +318,35 @@
     $('ar-c2').innerHTML = f ? nivel2(f) : '';
     $('ar-c3').innerHTML = st.oc ? nivel3(st.oc) : `<div class="ar-ph">${f ? 'Elegí una OC para ver sus archivos.' : ''}</div>`;
     if (scroll) ['ar-c1', 'ar-c2', 'ar-c3'].forEach((id, i) => { $(id).scrollTop = scroll[i]; });
+    else if (ancho.matches) {
+      // Lo abierto (desde la búsqueda, un link o al cambiar de vista) puede
+      // quedar fuera de la columna: se la corre hasta mostrarlo.
+      aLaVista($('ar-c1'), $('ar-c1').querySelector('.ar-fd[aria-current="true"]'));
+      aLaVista($('ar-c2'), $('ar-c2').querySelector('.ar-r--oc[aria-current="true"]'));
+    }
     if (st.oc) pedirCarpetas([ocs.get(st.oc)]);
+  }
+
+  // En la compu cada columna es sticky (posicionada): el offsetTop de lo de
+  // adentro es contra la columna.
+  function aLaVista(col, el) {
+    if (!el) return;
+    const top = el.offsetTop, alto = el.offsetHeight;
+    if (top < col.scrollTop || top + alto > col.scrollTop + col.clientHeight)
+      col.scrollTop = top - (col.clientHeight - alto) / 2;
+  }
+
+  // ---- Barra de letras (Por proveedor) ----
+
+  const letraDe = k => {
+    const c = k.normalize('NFD').replace(/[̀-ͯ]/g, '').charAt(0).toUpperCase();
+    return /[A-Z]/.test(c) ? c : '#';
+  };
+  function irALetra(l) {
+    const el = $('ar-c1').querySelector(`.ar-fd[data-ini="${l}"]`);
+    if (!el) return;
+    if (ancho.matches) $('ar-c1').scrollTop = el.offsetTop - 6;
+    else el.scrollIntoView({ block: 'start' });
   }
 
   function pintarMigas(f) {
@@ -329,15 +357,26 @@
   }
 
   function nivel1(lista, f) {
-    let h = `<div class="ar-lbl">${DIMS[st.v]}<i>${plural(lista.length, 'carpeta', 'carpetas')}</i></div>`;
-    h += lista.length ? `<div class="ar-fgrid">` + lista.map(([k, l]) => {
+    // Por proveedor, una barra con las iniciales: tocar o deslizar salta a la letra.
+    const letras = [];
+    const ini = st.v === 'prov' ? k => {
+      if (k === 'Sin proveedor') return '';
+      const c = letraDe(k);
+      if (letras.includes(c)) return '';
+      letras.push(c);
+      return ` data-ini="${c}"`;
+    } : () => '';
+    const grid = lista.map(([k, l]) => {
       const inc = l.filter(incompleta).length;
       const n = l.reduce((s, o) => s + archivosDe(o).length, 0);
-      return `<button type="button" class="ar-fd" data-f="${esc(k)}" aria-current="${k === f}"><span class="ar-fd-ic">${icSvg(ICONO_DIM[st.v])}</span>
+      return `<button type="button" class="ar-fd" data-f="${esc(k)}"${ini(k)} aria-current="${k === f}"><span class="ar-fd-ic">${icSvg(ICONO_DIM[st.v])}</span>
         <b>${esc(nombreCarpeta(k, st.v))}</b><small>${plural(l.length, 'OC', 'OC')} · ${plural(n, 'archivo', 'archivos')}</small>
         <em class="${inc ? '' : 'ok'}">${inc ? plural(inc, 'sin factura o remito', 'sin factura o remito') : 'Todo cargado'}</em></button>`;
-    }).join('') + `</div>` : `<div class="ar-ph">Todavía no hay OC.</div>`;
-    return h;
+    }).join('');
+    const abc = letras.length > 1 ? `<div class="ar-abc-w"><nav class="ar-abc" aria-label="Ir a la letra">${letras.sort((a, b) => (a === '#') - (b === '#') || a.localeCompare(b))
+      .map(c => `<button type="button" data-letra="${c}">${c}</button>`).join('')}</nav></div>` : '';
+    return abc + `<div class="ar-lbl">${DIMS[st.v]}<i>${plural(lista.length, 'carpeta', 'carpetas')}</i></div>` +
+      (lista.length ? `<div class="ar-fgrid${abc ? ' ar-fgrid--abc' : ''}">${grid}</div>` : `<div class="ar-ph">Todavía no hay OC.</div>`);
   }
 
   function ordenar(l) {
@@ -545,28 +584,44 @@
     return ['oc ' + o.nro, o.nro, o.prov, o.obra].join(' ').toLowerCase();
   }
 
+  const articulosDe = o => [...new Set((o.h.items || []).map(it => it && it.desc).filter(Boolean))];
+
   function pintarBusqueda(q) {
     const terms = q.split(/\s+/).filter(Boolean);
     const hay = txt => terms.every(t => txt.includes(t));
+    const t0 = terms[0];
+    // Proveedores y obras que coinciden: llevan a su carpeta.
+    const MAX_CARP = 6;
+    const grupos = [['prov', 'Proveedores'], ['obra', 'Obras']]
+      .map(([v, n]) => [v, n, carpetas(v).filter(([k]) => !k.startsWith('Sin ') && hay(k.toLowerCase()))])
+      .filter(([, , l]) => l.length);
     const res = [];
     ocs.forEach(o => {
-      const files = archivosDe(o).filter(a => hay(textoOC(o) + ' ' + (a.nombre || '').toLowerCase() + ' ' + (NOMBRE_TIPO[a.tipo] || '').toLowerCase()));
-      if (hay(textoOC(o)) || files.length) res.push({ o, files: hay(textoOC(o)) ? [] : files });
+      const base = textoOC(o);
+      if (hay(base)) { res.push({ o, files: [], arts: [] }); return; }
+      const files = archivosDe(o).filter(a => hay(base + ' ' + (a.nombre || '').toLowerCase() + ' ' + (NOMBRE_TIPO[a.tipo] || '').toLowerCase()));
+      const arts = articulosDe(o).filter(d => hay(base + ' ' + d.toLowerCase()));
+      if (files.length || arts.length) res.push({ o, files, arts });
     });
     res.sort((a, b) => b.o.ts - a.o.ts);
-    if (!res.length) {
+    if (!res.length && !grupos.length) {
       $('ar-res').innerHTML = `<div class="ar-vacio">${icSvg('search')}<span>No hay nada que coincida.</span></div>`;
       return;
     }
-    const t0 = terms[0];
-    $('ar-res').innerHTML = `<div class="ar-lbl">${plural(res.length, 'OC', 'OC')}</div><div class="ar-rows">` + res.slice(0, limite).map(({ o, files }) => {
+    const carps = grupos.map(([v, n, l]) => `<div class="ar-lbl">${n}<i>${l.length > MAX_CARP ? 'las primeras ' + MAX_CARP + ' de ' + l.length : ''}</i></div><div class="ar-rows">` +
+      l.slice(0, MAX_CARP).map(([k, ls]) => `<button type="button" class="ar-r" data-ir-v="${v}" data-ir-f="${esc(k)}">
+        <span class="ar-fd-ic">${icSvg(ICONO_DIM[v])}</span>
+        <span class="ar-r-tx"><b>${resaltar(k, t0)}</b><small>${plural(ls.length, 'OC', 'OC')} · ${plural(ls.reduce((s, o) => s + archivosDe(o).length, 0), 'archivo', 'archivos')}</small></span>
+        ${icSvg('chevron', 'ar-chev')}</button>`).join('') + `</div>`).join('');
+    $('ar-res').innerHTML = carps + (res.length ? `<div class="ar-lbl">${plural(res.length, 'OC', 'OC')}</div><div class="ar-rows">` + res.slice(0, limite).map(({ o, files, arts }) => {
       const camino = nombreCarpeta(claveOC(o, st.v), st.v) + ' › OC ' + o.nro;
+      const det = [...files.map(a => resaltar(a.nombre, t0)), ...arts.map(d => resaltar(d, t0))];
       return `<button type="button" class="ar-r" data-ir-oc="${esc(o.id)}">
         <span class="ar-r-n">${resaltar(o.nro, t0)}</span>
         <span class="ar-r-tx"><b>${resaltar(o.prov || '—', t0)}</b>
-          <small>${files.length ? files.map(a => resaltar(a.nombre, t0)).join(', ') : esc(camino) + (o.obra && st.v !== 'obra' ? ' · ' + resaltar(o.obra, t0) : '')}</small></span>
+          <small>${det.length ? det.join(', ') : esc(camino) + (o.obra && st.v !== 'obra' ? ' · ' + resaltar(o.obra, t0) : '')}</small></span>
         ${dots(o)}${icSvg('chevron', 'ar-chev')}</button>`;
-    }).join('') + `</div>` +
+    }).join('') + `</div>` : '') +
       (res.length > limite ? `<button type="button" class="ar-mas" id="ar-mas">Ver ${Math.min(PAGINA, res.length - limite)} más</button>` : '');
   }
 
@@ -1086,6 +1141,8 @@
         ir({ f: st.f || (cur ? cur.dataset.f : ''), oc: d.oc, orden: st.orden });
       }
       else if (d.irOc) { const o = ocs.get(d.irOc); $('ar-q').value = ''; ir({ f: claveOC(o, st.v), oc: o.id }); }
+      else if (d.irF) { $('ar-q').value = ''; ir({ v: d.irV, f: d.irF, oc: '' }); }
+      else if (d.letra) irALetra(d.letra);
       else if (d.orden) { st.orden = d.orden; pintar(); }
       else if ('inc' in d) { st.inc = !st.inc; pintar(); }
       else if (d.ficha) abrirFicha();
@@ -1093,6 +1150,25 @@
       else if (d.ent) verEntrega(d.ent);
       else if (d.asignar) asignar(d.asignar);
       else if (t.id === 'ar-mas') { limite += PAGINA; pintar(); }
+    });
+    // Deslizar el dedo (o el mouse apretado) por la barra de letras va saltando.
+    $('ar-c1').addEventListener('pointerdown', e => {
+      const abc = e.target.closest('.ar-abc'); if (!abc) return;
+      e.preventDefault();
+      abc.setPointerCapture(e.pointerId);
+      let ultima = '';
+      const mover = ev => {
+        const r = abc.getBoundingClientRect();
+        const x = ev.clientX >= r.left && ev.clientX <= r.right ? ev.clientX : r.left + r.width / 2;
+        const b = document.elementFromPoint(x, ev.clientY);
+        const l = b && b.closest && b.closest('[data-letra]');
+        if (l && l.dataset.letra !== ultima) { ultima = l.dataset.letra; irALetra(ultima); }
+      };
+      const fin = () => { abc.removeEventListener('pointermove', mover); abc.removeEventListener('pointerup', fin); abc.removeEventListener('pointercancel', fin); };
+      mover(e);
+      abc.addEventListener('pointermove', mover);
+      abc.addEventListener('pointerup', fin);
+      abc.addEventListener('pointercancel', fin);
     });
     $('ar-file').addEventListener('change', e => subir(e.target.files && e.target.files[0]));
     $('modal-preview-close').addEventListener('click', cerrarFicha);

@@ -64,7 +64,7 @@
     @media (min-width: 2200px) { .ar-page { --z: 1.45; } }
 
     .ar-lbl { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin: 1rem .2rem .45rem; }
-    .ar-lbl:first-child { margin-top: .1rem; }
+    .ar-lbl:first-child, .ar-abc-w + .ar-lbl { margin-top: .1rem; }
     .ar-lbl i { font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; opacity: .85; }
 
     /* Nivel 1: carpetas */
@@ -78,6 +78,19 @@
     .ar-fd em { font-style: normal; font-size: .72rem; font-weight: 600; color: var(--durazno-fg); }
     .ar-fd em.ok { color: var(--menta-fg); }
     .ar-fd[aria-current="true"] { box-shadow: 0 0 0 2px var(--tono), var(--shadow-leva); }
+    .ar-fd { scroll-margin-top: 72px; }
+
+    /* Barra de letras (Por proveedor). Teléfono: fija al borde derecho. Compu: pegada arriba
+       a la derecha de la columna (el envoltorio sticky de alto 0 la deja quieta al scrollear). */
+    .ar-abc { position: fixed; right: 2px; top: calc(50% + 30px); transform: translateY(-50%); z-index: 5; display: flex; flex-direction: column; align-items: stretch; max-height: calc(100dvh - 100px); overflow: hidden; padding: 4px 1px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-leva); touch-action: none; user-select: none; }
+    .ar-abc button { flex: 0 1 auto; min-height: 0; border: 0; background: transparent; font: inherit; font-size: .68rem; font-weight: 700; line-height: 1.2; color: var(--tono); padding: 1px 5px; border-radius: 6px; cursor: pointer; }
+    .ar-abc button:hover { background: var(--tono-soft); }
+    .ar-fgrid--abc { padding-right: 16px; }
+    @media (min-width: 960px) {
+      .ar-abc-w { position: sticky; top: 0; height: 0; z-index: 2; }
+      .ar-abc { position: absolute; right: 0; top: 2rem; transform: none; max-height: calc(100dvh / var(--z, 1) - 4rem); }
+      .ar-fgrid--abc { padding-right: 26px; }
+    }
     @media (min-width: 960px) {
       .ar-fgrid { grid-template-columns: 1fr; gap: .4rem; }
       .ar-fd { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .65rem; row-gap: 0; align-items: center; padding: .6rem .7rem; border-radius: 12px; }
@@ -253,7 +266,7 @@
     <div class="ar-tools">
       <label class="ar-search">
         <span id="ar-ic-search"></span>
-        <input type="search" id="ar-q" placeholder="Buscar por N° de OC, proveedor, obra o archivo…" autocomplete="off">
+        <input type="search" id="ar-q" placeholder="Buscar por N° de OC, proveedor, obra, artículo o archivo…" autocomplete="off">
       </label>
       <div class="ar-seg" id="ar-dim" role="group" aria-label="Ordenar carpetas">
         <button type="button" data-dim="mes" aria-pressed="false">Por mes</button>
