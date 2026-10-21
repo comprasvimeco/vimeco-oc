@@ -176,6 +176,7 @@ Estructura JSON requerida:
   ],
   "subtotal_documento": número_o_null,
   "total_documento": número_o_null,
+  "descuento_ya_aplicado": false,
   "descuento": { "porcentaje": número_o_null, "monto": número_positivo_o_cero },
   "noGravado": { "monto": número_positivo_o_cero },
   "impuestos": [
@@ -219,6 +220,7 @@ Reglas generales:
 - El campo "total" de cada ítem es el importe de esa línea tal como figura en el documento
 - Si una descripción está parcialmente ilegible, extraé lo que puedas y agregá "..." al final
 - "descuento": monto POSITIVO si hay descuento global. Si tiene porcentaje explícito, completar "porcentaje". Si no hay descuento, devolver null
+- DESCUENTO YA APLICADO: si el documento dice que el descuento ya está aplicado o incluido en los precios (ej: "Con el 25% de descuento ya aplicado", "precios con descuento incluido", "precios bonificados"), los precios de los ítems YA son los descontados: "descuento_ya_aplicado": true y "descuento": null. Ese descuento NO se vuelve a restar. Mismo criterio si los ítems ya suman el neto o el total del documento sin restar nada
 - "noGravado": si hay ítems no gravados, extraer su monto total. Si no hay, devolver null
 - "impuestos": incluir SOLO impuestos reales (IVA, percepciones). NO incluir Subtotal, Neto gravado ni TOTAL
 - Si el documento es completamente ilegible, devolvé items: [] e impuestos: []`;
@@ -317,7 +319,7 @@ function parseGeminiResponse(text) {
     throw new Error('La respuesta de Gemini no es JSON válido. Intentá con otra imagen.');
   }
 
-  return {
+  const r = {
     proveedor:              trimOrNull(parsed.proveedor),
     cuit_proveedor:         trimOrNull(parsed.cuit_proveedor),
     domicilio_proveedor:    trimOrNull(parsed.domicilio_proveedor),
@@ -349,6 +351,22 @@ function parseGeminiResponse(text) {
       monto:      parseFloatSafe(imp.monto)
     })).filter(imp => imp.nombre !== '' && imp.monto > 0)
   };
+  if (parsed.descuento_ya_aplicado === true || descuentoYaEnLosItems(r)) r.descuento = null;
+  return r;
+}
+
+/*
+ * «Con el 25% de descuento ya aplicado»: los precios ya vienen descontados y
+ * Gemini a veces igual informa el descuento, que se restaba dos veces. Si los
+ * ítems más los impuestos ya dan el total del documento, el descuento no va.
+ */
+function descuentoYaEnLosItems(r) {
+  if (!r.descuento || !r.total_documento || !r.items.length) return false;
+  const items = r.items.reduce((s, it) => s + (it.total_documento || it.cantidad * it.precio_unitario), 0);
+  const imp   = r.impuestos.reduce((s, i) => s + i.monto, 0);
+  const tol   = r.total_documento * 0.005;
+  return Math.abs(items + imp - r.total_documento) <= tol
+      || Math.abs(items - r.total_documento) <= tol;
 }
 
 function trimOrNull(val) {
