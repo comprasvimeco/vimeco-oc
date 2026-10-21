@@ -88,7 +88,9 @@ let descuento        = { pct: null, monto: 0 };
 let noGravado        = { pct: null, monto: 0 };
 let impuestos        = [];   // [{nombre, pct, monto}]
 let firmaBase64      = null; // firma del usuario activo (cargada desde Firebase)
-let verifRowWarnings = {};   // {idx: true} ítems con discrepancia post-extracción
+let verifRowWarnings = {};   // {idx: true} ítems que no cierran con el documento
+let docRef           = null; // montos del presupuesto leídos por la IA: {subtotal, total, impuestos, ivaIncluido}
+let verifColapsado   = false; // el cartel de diferencias se achicó al indicador de Totales
 let manualOCNumber   = null; // número de OC ingresado manualmente
 
 // ---- DOM shortcut ----
@@ -124,7 +126,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-extract').addEventListener('click', handleExtract);
   $('btn-clear-file').addEventListener('click', clearFile);
   $('btn-add-impuesto').addEventListener('click', addImpuestoRow);
-  $('verif-banner-close').addEventListener('click', hideVerifBanner);
+  $('verif-banner-close').addEventListener('click', () => { verifColapsado = true; refrescarVerif(); programarBorrador(); });
+  $('verif-chip').addEventListener('click', () => {
+    if (!verificarExtraccion().issues.length) return;
+    verifColapsado = false;
+    refrescarVerif();
+    const sec = $('verif-banner').closest('.oc-section');
+    if (sec?.classList.contains('collapsed')) openOCSection(sec);
+    $('verif-banner').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
   setupIVAToggle();
   setupMonedaToggle();
 
@@ -1258,14 +1268,18 @@ function updateOCSummaries() {
       const el = sec.querySelector('.oc-sum');
       if (!el) return;
       const { txt, falta } = ocSectionSummary(i);
+      // Ítems y Totales plegados: la diferencia con el presupuesto también se ve.
+      const aviso = (i === 3 || i === 4) && verificarExtraccion().issues.length;
       // Con un solo dato faltante lo dice la pastilla; con varios, el detalle va abajo.
       el.innerHTML = (txt ? `<span class="oc-sum-t">${esc(txt)}</span>` : '')
-        + (falta.length > 1 ? `<span class="oc-sum-f">Falta: ${esc(falta.join(', '))}</span>` : '');
+        + (falta.length > 1 ? `<span class="oc-sum-f">Falta: ${esc(falta.join(', '))}</span>` : '')
+        + (aviso ? '<span class="oc-sum-a">No coincide con el presupuesto</span>' : '');
       const st = sec.querySelector('.oc-st');
       if (st) {
         const [cls, t] = i === 0 ? ['opc', 'Opcional']
           : falta.length === 1 ? ['falta', 'Falta ' + falta[0]]
           : falta.length ? ['falta', `Faltan ${falta.length}`]
+          : aviso ? ['aviso', 'No coincide']
           : txt ? ['ok', 'Listo'] : ['', ''];
         st.className = 'oc-st' + (cls ? ' oc-st--' + cls : '');
         st.innerHTML = cls === 'ok' ? icSvg('checkSm') + t : esc(t);
@@ -1405,29 +1419,19 @@ function applyExtractionResult(r) {
     renderImpuestos();
   }
 
+  // Los montos del documento se guardan antes de recalcular (que pisa el monto
+  // de los impuestos con %): contra ellos se verifica con cada cambio.
+  docRef = {
+    subtotal:    parseFloat(r.subtotal_documento) || 0,
+    total:       parseFloat(r.total_documento) || 0,
+    impuestos:   (r.impuestos || []).filter(i => i.porcentaje > 0 && i.monto > 0)
+                   .map(i => ({ nombre: i.nombre, monto: i.monto })),
+    ivaIncluido: r.precios_incluyen_iva === true
+  };
+  verifColapsado = false;
+
   recalcTotales();
-
-  const { issues, rowWarn } = verificarExtraccion(r);
-  if (issues.length) {
-    verifRowWarnings = rowWarn;
-    renderTable();
-    showVerifBanner(issues);
-  }
-
-  // Sugerir toggle IVA si Gemini detectó precios con IVA incluido,
-  // o si el subtotal calculado es ~21% mayor al declarado en el documento
-  if (!ivaActive) {
-    const sugerirIva = r.precios_incluyen_iva === true ||
-      (r.subtotal_documento && (() => {
-        const ratio = roundCents(calcSubtotal()) / r.subtotal_documento;
-        return ratio > 1.17 && ratio < 1.25;
-      })());
-    if (sugerirIva) {
-      toast('Los precios podrían incluir IVA — revisá el toggle "Precios con IVA incluido".', 'warning');
-    }
-  }
-
-  return issues;
+  renderTable();
 }
 
 async function handleExtract() {
@@ -1472,14 +1476,20 @@ function clearExtractStatus() {
   el.textContent = '';
 }
 
-// ---- Verificación post-extracción ----
-function verificarExtraccion(r) {
+// ---- Verificación contra el documento ----
+// Compara lo cargado con los montos que leyó la IA del presupuesto (el total de
+// cada ítem viaja con el ítem; el resto está en docRef). Se recalcula con cada
+// cambio: si se corrige, la diferencia desaparece sola.
+function verificarExtraccion() {
   const issues  = [];
   const rowWarn = {};
+  if (!docRef) return { issues, rowWarn };
 
   items.forEach((it, idx) => {
     if (!it.total_documento) return;
-    const calc = roundCents((it.cantidad || 0) * (it.precio_unitario || 0));
+    // Con "IVA incluido" el precio pasa a neto; el documento lo trae con IVA.
+    const precio = it._precio_original ?? it.precio_unitario;
+    const calc = roundCents((it.cantidad || 0) * (precio || 0));
     const diff = Math.abs(calc - it.total_documento);
     if (diff / it.total_documento > 0.005) {
       const desc = it.descripcion.length > 28 ? it.descripcion.substring(0, 26) + '…' : it.descripcion;
@@ -1488,43 +1498,85 @@ function verificarExtraccion(r) {
     }
   });
 
-  if (r.subtotal_documento) {
+  if (docRef.subtotal) {
     const calc = roundCents(calcSubtotal());
-    const diff = Math.abs(calc - r.subtotal_documento);
-    if (diff / r.subtotal_documento > 0.005) {
-      issues.push(`Subtotal: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(r.subtotal_documento)}`);
+    const diff = Math.abs(calc - docRef.subtotal);
+    if (diff / docRef.subtotal > 0.005) {
+      issues.push(`Subtotal: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(docRef.subtotal)}`);
     }
   }
 
-  impuestos.forEach(imp => {
-    if (!imp.pct || !imp.monto) return;
-    const calc = roundCents(calcGravado() * imp.pct / 100);
-    const diff = Math.abs(calc - imp.monto);
-    if (diff / imp.monto > 0.01) {
-      issues.push(`${imp.nombre}: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(imp.monto)}`);
+  (docRef.impuestos || []).forEach(ref => {
+    const imp = impuestos.find(i => (i.nombre || '').trim().toLowerCase() === (ref.nombre || '').trim().toLowerCase());
+    if (!imp) return;   // si se sacó, lo muestra el total
+    const calc = roundCents(imp.monto || 0);
+    const diff = Math.abs(calc - ref.monto);
+    if (diff / ref.monto > 0.01) {
+      issues.push(`${ref.nombre}: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(ref.monto)}`);
     }
   });
 
-  if (r.total_documento) {
+  if (docRef.total) {
     const calc = roundCents(calcTotal());
-    const diff = Math.abs(calc - r.total_documento);
-    if (diff / r.total_documento > 0.005) {
-      issues.push(`Total: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(r.total_documento)}`);
+    const diff = Math.abs(calc - docRef.total);
+    if (diff / docRef.total > 0.005) {
+      issues.push(`Total: calculado ${fmtMoneyDisplay(calc)} ≠ documento ${fmtMoneyDisplay(docRef.total)}`);
     }
   }
 
   return { issues, rowWarn };
 }
 
-function showVerifBanner(issues) {
-  $('verif-banner-list').innerHTML = issues.map(i => `<li>${i}</li>`).join('');
-  $('verif-banner').classList.remove('hidden');
+// ¿Los precios del documento parecen venir con IVA? Lo dijo la IA, o el
+// subtotal sin descontar da ~21% más que el del documento.
+function sugerirIvaIncluido() {
+  if (!docRef || ivaActive) return false;
+  if (docRef.ivaIncluido) return true;
+  if (!docRef.subtotal) return false;
+  const ratio = roundCents(calcSubtotal()) / docRef.subtotal;
+  return ratio > 1.17 && ratio < 1.25;
 }
 
-function hideVerifBanner() {
-  $('verif-banner').classList.add('hidden');
-  verifRowWarnings = {};
-  renderTable();
+// Pinta el estado de la verificación: cartel (si no se achicó), indicador en
+// Totales, renglones marcados y la sugerencia de IVA. Los renglones se marcan
+// en el lugar, sin volver a dibujar la tabla (no se pierde el foco al tipear).
+function refrescarVerif() {
+  const { issues, rowWarn } = verificarExtraccion();
+  verifRowWarnings = rowWarn;
+
+  $('verif-banner-list').innerHTML = issues.map(i => `<li>${esc(i)}</li>`).join('');
+  $('verif-banner').classList.toggle('hidden', !issues.length || verifColapsado);
+
+  const chip = $('verif-chip');
+  chip.classList.toggle('hidden', !docRef);
+  if (docRef) {
+    const ok = !issues.length;
+    chip.classList.toggle('verif-chip--ok', ok);
+    chip.disabled = ok;
+    let txt;
+    if (ok) txt = 'Coincide con el presupuesto';
+    else if (docRef.total) {
+      const dif = roundCents(calcTotal() - docRef.total);
+      txt = Math.abs(dif) / docRef.total > 0.005
+        ? `Presupuesto ${fmtMoneyDisplay(docRef.total)} · difiere ${fmtMoneyDisplay(Math.abs(dif))}`
+        : `${issues.length} ${issues.length === 1 ? 'diferencia' : 'diferencias'} con el presupuesto`;
+    } else txt = `${issues.length} ${issues.length === 1 ? 'diferencia' : 'diferencias'} con el presupuesto`;
+    chip.innerHTML = icSvg(ok ? 'checkSm' : 'alert') + `<span>${esc(txt)}</span>`;
+  }
+
+  $('items-tbody').querySelectorAll('tr[data-idx]').forEach(tr =>
+    tr.classList.toggle('item-row-warn', !!rowWarn[tr.dataset.idx]));
+  $('items-cards').querySelectorAll('.item-card[data-idx]').forEach(card =>
+    card.classList.toggle('item-row-warn', !!rowWarn[card.dataset.idx]));
+
+  $('iva-sugerencia').classList.toggle('hidden', !sugerirIvaIncluido());
+}
+
+// Sin documento de referencia (formulario limpio, otro presupuesto).
+function limpiarVerif() {
+  docRef = null;
+  verifColapsado = false;
+  refrescarVerif();
 }
 
 // ---- Items table ----
@@ -1769,6 +1821,7 @@ function recalcTotales() {
   });
 
   $('imp-total-value').textContent = fmtMoneyDisplay(calcTotal());
+  refrescarVerif();
   updateOCSummaries();
 }
 
@@ -2175,7 +2228,7 @@ function guardarBorrador() {
       ts: Date.now(), campos,
       rubro: selectedRubro, equipo: selectedEquipo, categoria: selectedCategoria,
       items, descuento, noGravado, impuestos, ivaActive, ivaPct, monedaUSD,
-      provCuit: _loadedProvCuit, provSnapshot: _provSnapshot, provFicha
+      provCuit: _loadedProvCuit, provSnapshot: _provSnapshot, provFicha, docRef, verifColapsado
     }));
   } catch (e) {
     console.warn('guardarBorrador:', e);
@@ -2281,6 +2334,8 @@ async function restaurarBorrador(b) {
   $('iva-pct').value = String(ivaPct);
   $('iva-pct-wrap').classList.toggle('hidden', !ivaActive);
   monedaUSD = !!b.monedaUSD;
+  docRef = b.docRef || null;
+  verifColapsado = !!b.verifColapsado;
   $('moneda-toggle').checked = monedaUSD;
   updateMonedaLabels();
 
@@ -2680,6 +2735,12 @@ async function aplicarRepetida(rep, numero) {
 
 async function handleGenerate() {
   if (!validateOCForm()) return;
+
+  // Lo cargado no cierra con el presupuesto: se pregunta una vez, acá.
+  const { issues: difs } = verificarExtraccion();
+  if (difs.length && !await showConfirm('No coincide con el presupuesto',
+    difs.join('\n') + '\n\n¿Emitir igual?',
+    { boton: 'Emitir igual', tono: 'warn', icono: 'alert', cancelar: 'Revisar' })) return;
 
   // ¿Repite una OC que la misma persona acaba de emitir?
   const repetida = await revisarRepetida();
@@ -3169,7 +3230,7 @@ function resetFormKeepProvider() {
 
   resetIVAToggle();
   resetMonedaToggle();
-  hideVerifBanner();
+  limpiarVerif();
   clearFile();
   renderTable();
   renderImpuestos();
@@ -3208,7 +3269,7 @@ function resetForm() {
 
   resetIVAToggle();
   resetMonedaToggle();
-  hideVerifBanner();
+  limpiarVerif();
   clearFile();
   clearManualOCNumber();
   renderTable();

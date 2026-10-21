@@ -246,10 +246,12 @@
             </span>
           </span>
         </div>
+        <!-- Queda mientras parezca que los precios traen IVA y no se eligió «Con IVA incluido» -->
+        <p id="iva-sugerencia" class="iva-sugerencia hidden">Los precios del presupuesto parecen incluir IVA: revisá si corresponde «Con IVA incluido».</p>
         <div id="verif-banner" class="verif-banner hidden">
           <div class="verif-banner-header">
-            <span><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>Verificación: hay discrepancias entre el documento y los datos extraídos</strong></span>
-            <button id="verif-banner-close" class="verif-banner-close" title="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <span><svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>Lo cargado no coincide con el presupuesto</strong></span>
+            <button id="verif-banner-close" class="verif-banner-close" title="Achicar: queda el aviso en Totales"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
           </div>
           <ul id="verif-banner-list" class="verif-banner-list"></ul>
         </div>
@@ -332,6 +334,8 @@
               </tr>
             </tfoot>
           </table>
+          <!-- Comparación con el presupuesto leído por la IA: se actualiza con cada cambio -->
+          <button type="button" id="verif-chip" class="verif-chip hidden"></button>
         </div>
       </div>
 

@@ -607,6 +607,19 @@ select.form-control { cursor: pointer; background-image: url("data:image/svg+xml
 tr.item-row-warn td { background: #fff8e1 !important; }
 tr.item-row-warn td:first-child { border-left: 3px solid #f59e0b; }
 .item-card.item-row-warn { border-left: 3px solid #f59e0b !important; background: #fff8e1; }
+/* Indicador fijo en Totales: ámbar mientras no cierre, verde cuando coincide */
+.verif-chip {
+  display: flex; align-items: center; gap: .4rem;
+  margin: .6rem 1rem .75rem auto; padding: .3rem .7rem;
+  font: inherit; font-size: .8rem; font-weight: 600;
+  color: #92400e; background: #fff8e1; border: 1px solid #f5d27a; border-radius: 999px;
+  cursor: pointer; font-variant-numeric: tabular-nums; max-width: calc(100% - 2rem);
+}
+.verif-chip .icon { width: 14px; height: 14px; flex-shrink: 0; }
+.verif-chip span { overflow-wrap: anywhere; text-align: left; }
+.verif-chip--ok { color: #166534; background: #ecfdf3; border-color: #b7e4c7; cursor: default; }
+.verif-chip:disabled { opacity: 1; }
+.iva-sugerencia { margin: .5rem 1rem; font-size: .8rem; color: #92400e; }
 
 /* ===== ADJUNTAR ARCHIVO ===== */
 .adj-page { max-width: 600px; margin: 0 auto; padding: 1rem; }
@@ -1363,6 +1376,7 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
     padding-left: calc(17px + .5rem + 22px + .5rem); min-width: 0; }
   .oc-sum-t { font-size: .78rem; color: var(--gray-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .oc-sum-f { font-size: .74rem; color: #b02a2a; font-weight: 700; }
+  .oc-sum-a { font-size: .74rem; color: #92400e; font-weight: 700; }
   .oc-section.collapsed.oc-incompleta .card-title .step-badge { background: #fde6e6; color: #b02a2a; box-shadow: none; }
 }
 
@@ -1717,10 +1731,11 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
 .oc-section > .card-header > .card-title { margin-right: auto; }
 .oc-st { display: none; align-items: center; gap: .3rem; padding: .12rem .55rem; border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
 .oc-st .icon { width: 11px; height: 11px; }
-.oc-st--ok, .oc-st--falta, .oc-st--opc { display: inline-flex; }
+.oc-st--ok, .oc-st--falta, .oc-st--opc, .oc-st--aviso { display: inline-flex; }
 .oc-st--ok    { background: #dff3e5; color: #1a7f3c; }
 .oc-st--falta { background: #fde6e6; color: #b02a2a; }
 .oc-st--opc   { background: var(--gray-100); color: var(--gray-500); }
+.oc-st--aviso { background: #fff3d6; color: #92400e; }
 .oc-section > .card-header > .oc-chevron { order: 5; }
 .oc-section > .card-header > .oc-sum { order: 10; }
 
