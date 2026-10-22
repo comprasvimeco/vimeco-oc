@@ -376,7 +376,7 @@ function render() {
               : '';
     // La carpeta de la OC en Archivo (archivo.html?nro=…), con sus archivos a la vista.
     const archivo = puedeArchivo && ocEv?.nroOC
-      ? `<a class="foc-btn foc-btn--edit act-archivo" data-key="${esc(e.key)}" href="archivo.html?nro=${encodeURIComponent(ocEv.nroOC)}" title="Ver los archivos de la OC ${esc(ocEv.nroOC)} en Archivo">${icSvg('folder')}Archivo</a>`
+      ? `<a class="foc-btn foc-btn--arc act-archivo" data-key="${esc(e.key)}" href="archivo.html?nro=${encodeURIComponent(ocEv.nroOC)}" title="Ver los archivos de la OC ${esc(ocEv.nroOC)} en Archivo">${icSvg('folder')}Archivo</a>`
       : '';
     const verOC = (rem || fac) && ocEv
       ? `<button class="foc-btn foc-btn--edit act-oc" title="Ver la ficha de la OC ${esc(ocEv.nroOC)}">${icSvg('eye')}Ver OC</button>`

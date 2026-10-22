@@ -1261,6 +1261,8 @@ mark.hl { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1p
 .foc-btn:disabled { opacity: .45; cursor: default; }
 .foc-btn--drive { background: #dcf3ef; color: #16695f; }
 .foc-btn--pdf   { background: #fce8ee; color: #a23a57; }
+/* Archivo, con el índigo de su tarjeta del menú (data-tone="indigo"). */
+.foc-btn--arc   { background: #e9ebfb; color: #3f46a6; }
 .foc-btn--del   { background: #fde6e6; color: #b02a2a; }
 .foc-btn.hidden { display: none; }
 .foc-btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
