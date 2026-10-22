@@ -481,11 +481,14 @@ function renderTabla() {
     const otros = (hits.length ? hits.length : items.length) - 1;
     const det = it ? hl(it.desc) + (otros > 0 ? ` <span>y ${otros} más</span>` : '') : '';
     const cur = oc.moneda === 'USD' ? 'USD' : 'ARS';
+    // Buscando un insumo: el precio unitario y la unidad del renglón que coincide.
+    const pu = hits.length ? _precioItem(hits[0], cur) : '';
+    const puHtml = pu ? `<div class="pu">${esc(pu)}</div>` : '';
     const cat = catObra(oc);
     const sub = [cat && OBRA_CATS[cat].label, oc.rubro?.nombre || (oc.equipo?.codigo ? equipoLabel(oc.equipo) : '')].filter(Boolean);
     return `<tr data-oc="${esc(oc.nroOC)}" tabindex="0">
       <td class="c-cat">${catTile(cat)}</td>
-      <td class="c-prov"><span class="prov">${hl(oc.proveedor?.nombre || 'Sin proveedor')}</span><div class="sub">${det}</div></td>
+      <td class="c-prov"><span class="prov">${hl(oc.proveedor?.nombre || 'Sin proveedor')}</span><div class="sub">${det}</div>${puHtml}</td>
       <td class="c-obra">${hl(obraLabel(obraKey(oc)))}<div class="sub">${sub.map(esc).join(' · ')}</div></td>
       <td class="c-resp">${hl(respLabel(oc))}</td>
       <td class="c-nro"><span class="fch">${dm(oc.timestamp)}</span><div class="sub nro">${hl(oc.nroOC)}</div></td>
