@@ -83,6 +83,10 @@
     return (n / 1048576).toFixed(n < 10485760 ? 1 : 0).replace('.', ',') + ' MB';
   }
 
+  const montoOC = o => {
+    const t = Number(o.h.total) || 0;
+    return t ? (o.h.moneda === 'USD' ? 'US$ ' : '$ ') + t.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+  };
   const fecha = ts => ts ? new Date(ts).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
   const claveMes = ts => { const d = new Date(ts || 0); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
   const nombreMes = k => {
@@ -486,11 +490,11 @@
         `<button type="button" data-orden="${k}" aria-pressed="${k === st.orden}">${nom}</button>`).join('')}</div>
         <button type="button" class="ar-tog" data-inc aria-pressed="${st.inc}">Sin factura o remito</button></div>
       ${vis.length ? `<div class="ar-rows">` + vis.map(o => {
-        // Tres renglones: N° (con fecha y estado), proveedor, obra · quien la emitió.
+        // Tres renglones: N° (con fecha, monto y estado), proveedor, obra · quien la emitió.
         const sub = [o.obra || 'Sin obra', o.h.responsable && o.h.responsable.nombre].filter(Boolean).join(' · ');
         return `<button type="button" class="ar-r ar-r--oc" data-oc="${esc(o.id)}" aria-current="${o.id === st.oc}">
           <span class="ar-r-tx">
-            <span class="ar-r-l1"><span class="ar-r-n">${esc(o.nro)}</span><span class="ar-r-f">${esc(fecha(o.ts))}</span>${etiquetaEstado(o)}</span>
+            <span class="ar-r-l1"><span class="ar-r-n">${esc(o.nro)}</span><span class="ar-r-f">${esc(fecha(o.ts))}</span>${montoOC(o) ? `<span class="ar-r-m">${esc(montoOC(o))}</span>` : ''}${etiquetaEstado(o)}</span>
             <b>${esc(o.prov || 'Sin proveedor')}</b><small>${esc(sub)}</small></span>
           ${dots(o)}${icSvg('chevron', 'ar-chev')}</button>`;
       }).join('') + `</div>` : `<div class="ar-ph">Todas las OC de esta carpeta tienen factura y remito.</div>`}
@@ -610,9 +614,7 @@
         <p class="ar-nota">La carpeta «${esc(fechaCarpeta(o))} | ${esc(o.prov || 'Sin proveedor')}» la comparte con ${o.compartida.length === 1 ? 'la OC' : 'las OC'} ${esc(o.compartida.join(', '))} y no se sabe de cuál es cada uno. Si alguno es de esta OC, asignáselo: pasa a su lista y deja de aparecer en las otras.</p>
         <div class="ar-rows">${o.extras.map(a => itemHtml(a, false, true)).join('')}</div>
       </details>` : '';
-    const t = Number(o.h.total) || 0;
-    const total = t ? (o.h.moneda === 'USD' ? 'US$ ' : '$ ') + t.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-    const extra = [o.h.fecha || fecha(o.ts), total, o.h.responsable && o.h.responsable.nombre ? 'emitió ' + o.h.responsable.nombre : ''].filter(Boolean).join(' · ');
+    const extra = [o.h.fecha || fecha(o.ts), montoOC(o), o.h.responsable && o.h.responsable.nombre ? 'emitió ' + o.h.responsable.nombre : ''].filter(Boolean).join(' · ');
     const nArch = archivosDe(o).length;
     const peso = archivosDe(o).reduce((s, a) => s + (Number(a.size) || 0), 0);
     return `<div class="ar-fh"><h2>OC ${esc(o.nro)}${etiquetaEstado(o)}${etiquetaAutorizacion(o)}</h2>
