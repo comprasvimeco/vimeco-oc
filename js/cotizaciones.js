@@ -78,7 +78,11 @@ function pillsEstado(cot) {
   try {
     const { q } = cuadroDe(cot);
     const cta = q.justa || q.amplia;
-    if (cta?.mejor) mejor = `<span class="ct-pill ct-pill--gr">Más barato: ${esc(nombrePresu(cot.presupuestos[cta.mejor]))}</span>`;
+    if (cta?.mejor) {
+      // Sin el código de proveedor del principio («2448 CARIGNANI…»): en la tarjeta sobra.
+      const nom = nombrePresu(cot.presupuestos[cta.mejor]).replace(/^\d+\s*[-–]?\s+/, '');
+      mejor = `<span class="ct-pill ct-pill--gr ct-pill--corta" title="Más barato: ${esc(nom)}">Más barato:&nbsp;<b>${esc(nom)}</b></span>`;
+    }
   } catch (_) {}
   return `<span class="ct-pill ct-pill--ok">${icSvg('check')}Comparada</span>${mejor}`;
 }
@@ -90,7 +94,7 @@ function tarjeta(cot) {
     <span class="ct-sq${cerrada ? ' ct-sq--ok' : ''}">${icSvg(cerrada ? 'check' : 'layers')}</span>
     <span style="min-width:0;flex:1">
       <span class="ct-card-t">${esc(cot.titulo)}</span>
-      <span class="ct-sub" style="display:block">${esc(cot.obra)} · ${n} ${n === 1 ? 'presupuesto' : 'presupuestos'} · ${esc(cot.creadoPor?.nombre || '')} ${fmtFecha(cot.ts)}</span>
+      <span class="ct-sub" style="display:block">${esc(cot.obra)} · ${n} ${n === 1 ? 'presupuesto' : 'presupuestos'} · ${cot.creadoPor?.nombre ? esc(cot.creadoPor.nombre) + ' · ' : ''}${fmtFecha(cot.ts)}</span>
       <span class="ct-card-p">${pillsEstado(cot)}</span>
     </span>
   </button>`;

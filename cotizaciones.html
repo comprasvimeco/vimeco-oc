@@ -25,6 +25,8 @@
     .ct-pill--del  { background: #fde6e6; color: #b02a2a; }
     .ct-pill--vio  { background: #f1e8fb; color: #6b3fa0; }
     .ct-pill--gr   { background: var(--gray-100); color: var(--gray-600); }
+    .ct-pill--corta { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+    .ct-pill--corta b { font-weight: 700; color: var(--gray-800); }
     .ct-btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: none; border-radius: 999px; font: inherit; font-weight: 700; font-size: .84rem;
       padding: .5rem .95rem; cursor: pointer; white-space: nowrap; background: #e8eef7; color: #234870; }
     .ct-btn .icon { width: 15px; height: 15px; }
@@ -45,7 +47,7 @@
 
     /* Lista */
     .ct-lista { display: grid; gap: .55rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-    .ct-card { display: flex; gap: .7rem; align-items: flex-start; text-align: left; border: none; font: inherit; color: inherit; cursor: pointer; width: 100%; }
+    .ct-card { display: flex; gap: .7rem; align-items: flex-start; text-align: left; border: none; font: inherit; color: inherit; cursor: pointer; width: 100%; min-width: 0; }
     .ct-card:hover { box-shadow: 0 1px 2px rgba(26,58,92,.08), 0 8px 22px -10px rgba(26,58,92,.35); }
     .ct-sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; background: #e8eef7; color: #234870; }
     .ct-sq .icon { width: 19px; height: 19px; }
