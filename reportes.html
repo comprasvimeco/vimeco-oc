@@ -114,33 +114,53 @@
       padding: .55rem .75rem; font: inherit; font-size: .92rem; }
     .rx-inp:focus { outline: 2px solid var(--lila); outline-offset: 1px; }
     .rx-sel { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: .5rem .6rem; font: inherit; font-size: .88rem; }
-    table.rx-oc { width: 100%; border-collapse: collapse; font-size: .88rem; }
-    table.rx-oc th { text-align: left; font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); font-weight: 600;
-      padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; user-select: none; }
+    table.rx-oc { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .88rem; }
+    table.rx-oc th { text-align: left; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); font-weight: 600;
+      padding: 6px 12px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; user-select: none; }
     table.rx-oc th[data-sort] { cursor: pointer; }
     table.rx-oc th[data-sort]:hover { color: var(--ink); }
-    table.rx-oc td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink); }
+    table.rx-oc td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--ink); }
+    table.rx-oc tbody tr:last-child td { border-bottom: 0; }
     table.rx-oc tbody tr { cursor: pointer; }
-    table.rx-oc tbody tr:hover td { background: var(--sunk); }
+    table.rx-oc tbody tr:hover td, table.rx-oc tbody tr:focus-visible td { background: var(--sunk); }
+    table.rx-oc tbody tr:focus-visible { outline: none; }
+    table.rx-oc tbody tr:hover td:first-child, table.rx-oc tbody tr:focus-visible td:first-child { border-radius: 12px 0 0 12px; }
+    table.rx-oc tbody tr:hover td:last-child, table.rx-oc tbody tr:focus-visible td:last-child { border-radius: 0 12px 12px 0; }
     table.rx-oc .r { text-align: right; }
-    table.rx-oc .sub { color: var(--ink-2); font-size: .8rem; margin-top: 1px; }
-    table.rx-oc .nro { font-weight: 700; white-space: nowrap; }
+    table.rx-oc .c-cat { width: 36px; padding-right: 0; }
+    table.rx-oc .prov { font-weight: 650; }
+    table.rx-oc .sub { color: var(--ink-2); font-size: .79rem; margin-top: 2px; }
+    table.rx-oc .c-prov .sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    table.rx-oc .c-obra { max-width: 240px; }
+    table.rx-oc .c-resp { color: var(--ink-2); white-space: nowrap; }
+    table.rx-oc .c-nro { white-space: nowrap; }
+    table.rx-oc .fch { font-weight: 600; }
+    table.rx-oc .nro { font-variant-numeric: tabular-nums; letter-spacing: .01em; white-space: nowrap; }
+    table.rx-oc .c-imp b { font-weight: 750; white-space: nowrap; }
     table.rx-oc mark { background: var(--durazno-bg); color: inherit; border-radius: 3px; padding: 0 1px; }
+    /* Categoría de la obra: los mismos tonos que la pantalla Obras */
+    .rx-cat { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; }
+    .rx-cat .icon { width: 17px; height: 17px; }
+    .rx-cat--arquitectura { background: #fdf0dc; color: #8a5a0b; }
+    .rx-cat--vial         { background: #e8eefc; color: #2c4fa8; }
+    .rx-cat--oficina      { background: #efebfd; color: #5a45a8; }
+    .rx-cat--sin          { background: var(--gris-bg); color: var(--otros); }
     .rx-sort-tel { display: none; }
     @media (max-width: 760px) {
       .rx-sort-tel { display: block; }
       table.rx-oc thead { display: none; }
       table.rx-oc, table.rx-oc tbody { display: block; }
-      table.rx-oc tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px .75rem; padding: 10px 4px;
-        border-bottom: 1px solid var(--line); }
+      table.rx-oc tbody tr { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; column-gap: .7rem; row-gap: 1px;
+        padding: 12px 6px; border-bottom: 1px solid var(--line); border-radius: 0; }
+      table.rx-oc tbody tr:last-child { border-bottom: 0; }
       table.rx-oc td { display: block; padding: 0; border: 0; }
-      table.rx-oc td.c-prov { grid-column: 1; grid-row: 1; font-weight: 600; }
-      table.rx-oc td.c-imp  { grid-column: 2; grid-row: 1; }
-      table.rx-oc td.c-obra { grid-column: 1; grid-row: 2; }
-      table.rx-oc td.c-fac  { grid-column: 2; grid-row: 2; text-align: right; }
-      table.rx-oc td.c-nro  { grid-column: 1 / -1; grid-row: 3; color: var(--ink-2); font-size: .8rem; }
-      table.rx-oc td.c-nro .sub, table.rx-oc td.c-nro .nro { display: inline; font-weight: 600; }
-      table.rx-oc td.c-nro .sub::before { content: ' · '; }
+      table.rx-oc td.c-cat  { grid-column: 1; grid-row: 1 / span 3; align-self: start; width: auto; }
+      table.rx-oc td.c-prov { grid-column: 2; grid-row: 1; }
+      table.rx-oc td.c-imp  { grid-column: 3; grid-row: 1; }
+      table.rx-oc td.c-obra { grid-column: 2; grid-row: 2 / span 2; max-width: none; margin-top: 3px; font-size: .84rem; }
+      table.rx-oc td.c-nro  { display: contents; }
+      table.rx-oc td.c-nro .fch { grid-column: 3; grid-row: 2; text-align: right; margin-top: 3px; font-size: .8rem; color: var(--ink-2); font-weight: 600; }
+      table.rx-oc td.c-nro .nro { grid-column: 3; grid-row: 3; text-align: right; margin: 0; font-size: .74rem; }
       table.rx-oc td.c-resp { display: none; }
       table.rx-oc tbody tr:hover td { background: none; }
     }

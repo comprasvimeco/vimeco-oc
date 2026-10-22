@@ -29,7 +29,6 @@ let remitosPorOC = {};
 
 const $ = id => document.getElementById(id);
 const DIA = 864e5;
-const DIAS_FACTURA = 15;   // sin factura pasados estos días = a reclamar
 const MESES    = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const MESES_LG = ['enero','febrero','marzo','abril','mayo','junio','julio',
                   'agosto','septiembre','octubre','noviembre','diciembre'];
@@ -457,12 +456,15 @@ function filasLista() {
   return { terms, filas: ordenar(terms.length ? l.filter(oc => coincideOC(oc, terms)) : l) };
 }
 
-function facturaPill(oc) {
-  const f = estadoFacturaOC(oc);
-  if (f.estado === 'con')   return '<span class="rx-pill rx-ok">Con factura</span>';
-  if (f.estado === 'otros') return '<span class="rx-pill rx-off" title="Tiene archivos, pero ninguno cargado como factura">Sin rotular</span>';
-  const vencida = (oc.timestamp || 0) < Date.now() - DIAS_FACTURA * DIA;
-  return `<span class="rx-pill ${vencida ? 'rx-warn' : 'rx-off'}"${vencida ? ` title="Más de ${DIAS_FACTURA} días sin factura"` : ''}>Sin factura</span>`;
+// Categoría de la obra (la de obras.js): casita, ruta o maletín, con los tonos de Obras.
+const CAT_ICON = { arquitectura: 'building', vial: 'road', oficina: 'briefcase' };
+function catObra(oc) {
+  const c = oc.obra ? obraPorNombre(oc.obra)?.categoria : '';
+  return CAT_ICON[c] ? c : '';
+}
+function catTile(cat) {
+  const lbl = cat ? OBRA_CATS[cat].label : 'Sin categoría';
+  return `<span class="rx-cat rx-cat--${cat || 'sin'}" title="${esc(lbl)}" aria-label="${esc(lbl)}">${icSvg(CAT_ICON[cat] || 'box')}</span>`;
 }
 
 function renderTabla() {
@@ -479,15 +481,17 @@ function renderTabla() {
     const otros = (hits.length ? hits.length : items.length) - 1;
     const det = it ? hl(it.desc) + (otros > 0 ? ` <span>y ${otros} más</span>` : '') : '';
     const cur = oc.moneda === 'USD' ? 'USD' : 'ARS';
+    const cat = catObra(oc);
+    const sub = [cat && OBRA_CATS[cat].label, oc.rubro?.nombre || (oc.equipo?.codigo ? equipoLabel(oc.equipo) : '')].filter(Boolean);
     return `<tr data-oc="${esc(oc.nroOC)}" tabindex="0">
-      <td class="c-nro"><span class="nro">${hl(oc.nroOC)}</span><div class="sub">${dm(oc.timestamp)}</div></td>
-      <td class="c-prov">${hl(oc.proveedor?.nombre || 'Sin proveedor')}<div class="sub">${det}</div></td>
-      <td class="c-obra">${hl(obraLabel(obraKey(oc)))}<div class="sub">${oc.rubro?.nombre ? esc(oc.rubro.nombre) : oc.equipo?.codigo ? esc(equipoLabel(oc.equipo)) : ''}</div></td>
+      <td class="c-cat">${catTile(cat)}</td>
+      <td class="c-prov"><span class="prov">${hl(oc.proveedor?.nombre || 'Sin proveedor')}</span><div class="sub">${det}</div></td>
+      <td class="c-obra">${hl(obraLabel(obraKey(oc)))}<div class="sub">${sub.map(esc).join(' · ')}</div></td>
       <td class="c-resp">${hl(respLabel(oc))}</td>
-      <td class="c-fac">${facturaPill(oc)}</td>
+      <td class="c-nro"><span class="fch">${dm(oc.timestamp)}</span><div class="sub nro">${hl(oc.nroOC)}</div></td>
       <td class="c-imp r rx-num"><b>${esc(fmtFull(oc.total, cur))}</b></td></tr>`;
   }).join('');
-  box.innerHTML = `<table class="rx-oc"><thead><tr>${th('fecha', 'N° · Fecha')}${th('proveedor', 'Proveedor · Detalle')}${th('obra', esc('Obra') + ' · Rubro')}${th('resp', 'Responsable')}<th>Factura</th>${th('importe', 'Importe', 'r')}</tr></thead>
+  box.innerHTML = `<table class="rx-oc"><thead><tr><th class="c-cat" aria-label="Categoría"></th>${th('proveedor', 'Proveedor · Detalle')}${th('obra', esc('Obra') + ' · Rubro')}${th('resp', 'Responsable')}${th('fecha', 'Fecha · N°')}${th('importe', 'Importe', 'r')}</tr></thead>
     <tbody>${rows || `<tr><td colspan="6" class="rx-empty">${EX.q.trim() ? 'No hay OC que coincidan con la búsqueda.' : 'No hay compras en este período.'}</td></tr>`}</tbody></table>` +
     (filas.length > EX.ver ? `<div style="text-align:center;margin-top:.75rem"><button type="button" class="foc-btn foc-btn--sec" data-mas-oc="1">Ver ${Math.min(VER_PASO, filas.length - EX.ver)} más de ${filas.length - EX.ver}</button></div>` : '');
 }
