@@ -340,7 +340,8 @@
   // ---- Barra de letras (Por proveedor) ----
   // Es la barra de desplazamiento de la lista: el tirador marca lo que se ve,
   // cada letra está a la altura donde empieza su inicial (corridas lo justo
-  // para que no se pisen) y se resalta la de lo que está arriba de todo.
+  // para que no se pisen) y se resalta la de lo que está arriba de todo, o la
+  // de la carpeta abierta mientras se la vea.
   // Tocar una letra salta a ella; deslizar recorre la lista pasando por cada
   // letra justo cuando el dedo está encima.
 
@@ -359,7 +360,7 @@
       get: () => scrollY, set: v => scrollTo(0, v) };
   }
 
-  let abc = null;   // { el, sc, H, max, th, an: [{ l, b, a, y }], activa }
+  let abc = null;   // { el, sc, H, max, th, an: [{ l, b, a, y }], sel: { a, z, l }, vista, activa }
   function armarAbc() {
     const el = $('ar-c1').querySelector('.ar-abc');
     const ve = !!el && !$('ar-cols').classList.contains('hidden') && getComputedStyle($('ar-c1')).display !== 'none';
@@ -380,7 +381,9 @@
     for (let i = an.length - 1; i >= 0; i--) an[i].y = Math.min(an[i].y, i < an.length - 1 ? an[i + 1].y - paso : H - paso / 2);
     an.forEach(x => { x.b.style.top = (x.y - paso / 2) + 'px'; x.b.style.height = paso + 'px'; });
     el.querySelector('.ar-abc-th').style.height = th + 'px';
-    abc = { el, sc, H, max, th, an, activa: '' };
+    const fd = $('ar-c1').querySelector('.ar-fd[aria-current="true"]');
+    const sel = fd && fd.dataset.f !== 'Sin proveedor' ? { a: sc.pos(fd), z: sc.pos(fd) + fd.offsetHeight, l: letraDe(fd.dataset.f) } : null;
+    abc = { el, sc, H, max, th, an, sel, vista: sc.vista, activa: '' };
     seguirAbc();
   }
 
@@ -390,6 +393,8 @@
     abc.el.querySelector('.ar-abc-th').style.transform = `translateY(${Math.min(1, s / abc.max) * (abc.H - abc.th)}px)`;
     let act = abc.an[0];
     abc.an.forEach(x => { if (x.a <= s + 4) act = x; });
+    const v = abc.sel;
+    if (v && v.a >= s - 4 && v.z <= s + abc.vista + 4) act = abc.an.find(x => x.l === v.l) || act;
     if (act.l !== abc.activa) {
       abc.an.forEach(x => x.b.classList.toggle('on', x === act));
       abc.activa = act.l;
