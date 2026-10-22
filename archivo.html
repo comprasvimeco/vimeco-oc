@@ -266,6 +266,11 @@
     .ar-ent--parcial { --e-fg: #9A5B00; --e-bg: #FFF1D9; }
     .ar-ent--completa { --e-fg: var(--menta-fg); --e-bg: var(--menta-bg); }
     .ar-ent--sin { --e-fg: var(--rosa-fg); --e-bg: var(--rosa-bg); }
+    .ar-ent--cot { --e-fg: #24578A; --e-bg: #E2ECF8; }
+    a.ar-ent-xls { text-decoration: none; }
+    .ar-ent--cot .ar-ent-xls { color: #24578A; }
+    .ar-ent--cot .ar-ent-xls:hover { background: #E2ECF8; }
+    .ar-ent--cot + .ar-rows { margin-top: .4rem; }
     .ar-ent-ver { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .45rem .7rem; text-align: left; border: 0; background: var(--surface); box-shadow: var(--shadow-leva); border-left: 4px solid var(--e-fg); border-radius: 12px; padding: .65rem .8rem; font: inherit; color: var(--ink); cursor: pointer; }
     .ar-ent-ver:hover { background: var(--e-bg); }
     .ar-ent-tx b { display: block; font-size: .9rem; color: var(--e-fg); }
@@ -294,6 +299,8 @@
     .ar-tipo--factura { background: var(--fac-bg); color: var(--fac-fg); }
     .ar-tipo--remito { background: #D9F2F0; color: #19645E; }
     .ar-tipo--planilla { background: var(--menta-bg); color: var(--menta-fg); }
+    .ar-tipo--cotizado { background: #E2ECF8; color: #24578A; }
+    .ar-tipo--elegido { background: var(--menta-bg); color: var(--menta-fg); }
     .ar-falta { display: flex; align-items: center; gap: .7rem; width: calc(100% - 1rem); margin: .45rem .5rem; padding: .5rem .6rem; border: 1.5px dashed #C9CDF3; border-radius: 12px; background: transparent; font: inherit; font-size: .84rem; color: var(--ink-2); text-align: left; text-decoration: none; }
     button.ar-falta, a.ar-falta { cursor: pointer; }
     .ar-falta .icon { flex: none; width: 18px; height: 18px; color: var(--tono-2); margin: 0 .5rem 0 .45rem; }
@@ -328,6 +335,7 @@
     .vis-tipo--factura { background: #F3E6FB; color: #7A3A9E; }
     .vis-tipo--remito { background: #D9F2F0; color: #19645E; }
     .vis-tipo--planilla { background: #DDF5E8; color: #1D6B45; }
+    .vis-tipo--cotizado, .vis-tipo--informe { background: #E2ECF8; color: #24578A; }
     /* En el teléfono la pastilla y los botones van arriba y el nombre abajo, entero. */
     @media (max-width: 640px) {
       .vis-hd { flex-wrap: wrap; }
@@ -465,6 +473,8 @@
 <script src="js/drive.js"></script>
 <script src="js/entregas.js"></script>
 <script src="js/entregasPDF.js"></script>
+<script src="js/cotizacionCalc.js"></script>
+<script src="js/cotizacionPDF.js"></script>
 <script src="js/ocGenerator.js"></script>
 <script src="js/fichaOC.js"></script>
 <script src="js/scanner.js"></script>

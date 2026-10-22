@@ -57,6 +57,7 @@ const STATIC_ASSETS = [
   BASE + '/js/borradorArchivo.js',
   BASE + '/js/entregas.js',
   BASE + '/js/entregasPDF.js',
+  BASE + '/js/cotizacionPDF.js',
   BASE + '/js/icons.js',
   BASE + '/js/install.js',
   BASE + '/js/ui.js',

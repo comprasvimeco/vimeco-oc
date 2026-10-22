@@ -55,6 +55,8 @@ que no se puede atribuir va en «En la misma carpeta de Drive». El visor baja c
 En la OC abierta, «Cargar archivo» (o soltar un archivo encima, o los huecos «Falta …») abre una hoja para
 cargar ahí mismo factura, remito (N°, fecha y cantidades), presupuesto u otro: guarda igual que Facturas,
 Remitos y la autorización (`adjuntos`, `/remitos` + `entrega` + planillas, `fuenteUrl`), sin la cola offline.
+Si la OC salió de Cotizaciones (`cotizacionId`), abajo va «Cotización»: el informe de la comparativa en PDF
+(`js/cotizacionPDF.js`, armado al momento con `cuadroDeCotizacion` de `cotizacionCalc.js`) y los presupuestos comparados (el elegido marcado).
 
 `CAJAS` y `PERSONAL` originalmente vivían dentro de COMPRAS. Una migración única
 best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags

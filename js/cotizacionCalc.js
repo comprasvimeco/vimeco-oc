@@ -175,6 +175,22 @@ function armarCuadro(comparacion, lecturas, { tc = null, cantidades = {} } = {})
   return { pids, filas, justa, amplia: amplia && justa && amplia.filas.length === justa.filas.length ? null : amplia, faltan, totalDoc };
 }
 
+// El cuadro de una comparativa tal como se guarda en /cotizaciones/{id}: RTDB no
+// guarda nulls ni objetos vacíos, así que se rearma lo que armarCuadro espera.
+// Lo usan la pantalla de Cotizaciones y el informe en PDF (cotizacionPDF.js).
+function cuadroDeCotizacion(cot, { tc = null } = {}) {
+  const c = cot.comparacion;
+  const lecturas = c.pids.map(pid => cot.presupuestos[pid].lectura);
+  const comp = {
+    pids: c.pids,
+    presupuestos: c.presupuestos || {},
+    renglones: (c.renglones || []).map(r => ({ ...r, items: r.items || {} })),
+    avisos: c.avisos || []
+  };
+  lecturas.forEach(l => { l.items = l.items || []; });
+  return { comp, q: armarCuadro(comp, lecturas, { tc, cantidades: cot.cantidades || {} }) };
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { factorDescuento, unitarioNeto, normalizarComparacion, armarCuadro };
+  module.exports = { factorDescuento, unitarioNeto, normalizarComparacion, armarCuadro, cuadroDeCotizacion };
 }

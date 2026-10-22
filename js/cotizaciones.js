@@ -52,19 +52,7 @@ function estadoComparacion(cot) {
   return ids.length === c.pids.length ? 'ok' : 'vieja';
 }
 
-function cuadroDe(cot) {
-  const c = cot.comparacion;
-  const lecturas = c.pids.map(pid => cot.presupuestos[pid].lectura);
-  // RTDB no guarda nulls ni objetos vacíos: se rearma lo que el cálculo espera.
-  const comp = {
-    pids: c.pids,
-    presupuestos: c.presupuestos || {},
-    renglones: (c.renglones || []).map(r => ({ ...r, items: r.items || {} })),
-    avisos: c.avisos || []
-  };
-  lecturas.forEach(l => { l.items = l.items || []; });
-  return { comp, q: armarCuadro(comp, lecturas, { tc: S.tc, cantidades: cot.cantidades || {} }) };
-}
+const cuadroDe = cot => cuadroDeCotizacion(cot, { tc: S.tc });
 
 // ─── Lista ──────────────────────────────────────────────
 function pillsEstado(cot) {

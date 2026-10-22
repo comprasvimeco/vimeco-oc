@@ -25,7 +25,7 @@
   const $ = id => document.getElementById(id);
   const esc = s => escHtml(s == null ? '' : String(s));
 
-  const NOMBRE_TIPO = { oc: 'OC', presupuesto: 'Presupuesto', factura: 'Factura', remito: 'Remito', otro: 'Otro', planilla: 'Planilla' };
+  const NOMBRE_TIPO = { oc: 'OC', presupuesto: 'Presupuesto', factura: 'Factura', remito: 'Remito', otro: 'Otro', planilla: 'Planilla', cotizado: 'Cotizado' };
   // Lo que tiene que tener una OC, en el orden en que se muestra.
   const DOCS = [['oc', 'OC'], ['presupuesto', 'Presupuesto'], ['factura', 'Factura'], ['remito', 'Remito']];
   const DIMS = { mes: 'Por mes', obra: 'Por obra', prov: 'Por proveedor' };
@@ -158,6 +158,7 @@
           fileId: d.fileId || null, folderId: d.folderId || null, sinArchivo: !tiene });
       });
       if (_carpetas.has(o.folder) && _carpetas.get(o.folder).files) completarDocs(o, _carpetas.get(o.folder).files);
+      docsCotizacion(o);
       ocs.set(o.id, o);
     });
     // Con la carpeta ya listada, se reparten los archivos sin dueño.
@@ -262,6 +263,98 @@
     if (v === 'mes') out.sort((a, b) => b[0].localeCompare(a[0]));
     else out.sort((a, b) => (a[0].startsWith('Sin ') - b[0].startsWith('Sin ')) || a[0].localeCompare(b[0], 'es'));
     return out;
+  }
+
+  // ---- La comparativa de la que salió la OC (Cotizaciones) ----
+  // La OC guarda `cotizacionId`; la comparativa se pide al abrir la OC y queda
+  // en memoria. Sus presupuestos van aparte de los archivos de la OC (no son
+  // «el presupuesto» ni cuentan como faltantes) y el informe se arma en PDF.
+
+  const _cots = new Map();   // id → { listo, data, error }
+  function pedirCotizacion(id) {
+    if (_cots.has(id)) return;
+    const c = { listo: false, data: null, error: false };
+    _cots.set(id, c);
+    getCotizacion(id)
+      .then(d => { c.data = d; }, e => { console.warn('getCotizacion:', e); c.error = true; })
+      .finally(() => { c.listo = true; armar(); pintar(true); });
+  }
+
+  // Sin el código de proveedor del principio («2448 CARIGNANI…»), como en Cotizaciones.
+  const nombreCotizado = p => String((p.lectura && p.lectura.proveedor) || p.nombre || 'Presupuesto').replace(/^\d+\s*[-–]?\s+/, '');
+
+  function docsCotizacion(o) {
+    o.cotDocs = [];
+    const c = o.h.cotizacionId && _cots.get(o.h.cotizacionId);
+    o.cot = (c && c.data) || null;
+    if (!o.cot) return;
+    const cot = o.cot;
+    const elegido = cot.oc && cot.oc.nroOC === o.nro ? cot.oc.pid : null;
+    Object.entries(cot.presupuestos || {})
+      .sort((a, b) => (a[1].ts || 0) - (b[1].ts || 0))
+      .forEach(([pid, p]) => {
+        if (!p || !p.fileId) return;
+        const total = p.lectura && p.lectura.total_documento;
+        const d = { id: 'cot_' + pid, fileId: p.fileId, ocId: o.id, tipo: 'cotizado', nombre: nombreCotizado(p),
+          etiqueta: pid === elegido ? 'Elegido' : 'Cotizado', mime: p.mime, size: p.size, ts: p.ts,
+          detalle: total ? '$ ' + Number(total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' };
+        o.cotDocs.push(d);
+        docsReg.set(d.id, d);
+      });
+    // El elegido, primero.
+    o.cotDocs.sort((a, b) => (b.etiqueta === 'Elegido') - (a.etiqueta === 'Elegido'));
+  }
+
+  // El cuadro, si se puede armar: hace falta que sigan todos los presupuestos comparados.
+  function cuadroArmable(cot) {
+    const c = cot.comparacion;
+    if (!c || !Array.isArray(c.pids) || c.pids.length < 2) return null;
+    if (c.pids.some(pid => !(cot.presupuestos && cot.presupuestos[pid] && cot.presupuestos[pid].lectura))) return null;
+    try { return cuadroDeCotizacion(cot).q; } catch (e) { console.warn('cuadroDeCotizacion:', e); return null; }
+  }
+
+  function cotizacionOC(o) {
+    const id = o.h.cotizacionId;
+    if (!id) return '';
+    pedirCotizacion(id);
+    const c = _cots.get(id);
+    const lbl = t => `<div class="ar-lbl">Cotización<i>${esc(t)}</i></div>`;
+    if (!c.listo) return lbl('') + `<div class="ar-falta ar-falta--info">${icSvg('search')}Buscando la comparativa…</div>`;
+    if (!o.cot) return lbl('') + `<div class="ar-falta ar-falta--info">${icSvg('info')}${c.error
+      ? 'No se pudo traer la comparativa de la que salió esta OC.' : 'La comparativa de la que salió esta OC se borró de Cotizaciones.'}</div>`;
+    const cot = o.cot;
+    const q = cuadroArmable(cot);
+    let tarjeta = '';
+    if (q) {
+      const cta = q.justa || q.amplia;
+      const sub = [plural(q.pids.length, 'presupuesto comparado', 'presupuestos comparados'),
+        cta && cta.mejor ? 'más barato: ' + nombreCotizado(cot.presupuestos[cta.mejor]) : '',
+        cot.comparacion.ts ? 'el ' + fecha(cot.comparacion.ts) : ''].filter(Boolean).join(' · ');
+      // «Abrir» lleva a Cotizaciones, que por ahora es sólo para 0000.
+      tarjeta = `<div class="ar-ent ar-ent--cot">
+        <button type="button" class="ar-ent-ver" data-cot-pdf title="Ver el informe de la comparativa en PDF">
+          <span class="ar-ent-tx"><b>Informe de la comparativa</b><small>${esc(sub)}</small></span>
+          <span class="ar-ent-cta">${icSvg('eye')}Ver</span>
+        </button>
+        ${codigo === '0000' ? `<a class="ar-ent-xls" href="cotizaciones.html?c=${encodeURIComponent(cot.id)}" title="Abrir en Cotizaciones">${icSvg('layers')}Abrir</a>` : ''}
+      </div>`;
+    }
+    const filas = o.cotDocs.length ? `<div class="ar-rows">${o.cotDocs.map(a => itemHtml(a)).join('')}</div>` : '';
+    return lbl([cot.titulo, plural(o.cotDocs.length, 'presupuesto', 'presupuestos')].filter(Boolean).join(' · ')) + tarjeta + filas;
+  }
+
+  // El informe se arma al momento con lo guardado (no está en Drive). Lo cotizado
+  // en dólares se pasa con el oficial guardado en la OC.
+  function verCotizacion() {
+    const o = st.oc && ocs.get(st.oc);
+    if (!o || !o.cot) return;
+    const nombre = nombreCotizacionPdf(o.cot);
+    const r = o.h.cotizacion && o.h.cotizacion.oficial;
+    const tc = (r && (r.venta || r.compra)) || null;
+    abrirArchivo({
+      tipo: 'informe', nombre,
+      generar: async () => ({ blob: await cotizacionPdf(o.cot, { nroOC: o.nro, tc }), nombre, mime: 'application/pdf' })
+    });
   }
 
   // ---- Navegación ----
@@ -505,12 +598,12 @@
   function itemHtml(a, conOC, asignable) {
     const [cls, lbl] = tile(a);
     const o = conOC && ocs.get(a.ocId);
-    const meta = [o ? 'OC ' + o.nro : '', fecha(a.ts), a.size ? fmtPeso(a.size) : '', a.por].filter(Boolean).join(' · ');
+    const meta = [o ? 'OC ' + o.nro : '', a.detalle, fecha(a.ts), a.size ? fmtPeso(a.size) : '', a.por].filter(Boolean).join(' · ');
     return `<div class="ar-item">
       <button type="button" class="ar-open" data-id="${esc(a.id)}" ${a.sinArchivo ? 'disabled title="Se cargó sin archivo"' : ''}>
         <span class="ar-tile ar-tile--${cls}">${esc(a.sinArchivo ? '—' : lbl)}</span>
         <span class="ar-r-tx"><b>${esc(a.nombre)}</b>
-          <small><span class="ar-tipo ar-tipo--${esc(a.tipo)}">${esc(NOMBRE_TIPO[a.tipo] || 'Otro')}</span>${esc(a.sinArchivo ? 'sin archivo' : meta)}</small></span>
+          <small><span class="ar-tipo ar-tipo--${esc(a.etiqueta === 'Elegido' ? 'elegido' : a.tipo)}">${esc(a.etiqueta || NOMBRE_TIPO[a.tipo] || 'Otro')}</span>${esc(a.sinArchivo ? 'sin archivo' : meta)}</small></span>
       </button>
       ${asignable ? `<button type="button" class="ar-asig" data-asignar="${esc(a.id)}">Es de esta OC</button>` : ''}
     </div>`;
@@ -625,7 +718,7 @@
           ${o.folder ? `<a class="ar-act" href="https://drive.google.com/drive/folders/${esc(o.folder)}" target="_blank" rel="noopener">${icSvg('drive')}Carpeta en Drive</a>` : ''}</div></div>
       <div class="ar-lbl">${plural(nArch, 'archivo', 'archivos')}<i>${peso ? fmtPeso(peso) : ''}</i></div>
       <div class="ar-rows">${h}</div>
-      ${entregaOC(o)}${ext}
+      ${entregaOC(o)}${cotizacionOC(o)}${ext}
       ${c && c.error ? `<p class="ar-nota">No se pudo mirar la carpeta en Drive: el PDF y el presupuesto pueden estar y no figurar.</p>` : ''}`;
   }
 
@@ -1284,12 +1377,14 @@
   let _abierto = null;
 
   // La pastilla grande del visor: qué es el archivo.
-  const TIPO_VISOR = { oc: 'Orden de Compra', presupuesto: 'Presupuesto', factura: 'Factura', remito: 'Remito', planilla: 'Planilla', otro: 'Otro archivo' };
-  // Los archivos de la OC que se recorren con las flechas, en el orden de nivel3.
+  const TIPO_VISOR = { oc: 'Orden de Compra', presupuesto: 'Presupuesto', factura: 'Factura', remito: 'Remito', planilla: 'Planilla', otro: 'Otro archivo',
+    cotizado: 'Presupuesto cotizado', informe: 'Comparativa' };
+  // Los archivos de la OC que se recorren con las flechas, en el orden de nivel3
+  // (al final, los presupuestos de la comparativa).
   function navegables(o) {
     const ver = a => !a.noEsta && !a.sinArchivo;
     return [...DOCS.flatMap(([t]) => o.docs.filter(a => a.tipo === t && ver(a))),
-      ...o.docs.filter(a => ver(a) && !DOCS.some(([t]) => t === a.tipo))];
+      ...o.docs.filter(a => ver(a) && !DOCS.some(([t]) => t === a.tipo)), ...(o.cotDocs || [])];
   }
 
   async function abrirArchivo(d) {
@@ -1510,6 +1605,7 @@
       else if (d.ficha) abrirFicha();
       else if (d.subir) abrirCarga(d.subir === 'elegir' ? '' : d.subir);
       else if (d.ent) verEntrega(d.ent);
+      else if ('cotPdf' in d) verCotizacion();
       else if (d.asignar) asignar(d.asignar);
       else if (t.id === 'ar-mas') { limite += PAGINA; pintar(); }
     });
