@@ -1,8 +1,9 @@
 /* VIMECO S.A. — Barra de letras: hace de barra de desplazamiento de una lista en
    orden alfabético (la misma de Archivo, Por proveedor). El tirador marca lo que
    se ve, cada letra va a la altura donde empieza su inicial (corridas lo justo
-   para que no se pisen) y se resalta la de lo que está arriba de todo. Tocar una
-   letra salta a ella; arrastrar recorre la lista de forma continua con una
+   para que no se pisen) y se resalta la de lo que está arriba de todo, o la del
+   renglón elegido (`elegido`, un selector dentro de `caja`) mientras se lo vea.
+   Tocar una letra salta a ella; arrastrar recorre la lista de forma continua con una
    burbuja grande con la letra.
    En la compu se desplaza `caja` (la lista, con su propio scroll); en el
    teléfono, la página, y la barra va fija al borde de la pantalla. */
@@ -15,8 +16,8 @@ function letraDe(s) {
 // Las barras visibles en el teléfono esconden la barra nativa de la página.
 const _barrasEnPagina = new Set();
 
-function barraLetras(nav, { caja, ancho, margenTel = 72 }) {
-  let m = null;                 // { sc, H, max, th, an: [{ l, b, a, y }], activa }
+function barraLetras(nav, { caja, ancho, margenTel = 72, elegido = '' }) {
+  let m = null;                 // { sc, H, max, th, an: [{ l, b, a, p, y }], activa }
   let destino = () => null;     // letra → primer renglón con esa inicial
 
   const desplazador = () => ancho.matches
@@ -52,8 +53,8 @@ function barraLetras(nav, { caja, ancho, margenTel = 72 }) {
     const paso = Math.min(17, H / bs.length);
     const an = bs.map(b => {
       const el = destino(b.dataset.letra);
-      const a = el ? Math.max(0, Math.min(max, sc.pos(el))) : 0;
-      return { l: b.dataset.letra, b, a, y: th / 2 + a / max * (H - th) };
+      const p = el ? sc.pos(el) : 0, a = Math.max(0, Math.min(max, p));
+      return { l: b.dataset.letra, b, a, p, y: th / 2 + a / max * (H - th) };
     });
     an.forEach((x, i) => { x.y = Math.max(x.y, paso / 2, i ? an[i - 1].y + paso : 0); });
     for (let i = an.length - 1; i >= 0; i--) an[i].y = Math.min(an[i].y, i < an.length - 1 ? an[i + 1].y - paso : H - paso / 2);
@@ -69,6 +70,12 @@ function barraLetras(nav, { caja, ancho, margenTel = 72 }) {
     nav.querySelector('.abc-th').style.transform = `translateY(${Math.min(1, s / m.max) * (m.H - m.th)}px)`;
     let act = m.an[0];
     m.an.forEach(x => { if (x.a <= s + 4) act = x; });
+    // La lista va en orden: la letra del elegido es la última que empieza antes que él.
+    const el = elegido && caja.querySelector(elegido);
+    if (el) {
+      const p = m.sc.pos(el);
+      if (p >= s - 4 && p + el.offsetHeight <= s + m.sc.vista + 4) act = m.an.filter(x => x.p <= p + 1).pop() || act;
+    }
     if (act.l !== m.activa) {
       m.an.forEach(x => x.b.classList.toggle('on', x === act));
       m.activa = act.l;

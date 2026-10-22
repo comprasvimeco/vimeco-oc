@@ -786,8 +786,8 @@ function elegirPestana(art) {
 // ─── Arranque ───────────────────────────────────────────
 // Las barras de letras de las dos listas (en la compu, la lista se desplaza por dentro).
 const anchoCompu = window.matchMedia('(min-width: 1000px)');
-const barraProv = barraLetras($('abc-prov'), { caja: $('lista'), ancho: anchoCompu });
-const barraArt = barraLetras($('abc-art'), { caja: $('art-lista'), ancho: anchoCompu });
+const barraProv = barraLetras($('abc-prov'), { caja: $('lista'), ancho: anchoCompu, elegido: '.pv-row.on' });
+const barraArt = barraLetras($('abc-art'), { caja: $('art-lista'), ancho: anchoCompu, elegido: '.pv-row--art.on' });
 
 function enlazar() {
   document.querySelectorAll('[data-ic]').forEach(el => { el.outerHTML = icSvg(el.dataset.ic); });
