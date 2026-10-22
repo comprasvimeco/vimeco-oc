@@ -13,7 +13,7 @@
        sólo dentro de la página (el header sigue siendo el de VIMECO). */
     @font-face { font-family: 'Geist'; src: url('assets/fonts/geist.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
     @font-face { font-family: 'Plus Jakarta Sans'; src: url('assets/fonts/plus-jakarta-sans.woff2') format('woff2'); font-weight: 200 800; font-style: normal; font-display: swap; }
-    .ar-page {
+    .ar-page, .ac-ov {
       --surface: #FFFFFF; --sunk: #F3F0FD; --ink: #231C4A; --ink-2: #6B658F; --line: #E8E4F7;
       --menta-bg: #DDF5E8; --menta-fg: #1D6B45; --durazno-bg: #FFE7D6; --durazno-fg: #9A4A16;
       --rosa-bg: #FBE1E6; --rosa-fg: #A0283E; --fac-bg: #F3E6FB; --fac-fg: #7A3A9E;
@@ -157,6 +157,109 @@
     .ar-acts { display: flex; gap: .45rem; flex-wrap: wrap; margin-top: .7rem; }
     .ar-act { display: inline-flex; align-items: center; gap: .35rem; border: 0; background: var(--surface); box-shadow: var(--shadow-leva); color: var(--tono); font: inherit; font-size: .8rem; font-weight: 600; padding: .5rem .8rem; border-radius: 10px; cursor: pointer; text-decoration: none; }
     .ar-act .icon { width: 15px; height: 15px; }
+
+    .ar-act--pri { background: var(--tono); color: #fff; }
+    .ar-act--pri:hover { background: var(--tono-2); }
+
+    /* Soltar un archivo sobre la OC abierta (en la compu) */
+    .ar-col.ar-soltar { position: relative; }
+    .ar-col.ar-soltar::after { content: 'Soltalo para cargarlo en esta OC'; position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; border: 2.5px dashed var(--tono-2); border-radius: 18px; background: rgba(227,229,252,.9); color: var(--tono); font-weight: 700; font-size: 1rem; pointer-events: none; }
+
+    /* Hoja para cargar factura, remito, presupuesto u otro en la OC abierta.
+       En el teléfono sube desde abajo; en la compu va centrada. */
+    body.ac-abierta { overflow: hidden; }
+    .ac-ov { position: fixed; inset: 0; z-index: 900; background: rgba(35,28,74,.42); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: flex; align-items: flex-end; justify-content: center; font-family: var(--font-texto); color: var(--ink); animation: visIn .18s ease-out; }
+    .ac-sheet { width: 100%; max-width: 600px; max-height: 94dvh; background: #F7F6FD; border-radius: 22px 22px 0 0; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 -10px 40px rgba(35,28,74,.25); animation: acSube .26s cubic-bezier(.2,.9,.3,1.1) both; }
+    .ac-sheet:focus { outline: none; }
+    @keyframes acSube { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
+    @media (min-width: 640px) {
+      .ac-ov { align-items: center; padding: 1.5rem; }
+      .ac-sheet { border-radius: 22px; max-height: calc(100dvh - 3rem); box-shadow: 0 20px 60px rgba(35,28,74,.3); }
+    }
+    .ac-hd { display: flex; align-items: flex-start; gap: .7rem; padding: 1rem 1rem .85rem 1.15rem; background: var(--surface); border-bottom: 1px solid var(--line); flex: none; }
+    .ac-hd-t { flex: 1; min-width: 0; }
+    .ac-hd-t b { display: block; font-family: var(--font-display); font-weight: 800; font-size: 1.15rem; letter-spacing: -.015em; line-height: 1.25; }
+    .ac-hd-t small { display: block; font-size: .8rem; color: var(--ink-2); margin-top: .1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ac-x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 11px; background: var(--sunk); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; padding: 0; }
+    .ac-x .icon { width: 18px; height: 18px; }
+    .ac-body { flex: 1; min-height: 0; overflow-y: auto; padding: .8rem 1rem 1.1rem; display: flex; flex-direction: column; gap: .55rem; }
+    .ac-lbl { display: flex; align-items: center; gap: .5rem; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); margin-top: .4rem; }
+    .ac-lbl:first-child { margin-top: 0; }
+
+    .ac-tipos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; }
+    @media (max-width: 420px) { .ac-tipos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .ac-tipo { --t-bg: var(--sunk); --t-fg: var(--ink); display: flex; flex-direction: column; align-items: center; gap: .1rem; padding: .7rem .3rem .6rem; border: 2px solid transparent; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-leva); font: inherit; color: var(--ink); cursor: pointer; text-align: center; transition: background .15s, border-color .15s, transform .1s; }
+    .ac-tipo .icon { width: 22px; height: 22px; color: var(--t-fg); margin-bottom: .2rem; }
+    .ac-tipo b { font-size: .86rem; font-weight: 700; }
+    .ac-tipo small { font-size: .68rem; color: var(--ink-2); }
+    .ac-tipo small.is-falta { color: var(--rosa-fg); font-weight: 600; }
+    .ac-tipo:active:not(:disabled) { transform: scale(.97); }
+    .ac-tipo[aria-pressed="true"] { background: var(--t-bg); border-color: var(--t-fg); color: var(--t-fg); }
+    .ac-tipo[aria-pressed="true"] small { color: var(--t-fg); }
+    .ac-tipo:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+    .ac-tipo--factura { --t-bg: var(--fac-bg); --t-fg: var(--fac-fg); }
+    .ac-tipo--remito { --t-bg: #D9F2F0; --t-fg: #19645E; }
+    .ac-tipo--presupuesto { --t-bg: var(--durazno-bg); --t-fg: var(--durazno-fg); }
+    .ac-tipo--otro { --t-bg: var(--tono-soft); --t-fg: var(--tono); }
+
+    .ac-aviso { display: flex; gap: .5rem; align-items: flex-start; margin: 0; font-size: .8rem; line-height: 1.4; padding: .55rem .7rem; border-radius: 11px; background: #FFF1D9; color: #8A4F0D; }
+    .ac-aviso .icon { width: 15px; height: 15px; flex: none; margin-top: 2px; }
+
+    .ac-drop { border: 2px dashed #C9CDF3; border-radius: 16px; background: var(--surface); padding: 1.2rem 1rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: .2rem; transition: background .15s, border-color .15s; }
+    .ac-ov.drag-over .ac-drop, .ac-ov.drag-over .ac-file { background: var(--tono-soft); border-color: var(--tono-2); box-shadow: 0 0 0 2.5px var(--tono-2); }
+    .ac-drop-ic { width: 46px; height: 46px; border-radius: 14px; background: var(--tono-soft); color: var(--tono); display: grid; place-items: center; margin-bottom: .35rem; }
+    .ac-drop-ic .icon { width: 22px; height: 22px; }
+    .ac-drop b { font-size: .92rem; }
+    .ac-drop small { font-size: .76rem; color: var(--ink-2); }
+    .ac-drop-btns { display: flex; gap: .45rem; margin-top: .7rem; flex-wrap: wrap; justify-content: center; }
+    .ac-btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: .86rem; font-weight: 600; padding: .6rem 1rem; border-radius: 12px; cursor: pointer; white-space: nowrap; }
+    .ac-btn .icon { width: 16px; height: 16px; }
+    .ac-btn--tono, .ac-btn--ok { background: var(--tono); border-color: var(--tono); color: #fff; }
+    .ac-btn--ok .spinner { width: 15px; height: 15px; border-width: 2px; }
+    .ac-btn:disabled { opacity: .5; cursor: default; }
+    .ac-file { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-leva); overflow: hidden; }
+    .ac-prev { display: block; width: 100%; max-height: 260px; object-fit: contain; background: #EEEBFA; }
+    .ac-file-r { display: flex; align-items: center; gap: .7rem; padding: .6rem .7rem .6rem .8rem; }
+    .ac-file-n { flex: 1; min-width: 0; }
+    .ac-file-n b { display: block; font-size: .86rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ac-file-n small { font-size: .74rem; color: var(--ink-2); }
+    .ac-mini { flex: none; border: 0; background: var(--tono-soft); color: var(--tono); font: inherit; font-size: .76rem; font-weight: 700; padding: .4rem .7rem; border-radius: 9px; cursor: pointer; }
+
+    #ac-rem { display: flex; flex-direction: column; gap: .55rem; }
+    .ac-f2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: .5rem; }
+    .ac-fld { display: block; min-width: 0; }
+    .ac-fld > span { display: block; font-size: .74rem; font-weight: 600; color: var(--ink-2); margin-bottom: .25rem; }
+    .ac-fld i { font-style: normal; font-weight: 400; }
+    .ac-in { width: 100%; box-sizing: border-box; border: 1.5px solid var(--line); background: var(--surface); border-radius: 11px; padding: .6rem .7rem; font: inherit; font-size: .92rem; color: var(--ink); outline: 0; min-height: 44px; }
+    .ac-in:focus { border-color: var(--tono-2); box-shadow: 0 0 0 4px rgba(59,68,168,.12); }
+    .ac-seg { margin-left: auto; display: inline-flex; background: var(--sunk); border-radius: 999px; padding: 3px; text-transform: none; letter-spacing: 0; }
+    .ac-seg button { border: 0; background: transparent; border-radius: 999px; padding: .25rem .7rem; font: inherit; font-size: .74rem; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+    .ac-seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-leva); }
+    .ac-its { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-leva); padding: .1rem .8rem; }
+    .ac-it { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .6rem; align-items: center; padding: .6rem 0; border-top: 1px solid var(--line); }
+    .ac-it:first-child { border-top: 0; }
+    .ac-it-d { font-size: .85rem; font-weight: 600; line-height: 1.3; }
+    .ac-it-m { font-size: .72rem; color: var(--ink-2); display: flex; gap: .45rem; flex-wrap: wrap; align-items: center; font-variant-numeric: tabular-nums; }
+    .ac-it-m b { color: var(--ink); }
+    .ac-it-q { grid-row: 1 / span 2; grid-column: 2; display: flex; align-items: center; gap: .25rem; }
+    .ac-stp { width: 30px; height: 30px; border-radius: 9px; border: 0; background: var(--sunk); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; padding: 0; }
+    .ac-stp .icon { width: 14px; height: 14px; }
+    .ac-qv { width: 64px; text-align: center; border: 1.5px solid var(--line); border-radius: 9px; padding: .35rem .3rem; font: inherit; font-size: .9rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; outline: 0; background: var(--surface); }
+    .ac-qv:focus { border-color: var(--tono-2); }
+    .ac-qv.is-cero { color: var(--ink-2); font-weight: 500; }
+    .ac-mk { font-weight: 700; border-radius: 6px; padding: 0 .4rem; }
+    .ac-mk--ok { background: var(--menta-bg); color: var(--menta-fg); }
+    .ac-mk--par, .ac-mk--mas { background: #FFF1D9; color: #8A4F0D; }
+    .ac-mk--no { background: var(--rosa-bg); color: var(--rosa-fg); }
+    .ac-mk--done { background: var(--sunk); color: var(--ink-2); }
+
+    .ac-ft { display: flex; align-items: center; gap: .5rem .7rem; padding: .75rem 1rem; padding-bottom: max(.75rem, env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); flex-wrap: wrap; flex: none; }
+    .ac-st { flex: 1 1 180px; min-width: 0; display: flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 700; line-height: 1.3; }
+    .ac-st::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+    .ac-st--ok { color: var(--menta-fg); }
+    .ac-st--parcial { color: #9A5B00; }
+    .ac-st--falta { color: var(--ink-2); }
+    .ac-ft-b { display: flex; gap: .45rem; margin-left: auto; }
 
     /* Tarjeta de entrega: qué llegó y qué falta. Abre el PDF; al lado, el Excel. */
     .ar-ent { --e-fg: #6B658F; --e-bg: var(--sunk); display: flex; gap: .45rem; margin: 0 0 .4rem; }
@@ -304,7 +407,6 @@
     <div id="ar-res" class="hidden"></div>
   </div>
   <div id="ar-estado" class="ar-vacio">Cargando…</div>
-  <input type="file" id="ar-file" class="hidden" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx">
 </main>
 
 <!-- ===== MODAL: Ficha de la OC (la misma que el Historial; acá sin PDF) ===== -->
@@ -326,6 +428,33 @@
   </div>
 </div>
 
+<!-- ===== Hoja: cargar factura, remito, presupuesto u otro en la OC abierta ===== -->
+<div class="ac-ov hidden" id="ar-carga" role="dialog" aria-modal="true" aria-labelledby="ac-t">
+  <div class="ac-sheet" tabindex="-1">
+    <div class="ac-hd">
+      <div class="ac-hd-t"><b id="ac-t">Cargar en la OC</b><small id="ac-sub"></small></div>
+      <button type="button" class="ac-x" id="ac-x" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="ac-body">
+      <div class="ac-lbl">Qué es</div>
+      <div class="ac-tipos" id="ac-tipos"></div>
+      <p class="ac-aviso hidden" id="ac-aviso"></p>
+      <div class="ac-lbl">Archivo</div>
+      <div id="ac-arch"></div>
+      <div id="ac-rem" class="hidden"></div>
+    </div>
+    <div class="ac-ft">
+      <span class="ac-st" id="ac-st"></span>
+      <div class="ac-ft-b">
+        <button type="button" class="ac-btn" id="ac-cancel">Cancelar</button>
+        <button type="button" class="ac-btn ac-btn--ok" id="ac-ok">Guardar</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="ac-file" class="hidden" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx">
+  <input type="file" id="ac-cam" class="hidden" accept="image/*" capture="environment">
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <script src="js/icons.js"></script>
@@ -338,6 +467,7 @@
 <script src="js/entregasPDF.js"></script>
 <script src="js/ocGenerator.js"></script>
 <script src="js/fichaOC.js"></script>
+<script src="js/scanner.js"></script>
 <script src="js/archivo.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

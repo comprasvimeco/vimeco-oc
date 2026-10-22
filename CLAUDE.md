@@ -52,6 +52,9 @@ de Leva. No tiene índice propio: se arma con `/historial` (carpetas, `fuenteUrl
 `/remitos` (`drive`), y lista en Drive sólo la carpeta de OBRAS de las OC que se ven (para encontrar
 el PDF `OC_{nro}_…` y el presupuesto). Esa carpeta la comparten las OC del mismo proveedor y día: lo
 que no se puede atribuir va en «En la misma carpeta de Drive». El visor baja con `bajarDriveArchivo`.
+En la OC abierta, «Cargar archivo» (o soltar un archivo encima, o los huecos «Falta …») abre una hoja para
+cargar ahí mismo factura, remito (N°, fecha y cantidades), presupuesto u otro: guarda igual que Facturas,
+Remitos y la autorización (`adjuntos`, `/remitos` + `entrega` + planillas, `fuenteUrl`), sin la cola offline.
 
 `CAJAS` y `PERSONAL` originalmente vivían dentro de COMPRAS. Una migración única
 best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags

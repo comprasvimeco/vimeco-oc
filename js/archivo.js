@@ -604,7 +604,7 @@
         ? `<button type="button" class="ar-falta" data-subir="presupuesto">${icSvg('plus')}Sin presupuesto<b>Subir</b></button>`
         : `<div class="ar-falta ar-falta--info">${icSvg('search')}Buscando el presupuesto en Drive…</div>`;
       else if (!CERRADA.includes(o.estado))
-        h += `<a class="ar-falta" href="${t === 'factura' ? 'facturas.html' : 'remitos.html'}">${icSvg('plus')}Falta ${n.toLowerCase()}<b>Cargar en ${t === 'factura' ? 'Facturas' : 'Remitos'}</b></a>`;
+        h += `<button type="button" class="ar-falta" data-subir="${t}">${icSvg('plus')}Falta ${n.toLowerCase()}<b>Cargar</b></button>`;
     });
     h += o.docs.filter(a => !a.noEsta && !DOCS.some(([t]) => t === a.tipo)).map(a => itemHtml(a)).join('');
     // Lo de la carpeta compartida que no se sabe de qué OC es: plegado y fuera
@@ -621,7 +621,7 @@
         <p><b>${esc(o.prov || 'Sin proveedor')}</b> · ${esc(o.obra || 'Sin obra')}</p>
         <p>${esc(extra)}</p>
         <div class="ar-acts"><button type="button" class="ar-act" data-ficha="1">${icSvg('eye')}Ver ficha</button>
-          <button type="button" class="ar-act" data-subir="otro">${icSvg('plus')}Agregar archivo</button>
+          <button type="button" class="ar-act ar-act--pri" data-subir="elegir">${icSvg('plus')}Cargar archivo</button>
           ${o.folder ? `<a class="ar-act" href="https://drive.google.com/drive/folders/${esc(o.folder)}" target="_blank" rel="noopener">${icSvg('drive')}Carpeta en Drive</a>` : ''}</div></div>
       <div class="ar-lbl">${plural(nArch, 'archivo', 'archivos')}<i>${peso ? fmtPeso(peso) : ''}</i></div>
       <div class="ar-rows">${h}</div>
@@ -723,51 +723,342 @@
     toast('Listo: el archivo quedó en la OC ' + o.nro + '.', 'success');
   }
 
-  // El presupuesto (queda anotado en la OC como `fuenteUrl`, igual que al pedir
-  // autorización) u otro archivo (queda en `adjuntos`, igual que en Facturas).
-  // Facturas y remitos se cargan en sus pantallas, que además guardan los datos
-  // del comprobante.
+  // ---- Cargar en la OC abierta ----
+  // Factura, remito, presupuesto u otro archivo sin salir de Archivo: la OC ya
+  // está elegida. Cada cosa queda donde la deja su pantalla, así el resto de la
+  // app la ve igual:
+  //   factura     → `adjuntos` con tipo factura (como Facturas)
+  //   remito      → `/remitos` con N°, fecha y cantidades (como Remitos), más el
+  //                 resumen de entrega en la OC y las planillas de Drive
+  //   presupuesto → `fuenteUrl` (como al pedir autorización)
+  //   otro        → `adjuntos` (como Facturas)
+  // Remitos tiene además la cola sin conexión y la lectura con IA, porque se
+  // carga en obra; acá, si algo falla, la hoja queda abierta para reintentar.
 
-  let _subiendo = null;
-  function elegirArchivo(tipo) {
-    if (!ocs.has(st.oc)) return;
-    _subiendo = { tipo, oc: st.oc };
-    $('ar-file').value = '';
-    $('ar-file').click();
+  const CARGA = {
+    factura: { n: 'Factura', ic: 'file', btn: 'Guardar factura' },
+    remito: { n: 'Remito', ic: 'truck', btn: 'Guardar remito' },
+    presupuesto: { n: 'Presupuesto', ic: 'calc', btn: 'Guardar presupuesto' },
+    otro: { n: 'Otro', ic: 'clip', btn: 'Guardar archivo' }
+  };
+  const tactil = window.matchMedia('(pointer: coarse)');
+  let carga = null;       // { oc, tipo, file, url, nro, fecha, obs, pedido, recib, pend, cant, drive, guardando, conHistoria }
+  let _popPropio = false; // el history.back() de cerrar la hoja no tiene que repintar
+
+  // Qué parece ser un archivo, por su nombre. Sin pistas no se elige: mejor
+  // preguntar que rotular de factura algo que no lo es.
+  function tipoSugerido(n) {
+    if (/factura|\bfc\b|\bfac\b/i.test(n)) return 'factura';
+    if (/remito/i.test(n)) return 'remito';
+    if (/presupuesto|cotizaci/i.test(n)) return 'presupuesto';
+    return '';
   }
-  async function subir(file) {
-    const s = _subiendo; _subiendo = null;
-    const o = s && ocs.get(s.oc);
-    if (!o || !file) return;
-    const h = o.h;
-    const meta = {
-      drive_folder_obras_id: h.drive_folder_obras_id, drive_folder_proveedores_id: h.drive_folder_proveedores_id,
-      drive_folder_id: h.drive_folder_id, obra: o.obra || 'Sin obra', fecha: fechaCarpeta(o),
-      proveedor: o.prov || 'Sin proveedor', nroOC: o.nro
+  // Factura y remito no van en una OC que no los espera (anulada, sin autorizar…).
+  const tipoCerrado = (o, t) => (t === 'factura' || t === 'remito') && CERRADA.includes(o.estado);
+
+  const fmtCant = n => (parseFloat(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 });
+  // Para meter dentro de un input: sin separador de miles (como fmtInput en Remitos).
+  const enInput = n => { const v = parseFloat(n) || 0; return v === 0 ? '0' : String(v); };
+  const hoyISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+
+  const metaDrive = o => ({
+    drive_folder_obras_id: o.h.drive_folder_obras_id, drive_folder_proveedores_id: o.h.drive_folder_proveedores_id,
+    drive_folder_id: o.h.drive_folder_id, obra: o.obra || 'Sin obra', fecha: fechaCarpeta(o),
+    proveedor: o.prov || 'Sin proveedor', nroOC: o.nro
+  });
+
+  function abrirCarga(tipo, file) {
+    const o = ocs.get(st.oc);
+    if (!o || carga) return;
+    const e = calcEntrega(o.h, remitosOC[o.nro] || []);
+    carga = {
+      oc: o.id, tipo: tipo && !tipoCerrado(o, tipo) ? tipo : '', file: null, url: null,
+      nro: '', fecha: hoyISO(), obs: '',
+      pedido: e.pedido, recib: e.recibido, pend: e.pendiente, cant: e.pendiente.slice(),
+      drive: null, guardando: false, conHistoria: false
     };
-    toast('Subiendo ' + file.name + '…', 'info');
+    $('ac-t').textContent = 'Cargar en la OC ' + o.nro;
+    $('ac-sub').textContent = (o.prov || 'Sin proveedor') + ' · ' + (o.obra || 'Sin obra');
+    $('ar-carga').classList.remove('hidden');
+    document.body.classList.add('ac-abierta');
+    // El botón Atrás del teléfono cierra la hoja, como el visor.
+    try { history.pushState({ carga: 1, archivo: 1 }, ''); carga.conHistoria = true; } catch (_) {}
+    if (file) ponerArchivo(file); else pintarCarga();
+    $('ar-carga').querySelector('.ac-sheet').focus();
+  }
+
+  function cerrarCarga(sinHistoria) {
+    const c = carga;
+    if (!c || c.guardando) return;
+    carga = null;
+    if (c.url) URL.revokeObjectURL(c.url);
+    $('ar-carga').classList.add('hidden');
+    $('ac-rem').innerHTML = '';
+    document.body.classList.remove('ac-abierta');
+    if (c.conHistoria && !sinHistoria) { _popPropio = true; try { history.back(); } catch (_) { _popPropio = false; } }
+  }
+
+  function pintarCarga() {
+    const c = carga, o = c && ocs.get(c.oc);
+    if (!o) return;
+    $('ac-tipos').innerHTML = Object.entries(CARGA).map(([t, d]) => {
+      const cerrado = tipoCerrado(o, t);
+      const n = t === 'otro' ? 0 : docsDe(o, t).length;
+      const sub = cerrado ? 'OC ' + o.estado : t === 'otro' ? 'Cualquier archivo' : n ? 'Ya tiene ' + n : 'Falta';
+      return `<button type="button" class="ac-tipo ac-tipo--${t}" data-ctipo="${t}" aria-pressed="${c.tipo === t}"${cerrado ? ' disabled' : ''}>
+        ${icSvg(d.ic)}<b>${d.n}</b><small class="${!cerrado && t !== 'otro' && !n ? 'is-falta' : ''}">${esc(sub)}</small></button>`;
+    }).join('');
+
+    const items = o.h.items || [];
+    const aviso = c.tipo === 'factura' && docsDe(o, 'factura').length ? 'Esta OC ya tiene factura. Si es otra (una parcial, una nota de crédito), cargala igual.'
+      : c.tipo === 'presupuesto' && o.h.fuenteUrl ? 'Ya tiene presupuesto: el nuevo pasa a ser el de la OC y el anterior queda en su carpeta de Drive.'
+      : c.tipo === 'remito' && !items.length ? 'La OC no tiene ítems cargados: el remito se guarda sin cantidades.'
+      : c.tipo === 'remito' && c.pend.every(p => p <= 0) ? 'Ya llegó todo lo de esta OC. Si este remito es de más, poné lo que llegó igual.'
+      : '';
+    $('ac-aviso').innerHTML = aviso ? icSvg('info') + '<span>' + esc(aviso) + '</span>' : '';
+    $('ac-aviso').classList.toggle('hidden', !aviso);
+
+    const a = c.file;
+    if (a) {
+      const [cls, txt] = tile({ mime: a.type, nombre: a.name });
+      $('ac-arch').innerHTML = `<div class="ac-file">
+          ${c.url ? `<img class="ac-prev" src="${c.url}" alt="">` : ''}
+          <div class="ac-file-r">${c.url ? '' : `<span class="ar-tile ar-tile--${cls}">${txt}</span>`}
+            <span class="ac-file-n"><b>${esc(a.name)}</b><small>${fmtPeso(a.size)}</small></span>
+            <button type="button" class="ac-mini" data-cfile="1">Cambiar</button></div></div>`;
+    } else {
+      const t = tactil.matches;
+      $('ac-arch').innerHTML = `<div class="ac-drop">
+          <span class="ac-drop-ic">${icSvg(t ? 'camera' : 'inbox')}</span>
+          <b>${t ? 'Sacá una foto o elegí el archivo' : 'Arrastrá el archivo acá'}</b>
+          <small>${t ? 'La foto pasa por el escáner para que quede derecha.' : 'O elegilo de la compu: fotos, PDF, Word o Excel.'}</small>
+          <div class="ac-drop-btns">${t ? `<button type="button" class="ac-btn ac-btn--tono" data-ccam="1">${icSvg('camera')}Sacar foto</button>` : ''}
+            <button type="button" class="ac-btn" data-cfile="1">${icSvg('clip')}Elegir archivo</button></div></div>`;
+    }
+
+    // El formulario del remito se arma una vez por tipo elegido: repintarlo con
+    // cada tecla haría perder el foco.
+    const esRem = c.tipo === 'remito';
+    $('ac-rem').classList.toggle('hidden', !esRem);
+    if (!esRem) $('ac-rem').innerHTML = '';
+    else if (!$('ac-rem').childElementCount) pintarRemito(o);
+    marcarRemito();
+  }
+
+  function pintarRemito(o) {
+    const c = carga, items = o.h.items || [];
+    const stp = (d, i) => `<button type="button" class="ac-stp" data-cstep="${d}" data-i="${i}" aria-label="${d > 0 ? 'Uno más' : 'Uno menos'}">${icSvg(d > 0 ? 'plus' : 'minus')}</button>`;
+    $('ac-rem').innerHTML = `<div class="ac-lbl">Datos del remito</div>
+      <div class="ac-f2">
+        <label class="ac-fld"><span>N° de remito</span><input type="text" id="ac-nro" class="ac-in" value="${esc(c.nro)}" autocomplete="off" placeholder="0001-00001234"></label>
+        <label class="ac-fld"><span>Fecha</span><input type="date" id="ac-fecha" class="ac-in" value="${esc(c.fecha)}"></label>
+      </div>` +
+      (items.length ? `<div class="ac-lbl">Qué llegó<span class="ac-seg"><button type="button" data-ctodo="todo">Llegó todo</button><button type="button" data-ctodo="nada">Nada</button></span></div>
+      <div class="ac-its">${items.map((it, i) => {
+        const completo = c.pend[i] <= 0;
+        return `<div class="ac-it">
+          <div class="ac-it-d">${esc(it.desc || '—')}</div>
+          <div class="ac-it-q">${completo ? '' : stp(-1, i)}
+            <input type="text" class="ac-qv" inputmode="decimal" data-i="${i}" value="${enInput(c.cant[i])}" aria-label="Cantidad recibida de ${esc(it.desc || 'este renglón')}">
+            ${completo ? '' : stp(1, i)}</div>
+          <div class="ac-it-m"><span>Pedido <b>${fmtCant(c.pedido[i])}</b> ${esc(it.unidad || '')}</span>${c.recib[i] > 0 ? `<span>Recibido <b>${fmtCant(c.recib[i])}</b></span>` : ''}<span class="ac-mk"></span></div>
+        </div>`;
+      }).join('')}</div>` : '') +
+      `<label class="ac-fld"><span>Observaciones <i>(opcional)</i></span><input type="text" id="ac-obs" class="ac-in" value="${esc(c.obs)}" autocomplete="off"></label>`;
+  }
+
+  function marca(q, pend) {
+    if (pend <= 0) return q > 0 ? ['mas', 'De más'] : ['done', 'Ya completo'];
+    if (q <= 0) return ['no', 'No llegó'];
+    if (q === pend) return ['ok', 'Completa'];
+    if (q > pend) return ['mas', fmtCant(q - pend) + ' de más'];
+    return ['par', 'Quedan ' + fmtCant(pend - q)];
+  }
+
+  // Marcas de cada renglón, «Llegó todo / Nada» y el pie.
+  function marcarRemito() {
+    const c = carga;
+    if (!c) return;
+    const inputs = [...document.querySelectorAll('#ac-rem .ac-qv')];
+    inputs.forEach(inp => {
+      const i = +inp.dataset.i, q = c.cant[i] || 0;
+      const [cls, txt] = marca(q, c.pend[i]);
+      const mk = inp.closest('.ac-it').querySelector('.ac-mk');
+      mk.className = 'ac-mk ac-mk--' + cls;
+      mk.textContent = txt;
+      inp.classList.toggle('is-cero', q <= 0);
+    });
+    if (inputs.length) {
+      const todo = c.cant.every((q, i) => q === c.pend[i]), nada = c.cant.every(q => !q);
+      document.querySelector('#ac-rem [data-ctodo="todo"]').classList.toggle('on', todo);
+      document.querySelector('#ac-rem [data-ctodo="nada"]').classList.toggle('on', nada && !todo);
+    }
+    pintarPie();
+  }
+
+  function faltaCarga() {
+    const c = carga, o = ocs.get(c.oc), f = [];
+    if (!c.tipo) f.push('elegir qué es');
+    if (!c.file) f.push('el archivo');
+    if (c.tipo === 'remito') {
+      if (!c.nro.trim()) f.push('el N° de remito');
+      if (!c.fecha) f.push('la fecha');
+      if ((o.h.items || []).length && !c.cant.some(q => q > 0)) f.push('lo que llegó');
+    }
+    return f;
+  }
+
+  function pintarPie() {
+    const c = carga;
+    if (!c) return;
+    const o = ocs.get(c.oc), f = faltaCarga();
+    let cls = 'ok', txt = 'Listo para guardar';
+    if (f.length) { cls = 'falta'; txt = 'Falta ' + (f.length > 1 ? f.slice(0, -1).join(', ') + ' y ' + f[f.length - 1] : f[0]); }
+    else if (c.tipo === 'remito' && (o.h.items || []).length) {
+      const quedan = c.pedido.filter((p, i) => c.recib[i] + (c.cant[i] || 0) < p).length;
+      if (!quedan) txt = 'Con este remito se completa la OC';
+      else { cls = 'parcial'; txt = 'Entrega parcial: ' + (quedan === 1 ? 'queda 1 renglón' : `quedan ${quedan} renglones`); }
+    }
+    $('ac-st').className = 'ac-st ac-st--' + cls;
+    $('ac-st').textContent = txt;
+    const b = $('ac-ok');
+    b.disabled = !!f.length || c.guardando;
+    b.innerHTML = c.guardando ? '<span class="spinner"></span> Guardando…' : icSvg('checkSm') + (c.tipo ? CARGA[c.tipo].btn : 'Guardar');
+    $('ac-cancel').disabled = $('ac-x').disabled = c.guardando;
+  }
+
+  function elegirCarga(cam) {
+    const i = $(cam ? 'ac-cam' : 'ac-file');
+    i.value = '';
+    i.click();
+  }
+  // La foto de la cámara pasa por el escáner (recorte y filtro), como en Facturas y Remitos.
+  async function archivoElegido(file, cam) {
+    if (!file || !carga) return;
+    if (cam && file.type.startsWith('image/') && typeof openScanner === 'function') {
+      try { const s = await openScanner(file); if (!s) return; file = s; }
+      catch (_) { toast('Escáner no disponible; va la foto original.', 'warning'); }
+    }
+    if (carga) ponerArchivo(file);
+  }
+  function ponerArchivo(file) {
+    const c = carga;
+    if (c.url) URL.revokeObjectURL(c.url);
+    c.file = file;
+    c.drive = null;
+    c.url = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+    if (!c.tipo) { const t = tipoSugerido(file.name); if (t && !tipoCerrado(ocs.get(c.oc), t)) c.tipo = t; }
+    pintarCarga();
+  }
+
+  async function confirmarRemito(o, c) {
+    const exc = c.cant.filter((q, i) => q > c.pend[i]).length;
+    if (exc && !await showConfirm('Más de lo pendiente',
+      `${exc === 1 ? 'Un renglón supera' : exc + ' renglones superan'} lo que falta entregar en esta OC.\n\n¿Guardar igual?`,
+      { boton: 'Guardar igual', tono: 'warn', icono: 'alert' })) return false;
+    // Mismo número y proveedor = casi seguro el mismo remito dos veces, y duplicaría lo recibido.
+    const nro = c.nro.trim();
+    const dup = todosRemitos().find(r => (r.nro || '').trim().toLowerCase() === nro.toLowerCase() &&
+      ((r.proveedor && r.proveedor.nombre) || '') === o.prov);
+    if (dup && !await showConfirm('Remito repetido',
+      `Ya hay un remito ${nro} de ${o.prov || 'este proveedor'} (OC ${dup.nroOC}).\n\n¿Cargarlo igual?`,
+      { boton: 'Cargar igual', tono: 'warn', icono: 'alert' })) return false;
+    return true;
+  }
+
+  async function guardarAdjunto(o, c) {
+    const fac = c.tipo === 'factura';
+    const subida = fac ? new File([c.file], nombreArchivoDrive('Factura', c.file.name), { type: c.file.type }) : c.file;
+    const r = await attachToDriveOC(subida, metaDrive(o));
+    const registro = { tipo: fac ? 'factura' : 'otro', nombre: subida.name, ts: Date.now(), por: nombreUsuario, fileId: r.fileId || null, folderId: r.folderId || null };
+    o.h.adjuntos = o.h.adjuntos || {};
+    o.h.adjuntos['local_' + registro.ts] = registro;
+    await registrarAdjuntoOC(o.nro, registro).catch(e => console.warn('registrarAdjunto:', e));
+    const fid = r.folderId || o.folder;
+    logActivity({
+      tipo: fac ? 'factura' : 'adjunto', nroOC: o.nro,
+      usuario: { codigo, nombre: nombreUsuario },
+      titulo: `${fac ? 'Factura' : 'Adjunto'} en OC ${o.nro} — ${o.prov || 'Sin proveedor'}`,
+      detalle: `${subida.name} · ${o.obra || 'Sin obra'}`,
+      driveUrl: fid ? `https://drive.google.com/drive/folders/${fid}` : ''
+    }).catch(() => {});
+    return fac ? `Factura cargada en la OC ${o.nro}.` : `Archivo guardado en la OC ${o.nro}.`;
+  }
+
+  async function guardarPresupuesto(o, c) {
+    const f = new File([c.file], nombreArchivoDrive('Presupuesto', c.file.name), { type: c.file.type });
+    const r = await attachToDriveOC(f, metaDrive(o));
+    if (!r.fileId) throw new Error('Drive no devolvió el archivo.');
+    o.h.fuenteUrl = `https://drive.google.com/file/d/${r.fileId}/view`;
+    await patchHistorialEntry(o.key, { fuenteUrl: o.h.fuenteUrl });
+    return `Presupuesto guardado en la OC ${o.nro}.`;
+  }
+
+  async function guardarRemitoCarga(o, c) {
+    const nro = c.nro.trim();
+    // La foto primero: si Drive falla no queda un remito sin comprobante, y si
+    // lo que falla es guardarlo, el reintento no la sube dos veces.
+    if (!c.drive) {
+      const up = new File([c.file], nombreArchivoDrive('Remito', c.file.name, nro), { type: c.file.type });
+      const r = await attachToDriveOC(up, metaDrive(o));
+      c.drive = { folderId: r.folderId || null, fileId: r.fileId || null,
+        url: r.folderId ? `https://drive.google.com/drive/folders/${r.folderId}` : '', archivo: up.name };
+    }
+    const items = (o.h.items || []).map((it, i) => ({ idx: i, desc: it.desc || '', unidad: it.unidad || '', cantidad: c.cant[i] || 0 }))
+      .filter(it => it.cantidad > 0);
+    const completa = c.pedido.every((p, i) => c.recib[i] + (c.cant[i] || 0) >= p);
+    const record = {
+      tipo: 'remito', nro, fecha: c.fecha, timestamp: Date.now(),
+      ocKey: o.key, nroOC: o.nro, obra: o.obra || '',
+      proveedor: { nombre: o.prov || '', cuit: (o.h.proveedor && o.h.proveedor.cuit) || '' },
+      recibidoPor: { codigo, nombre: nombreUsuario },
+      items, entrega: completa ? 'total' : 'parcial',
+      observaciones: c.obs.trim(), drive: c.drive
+    };
+    const key = await saveRemito(record);
+    (remitosOC[o.nro] = remitosOC[o.nro] || []).push({ ...record, key });
+
+    // Lo mismo que hace Remitos después de guardar, todo best-effort: el
+    // resumen de entrega en la OC, el feed y las planillas de Drive.
+    const e = calcEntrega(o.h, remitosOC[o.nro]);
+    o.h.entrega = { estado: e.estado, remitos: e.remitos.map(r => r.key).filter(Boolean), ultimaFecha: (e.remitos[0] && e.remitos[0].fecha) || null };
+    patchHistorialEntry(o.key, { entrega: o.h.entrega }).catch(() => {});
+    const n = items.length;
+    logActivity({
+      tipo: 'remito', nroOC: o.nro, usuario: record.recibidoPor,
+      titulo: `Remito ${nro} — ${o.prov || 'Sin proveedor'}`,
+      detalle: `OC ${o.nro} · ${o.obra || 'Sin obra'} · ${n} ítem${n !== 1 ? 's' : ''} · ${completa ? 'entrega completa' : 'entrega parcial'}`,
+      driveUrl: c.drive.url
+    }).catch(() => {});
+    sincronizarEntregas({ oc: o.h, ocs: [...ocs.values()].filter(x => !SIN_PDF.includes(x.estado)).map(x => x.h), remitos: todosRemitos() })
+      .catch(err => console.error('sincronizarEntregas:', err));
+    return `Remito ${nro} cargado en la OC ${o.nro}.`;
+  }
+
+  const GUARDAR = { factura: guardarAdjunto, otro: guardarAdjunto, presupuesto: guardarPresupuesto, remito: guardarRemitoCarga };
+
+  async function guardarCarga() {
+    const c = carga, o = c && ocs.get(c.oc);
+    if (!o || c.guardando || faltaCarga().length) return;
+    if (c.tipo === 'remito' && !(await confirmarRemito(o, c))) return;
+    c.guardando = true;
+    pintarPie();
     try {
-      if (s.tipo === 'presupuesto') {
-        const f = new File([file], nombreArchivoDrive('Presupuesto', file.name), { type: file.type });
-        const r = await attachToDriveOC(f, meta);
-        if (!r.fileId) throw new Error('Drive no devolvió el archivo');
-        h.fuenteUrl = `https://drive.google.com/file/d/${r.fileId}/view`;
-        await patchHistorialEntry(o.key, { fuenteUrl: h.fuenteUrl });
-      } else {
-        const r = await attachToDriveOC(file, meta);
-        const registro = { tipo: 'otro', nombre: file.name, ts: Date.now(), por: nombreUsuario, fileId: r.fileId || null, folderId: r.folderId || null };
-        h.adjuntos = h.adjuntos || {};
-        h.adjuntos['local_' + registro.ts] = registro;
-        await registrarAdjuntoOC(o.nro, registro).catch(e => console.warn('registrarAdjunto:', e));
-      }
+      const msj = await GUARDAR[c.tipo](o, c);
+      c.guardando = false;
+      cerrarCarga();
       if (o.folder) _carpetas.delete(o.folder);
       armar(); pintarUso(); pintar(true);
-      toast('Archivo guardado.', 'success');
+      toast(msj, 'success');
     } catch (e) {
-      console.error('subir:', e);
-      toast('No se pudo subir el archivo. ' + (e.message || ''), 'error');
+      console.error('guardarCarga:', e);
+      c.guardando = false;
+      pintarPie();
+      toast('No se pudo guardar. ' + (e.message || 'Revisá la conexión y probá de nuevo.'), 'error');
     }
   }
+
+  const traeArchivos = e => !!e.dataTransfer && [...e.dataTransfer.types].includes('Files');
 
   // ---- Visor ----
   // Pantalla completa encima de la página: imagen, PDF (con pdf.js, porque ni
@@ -1217,7 +1508,7 @@
       else if (d.orden) { st.orden = d.orden; pintar(); }
       else if ('inc' in d) { st.inc = !st.inc; pintar(); }
       else if (d.ficha) abrirFicha();
-      else if (d.subir) elegirArchivo(d.subir);
+      else if (d.subir) abrirCarga(d.subir === 'elegir' ? '' : d.subir);
       else if (d.ent) verEntrega(d.ent);
       else if (d.asignar) asignar(d.asignar);
       else if (t.id === 'ar-mas') { limite += PAGINA; pintar(); }
@@ -1245,11 +1536,80 @@
     window.addEventListener('scroll', alDesplazar, { passive: true });
     window.addEventListener('resize', () => armarAbc());
     if (document.fonts) document.fonts.ready.then(() => armarAbc());
-    $('ar-file').addEventListener('change', e => subir(e.target.files && e.target.files[0]));
+    // Hoja de carga: botones, campos del remito y archivos (elegidos o soltados).
+    $('ar-carga').addEventListener('click', e => {
+      const t = e.target.closest('button');
+      if (!t || !carga) return;
+      const d = t.dataset;
+      if (d.ctipo) { carga.tipo = d.ctipo; pintarCarga(); }
+      else if (d.cfile) elegirCarga(false);
+      else if (d.ccam) elegirCarga(true);
+      else if (d.ctodo) {
+        carga.cant = d.ctodo === 'todo' ? carga.pend.slice() : carga.cant.map(() => 0);
+        document.querySelectorAll('#ac-rem .ac-qv').forEach(inp => { inp.value = enInput(carga.cant[+inp.dataset.i]); });
+        marcarRemito();
+      }
+      else if (d.cstep) {
+        const i = +d.i;
+        carga.cant[i] = Math.max(0, (carga.cant[i] || 0) + Number(d.cstep));
+        document.querySelector('#ac-rem .ac-qv[data-i="' + i + '"]').value = enInput(carga.cant[i]);
+        marcarRemito();
+      }
+      else if (t.id === 'ac-x' || t.id === 'ac-cancel') cerrarCarga();
+      else if (t.id === 'ac-ok') guardarCarga();
+    });
+    $('ar-carga').addEventListener('input', e => {
+      const t = e.target;
+      if (!carga) return;
+      if (t.id === 'ac-nro') carga.nro = t.value;
+      else if (t.id === 'ac-fecha') carga.fecha = t.value;
+      else if (t.id === 'ac-obs') carga.obs = t.value;
+      else if (t.classList.contains('ac-qv')) carga.cant[+t.dataset.i] = Math.max(0, parseArgFloat(t.value) || 0);
+      else return;
+      marcarRemito();
+    });
+    $('ac-file').addEventListener('change', e => archivoElegido(e.target.files && e.target.files[0], false));
+    $('ac-cam').addEventListener('change', e => archivoElegido(e.target.files && e.target.files[0], true));
+    $('ar-carga').addEventListener('dragover', e => {
+      if (!carga || carga.guardando || !traeArchivos(e)) return;
+      e.preventDefault();
+      $('ar-carga').classList.add('drag-over');
+    });
+    $('ar-carga').addEventListener('dragleave', e => { if (!$('ar-carga').contains(e.relatedTarget)) $('ar-carga').classList.remove('drag-over'); });
+    $('ar-carga').addEventListener('drop', e => {
+      $('ar-carga').classList.remove('drag-over');
+      if (!carga || carga.guardando || !traeArchivos(e)) return;
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (f) ponerArchivo(f);
+    });
+    // En la compu, un archivo soltado sobre la OC abierta abre la hoja con él.
+    const c3 = $('ar-c3');
+    $('ar-cols').addEventListener('dragover', e => {
+      if (!st.oc || carga || !traeArchivos(e)) return;
+      e.preventDefault();
+      c3.classList.add('ar-soltar');
+    });
+    $('ar-cols').addEventListener('dragleave', e => { if (!$('ar-cols').contains(e.relatedTarget)) c3.classList.remove('ar-soltar'); });
+    $('ar-cols').addEventListener('drop', e => {
+      c3.classList.remove('ar-soltar');
+      if (!st.oc || carga || !traeArchivos(e)) return;
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (f) abrirCarga(tipoSugerido(f.name), f);
+    });
     $('modal-preview-close').addEventListener('click', cerrarFicha);
     $('modal-preview').addEventListener('click', e => { if (e.target.id === 'modal-preview') cerrarFicha(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !_abierto && fichaAbierta()) cerrarFicha(); });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape' || _abierto) return;
+      // Con una confirmación abierta encima, el Escape es de ella.
+      const conf = $('modal-confirm');
+      if (carga) { if (!conf || conf.classList.contains('hidden')) cerrarCarga(); }
+      else if (fichaAbierta()) cerrarFicha();
+    });
     window.addEventListener('popstate', () => {
+      if (_popPropio) { _popPropio = false; return; }
+      if (carga) { carga.conHistoria = false; cerrarCarga(); return; }
       if (_abierto) { _abierto.conHistoria = false; cerrarVisor(); return; }
       leerUrl(); pintar();
     });
