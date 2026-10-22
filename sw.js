@@ -141,7 +141,9 @@ self.addEventListener('fetch', event => {
   // dolarapi.com: cotización del dólar. Debe ser siempre fresca — si el SW la
   // cacheara (cache-first de terceros, más abajo) devolvería siempre el primer
   // valor. Se deja pasar a la red nativamente (y dolar.js cachea en localStorage).
-  if (url.hostname.endsWith('dolarapi.com')) {
+  // Lo mismo con los feriados nacionales (argentinadatos.com, Personal → configuración):
+  // un traslado por decreto tiene que llegar, no quedar la primera lista cacheada.
+  if (url.hostname.endsWith('dolarapi.com') || url.hostname.endsWith('argentinadatos.com')) {
     return;
   }
 

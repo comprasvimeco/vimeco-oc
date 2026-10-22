@@ -9,46 +9,263 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a3a5c">
   <style>
-    .sec-card { background:#fff; border:1px solid var(--gray-200); border-radius:12px; margin-bottom:1rem; overflow:hidden; }
-    .sec-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.85rem 1rem; cursor:pointer; user-select:none; }
-    .sec-head h2 { font-size:1rem; color:var(--gray-700); margin:0; }
-    .sec-head .chev { transition:transform .2s; color:var(--gray-400); }
-    .sec-card.collapsed .chev { transform:rotate(-90deg); }
-    .sec-card.collapsed .sec-body { display:none; }
-    .sec-body { padding:0 1rem 1rem; }
+    body { --per-bg: #fbeedd; --per: #8a4f0d; --obr-bg: #e8eef7; --obr: #234870; --ok-bg: #dff3e5; --ok: #1a7f3c; }
+    .pc-page { max-width: 1180px; margin: 0 auto; padding: 1rem 1rem 5rem; }
 
-    .chip-list { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.75rem; }
-    .chip { display:inline-flex; align-items:center; gap:.4rem; background:var(--gray-100); border:1px solid var(--gray-200);
-            border-radius:999px; padding:.3rem .75rem; font-size:.9rem; }
-    .chip button { border:none; background:none; color:var(--gray-500); cursor:pointer; font-size:1rem; line-height:1; padding:0; }
-    .chip button:hover { color:#d64545; }
-    .chip .chip-move { font-weight:700; }
-    .chip .chip-move:hover { color:var(--gray-800); }
-    .chip .chip-move:disabled { opacity:.25; cursor:default; }
-    .chip .chip-move:disabled:hover { color:var(--gray-500); }
-    .cfg-row { display:flex; gap:.5rem; flex-wrap:wrap; }
-    .fer-item { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.4rem .25rem; border-bottom:1px solid var(--gray-100); }
-    .fer-item:last-child { border-bottom:none; }
-    .fer-fecha { font-weight:600; color:var(--gray-700); min-width:110px; }
-    .fer-nombre { flex:1; color:var(--gray-600); }
+    .pc-ttl-row { display: flex; align-items: center; gap: .45rem; margin: .3rem 0 .85rem; flex-wrap: wrap; }
+    .pc-ttl { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; }
+    .pc-cnt { display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--gray-200); color: var(--gray-600);
+      font-size: .74rem; font-weight: 700; padding: .18rem .6rem; border-radius: 999px; white-space: nowrap; }
+    .pc-pend { display: inline-flex; align-items: center; gap: .35rem; background: #fde6e6; color: #b02a2a; font: inherit; font-size: .74rem; font-weight: 700;
+      padding: .18rem .6rem; border-radius: 999px; white-space: nowrap; border: none; cursor: pointer; }
+    .pc-pend::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #d64545; flex: none; }
+    .pc-pend .corto { display: none; }
 
-    /* Padrón */
-    .pad-tools { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem; }
-    .pad-tools input { flex:1; min-width:160px; }
-    .pad-item { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; padding:.6rem .25rem; border-bottom:1px solid var(--gray-100); }
-    .pad-item:last-child { border-bottom:none; }
-    .pad-item.inactivo { opacity:.55; }
-    .pad-avatar { width:40px; height:40px; border-radius:50%; background:var(--gray-100); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; font-weight:600; color:var(--gray-500); }
-    .pad-avatar img { width:100%; height:100%; object-fit:cover; }
-    .pad-info { flex:1 1 55%; min-width:0; }
-    .pad-name { font-weight:600; color:var(--gray-800); }
-    .pad-meta { font-size:.8rem; color:var(--gray-500); }
-    .pad-cat { display:inline-block; background:var(--gray-100); border-radius:999px; padding:.1rem .5rem; font-size:.72rem; color:var(--gray-600); }
-    .dni-folder { text-decoration:none; font-size:.9rem; margin-left:.25rem; }
-    .pad-actions { display:flex; gap:.4rem; flex-shrink:0; margin-left:auto; }
-    @media (max-width:600px) { .pad-actions { width:100%; margin-left:0; } .pad-actions .btn { flex:1; } }
-    .dni-preview { margin-top:.4rem; }
-    .dni-preview img { max-width:100%; max-height:150px; border-radius:8px; border:1px solid var(--gray-200); }
+    /* Resumen: valores, feriados, categorías (abren su hoja) */
+    .pc-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-bottom: 1rem; }
+    .pc-sumc { display: flex; gap: .6rem; align-items: center; background: #fff; border: none; border-radius: 14px; padding: .7rem .8rem; text-align: left;
+      box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); font: inherit; color: inherit; cursor: pointer; min-width: 0; }
+    .pc-sumc:hover { background: #fbfcfe; }
+    .pc-sumc .tx { flex: 1; min-width: 0; }
+    .pc-sumc .tx b { display: block; color: var(--primary-dark); font-size: .95rem; }
+    .pc-sumc .tx small { display: block; color: var(--gray-500); font-size: .76rem; line-height: 1.35; }
+    .pc-sumc .chev { color: var(--gray-300); flex: none; }
+    .pc-sumc .pc-pend { cursor: inherit; flex: none; }
+
+    .pc-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+    @media (min-width: 1000px) {
+      .pc-layout { grid-template-columns: 400px minmax(0, 1fr); }
+      .pc-side { position: sticky; top: .75rem; max-height: calc(100vh - 90px); overflow-y: auto; padding: 2px 4px 1rem 2px; margin: -2px -4px 0 -2px; scrollbar-width: thin; }
+    }
+    /* Teléfono: lista o ficha, una a la vez. */
+    @media (max-width: 999.98px) {
+      .pc-ficha { display: none; }
+      body.pc-open .pc-ficha { display: block; }
+      body.pc-open .pc-side, body.pc-open .pc-ttl-row, body.pc-open .pc-sum { display: none; }
+    }
+    @media (max-width: 760px) {
+      .pc-sum { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+    }
+    @media (max-width: 560px) {
+      .pc-page { padding: .8rem .6rem 5rem; }
+      .pc-ttl { font-size: 1.2rem; }
+      .pc-ttl-row .pc-cnt { display: none; }
+      .pc-ttl-row .pc-pend .largo { display: none; }
+      .pc-ttl-row .pc-pend .corto { display: inline; }
+      .pc-add-txt { display: none; }
+      .pc-add { padding: .45rem .65rem; }
+      .pc-row .pc-dni { display: none; }
+    }
+
+    .pc-sub-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .55rem; }
+    .pc-sub-row h2 { font-size: 1.05rem; color: var(--primary-dark); margin: 0; }
+    .pc-add { margin-left: auto; background: var(--primary); color: #fff; }
+    .pc-srch { display: flex; align-items: center; gap: .5rem; background: #fff; border: 1px solid var(--gray-200); border-radius: 12px;
+      padding: 0 .75rem; color: var(--gray-400); margin-bottom: .6rem; }
+    .pc-srch input { flex: 1; border: none; outline: none; background: transparent; font: inherit; font-size: .9rem; padding: .6rem 0; color: var(--gray-800); min-width: 0; }
+    .pc-srch:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px #2348701f; }
+    .pc-flt { display: flex; gap: .35rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    @media (max-width: 560px) { .pc-flt { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -.6rem; padding-right: .6rem; } }
+    .pc-flt button { flex: none; display: inline-flex; align-items: center; gap: .3rem; font: inherit; font-size: .76rem; font-weight: 700;
+      padding: .3rem .7rem; border-radius: 999px; background: #fff; border: 1px solid var(--gray-200); color: var(--gray-600); cursor: pointer; white-space: nowrap; }
+    .pc-flt button .icon { width: 13px; height: 13px; }
+    .pc-flt button b { color: var(--gray-400); }
+    .pc-flt button.on { background: var(--primary-dark); border-color: var(--primary-dark); color: #fff; }
+    .pc-flt button.on b { color: #ffffffaa; }
+
+    .pc-rows { background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); overflow: hidden; }
+    .pc-row { display: flex; align-items: center; gap: .65rem; padding: .62rem .75rem; border: none; border-bottom: 1px solid var(--gray-100);
+      background: none; width: 100%; text-align: left; font: inherit; cursor: pointer; color: inherit; }
+    .pc-row:last-child { border-bottom: none; }
+    .pc-row:hover { background: #f8fafc; }
+    .pc-row.sel { background: #f3f6fb; box-shadow: inset 3px 0 0 var(--primary); }
+    .pc-row .mid { flex: 1; min-width: 0; }
+    .pc-row .nm { display: block; font-weight: 700; color: var(--primary-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pc-row .l2 { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; margin-top: .22rem; }
+    .pc-row .pc-dni { font-size: .76rem; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+    .pc-row.off .nm, .pc-row.off .l2 { opacity: .55; }
+    .pc-row .chev { color: var(--gray-300); }
+    .pc-empty { padding: 1.2rem; text-align: center; color: var(--gray-500); font-size: .88rem; }
+
+    .pc-av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 800; font-size: .82rem;
+      letter-spacing: .03em; background: var(--per-bg); color: var(--per); }
+    .pc-av.off { background: var(--gray-200); color: var(--gray-500); }
+    .pc-av.lg { width: 56px; height: 56px; font-size: 1.1rem; }
+    .pc-sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; background: var(--gray-100); color: var(--gray-600); }
+    .pc-sq .icon { width: 18px; height: 18px; }
+    .pc-sq.sm { width: 32px; height: 32px; border-radius: 10px; }
+    .pc-sq.sm .icon { width: 16px; height: 16px; }
+    .pc-pm { display: inline-flex; align-items: center; gap: .28rem; font-size: .7rem; font-weight: 700; padding: .14rem .5rem .14rem .42rem;
+      border-radius: 999px; white-space: nowrap; background: var(--gray-100); color: var(--gray-500); }
+    .pc-pm .icon { width: 11px; height: 11px; }
+    .t-per { background: var(--per-bg); color: var(--per); } .t-obr { background: var(--obr-bg); color: var(--obr); }
+    .t-ok { background: var(--ok-bg); color: var(--ok); } .t-warn { background: #fef3c7; color: #854d0e; } .t-red { background: #fde6e6; color: #b02a2a; }
+
+    .pc-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); padding: .85rem .9rem; }
+    .pc-card + .pc-card { margin-top: .75rem; }
+    .pc-sec-h { display: flex; align-items: center; gap: .55rem; margin-bottom: .6rem; }
+    .pc-sec-h b { color: var(--primary-dark); font-size: .98rem; }
+    .pc-sec-h .push { margin-left: auto; }
+    .pc-aviso { display: flex; gap: .45rem; align-items: flex-start; background: #fef7e8; color: #7a4a0c; border-radius: 10px;
+      padding: .5rem .65rem; font-size: .78rem; line-height: 1.35; margin-top: .45rem; }
+    .pc-aviso .icon { width: 14px; height: 14px; margin-top: .1rem; flex: none; }
+    .pc-hint { font-size: .76rem; color: var(--gray-500); line-height: 1.4; margin-top: .45rem; }
+    .pc-lnk { display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; font-weight: 700; color: var(--primary); text-decoration: none;
+      background: none; border: none; font-family: inherit; cursor: pointer; padding: 0; }
+    .pc-lnk .icon { width: 14px; height: 14px; }
+
+    /* Ficha */
+    .pc-vacia { text-align: center; color: var(--gray-500); padding: 3rem 1rem; }
+    .pc-vacia .icon { width: 34px; height: 34px; color: var(--gray-300); margin-bottom: .5rem; }
+    .pc-fhead { display: flex; align-items: center; gap: .8rem; }
+    .pc-fhead .id { min-width: 0; flex: 1; }
+    .pc-fhead .nm { font-size: 1.25rem; font-weight: 700; color: var(--primary-dark); line-height: 1.2; overflow-wrap: anywhere; }
+    .pc-fhead .meta { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .35rem; align-items: center; }
+    .pc-fcols { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; margin-top: .75rem; align-items: start; }
+    @media (min-width: 1240px) { .pc-fcols { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+    .pc-fld { margin-bottom: .65rem; }
+    .pc-fld:last-child { margin-bottom: 0; }
+    .pc-fld > label, .pc-fld > .lb { display: block; font-size: .72rem; font-weight: 700; color: var(--gray-500); margin-bottom: .25rem; }
+    .pc-fld .form-control.chg { border-color: #e0a24a; box-shadow: 0 0 0 3px #e0a24a26; }
+    .pc-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .pc-tel { display: flex; gap: .35rem; align-items: center; }
+    .pc-tel .form-control { flex: 1; min-width: 0; }
+    .pc-call { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--ok-bg); color: var(--ok); flex: none; }
+    .pc-call[hidden] { display: none; }
+    .pc-call .icon { width: 15px; height: 15px; }
+    .pc-prow { display: flex; align-items: center; gap: .65rem; padding: .1rem 0 .65rem; cursor: pointer; }
+    .pc-prow .tx { flex: 1; min-width: 0; }
+    .pc-prow .tx b { display: block; font-size: .9rem; color: var(--gray-700); font-weight: 600; }
+    .pc-prow .tx small { display: block; font-size: .76rem; color: var(--gray-500); line-height: 1.35; }
+    .pc-sw { position: relative; width: 36px; height: 21px; flex: none; }
+    .pc-sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: inherit; }
+    .pc-sw span { position: absolute; inset: 0; border-radius: 999px; background: var(--gray-200); transition: background .15s; pointer-events: none; }
+    .pc-sw span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+    .pc-sw input:checked + span { background: var(--per); }
+    .pc-sw input:checked + span::after { transform: translateX(15px); }
+    .pc-sw input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .pc-sw.chg span { box-shadow: 0 0 0 2px #e0a24a; }
+    .pc-sw.ok input:checked + span { background: var(--ok); }
+    .pc-sw.ok input:disabled + span { opacity: .4; }
+
+    /* DNI */
+    .pc-dnis { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .pc-dslot { position: relative; aspect-ratio: 1.58; border-radius: 10px; overflow: hidden; background: var(--gray-100); border: none; padding: 0;
+      font: inherit; cursor: pointer; display: grid; place-items: center; color: var(--gray-500); font-size: .76rem; font-weight: 700; }
+    .pc-dslot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pc-dslot > span:not(.tag) { display: inline-flex; gap: .3rem; align-items: center; }
+    .pc-dslot .tag { position: absolute; bottom: .35rem; left: .4rem; background: #ffffffd9; color: var(--gray-700); border-radius: 999px; padding: 0 .45rem; font-size: .7rem; }
+    .pc-dslot.vacio { background: transparent; border: 1.5px dashed var(--gray-300); }
+    .pc-dslot.vacio span { display: inline-flex; gap: .3rem; align-items: center; }
+    .pc-dslot.chg { box-shadow: 0 0 0 2px #e0a24a; }
+    .pc-dslot .spinner { width: 18px; height: 18px; }
+    .pc-dcambiar { display: flex; justify-content: space-between; margin-top: .3rem; gap: .5rem; }
+    .pc-dcambiar button { font-size: .74rem; }
+
+    .pc-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+
+    /* Barra de guardar: sólo con cambios. */
+    .pc-savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: #fff; border-top: 1px solid var(--gray-200);
+      padding: .55rem .8rem calc(.55rem + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: .5rem;
+      box-shadow: 0 -6px 18px -12px rgba(26,58,92,.35); }
+    .pc-savebar.hidden { display: none; }
+    .pc-savebar .s { flex: 1; font-size: .8rem; color: #8a4f0d; font-weight: 700; display: flex; align-items: center; gap: .35rem; }
+    .pc-savebar .s::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #e0a24a; flex: none; }
+    .pc-savebar .foc-btn--save, .pc-dlg .foc-btn--save { background: var(--primary); color: #fff; }
+    @media (min-width: 1000px) {
+      .pc-savebar { left: auto; right: 1.4rem; bottom: 1.1rem; border: 1px solid var(--gray-200); border-radius: 999px; padding: .4rem .45rem .4rem 1rem; }
+    }
+
+    /* Hojas y diálogos */
+    .pc-dlg { max-width: 520px; align-items: stretch; text-align: left; padding: 1.1rem 1.1rem 1rem; max-height: 92vh; overflow-y: auto; }
+    .pc-dlg.sm { max-width: 440px; }
+    .pc-dlg-h { display: flex; align-items: center; gap: .6rem; margin-bottom: .85rem; }
+    .pc-dlg-h b { font-size: 1.05rem; color: var(--primary-dark); display: block; }
+    .pc-dlg-h small { font-size: .78rem; color: var(--gray-500); }
+    .pc-dlg-h .x { margin-left: auto; align-self: flex-start; }
+    .pc-dlg-f { display: flex; gap: .5rem; margin-top: .9rem; }
+    .pc-dlg-f .foc-btn { flex: 1; justify-content: center; padding: .62rem; font-size: .88rem; }
+    .pc-dlg-f .foc-btn:disabled { opacity: .5; cursor: default; }
+    @media (max-width: 560px) {
+      .pc-modal { align-items: flex-end; padding: 0; }
+      .pc-modal .confirm-box { border-radius: 18px 18px 0 0; max-width: none; width: 100%; max-height: 94vh; }
+    }
+
+    /* Valores */
+    .pc-mes { display: flex; align-items: center; gap: .4rem; margin-bottom: .6rem; }
+    .pc-mes .arr { width: 32px; height: 32px; border-radius: 999px; background: var(--gray-100); color: var(--gray-600); display: grid; place-items: center; border: none; cursor: pointer; }
+    .pc-mes .arr .icon { width: 15px; height: 15px; }
+    .pc-mes b { color: var(--primary-dark); font-size: 1rem; min-width: 9rem; text-align: center; }
+    .pc-mes .pc-pm { margin-left: auto; }
+    .pc-pct { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; background: var(--gray-100); border-radius: 10px; padding: .45rem .6rem; font-size: .82rem; color: var(--gray-600); margin: .5rem 0 .55rem; }
+    .pc-pct .icon { width: 14px; height: 14px; }
+    .pc-pct input { width: 64px; text-align: right; padding: .25rem .45rem; border: 1px solid var(--gray-300); border-radius: 8px; font: inherit; }
+    .pc-pct .foc-btn { margin-left: auto; padding: .3rem .75rem; }
+    .pc-vrow { display: flex; align-items: center; gap: .6rem; padding: .45rem 0; border-top: 1px solid var(--gray-100); }
+    .pc-vrow:first-child { border-top: none; }
+    .pc-vrow .tx { flex: 1; min-width: 0; font-size: .9rem; color: var(--gray-700); font-weight: 600; }
+    .pc-vrow .tx small { display: block; font-weight: 400; color: var(--gray-500); font-size: .74rem; font-variant-numeric: tabular-nums; }
+    .pc-vrow .form-control.chg { border-color: #e0a24a; box-shadow: 0 0 0 3px #e0a24a26; }
+    .pc-vrow .form-control { width: 130px; text-align: right; font-variant-numeric: tabular-nums; }
+    .pc-vt-wrap { overflow-x: auto; margin-top: .9rem; border-top: 1px solid var(--gray-100); padding-top: .6rem; }
+    .pc-vt-t { font-size: .72rem; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .2rem; }
+    .pc-vt { width: 100%; border-collapse: collapse; font-size: .8rem; font-variant-numeric: tabular-nums; }
+    .pc-vt th { font-size: .7rem; font-weight: 700; color: var(--gray-500); text-align: right; padding: .3rem .35rem; border-bottom: 1px solid var(--gray-200); white-space: nowrap; }
+    .pc-vt th:first-child, .pc-vt td:first-child { text-align: left; padding-left: 0; }
+    .pc-vt td { text-align: right; padding: .35rem .35rem; border-bottom: 1px solid var(--gray-100); color: var(--gray-700); white-space: nowrap; }
+    .pc-vt tr:last-child td { border-bottom: none; }
+    .pc-vt .falta { color: #b02a2a; }
+    .pc-vt td.falta { color: var(--gray-300); }
+    .pc-vt .cur { background: #fffaf0; }
+    .pc-vt th button { border: none; background: none; font: inherit; color: inherit; cursor: pointer; padding: 0; }
+
+    /* Feriados */
+    .pc-yr { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .55rem; }
+    .pc-yr button { font: inherit; font-size: .78rem; font-weight: 700; padding: .28rem .7rem; border-radius: 999px; background: var(--gray-100); color: var(--gray-600); border: none; cursor: pointer; }
+    .pc-yr button.on { background: var(--primary-dark); color: #fff; }
+    .pc-yr button.red:not(.on) { background: #fde6e6; color: #b02a2a; }
+    .pc-flist { max-height: 46vh; overflow-y: auto; margin-right: -.3rem; padding-right: .3rem; }
+    .pc-fer { display: flex; align-items: center; gap: .6rem; padding: .42rem 0; border-top: 1px solid var(--gray-100); font-size: .86rem; }
+    .pc-fer:first-child { border-top: none; }
+    .pc-fer .d { width: 3.7rem; flex: none; text-align: center; border-radius: 8px; background: var(--per-bg); color: var(--per); font-weight: 800; font-size: .78rem; padding: .2rem 0; line-height: 1.15; }
+    .pc-fer .d small { display: block; font-weight: 600; font-size: .64rem; opacity: .8; text-transform: uppercase; }
+    .pc-fer .tx { flex: 1; min-width: 0; color: var(--gray-700); }
+    .pc-fer .tx small { display: block; color: var(--gray-500); font-size: .72rem; }
+    .pc-fer.past { opacity: .45; }
+    .pc-fer.past .d { background: var(--gray-100); color: var(--gray-500); }
+    .pc-fer.prox .d { box-shadow: 0 0 0 2px #e0a24a; }
+    .pc-fer.nuevo .d { background: var(--ok-bg); color: var(--ok); }
+    .pc-fer.ya .d { background: var(--gray-100); color: var(--gray-500); }
+    .pc-qx { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; border: none; background: none; color: var(--gray-300); cursor: pointer; flex: none; }
+    .pc-qx:hover { background: var(--gray-100); color: #b02a2a; }
+    .pc-qx .icon { width: 14px; height: 14px; }
+    .pc-addf { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: .4rem; margin-top: .6rem; }
+    @media (max-width: 560px) { .pc-addf { grid-template-columns: 1fr auto; } .pc-addf input[type=date] { grid-column: 1 / -1; } }
+    .pc-acts { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .6rem; }
+
+    /* Categorías */
+    .pc-cat { display: flex; align-items: center; gap: .55rem; padding: .5rem 0; border-top: 1px solid var(--gray-100); }
+    .pc-cat:first-child { border-top: none; }
+    .pc-cat .ord { display: flex; flex-direction: column; gap: 2px; }
+    .pc-cat .ord button { width: 24px; height: 17px; border-radius: 5px; background: var(--gray-100); color: var(--gray-500); display: grid; place-items: center; border: none; cursor: pointer; padding: 0; }
+    .pc-cat .ord button:disabled { opacity: .3; cursor: default; }
+    .pc-cat .ord .icon { width: 11px; height: 11px; }
+    .pc-cat .n { width: 18px; text-align: center; font-weight: 800; color: var(--per); font-size: .8rem; flex: none; }
+    .pc-cat .tx { flex: 1; min-width: 0; }
+    .pc-cat .tx b { display: block; color: var(--gray-700); font-size: .9rem; }
+    .pc-cat .tx small { color: var(--gray-500); font-size: .75rem; }
+    .pc-cat .tx input { width: 100%; }
+    .pc-cat .vh { text-align: right; font-variant-numeric: tabular-nums; font-size: .8rem; color: var(--gray-500); white-space: nowrap; }
+    .pc-cat .vh b { display: block; color: var(--primary-dark); font-size: .88rem; }
+    .pc-mini { width: 28px; height: 28px; border-radius: 999px; background: var(--gray-100); color: var(--gray-500); display: grid; place-items: center; flex: none; border: none; cursor: pointer; }
+    .pc-mini .icon { width: 13px; height: 13px; }
+    .pc-addc { display: flex; gap: .4rem; margin-top: .6rem; }
+    .pc-addc .form-control { flex: 1; }
+
+    /* Visor de la foto del DNI */
+    .pc-visor { max-width: 760px; padding: .8rem; }
+    .pc-visor img { width: 100%; max-height: 75vh; object-fit: contain; border-radius: 10px; background: var(--gray-100); }
   </style>
 </head>
 <body>
@@ -67,124 +284,81 @@
 </header>
 
 <main class="app-main">
-
-  <!-- Categorías -->
-  <div class="sec-card" id="cat-card">
-    <div class="sec-head"><h2>Categorías de personal</h2>
-      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
-    <div class="sec-body">
-      <p style="color:var(--gray-500);font-size:.82rem;margin:.25rem 0 .6rem;">El orden define la jerarquía (de mayor a menor): las cuadrillas y las planillas se ordenan así. Usá ‹ › para reordenar.</p>
-      <div id="cat-list" class="chip-list"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
-      <div class="cfg-row">
-        <input type="text" id="cat-input" class="form-control" placeholder="Ej: Oficial" style="flex:1;min-width:160px;">
-        <button class="btn btn-primary btn-sm" id="cat-add">+ Agregar</button>
+  <div class="pc-page">
+    <div class="pc-ttl-row">
+      <h1 class="pc-ttl">Personal · configuración</h1>
+      <span class="pc-cnt" id="pc-count"></span>
+      <span id="pc-pends" style="display:contents"></span>
+    </div>
+    <div class="pc-sum" id="pc-sum"></div>
+    <div class="pc-layout">
+      <div class="pc-side">
+        <div class="pc-sub-row"><h2>Padrón</h2>
+          <button type="button" class="foc-btn pc-add" id="pc-add"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="pc-add-txt">Agregar persona</span></button></div>
+        <label class="pc-srch"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="pc-q" placeholder="Buscar por nombre o DNI" autocomplete="off" aria-label="Buscar en el padrón"></label>
+        <div class="pc-flt" id="pc-flt" role="group" aria-label="Filtrar"></div>
+        <div id="pc-list"><div class="hist-loading">Cargando padrón…</div></div>
       </div>
+      <div class="pc-ficha" id="pc-ficha"></div>
     </div>
   </div>
-
-  <!-- Valores por categoría (UOCRA) -->
-  <div class="sec-card collapsed" id="val-card">
-    <div class="sec-head"><h2>Valores por categoría ($/hora)</h2>
-      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
-    <div class="sec-body">
-      <p style="color:var(--gray-500);font-size:.82rem;margin:.25rem 0 .6rem;">
-        Valor hora básico de convenio (UOCRA) por categoría, para el cálculo del monto a pagar.
-        La UOCRA no publica una API: hay que cargarlos a mano cada mes cuando sale la escala
-        (<a href="https://www.uocra.org" target="_blank" rel="noopener">uocra.org</a>).
-      </p>
-      <div class="cfg-row" style="margin-bottom:.75rem;align-items:center;">
-        <label for="val-mes" style="font-size:.85rem;color:var(--gray-600);">Mes:</label>
-        <input type="month" id="val-mes" class="form-control" style="max-width:180px;">
-        <button class="btn btn-sm btn-outline" id="val-copiar">Copiar del mes anterior</button>
-      </div>
-      <div id="val-list" style="margin-bottom:.75rem;"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
-      <button class="btn btn-primary btn-sm" id="val-save">Guardar valores</button>
-    </div>
-  </div>
-
-  <!-- Feriados -->
-  <div class="sec-card collapsed" id="fer-card">
-    <div class="sec-head"><h2>Feriados</h2>
-      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
-    <div class="sec-body">
-      <div id="fer-list" style="margin-bottom:.75rem;"><span style="color:var(--gray-500);font-size:.85rem;">Cargando…</span></div>
-      <div class="cfg-row">
-        <input type="date" id="fer-fecha" class="form-control" style="min-width:150px;">
-        <input type="text" id="fer-nombre" class="form-control" placeholder="Nombre del feriado" style="flex:1;min-width:160px;">
-        <button class="btn btn-primary btn-sm" id="fer-add">+ Agregar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Padrón -->
-  <div class="sec-card collapsed" id="pad-card">
-    <div class="sec-head"><h2>Padrón de personal <span id="pad-count" style="color:var(--gray-400);font-weight:400;"></span></h2>
-      <svg class="icon chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></div>
-    <div class="sec-body">
-      <div class="pad-tools">
-        <input type="text" id="pad-search" class="form-control" placeholder="Buscar por nombre o DNI…">
-        <button class="btn btn-primary btn-sm" id="pad-add">+ Agregar</button>
-      </div>
-      <div id="pad-list"><div class="hist-loading">Cargando padrón…</div></div>
-    </div>
-  </div>
-
 </main>
 
-<!-- Modal: Agregar / Editar personal (padrón) -->
-<div class="modal-overlay hidden" id="modal-personal">
-  <div class="modal modal--sm">
-    <div class="modal-header">
-      <span class="modal-title" id="modal-personal-title">Agregar al padrón</span>
-      <button class="modal-close" id="modal-personal-close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+<div class="pc-savebar hidden" id="pc-savebar">
+  <span class="s" id="pc-save-txt"></span>
+  <button type="button" class="foc-btn foc-btn--clear" id="pc-undo">Deshacer</button>
+  <button type="button" class="foc-btn foc-btn--save" id="pc-save"></button>
+</div>
+<input type="file" id="pc-foto-input" accept="image/*" class="hidden">
+
+<!-- Alta -->
+<div class="modal-overlay pc-modal hidden" id="modal-alta">
+  <div class="confirm-box pc-dlg sm" role="dialog" aria-modal="true" aria-labelledby="alta-t">
+    <div class="pc-dlg-h"><span class="pc-sq sm t-per" id="alta-ic"></span><div><b id="alta-t">Agregar persona</b><small>Lo demás se completa en la ficha, que se abre al crear</small></div></div>
+    <div class="pc-row2">
+      <div class="pc-fld"><label for="alta-apellido">Apellido</label><input type="text" id="alta-apellido" class="form-control" placeholder="Pérez" autocomplete="off"></div>
+      <div class="pc-fld"><label for="alta-nombre">Nombre</label><input type="text" id="alta-nombre" class="form-control" placeholder="Juan" autocomplete="off"></div>
     </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:.75rem;">
-        <div class="form-group u-flex-1"><label for="p-nombre">Nombre *</label>
-          <input type="text" id="p-nombre" class="form-control" placeholder="Juan"></div>
-        <div class="form-group u-flex-1"><label for="p-apellido">Apellido *</label>
-          <input type="text" id="p-apellido" class="form-control" placeholder="Pérez"></div>
-      </div>
-      <div style="display:flex;gap:.75rem;">
-        <div class="form-group u-flex-1"><label for="p-dni">DNI</label>
-          <input type="text" id="p-dni" class="form-control" inputmode="numeric" placeholder="30123456"></div>
-        <div class="form-group u-flex-1"><label for="p-categoria">Categoría</label>
-          <select id="p-categoria" class="form-control"></select></div>
-      </div>
-      <div style="display:flex;gap:.75rem;">
-        <div class="form-group u-flex-1"><label for="p-telefono">Teléfono</label>
-          <input type="tel" id="p-telefono" class="form-control" inputmode="tel" placeholder="11 2345-6789"></div>
-        <div class="form-group u-flex-1"><label for="p-domicilio">Domicilio</label>
-          <input type="text" id="p-domicilio" class="form-control" placeholder="Calle 123, Localidad"></div>
-      </div>
-      <div style="display:flex;gap:.75rem;align-items:flex-end;">
-        <div class="form-group u-flex-1 u-mb-0">
-          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-            <input type="checkbox" id="p-horas-extra" style="width:18px;height:18px;"> Horas extras
-          </label>
-        </div>
-        <div class="form-group u-flex-1 u-mb-0"><label for="p-pct-extra">% extra</label>
-          <input type="number" id="p-pct-extra" class="form-control" min="0" step="1" placeholder="0"></div>
-      </div>
-      <label style="font-size:.9rem;color:var(--gray-700);font-weight:500;">Foto del DNI</label>
-      <div style="display:flex;gap:.75rem;margin-top:.35rem;">
-        <div class="form-group u-flex-1 u-mb-0">
-          <label for="p-foto-frente" style="font-size:.78rem;color:var(--gray-500);">Frente</label>
-          <input type="file" id="p-foto-frente" class="form-control" accept="image/*">
-          <div class="dni-preview" id="p-foto-frente-preview"></div>
-        </div>
-        <div class="form-group u-flex-1 u-mb-0">
-          <label for="p-foto-dorso" style="font-size:.78rem;color:var(--gray-500);">Dorso</label>
-          <input type="file" id="p-foto-dorso" class="form-control" accept="image/*">
-          <div class="dni-preview" id="p-foto-dorso-preview"></div>
-        </div>
-      </div>
-      <div id="modal-personal-error" class="alert alert-error hidden" style="margin-top:.75rem"></div>
+    <div class="pc-row2">
+      <div class="pc-fld"><label for="alta-dni">DNI</label><input type="text" id="alta-dni" class="form-control" inputmode="numeric" placeholder="30123456" autocomplete="off"></div>
+      <div class="pc-fld"><label for="alta-cat">Categoría</label><select id="alta-cat" class="form-control"></select></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" id="modal-personal-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="modal-personal-save">Guardar</button>
+    <div id="alta-dup"></div>
+    <div class="pc-hint">También se agrega gente desde la cuadrilla de cada obra.</div>
+    <div id="alta-error" class="alert alert-error hidden" style="margin-top:.6rem"></div>
+    <div class="pc-dlg-f">
+      <button type="button" class="foc-btn foc-btn--clear" id="alta-cancel">Cancelar</button>
+      <button type="button" class="foc-btn foc-btn--save" id="alta-save"></button>
     </div>
+  </div>
+</div>
+
+<!-- Valores hora por mes -->
+<div class="modal-overlay pc-modal hidden" id="hoja-valores">
+  <div class="confirm-box pc-dlg" role="dialog" aria-modal="true" aria-labelledby="val-t" id="val-box"></div>
+</div>
+
+<!-- Feriados -->
+<div class="modal-overlay pc-modal hidden" id="hoja-feriados">
+  <div class="confirm-box pc-dlg" role="dialog" aria-modal="true" aria-labelledby="fer-t" id="fer-box"></div>
+</div>
+
+<!-- Traer feriados nacionales -->
+<div class="modal-overlay pc-modal hidden" id="modal-traer">
+  <div class="confirm-box pc-dlg" role="dialog" aria-modal="true" aria-labelledby="traer-t" id="traer-box"></div>
+</div>
+
+<!-- Categorías -->
+<div class="modal-overlay pc-modal hidden" id="hoja-cats">
+  <div class="confirm-box pc-dlg" role="dialog" aria-modal="true" aria-labelledby="cat-t" id="cat-box"></div>
+</div>
+
+<!-- Foto del DNI ampliada -->
+<div class="modal-overlay hidden" id="modal-foto">
+  <div class="confirm-box pc-dlg pc-visor" role="dialog" aria-modal="true" aria-label="Foto del DNI">
+    <div class="pc-dlg-h" style="margin-bottom:.5rem"><b id="foto-t"></b><button type="button" class="pc-qx x" id="foto-close" aria-label="Cerrar"></button></div>
+    <img id="foto-img" alt="Foto del DNI">
   </div>
 </div>
 
