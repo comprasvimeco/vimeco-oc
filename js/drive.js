@@ -17,6 +17,7 @@
     window.listDriveFolderFiles = noDrive;
     window.findFileInFolder     = noDrive;
     window.bajarDriveArchivo    = noDrive;
+    window.uploadCotizacionArchivo = noDrive;
     return;
   }
 
@@ -1105,6 +1106,29 @@
   // Contenido de un archivo, para el visor de Archivo (archivo.html). Los
   // documentos nativos de Google (planillas, docs) no se pueden bajar tal cual:
   // devuelven `nativo` y el visor ofrece abrirlos en Drive.
+  // Presupuestos de una comparativa: COMPRAS/COTIZACIONES/{Obra}/{carpeta}/archivo.
+  // COTIZACIONES va dentro de COMPRAS, hermana de OBRAS y PROVEEDORES.
+  let _cotizacionesId = null;
+  window.uploadCotizacionArchivo = async function (file, { obra, carpeta }) {
+    const token = await getAccessToken();
+    if (!_cotizacionesId) {
+      try {
+        const r = await fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/cotizacionesId.json');
+        if (r.ok) _cotizacionesId = await r.json();
+      } catch (_) {}
+      if (!_cotizacionesId) {
+        _cotizacionesId = await getOrCreateFolder(token, 'COTIZACIONES', DRIVE_CONFIG.folderId);
+        fetch(FIREBASE_CONFIG.databaseURL + '/drive_config/cotizacionesId.json', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_cotizacionesId)
+        }).catch(() => {});
+      }
+    }
+    const obraId  = await getOrCreateFolder(token, obra || 'Sin obra', _cotizacionesId);
+    const folderId = await getOrCreateFolder(token, carpeta, obraId);
+    const fileId  = await uploadFile(token, file, file.name || 'presupuesto', file.type || 'application/octet-stream', folderId);
+    return { fileId, folderId };
+  };
+
   window.bajarDriveArchivo = async function (fileId) {
     const token = await getAccessToken();
     const base  = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`;

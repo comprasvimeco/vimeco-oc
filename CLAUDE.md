@@ -102,6 +102,14 @@ y sin las de prueba (`esOCPrueba` en `driveBackup.js`); totales en pesos al ofic
   `nombre`; caché en `localStorage` vía `nombreOCGuardado`), qué puede hacer cada uno, notificaciones y
   Cerrar sesión (ya no está en el menú). Al autorizar se guarda `autorizacion.firmanteOC` (el nombre del PDF).
   `app.html` ya no tiene menú ☰ ni versión.
+- `compras.html` → **Cotizaciones** (`cotizaciones.html` + `js/cotizaciones.js`; por ahora sólo 0000, que ve la tarjeta y entra): comparativa por obra
+  con 2 a 6 presupuestos. Cada uno se lee al subirlo con `extractFromFile` y va a Drive
+  `COMPRAS/COTIZACIONES/{Obra}/{fecha título}/`. «Comparar» hace una llamada a `compararPresupuestos`
+  (`CADENA_COMPARA` en `js/gemini.js`: Flash grandes pensando a fondo, lite de última red), que sólo empareja
+  renglones por índice y lee condiciones. Las cuentas («mismo producto» / «con parecidos», sin IVA, cantidad
+  editable por renglón) salen de `js/cotizacionCalc.js` (`tests/cotizacion.test.js`). Datos en `/cotizaciones/{id}`.
+  «Abrir la Orden de Compra» precarga la OC con la lectura (`sessionStorage.oc_desde_cotizacion`) y el archivo
+  (IndexedDB `vimeco-borrador-oc`, clave `cotizacion_{código}`). La OC guarda `cotizacionId` y cierra la comparativa.
 - `menu.html` → **Proveedores** (`proveedores.html`, para todos): ficha editable de cada proveedor, artículos
   comprados con el último precio y comparación por artículo. Lo tildado abre `app.html` precargado vía
   `sessionStorage.oc_desde_proveedor` (`loadOCDesdeProveedor`). Todos ven precios por unidad; no se muestran

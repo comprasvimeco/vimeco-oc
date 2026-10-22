@@ -70,6 +70,17 @@
       <div class="menu-card-title">Remitos</div>
       <div class="menu-card-sub">Controlar entregas sobre la OC</div>
     </a>
+    <a href="cotizaciones.html" class="menu-card hidden" id="menu-card-cotizaciones">
+      <div class="menu-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+          <polyline points="2 17 12 22 22 17"/>
+          <polyline points="2 12 12 17 22 12"/>
+        </svg>
+      </div>
+      <div class="menu-card-title">Cotizaciones</div>
+      <div class="menu-card-sub">Comparar presupuestos del mismo pedido</div>
+    </a>
     <a href="historial.html" class="menu-card" id="menu-card-historial" data-tone="sky">
       <div class="menu-card-icon">
         <span id="historial-badge" class="menu-card-badge hidden" title="OC posiblemente duplicadas por revisar"></span>
@@ -95,6 +106,8 @@
     window.location.href = 'index.html';
   } else {
     document.getElementById('hdr-name').textContent = _s.nombre;
+    // Cotizaciones: por ahora sólo para 0000, mientras se prueba.
+    if (_s.codigo === '0000') document.getElementById('menu-card-cotizaciones').classList.remove('hidden');
 
     // Historial: globito con las OC propias posiblemente duplicadas que falta
     // resolver (anular la que sobra o decir que son compras distintas).

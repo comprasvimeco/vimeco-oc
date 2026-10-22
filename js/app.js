@@ -2373,9 +2373,24 @@ async function arrancarBorrador(obrasListas) {
   sessionStorage.removeItem('oc_desde_proveedor');
   let desdeProv = null;
   try { desdeProv = provRaw ? JSON.parse(provRaw) : null; } catch (e) { console.warn('oc_desde_proveedor:', e); }
+  const cotRaw = sessionStorage.getItem('oc_desde_cotizacion');
+  sessionStorage.removeItem('oc_desde_cotizacion');
+  let desdeCot = null;
+  try { desdeCot = cotRaw ? JSON.parse(cotRaw) : null; } catch (e) { console.warn('oc_desde_cotizacion:', e); }
   await obrasListas;
 
-  if (desdeProv) {
+  if (desdeCot) {
+    const usarla = !b || await showConfirm('Tenés una OC sin terminar',
+      `${resumenBorrador(b)}.\nSi abrís la OC de la comparativa «${desdeCot.titulo || ''}», la que estabas cargando se borra.`,
+      { boton: 'Abrir la nueva', tono: 'warn', icono: 'undo', cancelar: 'Seguir con la mía' });
+    if (usarla) {
+      if (b) borrarBorrador();
+      try { await loadOCDesdeCotizacion(desdeCot); } catch (e) { console.warn('loadOCDesdeCotizacion:', e); }
+    } else {
+      await restaurarBorrador(b);
+      mostrarAvisoBorrador(b);
+    }
+  } else if (desdeProv) {
     const usarla = !b || await showConfirm('Tenés una OC sin terminar',
       `${resumenBorrador(b)}.\nSi abrís la OC a ${desdeProv.proveedor?.nombre || 'este proveedor'}, la que estabas cargando se borra.`,
       { boton: 'Abrir la nueva', tono: 'warn', icono: 'undo', cancelar: 'Seguir con la mía' });
@@ -2802,8 +2817,8 @@ async function handleGenerate() {
   // Guardar en historial; una vez guardado, subir a Drive y salvar folder_id
   const histKey   = numero.replace(/-/g, '');
   recordarObra(ocData.proveedor.ubicacion);
-  const histSaved = saveOCToHistory(ocData, ocData._total, { estado: 'emitida', ...extraRepetida(repetida) })
-    .then(() => { updateProveedoresCache(); aplicarRepetida(repetida, numero); return true; })
+  const histSaved = saveOCToHistory(ocData, ocData._total, { estado: 'emitida', ...extraRepetida(repetida), ...extraCotizacion() })
+    .then(() => { updateProveedoresCache(); aplicarRepetida(repetida, numero); cerrarCotizacion(numero); return true; })
     .catch(e => { console.warn('saveOCToHistory:', e); return false; });
 
   // Compartir (solo mobile/táctil) o descargar
@@ -2932,10 +2947,12 @@ async function solicitarAutorizacion(autorizador, regla = null, repetida = null)
       _payload:     ocData,
       // Avisa en la bandeja que hay presupuesto aunque la subida no haya llegado.
       ...(fuente ? { tieneFuente: true } : {}),
-      ...extraRepetida(repetida)
+      ...extraRepetida(repetida),
+      ...extraCotizacion()
     });
     updateProveedoresCache();
     if (repetida?.tipo === 'otra') aplicarRepetida(repetida, numero);
+    cerrarCotizacion(numero);
   } catch (e) {
     console.warn('saveOCToHistory (pendiente):', e);
     toast('No se pudo registrar la solicitud. Revisá tu conexión.', 'error');
@@ -3100,6 +3117,7 @@ let _ocBase = null;
 
 function loadOCBase(oc) {
   _ocBase = oc;
+  _cotizacion = null;
   const prov = oc.proveedor || {};
   $('proveedor').value                = prov.nombre          || '';
   $('cuit-proveedor').value           = prov.cuit            || '';
@@ -3164,6 +3182,7 @@ function loadOCBase(oc) {
 // OC. La obra queda para elegir.
 function loadOCDesdeProveedor(d) {
   _ocBase = null;
+  _cotizacion = null;
   const p = d.proveedor || {};
   $('proveedor').value                = p.nombre          || '';
   $('cuit-proveedor').value           = p.cuit            || '';
@@ -3198,9 +3217,60 @@ function loadOCDesdeProveedor(d) {
           : `OC a ${p.nombre}. Revisá la obra y cargá los ítems.`, 'info');
 }
 
+// ---- OC desde Cotizaciones ----
+// El presupuesto elegido en la comparativa llega con su lectura (la misma que
+// haría "Extraer con IA") y el archivo, que viaja en la base del borrador con
+// otra clave para no pisar el de una OC a medio cargar.
+let _cotizacion = null;   // { id, pid } de la comparativa de la que sale esta OC
+const extraCotizacion = () => _cotizacion ? { cotizacionId: _cotizacion.id } : {};
+const archivoCotizacionKey = () => 'cotizacion_' + (sessionStorage.getItem('responsable_code') || '');
+
+async function tomarArchivoCotizacion() {
+  try {
+    const db  = await _borradorDB();
+    const tx  = db.transaction('archivo', 'readwrite');
+    const st  = tx.objectStore('archivo');
+    const req = st.get(archivoCotizacionKey());
+    const file = await new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+    st.delete(archivoCotizacionKey());
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    db.close();
+    return file || null;
+  } catch (e) {
+    console.warn('tomarArchivoCotizacion:', e);
+    return null;
+  }
+}
+
+async function loadOCDesdeCotizacion(d) {
+  resetForm();
+  if (d.obra) setObraValue(d.obra);
+  const file = await tomarArchivoCotizacion();
+  if (file) handleFileSelected(file);
+  applyExtractionResult(d.lectura || {});
+  monedaUSD = d.moneda === 'USD';
+  const monedaChk = $('moneda-toggle');
+  if (monedaChk) monedaChk.checked = monedaUSD;
+  updateMonedaLabels();
+  await enrichFromBase({ notify: false }).catch(e => console.warn('enrichFromBase:', e));
+  _cotizacion = { id: d.cotizacionId, pid: d.pid };
+  if (typeof updateOCSummaries === 'function') updateOCSummaries();
+  toast(`OC a ${d.lectura?.proveedor || 'el proveedor elegido'} con su presupuesto. Revisá los datos antes de generar.`, 'info');
+}
+
+// La OC salió: queda enganchada a la comparativa y la comparativa se cierra.
+function cerrarCotizacion(nroOC) {
+  if (!_cotizacion || typeof patchCotizacion !== 'function') return;
+  const { id, pid } = _cotizacion;
+  _cotizacion = null;
+  patchCotizacion(id, { estado: 'cerrada', oc: { nroOC, pid, ts: Date.now() } })
+    .catch(e => console.warn('cerrarCotizacion:', e));
+}
+
 // ---- Nueva OC mismo proveedor ----
 function resetFormKeepProvider() {
   _ocBase = null;
+  _cotizacion = null;
   $('ref-presupuesto').value  = '';
   $('obra').value             = '';
   setRubro(null);
@@ -3239,6 +3309,7 @@ function resetFormKeepProvider() {
 // ---- Reset ----
 function resetForm() {
   _ocBase = null;
+  _cotizacion = null;
   ['proveedor','cuit-proveedor','nombre-proveedor','codigo-interno-proveedor',
    'domicilio-proveedor','telefonos-proveedor',
    'ref-presupuesto','obra','condicion-pago','plazo-entrega','lugar-entrega','observaciones']

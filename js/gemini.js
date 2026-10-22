@@ -31,6 +31,22 @@ const CADENA_DOC = [G_LITE_35, G_LITE_31, G_FLASH_36, G_FLASH_25];
 // Arranca por el modelo grande y deja los lite como red para cuando se agote.
 const CADENA_REMITO = [G_FLASH_36, G_LITE_35, G_LITE_31, G_FLASH_25];
 
+// Comparar presupuestos (Cotizaciones): es razonamiento, no lectura. Una sola
+// llamada por comparativa, así que se usan los Flash grandes pensando a fondo
+// (20 por día cada uno en el tier gratuito; el Pro da 0). El 22/10 los 3.6-3.8
+// devolvían 503 por demanda casi siempre: la cascada salta al siguiente. El lite
+// queda de última red y la pantalla avisa que conviene repetir.
+const PIENSA = { thinkingConfig: { thinkingLevel: 'high' } };
+const CADENA_COMPARA = [
+  { id: 'gemini-3.8-flash',       cfg: PIENSA },
+  { id: 'gemini-3.7-flash',       cfg: PIENSA },
+  { id: 'gemini-3.6-flash',       cfg: PIENSA },
+  { id: 'gemini-3-flash-preview', cfg: PIENSA },
+  G_FLASH_25,
+  G_LITE_35
+];
+const MODELOS_COMPARA_FLOJOS = new Set([G_LITE_35.id]);
+
 const GEMINI_AGOTADOS_KEY = 'vimeco_gemini_agotados';
 const modelosSinNombre    = new Set();   // 404: nombre que esta API todavía no sirve
 
@@ -560,4 +576,81 @@ async function extractFromRemito(file, ocItems) {
     items:         leidos,
     sinMatch:      (parsed.sin_match || []).map(t => String(t || '').trim()).filter(Boolean)
   };
+}
+
+// ---- Comparar presupuestos (Cotizaciones) ----
+// El modelo NO elige ni suma: empareja los renglones ya leídos de cada
+// presupuesto (por índice), dice cuánto se parecen, pasa unidades y lee la letra
+// chica. Los precios salen de la lectura de cada uno —la misma que después
+// precarga la OC— y las cuentas las hace cotizacionCalc.js.
+function compararPrompt(lecturas) {
+  const bloques = lecturas.map((r, i) => {
+    const items = (r.items || []).map((it, idx) =>
+      `  [${idx}] ${it.descripcion} | ${it.cantidad} ${it.unidad} | unitario ${it.precio_unitario}`).join('\n');
+    const desc = r.descuento ? ` · descuento global ${r.descuento.porcentaje ? r.descuento.porcentaje + '%' : '$ ' + r.descuento.monto}` : '';
+    return `P${i + 1}: ${r.proveedor || 'sin nombre'} · precios con IVA incluido: ${r.precios_incluyen_iva}${desc}\n${items || '  (sin ítems leídos)'}`;
+  }).join('\n\n');
+
+  return `Sos un comprador técnico de una constructora argentina. Te paso ${lecturas.length} presupuestos (P1..P${lecturas.length}, en el mismo orden que los archivos adjuntos) pedidos para la MISMA compra, y lo que ya se leyó de cada uno:
+
+${bloques}
+
+Tu trabajo NO es elegir ni sumar: es EMPAREJAR los renglones equivalentes entre presupuestos y leer las condiciones, para que la app haga la cuenta.
+
+Reglas:
+- Un renglón agrupa los ítems de distintos presupuestos que cumplen la misma función. Referenciá cada ítem por su índice [n] de la lista de arriba. Cada ítem va en un solo renglón. Un ítem que no tiene par en otro presupuesto va en un renglón propio.
+- "grado" del renglón: "igual" (mismo producto o especificación, aunque cambie el nombre o el código) o "parecido" (misma función pero otra marca, línea o medida que puede rendir distinto). Si un ítem directamente no reemplaza a los otros (otra medida, otro material), marcalo "distinto": true y explicá en "nota".
+- "factor": cuántas unidades de "unidad_comun" trae UNA unidad del ítem tal como está en el documento (1 si es la misma unidad). Ej.: unidad común "barra de 12 m" y el ítem en toneladas de hierro Ø8 → 1 tn = 211 barras (0,395 kg/m × 12 m = 4,74 kg). Explicá la conversión en "nota".
+- Un número entre paréntesis en la descripción (ej.: "X 25 KG. (64)") suele ser unidades por pallet o por bulto, no la cantidad pedida: si las cantidades difieren por eso, decilo en "avisos".
+- "iva_pct": sólo si el presupuesto tiene precios con IVA incluido, la alícuota que corresponde a ese ítem (21 o 10.5); si no, null.
+- Si al mirar el documento ves que un precio o una cantidad leída está mal, decilo en "avisos" (no lo corrijas en los números).
+- Condiciones de cada presupuesto, tal como dice el documento: pago (plazo o forma de pago; la condición frente al IVA NO es condición de pago), entrega (plazo o lugar), validez, flete, percepciones u otros impuestos aparte, moneda ("ARS" o "USD"), fecha y número.
+- "avisos": lo que quien compra tiene que mirar antes de decidir. Máximo 6, frases cortas en español rioplatense, nombrando al proveedor (no "P1").
+- No inventes: si un dato no está, null.
+
+Devolvé ÚNICAMENTE este JSON:
+{"presupuestos":[{"id":"P1","moneda":"ARS","fecha":null,"numero":null,"condiciones":{"pago":null,"entrega":null,"validez":null,"flete":null,"percepciones":null,"otros":null}}],
+ "renglones":[{"nombre":"descripción neutra y corta","unidad_comun":"u","grado":"igual","motivo":"por qué son iguales o parecidos","items":{"P1":{"idx":0,"factor":1,"iva_pct":null,"distinto":false,"nota":null},"P2":null}}],
+ "avisos":[""]}`;
+}
+
+// presus: [{ file, lectura }] en el orden de las columnas. Devuelve el JSON
+// crudo del modelo (lo valida cotizacionCalc.normalizarComparacion) y con qué
+// modelo salió.
+async function compararPresupuestos(presus) {
+  const adjuntos = [];
+  for (const p of presus) {
+    const file = await compressImageIfNeeded(p.file);
+    adjuntos.push({ inline_data: { mime_type: normalizeMimeType(file.type, file.name), data: await fileToBase64(file) } });
+  }
+
+  const body = {
+    contents: [{ parts: [{ text: compararPrompt(presus.map(p => p.lectura)) }, ...adjuntos] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 32768, responseMimeType: 'application/json' }
+  };
+  const opts = {
+    timeout:    180000,
+    msgTimeout: 'La comparación tardó demasiado. Probá de nuevo en un rato.',
+    msgVacio:   'Gemini no devolvió la comparación. Probá de nuevo.'
+  };
+  // Si están todos saturados (503), una vuelta más a los pocos segundos suele
+  // entrar: un 503 no gasta cupo.
+  const SATURADO = /high demand|overloaded|unavailable|HTTP 5\d\d/i;
+  let resp;
+  try {
+    resp = await callGemini(CADENA_COMPARA, body, opts);
+  } catch (e) {
+    if (!SATURADO.test(e.message)) throw e;
+    await new Promise(r => setTimeout(r, 6000));
+    try { resp = await callGemini(CADENA_COMPARA, body, opts); }
+    catch (e2) {
+      throw SATURADO.test(e2.message)
+        ? new Error('Los modelos de IA están saturados en este momento. Probá de nuevo en unos minutos.') : e2;
+    }
+  }
+  const { data, modelo } = resp;
+
+  // Con thinking, las partes de razonamiento vienen marcadas: se saltean.
+  const texto = (data.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('');
+  return { crudo: jsonDeTexto(texto), modelo, flojo: MODELOS_COMPARA_FLOJOS.has(modelo) };
 }

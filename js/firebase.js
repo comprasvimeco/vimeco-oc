@@ -1310,4 +1310,45 @@ window._fetchConTope = function (url, opts, ms = 20000) {
     const resp = await fetch(_base() + '/remitos/' + key + '.json', { method: 'DELETE' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
   };
+
+  // ── Cotizaciones: comparar presupuestos (estructura en js/cotizacionCalc.js) ──
+  window.getCotizaciones = async function () {
+    const resp = await fetch(_base() + '/cotizaciones.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (!data) return [];
+    return Object.entries(data)
+      .map(([id, c]) => ({ ...c, id }))
+      .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  };
+
+  window.getCotizacion = async function (id) {
+    const resp = await fetch(_base() + '/cotizaciones/' + id + '.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const c = await resp.json();
+    return c ? { ...c, id } : null;
+  };
+
+  // POST: la clave la pone Firebase (ordenada por fecha, sin choques entre dispositivos).
+  window.crearCotizacion = async function (data) {
+    const resp = await fetch(_base() + '/cotizaciones.json', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return (await resp.json()).name;
+  };
+
+  // `ruta` relativa a la cotización ('' = la raíz), para no pisar lo que otro
+  // esté cargando en la misma: cada presupuesto se escribe en su propio nodo.
+  window.patchCotizacion = async function (id, fields, ruta = '') {
+    const resp = await fetch(_base() + '/cotizaciones/' + id + (ruta ? '/' + ruta : '') + '.json', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
+
+  window.deleteCotizacion = async function (id, ruta = '') {
+    const resp = await fetch(_base() + '/cotizaciones/' + id + (ruta ? '/' + ruta : '') + '.json', { method: 'DELETE' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  };
 })();

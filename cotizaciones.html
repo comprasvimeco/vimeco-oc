@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIMECO S.A. — Cotizaciones</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="icono_app.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIMECO OC">
+  <style>
+    /* ===== Cotizaciones (azul de Compras) ===== */
+    .ct-main { max-width: 1240px; padding-bottom: 6rem; }
+    .hidden { display: none !important; }
+    .ct-ttl { display: flex; align-items: center; gap: .45rem; margin-bottom: .8rem; flex-wrap: wrap; }
+    .ct-t { font-size: 1.45rem; font-weight: 700; color: var(--primary-dark); margin: 0 .2rem 0 0; min-width: 0; overflow-wrap: anywhere; }
+    .ct-push { margin-left: auto; }
+    .ct-pill { display: inline-flex; align-items: center; gap: .3rem; font-size: .76rem; font-weight: 700; padding: .22rem .65rem; border-radius: 999px; white-space: nowrap; background: #e8eef7; color: #234870; }
+    .ct-pill .icon { width: 13px; height: 13px; }
+    .ct-pill--ok   { background: #dff3e5; color: #1a7f3c; }
+    .ct-pill--amb  { background: #fbeedd; color: #8a4f0d; }
+    .ct-pill--del  { background: #fde6e6; color: #b02a2a; }
+    .ct-pill--vio  { background: #f1e8fb; color: #6b3fa0; }
+    .ct-pill--gr   { background: var(--gray-100); color: var(--gray-600); }
+    .ct-btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: none; border-radius: 999px; font: inherit; font-weight: 700; font-size: .84rem;
+      padding: .5rem .95rem; cursor: pointer; white-space: nowrap; background: #e8eef7; color: #234870; }
+    .ct-btn .icon { width: 15px; height: 15px; }
+    .ct-btn--solid { background: #234870; color: #fff; }
+    .ct-btn--ok { background: #dff3e5; color: #1a7f3c; }
+    .ct-btn--clear { background: var(--gray-100); color: var(--gray-600); }
+    .ct-btn--del { background: #fde6e6; color: #b02a2a; }
+    .ct-btn--ic { padding: .45rem; }
+    .ct-btn:disabled { background: var(--gray-200); color: var(--gray-500); cursor: default; }
+    .ct-btn:not(:disabled):hover { filter: brightness(.96); }
+    .ct-btn:focus-visible, .ct-card:focus-visible, .ct-cel:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; }
+    .ct-box { background: var(--white); border-radius: 14px; box-shadow: 0 1px 2px rgba(26,58,92,.06), 0 6px 18px -10px rgba(26,58,92,.25); padding: .85rem .9rem; min-width: 0; }
+    .ct-h { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); font-weight: 700; margin: 1rem 0 .45rem; }
+    .ct-h:first-child { margin-top: 0; }
+    .ct-vacio { color: var(--gray-500); text-align: center; padding: 1.4rem .8rem; font-size: .9rem; }
+    .ct-sub { color: var(--gray-500); font-size: .8rem; }
+    .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    /* Lista */
+    .ct-lista { display: grid; gap: .55rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+    .ct-card { display: flex; gap: .7rem; align-items: flex-start; text-align: left; border: none; font: inherit; color: inherit; cursor: pointer; width: 100%; }
+    .ct-card:hover { box-shadow: 0 1px 2px rgba(26,58,92,.08), 0 8px 22px -10px rgba(26,58,92,.35); }
+    .ct-sq { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; background: #e8eef7; color: #234870; }
+    .ct-sq .icon { width: 19px; height: 19px; }
+    .ct-sq--ok { background: #dff3e5; color: #1a7f3c; }
+    .ct-card-t { font-weight: 700; color: var(--gray-900); overflow-wrap: anywhere; }
+    .ct-card-p { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .4rem; }
+
+    /* Detalle */
+    .ct-det { display: grid; gap: .9rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+    @media (min-width: 1000px) { .ct-det { grid-template-columns: 340px minmax(0, 1fr); } }
+    .ct-drop { border: 1.5px dashed #9fb4d1; background: #f2f6fb; border-radius: 12px; padding: .9rem; text-align: center; color: #234870; transition: background .15s, border-color .15s; }
+    .ct-drop.sobre { background: #e3ecf8; border-color: #2557a7; }
+    .ct-drop b { display: block; }
+    .ct-drop .ct-sub { color: #4b6a93; }
+    .ct-drop-btns { display: flex; gap: .45rem; justify-content: center; margin-top: .6rem; flex-wrap: wrap; }
+    .ct-prs { display: grid; gap: .45rem; margin-top: .7rem; }
+    .ct-pr { display: flex; gap: .6rem; align-items: center; border: 1px solid var(--gray-200); border-radius: 12px; padding: .55rem .6rem; background: var(--white); }
+    .ct-pr .ct-sq { width: 32px; height: 32px; border-radius: 9px; }
+    .ct-pr .ct-sq .icon { width: 16px; height: 16px; }
+    .ct-pr-x { flex: 1; min-width: 0; }
+    .ct-pr-t { font-weight: 700; color: var(--gray-900); font-size: .88rem; overflow-wrap: anywhere; }
+    .ct-pr-acc { display: flex; gap: .25rem; align-items: center; flex: none; }
+    .ct-pr-acc a, .ct-pr-acc button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--gray-100); color: var(--gray-600); cursor: pointer; }
+    .ct-pr-acc .icon { width: 15px; height: 15px; }
+    .ct-cmp-btn { width: 100%; margin-top: .75rem; padding: .7rem 1rem; font-size: .9rem; }
+    .ct-aviso { display: flex; gap: .55rem; align-items: flex-start; border-radius: 12px; padding: .65rem .75rem; font-size: .85rem; margin-bottom: .7rem; }
+    .ct-aviso .icon { width: 16px; height: 16px; flex: none; margin-top: .1rem; }
+    .ct-aviso--amb { background: #fbeedd; color: #6b3d08; }
+    .ct-aviso--inf { background: #e8eef7; color: #1a3a5c; }
+    .ct-aviso--del { background: #fde6e6; color: #8e2020; }
+    .ct-carga { display: flex; gap: .6rem; align-items: center; justify-content: center; color: #234870; padding: 2rem 1rem; text-align: center; }
+
+    /* Resultado */
+    .ct-res { display: grid; gap: .8rem; min-width: 0; }
+    .ct-sum { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .ct-sum-t { font-weight: 700; color: var(--primary-dark); }
+    .ct-sum-l { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .3rem .7rem; margin-top: .5rem; font-size: .88rem; align-items: baseline; }
+    .ct-sum-l .gana { font-weight: 700; color: #14532d; }
+    .ct-ia { background: #f6f1fd; border: 1px solid #e4d6f7; border-radius: 14px; padding: .8rem .9rem; color: #3f2a5c; font-size: .88rem; }
+    .ct-ia-t { display: flex; align-items: center; gap: .4rem; color: #6b3fa0; font-weight: 700; margin-bottom: .3rem; }
+    .ct-ia-t .icon { width: 16px; height: 16px; }
+    .ct-ia ul { margin: .2rem 0 0; padding-left: 1.1rem; }
+    .ct-ia li { margin: .25rem 0; }
+    .ct-ia-pie { color: #6b5a85; font-size: .78rem; margin-top: .45rem; }
+    .ct-tw { overflow-x: auto; border-radius: 14px; }
+    table.ct-tb { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .84rem; }
+    table.ct-tb th, table.ct-tb td { padding: .5rem .6rem; border-bottom: 1px solid var(--gray-200); text-align: right; vertical-align: top; }
+    table.ct-tb th:first-child, table.ct-tb td:first-child { text-align: left; }
+    table.ct-tb thead th { background: #f8fafc; color: var(--primary-dark); font-weight: 700; }
+    table.ct-tb tr:last-child td { border-bottom: 0; }
+    .ct-tb .sub { display: block; font-size: .74rem; color: var(--gray-500); font-weight: 500; white-space: normal; }
+    .ct-tb td.best { background: #eaf7ee; color: #14532d; font-weight: 700; }
+    .ct-tb td.falta { color: #b02a2a; background: #fff7f7; }
+    .ct-tb td.dist { background: #fff8ec; }
+    .ct-cel { cursor: pointer; }
+    .ct-cel:hover { box-shadow: inset 0 0 0 2px #9fb4d1; }
+    .ct-cel.sel { box-shadow: inset 0 0 0 2px #2557a7; }
+    .ct-tb tr.tot td { font-weight: 700; color: var(--gray-900); background: #f8fafc; }
+    .ct-tb tr.tot.hi td { background: #eef3fa; }
+    .ct-cant { width: 5.6rem; text-align: right; padding: .3rem .45rem; font: inherit; font-size: .84rem; border: 1.5px solid var(--gray-300); border-radius: 8px; }
+    .ct-cant.fija { border-color: #2557a7; background: #f2f6fb; }
+    .ct-src { margin-top: .6rem; background: #fffdf3; border: 1px solid #efe3b6; border-radius: 10px; padding: .55rem .7rem; font-size: .82rem; color: #5a4a12; }
+    .ct-cond td { font-size: .82rem; text-align: left !important; }
+    .ct-cond td:first-child { color: var(--gray-500); white-space: nowrap; }
+    .ct-ele { display: grid; gap: .45rem; margin-top: .4rem; }
+    .ct-ele label { display: flex; gap: .55rem; align-items: flex-start; cursor: pointer; padding: .45rem .5rem; border-radius: 10px; }
+    .ct-ele label:hover { background: var(--gray-100); }
+    .ct-ele input { margin-top: .25rem; }
+    /* En el teléfono el cuadro pasa a una tarjeta por renglón */
+    .ct-mob { display: none; }
+    @media (max-width: 720px) {
+      .ct-tw--cuadro { display: none; }
+      .ct-mob { display: grid; gap: .5rem; }
+    }
+    .ct-mr { border-top: 1px solid var(--gray-200); padding: .6rem 0; }
+    .ct-mr:first-child { border-top: 0; padding-top: 0; }
+    .ct-mr-h { display: flex; gap: .4rem; align-items: flex-start; justify-content: space-between; }
+    .ct-mr-t { font-weight: 700; color: var(--gray-900); font-size: .88rem; }
+    .ct-mr-q { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .6rem; font-size: .84rem; margin-top: .35rem; }
+    .ct-mr-q .gana { font-weight: 700; color: #14532d; }
+    .ct-mr-q .falta { color: #b02a2a; }
+    .ct-mr-cant { display: flex; align-items: center; gap: .4rem; margin-top: .35rem; font-size: .8rem; color: var(--gray-500); }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
+    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    <span class="header-title">Cotizaciones</span>
+  </div>
+  <div class="header-user">
+    <div class="user-badge"><span id="hdr-name">—</span></div>
+    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
+  </div>
+</header>
+
+<main class="app-main ct-main">
+  <!-- Lista de comparativas -->
+  <section id="vista-lista">
+    <div class="ct-ttl">
+      <h1 class="ct-t">Cotizaciones</h1>
+      <span class="ct-pill hidden" id="n-abiertas"></span>
+      <button type="button" class="ct-btn ct-btn--solid ct-push" id="btn-nueva"><span data-ic="plus"></span>Nueva comparativa</button>
+    </div>
+    <div id="lista"><div class="ct-vacio">Cargando…</div></div>
+  </section>
+
+  <!-- Una comparativa -->
+  <section id="vista-det" class="hidden">
+    <div class="ct-ttl">
+      <h1 class="ct-t" id="det-titulo"></h1>
+      <span id="det-pills" style="display:contents"></span>
+      <button type="button" class="ct-btn ct-btn--clear ct-push hidden" id="btn-borrar" title="Borrar la comparativa"><span data-ic="trash"></span><span>Borrar</span></button>
+    </div>
+    <div class="ct-det">
+      <div class="ct-box" id="col-presus">
+        <div class="ct-h">Presupuestos</div>
+        <div class="ct-drop" id="drop">
+          <b>Soltá acá un presupuesto</b>
+          <span class="ct-sub">PDF o foto. Se lee con IA al subirlo.</span>
+          <div class="ct-drop-btns">
+            <button type="button" class="ct-btn" id="btn-foto"><span data-ic="camera"></span>Foto</button>
+            <button type="button" class="ct-btn" id="btn-elegir"><span data-ic="file"></span>Elegir</button>
+          </div>
+          <input type="file" id="in-foto" accept="image/*" capture="environment" class="hidden">
+          <input type="file" id="in-elegir" accept="image/*,application/pdf" multiple class="hidden">
+        </div>
+        <div class="ct-prs" id="presus"></div>
+        <button type="button" class="ct-btn ct-btn--ok ct-cmp-btn" id="btn-comparar" disabled><span data-ic="sparkles"></span><span id="btn-comparar-txt">Comparar</span></button>
+        <div class="ct-sub" id="cmp-nota" style="margin-top:.45rem;text-align:center"></div>
+      </div>
+      <div class="ct-res" id="res"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Nueva comparativa -->
+<div class="modal-overlay hidden" id="modal-nueva">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="ct-sq"><span data-ic="layers"></span></span>
+      <div><div class="modal-title">Nueva comparativa</div><div class="ct-sub">Después le subís los presupuestos.</div></div>
+      <button class="modal-close" id="nueva-close" aria-label="Cerrar"><span data-ic="x"></span></button>
+    </div>
+    <div class="modal-body">
+      <form id="form-nueva" autocomplete="off">
+        <div class="form-group"><label for="n-obra">Obra</label>
+          <select class="form-control" id="n-obra"><option value="">Elegí la obra</option></select></div>
+        <div class="form-group" style="margin-top:.7rem"><label for="n-titulo">Qué se está cotizando</label>
+          <input class="form-control" id="n-titulo" maxlength="80" placeholder="P. ej. Adhesivo porcelanato PB"></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="ct-btn ct-btn--clear" id="nueva-cancel" type="button">Cancelar</button>
+      <button class="ct-btn ct-btn--solid" id="nueva-crear" type="button"><span data-ic="checkSm"></span>Crear</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/config.js"></script>
+<script src="js/firebase.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/dolar.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/scanner.js"></script>
+<script src="js/cotizacionCalc.js"></script>
+<script src="js/cotizaciones.js"></script>
+</body>
+</html>
