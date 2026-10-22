@@ -142,10 +142,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('pct-descuento').addEventListener('input', e => {
     const v = parseArgFloat(e.target.value);
     descuento.pct = v > 0 ? v : null;
-    if (descuento.pct) {
-      descuento.monto = roundCents(calcSubtotal() * v / 100);
-      $('monto-descuento').value = fmtMoneyDisplay(descuento.monto);
-    }
+    // Sin porcentaje (se borró) el monto vuelve a 0: si no, queda el del último dígito
+    descuento.monto = descuento.pct ? roundCents(calcSubtotal() * v / 100) : 0;
+    $('monto-descuento').value = fmtMoneyDisplay(descuento.monto);
     recalcTotales();
   });
   $('monto-descuento').addEventListener('input', e => {
@@ -165,10 +164,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('pct-nogravado').addEventListener('input', e => {
     const v = parseArgFloat(e.target.value);
     noGravado.pct = v > 0 ? v : null;
-    if (noGravado.pct) {
-      noGravado.monto = roundCents(calcSubtotal() * v / 100);
-      $('monto-nogravado').value = fmtMoneyDisplay(noGravado.monto);
-    }
+    noGravado.monto = noGravado.pct ? roundCents(calcSubtotal() * v / 100) : 0;
+    $('monto-nogravado').value = fmtMoneyDisplay(noGravado.monto);
     recalcTotales();
   });
   $('monto-nogravado').addEventListener('input', e => {
@@ -1899,13 +1896,9 @@ function renderImpuestos() {
 
     tr.querySelector('.imp-pct').addEventListener('input', e => {
       const v = parseArgFloat(e.target.value);
-      if (v > 0) {
-        impuestos[idx].pct   = v;
-        impuestos[idx].monto = roundCents(calcGravado() * v / 100);
-        tr.querySelector('.imp-monto').value = fmtMoneyDisplay(impuestos[idx].monto);
-      } else {
-        impuestos[idx].pct = null;
-      }
+      impuestos[idx].pct   = v > 0 ? v : null;
+      impuestos[idx].monto = v > 0 ? roundCents(calcGravado() * v / 100) : 0;
+      tr.querySelector('.imp-monto').value = fmtMoneyDisplay(impuestos[idx].monto);
       recalcTotales();
     });
 
