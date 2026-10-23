@@ -703,6 +703,7 @@ async function cargarPaneles(code) {
   await reconciliarNovedadesOC(hist);
   await reconciliarLinksOC(hist);
   await reconciliarFechasOC(hist);
+  await resubirTodas({ auto: true });
 }
 
 // Autocorrección: la tarjeta de una OC autorizada va a la hora de la firma, no
@@ -811,7 +812,8 @@ function renderSinRespaldo() {
   const n = sinRespaldoOCs.length;
   box.innerHTML = `
     <div class="act-alert-hd">${icSvg('alert')} ${n} ${n === 1 ? 'orden sin respaldo' : 'órdenes sin respaldo'} en Drive</div>
-    <div class="act-alert-sub">Su PDF no quedó archivado en Drive, o se archivó pero no se registró dónde.</div>
+    <div class="act-alert-sub">Su PDF no quedó archivado en Drive, o se archivó pero no se registró dónde.
+      Se resuben solas al abrir Novedades; si alguna falla, se puede reintentar.</div>
     <div class="act-alert-list">${chips}</div>
     <div class="act-alert-actions">
       <button class="btn btn-sm btn-secondary" id="act-resubir">${icSvg('drive')} Resubir a Drive</button>
@@ -821,11 +823,22 @@ function renderSinRespaldo() {
   bindChipsOC(box);
 }
 
-async function resubirTodas() {
-  if (typeof uploadToDrive !== 'function') { toast('Drive no está configurado.', 'error'); return; }
-  const list = [...sinRespaldoOCs];
+// Autocorrección: al abrir Novedades se resuben solas las OC sin respaldo
+// (`auto`); el botón queda para reintentar las que fallen. Las de los últimos
+// minutos se saltean: puede que su subida siga en curso en el dispositivo que
+// las emitió (o en su cola offline), y resubirlas en paralelo duplicaría el PDF.
+const AUTO_RESUBIR_DESDE_MS = 15 * 60 * 1000;
+let resubiendo = false;
+
+async function resubirTodas({ auto = false } = {}) {
+  if (resubiendo) return;
+  if (typeof uploadToDrive !== 'function') { if (!auto) toast('Drive no está configurado.', 'error'); return; }
+  const list = auto
+    ? sinRespaldoOCs.filter(oc => Date.now() - tsNovedadOC(oc) >= AUTO_RESUBIR_DESDE_MS)
+    : [...sinRespaldoOCs];
   if (!list.length) return;
 
+  resubiendo = true;
   const btn = $('act-resubir');
   btn.disabled = true;
 
@@ -843,15 +856,15 @@ async function resubirTodas() {
     catch (e) { fallaron.push(`${oc.nroOC} (${e.message})`); }
   }
 
-  sinRespaldoOCs = list.filter(oc => !driveFolderId(oc));
-  btn.disabled = false;
-  btn.innerHTML = icSvg('drive') + ' Resubir a Drive';
+  sinRespaldoOCs = sinRespaldoOCs.filter(oc => !driveFolderId(oc));
+  resubiendo = false;
   renderSinRespaldo();
 
   // Recién ahora estas OC tienen carpeta: sus tarjetas pueden mostrar el link.
   await reconciliarLinksOC(list);
 
   if (fallaron.length) toast(`${ok} subidas. Fallaron: ${fallaron.join(', ')}`, 'warning');
+  else if (auto) toast(`Se ${ok === 1 ? 'archivó' : 'archivaron'} en Drive ${ok} ${ok === 1 ? 'orden que no tenía' : 'órdenes que no tenían'} respaldo.`, 'success');
   else if (yaEstaban === ok) toast(`Listo: ${ok === 1 ? 'ya estaba archivada en Drive' : `las ${ok} ya estaban archivadas en Drive`}; se registró el link.`, 'success');
   else if (yaEstaban) toast(`Listo: ${ok - yaEstaban} ${ok - yaEstaban === 1 ? 'orden subida' : 'órdenes subidas'}; ${yaEstaban} ya ${yaEstaban === 1 ? 'estaba archivada' : 'estaban archivadas'}.`, 'success');
   else toast(`Listo: ${ok} ${ok === 1 ? 'orden subida' : 'órdenes subidas'} a Drive.`, 'success');
