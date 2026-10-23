@@ -57,6 +57,9 @@ cargar ahí mismo factura, remito (N°, fecha y cantidades), presupuesto u otro:
 Remitos y la autorización (`adjuntos`, `/remitos` + `entrega` + planillas, `fuenteUrl`), sin la cola offline.
 Si la OC salió de Cotizaciones (`cotizacionId`), abajo va «Cotización»: el informe de la comparativa en PDF
 (`js/cotizacionPDF.js`, armado al momento con `cuadroDeCotizacion` de `cotizacionCalc.js`) y los presupuestos comparados (el elegido marcado).
+Hasta v326 la OC emitida subía el presupuesto a Drive sin guardar `fuenteUrl` (sólo lo guardaba el pedido de
+autorización): Archivo se lo anota al listar la carpeta (`anotarFuentes`) y una pasada única recorrió todas
+(marca `/drive_config/fuentesAnotadas`; si se borra, se repite).
 
 `CAJAS` y `PERSONAL` originalmente vivían dentro de COMPRAS. Una migración única
 best-effort (`_ensureOutsideCompras` en `js/drive.js`, guardada por los flags

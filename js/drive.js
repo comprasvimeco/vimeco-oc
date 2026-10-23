@@ -466,12 +466,13 @@
 
     await _pushPdf(token, pdfBlob, pdfName, obrasFolderId, proveedoresFolderId, nroOC);
 
-    // Archivo fuente en background (best-effort)
-    if (sourceFile) {
-      _pushSource(token, sourceFile, obrasFolderId, proveedoresFolderId, nroOC).catch(() => {});
-    }
+    // Archivo fuente en background (best-effort). `fuente` resuelve al link de
+    // la copia archivada ('' si no hay o falló), para guardarlo en la OC.
+    const fuente = sourceFile
+      ? _pushSource(token, sourceFile, obrasFolderId, proveedoresFolderId, nroOC).catch(() => '')
+      : Promise.resolve('');
 
-    return { obrasFolderId, proveedoresFolderId };
+    return { obrasFolderId, proveedoresFolderId, fuente };
   };
 
   // Busca una carpeta/archivo por nombre sin crear nada. Devuelve el id o null.
@@ -535,11 +536,9 @@
   // en una resubida el presupuesto puede venir de la cola offline, que es su
   // única copia, y quien la vacía necesita saber que llegó a Drive.
   async function _pushSourceIfMissing(obrasFid, provsFid, sourceFile, nroOC) {
-    if (!sourceFile) return true;   // nada que archivar, nada que perder
+    if (!sourceFile) return { ok: true, link: '' };   // nada que archivar, nada que perder
     const token = await getAccessToken();
-    const { ok } = await _archivarFuente(
-      token, sourceFile, _destinosFuente(obrasFid, provsFid), nroOC);
-    return ok;
+    return _archivarFuente(token, sourceFile, _destinosFuente(obrasFid, provsFid), nroOC);
   }
 
   // Subida idempotente: sube sólo las copias que falten. La usan los caminos de
@@ -547,20 +546,22 @@
   // archivado desde el intento anterior aunque el cliente lo haya visto fallar.
   // Devuelve `yaEstaba` para poder informarlo sin mentir, y
   // `presupuestoArchivado` para que quien vacía la cola no borre la única copia
-  // del presupuesto sin que haya llegado a Drive.
+  // del presupuesto sin que haya llegado a Drive, y `fuenteUrl` (el link a la
+  // copia archivada, '' si no hay) para guardarlo en la OC.
   window.uploadOCIfMissing = async function (pdfBlob, pdfName, meta, sourceFile) {
     let hallazgo = null;
     try { hallazgo = await window.findOCUpload(meta, pdfName); } catch (_) {}
 
     if (hallazgo && hallazgo.pdfEnObras && hallazgo.pdfEnProveedores) {
       // El PDF ya está archivado; lo único que puede faltar es el presupuesto.
-      const presupuestoArchivado = await _pushSourceIfMissing(
+      const fuente = await _pushSourceIfMissing(
         hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
       return {
         obrasFolderId:       hallazgo.obrasFolderId,
         proveedoresFolderId: hallazgo.proveedoresFolderId,
         yaEstaba:            true,
-        presupuestoArchivado
+        presupuestoArchivado: fuente.ok,
+        fuenteUrl:            fuente.link
       };
     }
     if (hallazgo && (hallazgo.pdfEnObras || hallazgo.pdfEnProveedores)) {
@@ -569,22 +570,22 @@
         proveedoresFolderId: hallazgo.pdfEnProveedores ? null : hallazgo.proveedoresFolderId,
         nroOC: meta.nroOC
       });
-      const presupuestoArchivado = await _pushSourceIfMissing(
+      const fuente = await _pushSourceIfMissing(
         hallazgo.obrasFolderId, hallazgo.proveedoresFolderId, sourceFile, meta.nroOC);
       return {
         obrasFolderId:       hallazgo.obrasFolderId,
         proveedoresFolderId: hallazgo.proveedoresFolderId,
         yaEstaba:            false,
-        presupuestoArchivado
+        presupuestoArchivado: fuente.ok,
+        fuenteUrl:            fuente.link
       };
     }
     // Nada archivado todavía: subida completa. El presupuesto se archiva aparte
     // y esperando el resultado — uploadToDrive lo manda en background y ahí no
     // hay forma de saber si llegó.
-    const ids = await window.uploadToDrive(pdfBlob, pdfName, meta, null);
-    const presupuestoArchivado = await _pushSourceIfMissing(
-      ids.obrasFolderId, ids.proveedoresFolderId, sourceFile, meta.nroOC);
-    return { ...ids, yaEstaba: false, presupuestoArchivado };
+    const { obrasFolderId, proveedoresFolderId } = await window.uploadToDrive(pdfBlob, pdfName, meta, null);
+    const fuente = await _pushSourceIfMissing(obrasFolderId, proveedoresFolderId, sourceFile, meta.nroOC);
+    return { obrasFolderId, proveedoresFolderId, yaEstaba: false, presupuestoArchivado: fuente.ok, fuenteUrl: fuente.link };
   };
 
   // Al PEDIR autorización: crea las carpetas y sube solo el archivo fuente (si hay),

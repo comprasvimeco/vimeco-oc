@@ -385,13 +385,14 @@ async function _procesarCola(items) {
       // Idempotente: el intento anterior pudo llegar a Drive aunque el cliente
       // lo viera fallar (corte de red al leer la respuesta). Reintentar a ciegas
       // dejaba una segunda copia del PDF en la carpeta.
-      const { obrasFolderId, proveedoresFolderId } = await uploadOCIfMissing(pdfBlob, item.pdfName,
+      const { obrasFolderId, proveedoresFolderId, fuenteUrl } = await uploadOCIfMissing(pdfBlob, item.pdfName,
         { obra: item.obra, fecha: item.fecha, proveedor: item.proveedor, nroOC: item.nroOC },
         srcFile
       );
       await driveQueue.dequeue(item.histKey);
       if (obrasFolderId || proveedoresFolderId)
         await saveDriveIds(item.histKey, obrasFolderId, proveedoresFolderId, item.nroOC);
+      if (fuenteUrl) patchHistorialEntry(item.histKey, { fuenteUrl }).catch(() => {});
       // Once: la novedad puede existir ya (la creó la reconciliación de
       // Novedades mientras la subida seguía en la cola); en ese caso sólo le
       // falta el link.
@@ -2857,9 +2858,12 @@ async function handleGenerate() {
     const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
     histSaved.then(saved =>
       uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
-        .then(({ obrasFolderId, proveedoresFolderId }) => {
+        .then(({ obrasFolderId, proveedoresFolderId, fuente }) => {
           if (saved && (obrasFolderId || proveedoresFolderId))
             saveDriveIds(histKey, obrasFolderId, proveedoresFolderId, numero);
+          // El link al presupuesto: sin él, Archivo y Autorizaciones no lo ven
+          // hasta buscarlo en la carpeta.
+          fuente.then(url => { if (saved && url) patchHistorialEntry(histKey, { fuenteUrl: url }).catch(() => {}); });
           logOCActivity(numero, driveProv, driveObra, ocData._total, obrasFolderId || proveedoresFolderId, { moneda: ocData.moneda });
         })
         .catch(async () => {

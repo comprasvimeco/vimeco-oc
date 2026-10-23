@@ -239,13 +239,61 @@
       const o = _pendientes.shift();
       if (_carpetas.has(o.folder)) continue;
       _activas++;
-      listarCarpeta(o.folder).catch(e => console.warn('listarCarpeta:', e)).finally(() => {
+      listarCarpeta(o.folder).then(files => anotarFuentes(o.folder, files)).catch(e => console.warn('listarCarpeta:', e)).finally(() => {
         _activas--;
-        clearTimeout(_repintar);
-        _repintar = setTimeout(() => { armar(); pintarUso(); pintar(true); }, 250);
+        repintarPronto();
         pedirCarpetas([]);
       });
     }
+  }
+  // A lo sumo un repintado cada 400 ms, aunque las carpetas lleguen seguidas.
+  function repintarPronto() {
+    if (_repintar) return;
+    _repintar = setTimeout(() => { _repintar = 0; armar(); pintarUso(); pintar(true); }, 400);
+  }
+
+  // ---- Presupuestos sin link ----
+  // Hasta v326 la OC emitida subía el presupuesto a Drive pero no guardaba su
+  // link (`fuenteUrl`): sólo lo hacía el pedido de autorización. Al listar una
+  // carpeta se le anota a cada OC sin link el «Presupuesto - …» que le toca.
+  // Si la carpeta es sólo suya, el más viejo; si la comparte (mismo proveedor y
+  // día), el que se subió en los 30 minutos siguientes a emitirla y no le
+  // puede tocar a otra. Si no hay forma de saberlo, queda sin anotar.
+  const VENTANA_FUENTE = 30 * 60000;
+  function anotarFuentes(folderId, files) {
+    const del = (porCarpeta.get(folderId) || []).map(id => ocs.get(id)).filter(Boolean);
+    const usados = new Set(del.map(o => idDeLink(o.h.fuenteUrl)).filter(Boolean));
+    const pres = files.filter(f => /^Presupuesto\b/i.test(f.name) && !usados.has(f.id))
+      .map(f => ({ f, t: Date.parse(f.createdTime) || 0 })).sort((a, b) => a.t - b.t);
+    const cerca = (o, x) => x.t >= o.ts - 120000 && x.t <= o.ts + VENTANA_FUENTE;
+    del.filter(o => !o.h.fuenteUrl).forEach(o => {
+      const x = del.length === 1 ? pres[0]
+        : pres.find(x => cerca(o, x) && !del.some(y => y !== o && cerca(y, x)));
+      if (!x) return;
+      pres.splice(pres.indexOf(x), 1);
+      o.h.fuenteUrl = `https://drive.google.com/file/d/${x.f.id}/view`;
+      patchHistorialEntry(o.key, { fuenteUrl: o.h.fuenteUrl }).catch(e => console.warn('fuenteUrl ' + o.nro + ':', e));
+    });
+  }
+
+  // Una sola vez (marca en /drive_config/fuentesAnotadas): recorre las carpetas
+  // de todas las OC sin link, de a dos y sin apuro, para anotar las viejas sin
+  // esperar a que alguien las abra. Si alguna carpeta falla, no se marca y se
+  // reintenta en la próxima entrada.
+  async function anotarFuentesViejas() {
+    const URL_MARCA = FIREBASE_CONFIG.databaseURL + '/drive_config/fuentesAnotadas.json';
+    try { if (await (await fetch(URL_MARCA)).json()) return; } catch (_) { return; }
+    const carpetas = [...new Set([...ocs.values()].filter(o => o.folder && !o.h.fuenteUrl).map(o => o.folder))];
+    let fallas = 0;
+    const uno = async () => {
+      for (let fid; (fid = carpetas.shift());) {
+        try { anotarFuentes(fid, await listarCarpeta(fid)); } catch (_) { fallas++; }
+        repintarPronto();
+      }
+    };
+    await Promise.all([uno(), uno()]);
+    if (fallas) console.warn(`Archivo: ${fallas} carpetas sin listar; los presupuestos se buscan de nuevo la próxima vez.`);
+    else fetch(URL_MARCA, { method: 'PUT', body: JSON.stringify(Date.now()) }).catch(() => {});
   }
 
   function claveOC(o, v) {
@@ -1575,6 +1623,7 @@
     $('ar-cuerpo').classList.remove('hidden');
     pintarUso();
     pintar();
+    anotarFuentesViejas().catch(e => console.warn('anotarFuentesViejas:', e));
 
     $('ar-q').addEventListener('input', () => { limite = PAGINA; pintar(); });
     $('ar-dim').addEventListener('click', e => {

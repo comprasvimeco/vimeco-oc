@@ -195,10 +195,14 @@ async function resubirOC(oc) {
   // copia; uploadOCIfMissing decide qué subir (y no sube nada si ya está todo).
   const blob   = generateOCBlob(await ocDataDe(oc));
   const enCola = await presupuestoEnCola(oc);
-  const { obrasFolderId, proveedoresFolderId, yaEstaba, presupuestoArchivado } =
+  const { obrasFolderId, proveedoresFolderId, yaEstaba, presupuestoArchivado, fuenteUrl } =
     await uploadOCIfMissing(blob, fname, meta, enCola?.file || null);
 
   await registrarCarpetasOC(oc, obrasFolderId, proveedoresFolderId);
+  if (fuenteUrl) {
+    await patchHistorialEntry(histKeyOf(oc), { fuenteUrl }).catch(() => {});
+    oc.fuenteUrl = fuenteUrl;
+  }
 
   // Sólo se vacía la cola si quedó archivado TODO lo que había en ella. El
   // presupuesto encolado es su única copia (vive sólo en este navegador): si la
