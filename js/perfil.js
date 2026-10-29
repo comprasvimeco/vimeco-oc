@@ -177,6 +177,7 @@ async function pintarPermisos() {
   if (u.novedades != null ? u.novedades : u.admin) out.push(fila('sec', 'info', 'Novedades', 'OC, remitos y facturas que se cargan'));
   if (u.jefeTaller) out.push(fila('sec', 'tool', 'Jefe de Taller', 'Equipos: datos, foto y repuestos'));
   if (u.archivo) out.push(fila('sec', 'folder', 'Archivo', 'Todos los archivos de Compras'));
+  if (u.cotizaciones) out.push(fila('sec', 'layers', 'Cotizaciones', 'Comparar presupuestos del mismo pedido'));
   if (u.jefeObra) {
     let obras = [];
     try {

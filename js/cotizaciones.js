@@ -699,8 +699,12 @@ function enlazar() {
 document.addEventListener('DOMContentLoaded', async () => {
   const _s = (() => { try { return JSON.parse(localStorage.getItem('vimeco_session')); } catch (_) { return null; } })();
   if (!_s?.codigo) { window.location.href = 'index.html'; return; }
-  // Por ahora sólo para 0000, mientras se prueba.
-  if (_s.codigo !== '0000') { window.location.href = 'compras.html'; return; }
+  // Sólo 0000 y quien tenga el permiso `cotizaciones` (se da en Usuarios).
+  if (_s.codigo !== '0000') {
+    let u = null;
+    try { u = await getUsuario(_s.codigo); } catch (_) {}
+    if (!u || !u.cotizaciones) { window.location.href = 'compras.html'; return; }
+  }
   S.code = _s.codigo;
   S.nombre = _s.nombre || '';
   sessionStorage.setItem('responsable_code', S.code);

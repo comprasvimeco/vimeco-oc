@@ -107,7 +107,7 @@ y sin las de prueba (`esOCPrueba` en `driveBackup.js`); totales en pesos al ofic
   `nombre`; caché en `localStorage` vía `nombreOCGuardado`), qué puede hacer cada uno, notificaciones y
   Cerrar sesión (ya no está en el menú). Al autorizar se guarda `autorizacion.firmanteOC` (el nombre del PDF).
   `app.html` ya no tiene menú ☰ ni versión.
-- `compras.html` → **Cotizaciones** (`cotizaciones.html` + `js/cotizaciones.js`; por ahora sólo 0000, que ve la tarjeta y entra): comparativa por obra
+- `compras.html` → **Cotizaciones** (`cotizaciones.html` + `js/cotizaciones.js`; para 0000 y el permiso `cotizaciones`, que se habilita en Usuarios como un módulo más): comparativa por obra
   con 2 a 6 presupuestos. Cada uno se lee al subirlo con `extractFromFile` y va a Drive
   `COMPRAS/COTIZACIONES/{Obra}/{fecha título}/`. «Comparar» hace una llamada a `compararPresupuestos`
   (`CADENA_COMPARA` en `js/gemini.js`: Flash grandes pensando a fondo, lite de última red), que sólo empareja

@@ -106,8 +106,10 @@
     window.location.href = 'index.html';
   } else {
     document.getElementById('hdr-name').textContent = _s.nombre;
-    // Cotizaciones: por ahora sólo para 0000, mientras se prueba.
-    if (_s.codigo === '0000') document.getElementById('menu-card-cotizaciones').classList.remove('hidden');
+    // Cotizaciones: 0000 y quien tenga el permiso `cotizaciones` (se da en Usuarios).
+    const _verCot = () => document.getElementById('menu-card-cotizaciones').classList.remove('hidden');
+    if (_s.codigo === '0000') _verCot();
+    else if (typeof getUsuario === 'function') getUsuario(_s.codigo).then(u => { if (u && u.cotizaciones) _verCot(); }).catch(() => {});
 
     // Historial: globito con las OC propias posiblemente duplicadas que falta
     // resolver (anular la que sobra o decir que son compras distintas).
