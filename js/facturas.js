@@ -7,7 +7,7 @@ let viewerIsAdmin = false; // 0000 o usuario con permiso admin
 let viewerCode    = '';
 let tipoCarga   = null;   // 'factura' | 'otro' — arranca sin elegir (ver elegirTipo)
 let rawFile     = null;   // imagen original (sin escanear), para volver a pasarla por el escáner
-let filePrevUrl = null;   // objectURL del preview actual
+let pastilla    = null;   // el archivo elegido: pastilla que abre su ficha (js/fichaArchivo.js)
 let filtroOC    = 'sin';  // 'sin' | 'con' | 'todas' — arranca en lo que falta cargar
 
 // Momento de cada OC mientras se le carga algo: 'subiendo' | 'ok' (recién cargada).
@@ -83,12 +83,13 @@ function estadoHtml(oc) {
 }
 
 // Cuadradito del renglón: en el teléfono es lo único que muestra el estado, y
-// con factura también la abre.
+// con factura también la abre. Verde con tilde la que la tiene, durazno la que la
+// espera; una anulada no espera nada y queda neutra (traído de Leva v344).
 function cuadroHtml(oc) {
   const e = estadoFactura(oc).estado;
-  if (e === 'con') return `<button type="button" class="fac-sq" data-doc="fact" aria-label="Abrir la factura" title="Abrir la factura">${icSvg('file')}</button>`;
+  if (e === 'con') return `<button type="button" class="fac-sq fac-sq--con" data-doc="fact" aria-label="Abrir la factura" title="Abrir la factura">${icSvg('fileCheck')}</button>`;
   if (e === 'otros') return `<span class="fac-sq fac-sq--otros" title="Tiene archivos sin rotular">${icSvg('clip')}</span>`;
-  return `<span class="fac-sq fac-sq--sin" title="Sin factura">${icSvg('alert')}</span>`;
+  return `<span class="fac-sq ${oc.estado !== 'anulada' ? 'fac-sq--sin' : 'fac-sq--nada'}" title="Sin factura">${icSvg('file')}</span>`;
 }
 
 // Cargar una factura sobre una OC que ya la tiene suele ser el mismo archivo
@@ -130,6 +131,7 @@ async function registrarAdjunto(oc, file, res) {
 // mirar: la pantalla arranca sin elegir y se elige una vez por visita.
 function elegirTipo(tipo) {
   tipoCarga = tipo;
+  pintarPastilla();
   $('adj-tipo').querySelectorAll('.fac-tipo-opt').forEach(b => b.setAttribute('aria-checked', String(b.dataset.tipo === tipo)));
   $('adj-tipo').classList.remove('is-falta');
   $('adj-tipo-falta').classList.add('hidden');
@@ -171,11 +173,30 @@ function setFile(file) {
   currentFile = file;
   borradorArchivo.guardar('facturas', { file, raw: rawFile });
   $('fac-drop-main').classList.add('hidden');
-  $('file-name').textContent = file.name;
-  $('file-size').textContent = `${(file.size / 1024).toFixed(0)} KB`;
   $('file-info').classList.remove('hidden');
-  mostrarPreview(file);
+  // Con la imagen original a mano se puede volver a recortar; un PDF no.
+  laPastilla().mostrar(file, { recortar: !!(rawFile || file.type.startsWith('image/')) && typeof openScanner === 'function' });
   mostrarElegirOC();
+}
+
+// La pastilla dice lo que se eligió arriba: Factura, Otro archivo o, sin elegir, Archivo.
+function laPastilla() {
+  if (!pastilla) {
+    pastilla = pastillaArchivo($('fac-pastilla'), { onQuitar: resetZone, onRecortar: async () => {
+      const base = rawFile || currentFile;
+      if (!base) return;
+      const scan = await escanear(base);
+      if (scan) setFile(scan);
+    } });
+    pintarPastilla();
+  }
+  return pastilla;
+}
+
+function pintarPastilla() {
+  if (!pastilla) return;
+  if (tipoCarga === 'factura') pastilla.tipo('factura', 'Factura');
+  else pastilla.tipo('otro', tipoCarga === 'otro' ? 'Otro archivo' : 'Archivo');
 }
 
 // Con el archivo ya elegido, la lista para cargarlo en una OC aparece sola: la
@@ -183,37 +204,20 @@ function setFile(file) {
 function mostrarElegirOC() {
   $('card-list').classList.add('hidden');
   $('card-result').classList.remove('hidden');
-  $('btn-restart').classList.add('hidden');   // ya está "Cambiar" en el archivo
+  $('btn-restart').classList.add('hidden');   // ya está Quitar en la ficha del archivo
   $('result-title').textContent = 'Elegir la OC';
   showManualList();
-}
-
-// El preview (con su botón de escanear) solo tiene sentido con imágenes: un PDF
-// ya viene derecho y no pasa por el escáner.
-function mostrarPreview(file) {
-  if (filePrevUrl) { URL.revokeObjectURL(filePrevUrl); filePrevUrl = null; }
-  const box = $('file-preview');
-  if (!file.type.startsWith('image/') || typeof openScanner !== 'function') {
-    box.classList.add('hidden');
-    $('file-preview-img').removeAttribute('src');
-    return;
-  }
-  filePrevUrl = URL.createObjectURL(file);
-  $('file-preview-img').src = filePrevUrl;
-  box.classList.remove('hidden');
 }
 
 function resetZone() {
   borradorArchivo.borrar('facturas');
   currentFile = null;
   rawFile     = null;
-  if (filePrevUrl) { URL.revokeObjectURL(filePrevUrl); filePrevUrl = null; }
+  if (pastilla) pastilla.limpiar();
   $('fac-drop-main').classList.remove('hidden');
   $('file-info').classList.add('hidden');
   $('card-result').classList.add('hidden');
   $('card-list').classList.remove('hidden');
-  $('file-preview').classList.add('hidden');
-  $('file-preview-img').removeAttribute('src');
   $('file-input').value     = '';
   $('camera-input').value   = '';
   $('manual-camera').value  = '';
@@ -225,7 +229,9 @@ function resetZone() {
 async function escanear(file) {
   if (!file || typeof openScanner !== 'function') return file || null;
   try {
-    return await openScanner(file);
+    const scan = await openScanner(file);
+    if (scan && scan.original) rawFile = scan.original;   // «Otra foto» dentro del escáner
+    return scan;
   } catch (_) {
     // Escáner no disponible (p. ej. sin conexión la primera vez): va la original.
     toast('Escáner no disponible; se usó la foto original.', 'warning');
@@ -545,7 +551,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   sessionStorage.setItem('responsable_name', name);
 
   $('hdr-name').textContent = name;
-  $('btn-back').addEventListener('click', () => { window.location.href = 'compras.html'; });
+  $('btn-back').addEventListener('click', () => vimecoVolver('compras.html'));
   $('btn-restart').addEventListener('click', resetToStart);
   $('btn-another').addEventListener('click', resetToStart);
 
@@ -661,7 +667,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-camera').addEventListener('click', () => cameraInput.click());
 
   // Archivo elegido a mano: se usa tal cual (puede ser un PDF). Si es imagen,
-  // queda disponible para escanearla desde el preview.
+  // se puede volver a recortar desde su ficha.
   function elegirArchivo(file) {
     if (!file) return;
     rawFile = file.type.startsWith('image/') ? file : null;
@@ -675,17 +681,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const f = cameraInput.files[0];
     cameraInput.value = '';
     if (!f) return;
-    rawFile = f;
-    const scan = await escanear(f);
-    if (scan) setFile(scan);   // null = canceló: no cambia nada
-  });
-
-  $('file-preview-img').addEventListener('click', () => verImagen(filePrevUrl));
-  $('btn-file-rescan').addEventListener('click', async () => {
-    const base = rawFile || currentFile;
-    if (!base) return;
-    const scan = await escanear(base);
-    if (scan) setFile(scan);
+    const scan = await escanear(f);   // deja en rawFile la foto de la que salió el recorte
+    if (!scan) return;                // canceló: queda todo como estaba
+    if (!scan.original) rawFile = f;  // sin escáner: va la foto tal cual
+    setFile(scan);
   });
 
   // Drag & drop (desktop)
@@ -697,8 +696,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     importZone.classList.remove('drag-over');
     elegirArchivo(e.dataTransfer.files[0]);
   });
-
-  $('btn-change-file').addEventListener('click', resetZone);
 
   $('btn-use-ai').addEventListener('click', async () => {
     if (!currentFile) return;

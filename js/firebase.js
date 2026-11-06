@@ -132,7 +132,12 @@ window._fetchConTope = function (url, opts, ms = 20000) {
       // Snapshot de la cotización del dólar al momento de emitir la OC.
       // Permite reexpresar el total en ARS/USD con el valor real de esa fecha.
       // null si nunca se pudo traer (offline sin caché previa).
-      cotizacion:     (typeof getDolarCached === 'function' ? getDolarCached() : null),
+      // `usada`: la que tomó la OC (del presupuesto, el oficial promedio o a mano).
+      cotizacion:     (() => {
+        const snap = typeof getDolarCached === 'function' ? getDolarCached() : null;
+        const u = ocData.moneda === 'USD' && ocData.cotizacionUsada;
+        return u ? { ...(snap || {}), usada: u.valor, origen: u.origen } : snap;
+      })(),
       ...extra
     };
 

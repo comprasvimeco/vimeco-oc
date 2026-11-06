@@ -1,5 +1,5 @@
 /* global getUsuario, patchUsuario, getFirma, saveFirma, nombreOCGuardado, recordarNombreOC, tienePersonal,
-   initPush, activarPush, showConfirm, toast, escHtml, icSvg, _hdrInitials, FIREBASE_CONFIG */
+   initPush, activarPush, pushRegistrado, showConfirm, toast, escHtml, icSvg, _hdrInitials, FIREBASE_CONFIG */
 /* Perfil (perfil.html): se llega tocando la pastilla del nombre en el header (js/ui.js).
    Traído de Leva, sin la cuenta de Google ni el mail.
    - Tu firma: /firmas/{código}, el mismo lienzo que antes estaba en el menú ☰ de la OC.
@@ -196,10 +196,14 @@ async function pintarPermisos() {
 
 // ---- Notificaciones ----
 async function pintarPush() {
-  const estado = await initPush(code);
+  let estado = await initPush(code);
+  // Con el permiso dado pero sin token registrado (Chrome no dejó suscribir el equipo) no llega nada:
+  // no se dice «Activadas» y queda el botón para reintentar.
+  if (estado === 'activas' && !pushRegistrado(code)) estado = 'fallo';
   const btn = $('pf-push-btn');
   const txt = {
     'activas':      'Activadas en este dispositivo. Te avisamos cuando te pidan firmar una OC y cuando te respondan un pedido.',
+    'fallo':        'Este dispositivo no quedó suscripto a los avisos. Tocá Activar para reintentar.',
     'pedir':        'Te avisamos cuando te pidan firmar una OC y cuando te respondan un pedido.',
     'bloqueadas':   'Bloqueadas en este navegador. Habilitalas desde los permisos del sitio y volvé a entrar.',
     'ios-instalar': 'En iPhone, primero agregá la app a la pantalla de inicio (Compartir → Agregar a inicio) y abrila desde ese ícono.',
@@ -207,7 +211,7 @@ async function pintarPush() {
   }[estado];
   if (!txt) return;   // sin configurar: no se muestra
   $('pf-push-txt').textContent = txt;
-  btn.classList.toggle('hidden', estado !== 'pedir');
+  btn.classList.toggle('hidden', estado !== 'pedir' && estado !== 'fallo');
   $('pf-push-card').classList.remove('hidden');
 }
 
@@ -221,6 +225,10 @@ function setupPush() {
     btn.disabled = false;
     btn.textContent = 'Activar';
     if (ok) toast('Notificaciones activadas.', 'success');
+    // Lo que lo destrabó en el Android donde pasó (en Leva): reinstalar la app; borrar los datos del sitio no alcanzó.
+    else if (/push service/i.test(window.pushError || '')) toast(matchMedia('(display-mode: standalone)').matches
+      ? 'Chrome no pudo suscribir este teléfono a los avisos. Desinstalá la app, volvé a instalarla y activalas de nuevo.'
+      : 'Chrome no pudo suscribir este teléfono a los avisos. Reiniciá el teléfono y probá de nuevo.', 'error');
     else if (Notification.permission !== 'denied') toast('No se pudieron activar. Probá de nuevo.', 'error');
     pintarPush();
   });
@@ -229,10 +237,7 @@ function setupPush() {
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
   if (!code) return;
-  $('btn-back').addEventListener('click', () => {
-    if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) history.back();
-    else location.href = 'menu.html';
-  });
+  $('btn-back').addEventListener('click', () => vimecoVolver('menu.html'));
   $('pf-salir').addEventListener('click', async () => {
     const ok = await showConfirm('Cerrar sesión', 'Para volver a entrar vas a tener que elegir tu usuario y poner la contraseña.',
       { boton: 'Cerrar sesión', tono: 'del', icono: 'logout' });

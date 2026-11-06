@@ -83,7 +83,11 @@ let items            = [];
 let ivaActive        = false;
 let ivaPct           = 21;
 let monedaUSD        = false;
+let tcUSD            = null;   // cotización que toma la OC en dólares (pesos por dólar)
+let tcOrigen         = null;   // 'presupuesto' | 'oficial' | 'manual'
 let selectedFile     = null;
+let fotoOriginal     = null; // la foto del presupuesto sin recortar, para «Recortar»
+let pastillaPre      = null; // la pastilla «Presupuesto» y su ficha (js/fichaArchivo.js)
 let descuento        = { pct: null, monto: 0 };
 let noGravado        = { pct: null, monto: 0 };
 let impuestos        = [];   // [{nombre, pct, monto}]
@@ -114,6 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Archivo compartido desde otra app: se revisa antes que nada, para que ningún
   // otro paso del arranque pueda impedir que aparezca el cartel.
   checkSharedFile();
+  restaurarOCLista();
 
   $('hdr-name').textContent = name;
   $('date-display').textContent = formatDateDisplay(new Date());
@@ -124,7 +129,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-add-row').addEventListener('click', addEmptyRow);
   $('btn-generate').addEventListener('click', handleGenerate);
   $('btn-extract').addEventListener('click', handleExtract);
-  $('btn-clear-file').addEventListener('click', clearFile);
+  pastillaPre = pastillaArchivo($('upload-filename'), { tipo: 'presupuesto', etiqueta: 'Presupuesto',
+    onRecortar: () => { if (fotoOriginal) escanearFoto(fotoOriginal); }, onQuitar: clearFile });
   $('btn-add-impuesto').addEventListener('click', addImpuestoRow);
   $('verif-banner-close').addEventListener('click', () => { verifColapsado = true; refrescarVerif(); programarBorrador(); });
   $('verif-chip').addEventListener('click', () => {
@@ -185,7 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('modal-preview-close').addEventListener('click',  closePreview);
   $('modal-preview-close2').addEventListener('click', closePreview);
   $('modal-preview-generate').addEventListener('click', () => { closePreview(); handleGenerate(); });
-  $('btn-same-provider').addEventListener('click', resetFormKeepProvider);
+  setupOCLista();
   $('btn-borrador-cero').addEventListener('click', empezarDeCero);
   $('btn-borrador-ok').addEventListener('click', ocultarAvisoBorrador);
   $('btn-prov-editar').addEventListener('click', editarProveedor);
@@ -255,12 +261,11 @@ function setupIVAToggle() {
 }
 
 function applyIVAToggle() {
-  const factor = 1 + ivaPct / 100;
-  items.forEach(item => {
-    if (item._precio_original === undefined) {
-      item._precio_original = item.precio_unitario;
-      item.precio_unitario  = Math.round((item.precio_unitario / factor) * 100) / 100;
-    }
+  const pendientes = items.filter(item => item._precio_original === undefined);
+  const netos = OCCalc.netosSinIVA(pendientes, ivaPct);
+  pendientes.forEach((item, i) => {
+    item._precio_original = item.precio_unitario;
+    item.precio_unitario  = netos[i];
   });
 }
 
@@ -309,14 +314,53 @@ function setupMonedaToggle() {
   checkbox.addEventListener('change', () => {
     monedaUSD = checkbox.checked;
     updateMonedaLabels();
+    if (monedaUSD && !tcUSD) cotizacionPorDefecto();
+    pintarCotizacion();
+  });
+  const inp = $('tc-usd');
+  if (inp) inp.addEventListener('change', () => {
+    const v = parseArgFloat(inp.value);
+    if (v > 0) { tcUSD = Math.round(v * 100) / 100; tcOrigen = 'manual'; }
+    pintarCotizacion();
+    programarBorrador();
   });
 }
 
 function resetMonedaToggle() {
   monedaUSD = false;
+  tcUSD = null;
+  tcOrigen = null;
   const checkbox = $('moneda-toggle');
   if (checkbox) checkbox.checked = false;
   updateMonedaLabels();
+  pintarCotizacion();
+}
+
+// ---- Cotización del dólar de la OC ----
+// La del presupuesto, si la trae; si no, el oficial de hoy (promedio de compra y
+// venta). Se puede escribir otra. Sale en la OC como la cotización del día.
+function cotizacionOficial(snap) {
+  const o = snap && snap.oficial;
+  if (!o) return null;
+  const v = o.compra && o.venta ? (o.compra + o.venta) / 2 : (o.venta || o.compra);
+  return v ? Math.round(v * 100) / 100 : null;
+}
+async function cotizacionPorDefecto() {
+  let v = cotizacionOficial(typeof getDolarCached === 'function' ? getDolarCached() : null);
+  if (!v && typeof getDolarSnapshot === 'function') v = cotizacionOficial(await getDolarSnapshot());
+  if (v && monedaUSD && !tcUSD) { tcUSD = v; tcOrigen = 'oficial'; pintarCotizacion(); programarBorrador(); }
+}
+function pintarCotizacion() {
+  const wrap = $('tc-wrap'), inp = $('tc-usd'), org = $('tc-origen');
+  if (!wrap) return;
+  wrap.classList.toggle('hidden', !monedaUSD);
+  if (document.activeElement !== inp) inp.value = tcUSD ? fmtMoneyDisplay(tcUSD) : '';
+  const txt = !monedaUSD ? '' : !tcUSD ? 'Sin cotización: escribila'
+    : tcOrigen === 'presupuesto' ? 'Cotización del presupuesto'
+    : tcOrigen === 'oficial' ? 'Dólar oficial de hoy (promedio de compra y venta)' : 'Cotización escrita a mano';
+  org.textContent = txt;
+  org.classList.toggle('hidden', !txt);
+  org.classList.toggle('warn', monedaUSD && !tcUSD);
 }
 
 // Refleja la moneda elegida en los encabezados de la app: ($) ↔ (USD).
@@ -491,6 +535,9 @@ function showShareChoiceModal(file, nombreBuscado = '') {
     if (!f) return;
     $('modal-share-choice').classList.add('hidden');
     deleteSharedFile();
+    // El archivo es para una OC nueva: la confirmación no puede taparla.
+    if (_ocLista?.meta.registrada) { cerrarOCLista(); resetForm(true); }
+    else document.body.classList.remove('oc-lista-on');
     handleFileSelected(f);
     toast('Archivo cargado. Usá "Extraer con IA" para procesar.', 'success');
   };
@@ -980,7 +1027,7 @@ async function enrichFromBase(opts = {}) {
   applyProveedorBase(p);
   if (notify) {
     if (via === 'cuit')
-      toast('Proveedor en base — código ' + (p.codigoInterno || '—') + '.', 'success');
+      toast(p.codigoInterno ? 'Proveedor en base — código ' + p.codigoInterno + '.' : 'Proveedor en base.', 'success');
     else
       toast('Coincidencia por nombre: ' + (p.nombre || '') + ' (código ' + (p.codigoInterno || '—') + '). Verificá que sea correcto.', 'warning');
   }
@@ -1194,7 +1241,7 @@ function setupOCAccordion() {
     if (!header.querySelector('.oc-sum')) {
       const sum = document.createElement('div');
       sum.className = 'oc-sum';
-      header.appendChild(sum);
+      title.appendChild(sum);
     }
     header.addEventListener('click', e => {
       if (!isMobileViewport()) return;
@@ -1221,8 +1268,8 @@ function openOCSection(sec) {
 }
 
 // ---- Resumen de las secciones cerradas (mobile) ----
-// Debajo del título de cada sección colapsada: lo cargado en una línea y, en
-// rojo, los obligatorios que faltan. Así no hace falta abrirlas para revisar.
+// Debajo del título de cada sección colapsada, una línea: lo cargado o, si faltan
+// varios obligatorios, cuáles son. Así no hace falta abrirlas para revisar.
 function ocSectionSummary(i) {
   const v   = id => $(id).value.trim();
   const cur = monedaUSD ? 'US$ ' : '$ ';
@@ -1268,14 +1315,16 @@ function updateOCSummaries() {
       const { txt, falta } = ocSectionSummary(i);
       // Ítems y Totales plegados: la diferencia con el presupuesto también se ve.
       const aviso = (i === 3 || i === 4) && verificarExtraccion().issues.length;
-      // Con un solo dato faltante lo dice la pastilla; con varios, el detalle va abajo.
-      el.innerHTML = (txt ? `<span class="oc-sum-t">${esc(txt)}</span>` : '')
-        + (falta.length > 1 ? `<span class="oc-sum-f">Falta: ${esc(falta.join(', '))}</span>` : '')
-        + (aviso ? '<span class="oc-sum-a">No coincide con el presupuesto</span>' : '');
+      // Con un solo dato faltante lo dice la pastilla; con varios, la línea dice cuáles.
+      // «No coincide» va en la pastilla, salvo que esté ocupada con lo que falta.
+      const lista = falta.join(', ').replace(/, ([^,]*)$/, ' y $1');
+      el.innerHTML = falta.length > 1 ? `<span class="oc-sum-f">${esc(lista.charAt(0).toUpperCase() + lista.slice(1))}</span>`
+        : txt ? `<span class="oc-sum-t">${esc(txt)}</span>` : '';
+      if (aviso && falta.length) el.innerHTML += '<span class="oc-sum-a">No coincide con el presupuesto</span>';
       const st = sec.querySelector('.oc-st');
       if (st) {
         const [cls, t] = i === 0 ? ['opc', 'Opcional']
-          : falta.length === 1 ? ['falta', 'Falta ' + falta[0]]
+          : falta.length === 1 ? ['falta', (/s$/.test(falta[0]) ? 'Faltan ' : 'Falta ') + falta[0]]   // «Faltan ítems»
           : falta.length ? ['falta', `Faltan ${falta.length}`]
           : aviso ? ['aviso', 'No coincide']
           : txt ? ['ok', 'Listo'] : ['', ''];
@@ -1328,7 +1377,11 @@ function setupImportButtons() {
   btnCamera.addEventListener('click', () => cameraInput.click());
 
   fileInput.addEventListener('change',   () => { if (fileInput.files[0])   handleFileSelected(fileInput.files[0]); });
-  cameraInput.addEventListener('change', () => { if (cameraInput.files[0]) handleFileSelected(cameraInput.files[0]); });
+  cameraInput.addEventListener('change', () => {
+    const f = cameraInput.files[0];
+    cameraInput.value = '';   // sacar dos veces la misma foto vuelve a disparar change
+    if (f) escanearFoto(f);
+  });
 
   // Drag & drop (desktop)
   const dropZone = $('drop-zone');
@@ -1347,14 +1400,28 @@ function setupImportButtons() {
   });
 }
 
-function handleFileSelected(file) {
+// Foto del presupuesto: pasa por el escáner (recorte de perspectiva + Mejora). Derecha
+// y pareja, la IA la lee mejor y queda mejor archivada. Cancelar no cambia nada.
+async function escanearFoto(f) {
+  if (typeof openScanner !== 'function') { handleFileSelected(f); return; }
+  try {
+    const scan = await openScanner(f);
+    if (scan) handleFileSelected(scan, scan.original || f);   // otra, si sacó «Otra foto»
+  } catch (_) {
+    // Escáner no disponible (p. ej. sin conexión la primera vez): va la original.
+    handleFileSelected(f);
+    toast('Escáner no disponible; se usó la foto original.', 'warning');
+  }
+}
+
+// `raw`: la foto sin recortar, para «Recortar» (un PDF no tiene).
+function handleFileSelected(file, raw) {
   const ok = /\.(jpg|jpeg|png|webp|pdf)$/i.test(file.name) ||
     ['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type);
   if (!ok) { toast('Formato no soportado. Usá JPG, PNG, PDF o WEBP.', 'error'); return; }
   selectedFile = file;
-  const nameEl = $('upload-filename');
-  $('upload-filename-txt').textContent = `${file.name} (${formatBytes(file.size)})`;
-  nameEl.classList.remove('hidden');
+  fotoOriginal = raw || (file.type.startsWith('image/') ? file : null);
+  pastillaPre.mostrar(file, { recortar: !!fotoOriginal && typeof openScanner === 'function' });
   $('btn-extract').disabled = false;
   clearExtractStatus();
   borradorArchivo(file);
@@ -1362,9 +1429,10 @@ function handleFileSelected(file) {
 
 function clearFile() {
   selectedFile = null;
+  fotoOriginal = null;
   $('file-input').value   = '';
   $('camera-input').value = '';
-  $('upload-filename').classList.add('hidden');
+  pastillaPre.limpiar();
   $('btn-extract').disabled = true;
   clearExtractStatus();
   borradorArchivo(null);
@@ -1427,6 +1495,17 @@ function applyExtractionResult(r) {
     ivaIncluido: r.precios_incluyen_iva === true
   };
   verifColapsado = false;
+
+  if (r.moneda === 'USD' && !monedaUSD) {
+    $('moneda-toggle').checked = true;
+    $('moneda-toggle').dispatchEvent(new Event('change', { bubbles: true }));
+    syncSegs();
+  }
+  if (r.cotizacion_dolar > 0) {
+    tcUSD = Math.round(r.cotizacion_dolar * 100) / 100;
+    tcOrigen = 'presupuesto';
+    pintarCotizacion();
+  }
 
   recalcTotales();
   renderTable();
@@ -1627,7 +1706,7 @@ function renderTableDesktop() {
         <input type="text" value="${fmtInput(item.cantidad)}" data-field="cantidad" class="text-right num-input">
       </td>
       <td class="col-price">
-        <input type="text" value="${fmtInput(item.precio_unitario)}" data-field="precio_unitario" class="text-right num-input">
+        <input type="text" value="${fmtPrecioInput(item.precio_unitario)}" data-field="precio_unitario" class="text-right num-input">
       </td>
       <td class="col-subtotal text-right">${fmtMoneyDisplay(sub)}</td>
       <td class="col-actions text-center">
@@ -1685,7 +1764,7 @@ function renderTableMobile() {
         </div>
         <div class="item-card-col item-card-col--price">
           <span class="item-card-lbl">P.Unit</span>
-          <input type="text" class="item-card-price num-input" value="${fmtInput(item.precio_unitario)}">
+          <input type="text" class="item-card-price num-input" value="${fmtPrecioInput(item.precio_unitario)}">
         </div>
       </div>
       <div class="item-card-r3">
@@ -2190,6 +2269,8 @@ function syncSegs() {
 // archivo del presupuesto en IndexedDB (en localStorage no entra). Es por usuario:
 // en un teléfono compartido cada uno ve el suyo. Se borra al generar la OC (o
 // pedir su autorización) y al limpiar el formulario.
+const OC_LISTA_PROV = ['proveedor', 'cuit-proveedor', 'nombre-proveedor', 'codigo-interno-proveedor', 'domicilio-proveedor',
+  'telefonos-proveedor', 'condicion-iva-proveedor'];
 const BORRADOR_CAMPOS = ['obra', 'condicion-pago', 'plazo-entrega', 'lugar-entrega', 'observaciones',
   'proveedor', 'cuit-proveedor', 'nombre-proveedor', 'codigo-interno-proveedor', 'domicilio-proveedor',
   'telefonos-proveedor', 'condicion-iva-proveedor', 'ref-presupuesto'];
@@ -2221,7 +2302,7 @@ function guardarBorrador() {
     localStorage.setItem(borradorKey(), JSON.stringify({
       ts: Date.now(), campos,
       rubro: selectedRubro, equipo: selectedEquipo, categoria: selectedCategoria,
-      items, descuento, noGravado, impuestos, ivaActive, ivaPct, monedaUSD,
+      items, descuento, noGravado, impuestos, ivaActive, ivaPct, monedaUSD, tcUSD, tcOrigen,
       provCuit: _loadedProvCuit, provSnapshot: _provSnapshot, provFicha, docRef, verifColapsado
     }));
   } catch (e) {
@@ -2243,7 +2324,7 @@ function borrarBorrador() {
 }
 
 // La OC salió: el borrador se borra y no se vuelve a guardar hasta que se edite
-// algo (el formulario queda cargado para "Mismo proveedor").
+// algo (el formulario queda cargado, tapado por la confirmación, para «Otra al mismo proveedor»).
 function terminarBorrador() {
   borrarBorrador();
   _borradorPausa = true;
@@ -2328,10 +2409,14 @@ async function restaurarBorrador(b) {
   $('iva-pct').value = String(ivaPct);
   $('iva-pct-wrap').classList.toggle('hidden', !ivaActive);
   monedaUSD = !!b.monedaUSD;
+  tcUSD     = b.tcUSD || null;
+  tcOrigen  = b.tcOrigen || null;
   docRef = b.docRef || null;
   verifColapsado = !!b.verifColapsado;
   $('moneda-toggle').checked = monedaUSD;
   updateMonedaLabels();
+  if (monedaUSD && !tcUSD) cotizacionPorDefecto();
+  pintarCotizacion();
 
   renderTable();
   renderImpuestos();
@@ -2492,6 +2577,7 @@ function buildOCData(numero, firma = null) {
     impuestos:   pdfTotals,
     totalLetras: numberToWords(total),
     _total:      total,
+    cotizacionUsada: monedaUSD && tcUSD ? { valor: tcUSD, origen: tcOrigen || 'manual' } : null,
     // Datos crudos para restaurar en historial → Usar como base
     _descuento:      { pct: descuento.pct, monto: descuento.monto },
     _noGravado:      { pct: noGravado.pct, monto: noGravado.monto },
@@ -2510,8 +2596,9 @@ function totalEnPesos(total) {
   if (!monedaUSD) return total;
   const d  = typeof getDolarCached === 'function' ? getDolarCached() : null;
   const tc = d?.oficial?.venta || d?.blue?.venta;
-  // Sin cotización no se puede ubicar la OC: se exige el escalón más alto.
-  return tc ? total * tc : Infinity;
+  // Sin cotización no se puede ubicar la OC: se exige el escalón más alto. Las
+  // reglas miden con el oficial guardado: si la de la OC es más alta, manda esa.
+  return tc ? total * Math.max(tc, tcUSD || 0) : Infinity;
 }
 
 // null si la OC no requiere autorización por monto; si no, el escalón y la
@@ -2817,39 +2904,24 @@ async function handleGenerate() {
 
   // Guardar en historial; una vez guardado, subir a Drive y salvar folder_id
   const histKey   = numero.replace(/-/g, '');
+  const archivoFuente = selectedFile;   // «Generar otra orden» lo limpia antes de que llegue la subida
+  const cotizacionOC = _cotizacion;    // idem la comparativa de la que sale
   recordarObra(ocData.proveedor.ubicacion);
-  const histSaved = saveOCToHistory(ocData, ocData._total, { estado: 'emitida', ...extraRepetida(repetida), ...extraCotizacion() })
-    .then(() => { updateProveedoresCache(); aplicarRepetida(repetida, numero); cerrarCotizacion(numero); return true; })
-    .catch(e => { console.warn('saveOCToHistory:', e); return false; });
+  const extra = { estado: 'emitida', ...extraRepetida(repetida), ...extraCotizacion() };
+  const histSaved = saveOCToHistory(ocData, ocData._total, extra)
+    .then(() => { marcarOCRegistrada(numero, repetida); cerrarCotizacion(numero, cotizacionOC); return true; })
+    .catch(e => { console.warn('saveOCToHistory:', e); marcarOCNoRegistrada(numero); return false; });
 
-  // Compartir (solo mobile/táctil) o descargar
-  const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-  let shared = false;
-  if (isMobile && navigator.canShare) {
-    const file = new File([blob], fname, { type: 'application/pdf' });
-    if (navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ title: `OC ${numero} — VIMECO S.A.`, files: [file] });
-        shared = true;
-      } catch (e) {
-        if (e.name !== 'AbortError') console.warn('Web Share:', e);
-      }
-    }
-  }
-  if (!shared) {
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href = url; a.download = fname;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-  }
-
+  // Todo esto antes de compartir: la casilla se abre encima de la confirmación, y
+  // Android puede cerrar la app mientras se manda el PDF por WhatsApp.
   refreshOCNumberDisplay();
   terminarBorrador();
-  toast(shared ? `OC ${numero} compartida.` : `OC ${numero} generada.`, 'success');
   btn.disabled = false;
   btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
-  $('btn-same-provider').classList.remove('hidden');
+  abrirOCLista({
+    estado: 'emitida', registrada: false, nroOC: numero, proveedor: ocData.proveedor.nombre, monto: montoOCLista(ocData)
+  }, { blob, fname, ocData, extra, repetida });
+  _ocLista.guardando = histSaved;
 
   // Subir a Drive en background (espera historial para evitar race condition en PATCH)
   if (typeof uploadToDrive === 'function') {
@@ -2857,10 +2929,13 @@ async function handleGenerate() {
     const driveFecha = new Date().toISOString().slice(0, 10);
     const driveProv  = ocData.proveedor.nombre || 'Sin proveedor';
     histSaved.then(saved =>
-      uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, selectedFile)
+      uploadToDrive(blob, fname, { obra: driveObra, fecha: driveFecha, proveedor: driveProv, nroOC: numero }, archivoFuente)
         .then(({ obrasFolderId, proveedoresFolderId, fuente }) => {
-          if (saved && (obrasFolderId || proveedoresFolderId))
-            saveDriveIds(histKey, obrasFolderId, proveedoresFolderId, numero);
+          if (obrasFolderId || proveedoresFolderId) {
+            // Si la OC todavía no quedó registrada, las carpetas se guardan al reintentar.
+            if (saved) saveDriveIds(histKey, obrasFolderId, proveedoresFolderId, numero);
+            else anotarCarpetasOCLista(numero, obrasFolderId, proveedoresFolderId);
+          }
           // El link al presupuesto: sin él, Archivo y Autorizaciones no lo ven
           // hasta buscarlo en la carpeta.
           fuente.then(url => { if (saved && url) patchHistorialEntry(histKey, { fuenteUrl: url }).catch(() => {}); });
@@ -2876,7 +2951,7 @@ async function handleGenerate() {
               await driveQueue.enqueue({
                 histKey, pdfBlob: blob, pdfName: fname,
                 obra: driveObra, fecha: driveFecha, proveedor: driveProv,
-                nroOC: numero, total: ocData._total, sourceFile: selectedFile
+                nroOC: numero, total: ocData._total, sourceFile: archivoFuente
               });
               encolada = true;
             } catch (_) {}
@@ -2892,6 +2967,268 @@ async function handleGenerate() {
         })
     );
   }
+
+  await compartirPDFOC(blob, fname, numero);
+}
+
+// ---- Confirmación de la OC ----
+// Al generar (o pedir autorización) el formulario se reemplaza por esta pantalla.
+// Queda guardada en el dispositivo: si Android cierra la app mientras se comparte
+// el PDF, al volver sigue ahí, hasta tocar un botón o hasta OC_LISTA_MS después.
+// meta (localStorage): lo que se muestra. datos (IndexedDB, junto al borrador): el
+// PDF para volver a compartirlo y la OC para reintentar el registro.
+// Una OC sin registrar no vence: si no, quedaría fuera del Historial sin aviso.
+const OC_LISTA_MS = 60 * 60 * 1000;
+const OC_LISTA_IC = {
+  emitida:   '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>',
+  pendiente: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>',
+  fallo:     '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="7.5" x2="12" y2="12.5"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+};
+let _ocLista = null;   // { meta, datos } de la que se está mostrando
+let _ocListaReintentando = false;
+
+function ocListaKey() {
+  return `vimeco_oc_lista_${sessionStorage.getItem('responsable_code') || ''}`;
+}
+
+function montoOCLista(ocData) {
+  return (ocData.moneda === 'USD' ? 'US$ ' : '$ ') + fmtMoneyDisplay(ocData._total);
+}
+
+function guardarOCListaMeta() {
+  try { localStorage.setItem(ocListaKey(), JSON.stringify(_ocLista.meta)); }
+  catch (e) { console.warn('guardarOCListaMeta:', e); }
+}
+
+async function ocListaDatosDB(modo, valor) {
+  try {
+    const db = await _borradorDB();
+    const tx = db.transaction('archivo', modo === 'leer' ? 'readonly' : 'readwrite');
+    const st = tx.objectStore('archivo');
+    const req = modo === 'leer' ? st.get(ocListaKey()) : modo === 'poner' ? st.put(valor, ocListaKey()) : st.delete(ocListaKey());
+    const r = await new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); });
+    db.close();
+    return r || null;
+  } catch (e) {
+    console.warn('ocListaDatosDB:', e);
+    return null;
+  }
+}
+
+function abrirOCLista(meta, datos = null) {
+  // El proveedor se guarda para «Otra al mismo proveedor» si la app se cerró en el medio.
+  const prov = {
+    campos: Object.fromEntries(OC_LISTA_PROV.map(id => [id, $(id).value])),
+    provCuit: _loadedProvCuit, provSnapshot: _provSnapshot, provFicha
+  };
+  _ocLista = { meta: { ...meta, ts: Date.now(), prov }, datos };
+  guardarOCListaMeta();
+  ocListaDatosDB(datos ? 'poner' : 'borrar', datos);
+  pintarOCLista();
+  window.scrollTo(0, 0);
+}
+
+function pintarOCLista() {
+  const { meta, datos } = _ocLista;
+  const tipo = meta.fallo ? 'fallo' : meta.estado;
+  document.body.classList.add('oc-lista-on');
+  $('oc-lista').className = 'oc-lista oc-lista--' + tipo;
+  $('oc-lista-ic').innerHTML = OC_LISTA_IC[tipo];
+  $('oc-lista-t').textContent = { emitida: 'Orden de Compra generada', pendiente: 'Orden de Compra esperando autorización',
+    fallo: 'No se pudo registrar la Orden de Compra' }[tipo];
+  const sub = meta.fallo ? 'El PDF está bien, pero la OC todavía no está en el Historial. Revisá la conexión y reintentá.' : meta.sub;
+  $('oc-lista-s').textContent = sub || '';
+  $('oc-lista-s').classList.toggle('hidden', !sub);
+  $('oc-lista-aviso').textContent = meta.aviso || '';
+  $('oc-lista-aviso').classList.toggle('hidden', !meta.aviso);
+  const filas = [['N° OC', meta.nroOC], ['Proveedor', meta.proveedor], ['Monto', meta.monto]];
+  if (meta.autoriza) filas.push(['Autoriza', meta.autoriza]);
+  $('oc-lista-datos').innerHTML = filas.map(([a, b]) =>
+    `<div class="oc-lista-fila"><span>${a}</span><b>${esc(b)}</b></div>`).join('');
+  $('btn-lista-reintentar').classList.toggle('hidden', !meta.fallo);
+  $('btn-lista-otra').classList.toggle('hidden', !!meta.fallo);
+  $('btn-lista-mismo').classList.toggle('hidden', !!meta.fallo);
+  $('btn-lista-descartar').classList.toggle('hidden', !meta.fallo);
+  const pdf = $('btn-lista-pdf');
+  pdf.classList.toggle('hidden', !datos?.blob);
+  pdf.textContent = puedeCompartirPDF(datos?.blob, datos?.fname) ? 'Compartir el PDF de nuevo' : 'Descargar el PDF de nuevo';
+}
+
+function ocListaEsLa(numero) {
+  return _ocLista && _ocLista.meta.nroOC === numero;
+}
+
+function marcarOCRegistrada(numero, repetida) {
+  updateProveedoresCache();
+  aplicarRepetida(repetida, numero);
+  if (!ocListaEsLa(numero)) return;
+  const { meta } = _ocLista;
+  const carpetas = meta.carpetas;
+  meta.registrada = true;
+  meta.fallo = false;
+  delete meta.carpetas;
+  guardarOCListaMeta();
+  if (carpetas) saveDriveIds(numero.replace(/-/g, ''), carpetas.obras, carpetas.proveedores, numero);
+  if (document.body.classList.contains('oc-lista-on')) pintarOCLista();
+}
+
+function marcarOCNoRegistrada(numero) {
+  if (!ocListaEsLa(numero)) return;
+  _ocLista.meta.fallo = true;
+  guardarOCListaMeta();
+  pintarOCLista();
+}
+
+function anotarCarpetasOCLista(numero, obras, proveedores) {
+  if (!ocListaEsLa(numero)) return;
+  // Si ya se registró con un reintento, van directo.
+  if (_ocLista.meta.registrada) return void saveDriveIds(numero.replace(/-/g, ''), obras, proveedores, numero);
+  _ocLista.meta.carpetas = { obras, proveedores };
+  guardarOCListaMeta();
+}
+
+// Vuelve a registrar la OC. Puede haber llegado aunque la respuesta se perdió, y
+// entonces no se pisa: el registro ya puede tener sus carpetas de Drive.
+async function reintentarOCLista(avisar = true) {
+  if (!_ocLista || _ocLista.meta.registrada || _ocListaReintentando) return;
+  const { meta } = _ocLista;
+  _ocListaReintentando = true;
+  const btn = $('btn-lista-reintentar');
+  btn.disabled = true;
+  try {
+    _ocLista.datos = _ocLista.datos || await ocListaDatosDB('leer');
+    const datos = _ocLista.datos;
+    const key = meta.nroOC.replace(/-/g, '');
+    const r = await fetch(`${FIREBASE_CONFIG.databaseURL}/historial/${key}.json?shallow=true`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!await r.json()) {
+      if (!datos?.ocData) {
+        // Sin los datos en el dispositivo no hay cómo registrarla: que no quede trabado.
+        toast(`No se pudo recuperar la OC ${meta.nroOC}. Fijate si está en el Historial.`, 'warning');
+        return cerrarOCLista();
+      }
+      await saveOCToHistory(datos.ocData, datos.ocData._total, datos.extra);
+    }
+    marcarOCRegistrada(meta.nroOC, datos?.repetida);
+    if (avisar) toast('Listo, ya está en el Historial.', 'success');
+  } catch (e) {
+    console.warn('reintentarOCLista:', e);
+    marcarOCNoRegistrada(meta.nroOC);
+    if (avisar) toast('Sigue sin conexión con el servidor. Probá de nuevo en un rato.', 'error');
+  } finally {
+    _ocListaReintentando = false;
+    btn.disabled = false;
+  }
+}
+
+function cerrarOCLista() {
+  _ocLista = null;
+  try { localStorage.removeItem(ocListaKey()); } catch (_) {}
+  ocListaDatosDB('borrar');
+  document.body.classList.remove('oc-lista-on');
+}
+
+// Al abrir la pantalla. Una OC pedida desde Historial o Proveedores gana sobre la
+// confirmación, salvo que la anterior siga sin registrar.
+function restaurarOCLista() {
+  let meta = null;
+  try { meta = JSON.parse(localStorage.getItem(ocListaKey())); } catch (_) {}
+  if (!meta) return;
+  const entraOtra = sessionStorage.getItem('oc_base') || sessionStorage.getItem('oc_desde_proveedor');
+  if (meta.registrada && (entraOtra || Date.now() - meta.ts > OC_LISTA_MS)) {
+    _ocLista = { meta };
+    return cerrarOCLista();
+  }
+  _ocLista = { meta, datos: null };
+  pintarOCLista();
+  _ocLista.guardando = ocListaDatosDB('leer').then(datos => {
+    if (!ocListaEsLa(meta.nroOC)) return;
+    _ocLista.datos = datos;
+    pintarOCLista();
+    if (!meta.registrada) return reintentarOCLista(false);
+  });
+}
+
+// La app se cerró con la confirmación abierta: el formulario está vacío, se repone el proveedor.
+function reponerProveedorOCLista() {
+  const prov = _ocLista?.meta.prov;
+  if (!prov || $('proveedor').value.trim()) return;
+  Object.entries(prov.campos).forEach(([id, v]) => { $(id).value = v; });
+  _loadedProvCuit = prov.provCuit || null;
+  _provSnapshot   = prov.provSnapshot || {};
+  provFicha       = !!prov.provFicha;
+}
+
+// Salir de la confirmación espera a que termine de registrarse: si falla, el cartel
+// tiene que quedar a la vista para reintentar. Devuelve si se puede seguir.
+async function ocListaLibre() {
+  const l = _ocLista;
+  if (!l) return false;
+  if (!l.meta.registrada && !l.meta.fallo) await l.guardando;
+  return _ocLista === l && !!l.meta.registrada;
+}
+
+function setupOCLista() {
+  $('btn-lista-otra').addEventListener('click', async () => {
+    if (!await ocListaLibre()) return;
+    cerrarOCLista();
+    resetForm(true);
+    window.scrollTo(0, 0);
+  });
+  $('btn-lista-mismo').addEventListener('click', async () => {
+    if (!await ocListaLibre()) return;
+    reponerProveedorOCLista();
+    cerrarOCLista();
+    resetFormKeepProvider();
+    window.scrollTo(0, 0);
+  });
+  $('btn-lista-inicio').addEventListener('click', async () => {
+    // Sin registrar se conserva: al volver a entrar se puede reintentar.
+    if (await ocListaLibre()) cerrarOCLista();
+    window.location.href = 'menu.html';
+  });
+  $('btn-lista-reintentar').addEventListener('click', () => reintentarOCLista());
+  $('btn-lista-descartar').addEventListener('click', async () => {
+    const ok = await showConfirm('Seguir sin registrarla',
+      `La OC ${_ocLista.meta.nroOC} no va a aparecer en el Historial ni en Reportes.`,
+      { boton: 'Seguir igual', tono: 'del', icono: 'alert', cancelar: 'Volver' });
+    if (!ok) return;
+    cerrarOCLista();
+    resetForm(true);
+  });
+  $('btn-lista-pdf').addEventListener('click', () => {
+    const d = _ocLista?.datos;
+    if (d?.blob) compartirPDFOC(d.blob, d.fname, _ocLista.meta.nroOC);
+  });
+  window.addEventListener('online', () => { if (_ocLista?.meta.fallo) reintentarOCLista(false); });
+}
+
+function puedeCompartirPDF(blob, fname) {
+  const isMobile = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+  if (!blob || !isMobile || !navigator.canShare) return false;
+  return navigator.canShare({ files: [new File([blob], fname, { type: 'application/pdf' })] });
+}
+
+// Compartir (solo mobile/táctil) o descargar. Cerrar la casilla no descarga nada:
+// para eso queda «Compartir el PDF de nuevo».
+async function compartirPDFOC(blob, fname, numero) {
+  if (puedeCompartirPDF(blob, fname)) {
+    try {
+      await navigator.share({
+        title: `OC ${numero} — VIMECO S.A.`,
+        files: [new File([blob], fname, { type: 'application/pdf' })]
+      });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      console.warn('Web Share:', e);
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 // ---- Pedir autorización a otro usuario ----
@@ -3001,13 +3338,15 @@ async function solicitarAutorizacion(autorizador, regla = null, repetida = null)
 
   refreshOCNumberDisplay();
   terminarBorrador();
-  toast(`OC ${numero} enviada a ${autorizador.nombre} para autorización.` +
-    (repetida?.tipo === 'correccion' ? ' La anterior se anula cuando la firme.' : ''), 'success');
-  if (fuenteFallo)
-    toast(`No se pudo subir el presupuesto: ${autorizador.nombre} va a ver la OC sin él. Mandáselo por otro medio.`, 'error');
   btn.disabled = false;
   btn.innerHTML = icSvg('print') + ' Generar PDF — Orden de Compra';
-  $('btn-same-provider').classList.remove('hidden');
+  abrirOCLista({
+    estado: 'pendiente', registrada: true, nroOC: numero, proveedor: driveProv, monto: montoOCLista(ocData),
+    autoriza: autorizador.nombre,
+    sub: (autorizador.codigo !== solicitante.codigo ? `Le avisamos a ${autorizador.nombre}. ` : '') + 'El PDF sale cuando la firme.' +
+      (repetida?.tipo === 'correccion' ? ' La anterior se anula en ese momento.' : ''),
+    aviso: fuenteFallo ? `No se pudo subir el presupuesto: ${autorizador.nombre} va a ver la OC sin él. Mandáselo por otro medio.` : ''
+  });
 }
 
 // ---- Vista previa ----
@@ -3168,9 +3507,12 @@ function loadOCBase(oc) {
   $('monto-nogravado').value = fmtMoneyDisplay(noGravado.monto);
 
   monedaUSD = (oc.moneda === 'USD');
+  tcUSD = null; tcOrigen = null;   // la cotización es la de hoy, no la de la OC base
   const monedaChk = $('moneda-toggle');
   if (monedaChk) monedaChk.checked = monedaUSD;
   updateMonedaLabels();
+  if (monedaUSD) cotizacionPorDefecto();
+  pintarCotizacion();
 
   clearFile();
   renderTable();
@@ -3208,9 +3550,12 @@ function loadOCDesdeProveedor(d) {
   }));
   impuestos = (d.impuestos || []).map(imp => ({ nombre: imp.nombre || '', pct: imp.pct ?? null, monto: 0 }));
   monedaUSD = d.moneda === 'USD';
+  tcUSD = null; tcOrigen = null;
   const monedaChk = $('moneda-toggle');
   if (monedaChk) monedaChk.checked = monedaUSD;
   updateMonedaLabels();
+  if (monedaUSD) cotizacionPorDefecto();
+  pintarCotizacion();
 
   renderTable();
   renderImpuestos();
@@ -3263,10 +3608,10 @@ async function loadOCDesdeCotizacion(d) {
 }
 
 // La OC salió: queda enganchada a la comparativa y la comparativa se cierra.
-function cerrarCotizacion(nroOC) {
-  if (!_cotizacion || typeof patchCotizacion !== 'function') return;
-  const { id, pid } = _cotizacion;
-  _cotizacion = null;
+function cerrarCotizacion(nroOC, cot = _cotizacion) {
+  if (!cot || typeof patchCotizacion !== 'function') return;
+  const { id, pid } = cot;
+  if (_cotizacion === cot) _cotizacion = null;
   patchCotizacion(id, { estado: 'cerrada', oc: { nroOC, pid, ts: Date.now() } })
     .catch(e => console.warn('cerrarCotizacion:', e));
 }
@@ -3303,7 +3648,6 @@ function resetFormKeepProvider() {
   renderImpuestos();
   recalcTotales();
   clearExtractStatus();
-  $('btn-same-provider').classList.add('hidden');
   borrarBorrador();
   toast('Nueva OC — proveedor conservado.', 'info');
   aplicarObraRecordada();
@@ -3311,7 +3655,7 @@ function resetFormKeepProvider() {
 }
 
 // ---- Reset ----
-function resetForm() {
+function resetForm(silencioso = false) {
   _ocBase = null;
   _cotizacion = null;
   ['proveedor','cuit-proveedor','nombre-proveedor','codigo-interno-proveedor',
@@ -3344,9 +3688,8 @@ function resetForm() {
   renderImpuestos();
   recalcTotales();
   clearExtractStatus();
-  $('btn-same-provider').classList.add('hidden');
   borrarBorrador();
-  toast('Formulario limpiado.', 'info');
+  if (!silencioso) toast('Formulario limpiado.', 'info');
   aplicarObraRecordada();
 }
 
@@ -3363,6 +3706,10 @@ function fmtMoneyDisplay(n) {
 function fmtInput(n) {
   const v = parseFloat(n) || 0;
   return v === 0 ? '0' : String(v);
+}
+// El neto sin redondear puede traer muchos decimales: se muestran 2, se guarda entero.
+function fmtPrecioInput(n) {
+  return fmtInput(roundCents(n));
 }
 function formatBytes(bytes) {
   if (bytes < 1024)    return bytes + ' B';

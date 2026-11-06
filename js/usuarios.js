@@ -597,6 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
   sessionStorage.setItem('responsable_name', name);
   $('hdr-name').textContent = name;
 
+  window.vimecoCambiosSinGuardar = hayCambios;   // el doble toque a la flecha no se saltea la pregunta
   $('btn-back').addEventListener('click', () => {
     if (!MQ_ANCHA.matches && document.body.classList.contains('us-open')) { history.back(); return; }
     window.location.href = 'administracion.html';

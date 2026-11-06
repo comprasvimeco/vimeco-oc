@@ -91,10 +91,10 @@ const renglonesCompletos = e => e.pedido.filter((p, i) => e.recibido[i] >= p).le
 // OC contra las que tiene sentido cargar un remito: las que realmente se
 // emitieron (una pendiente de autorización todavía no es una compra, y una
 // rechazada no va a llegar nunca) y que no son pruebas.
-// El super-admin (0000) sí ve las de prueba: es quien las crea (obra "X" del
+// Quien administra (0000 o super admin) sí ve las de prueba: es quien las crea (obra "X" del
 // desplegable) y las necesita para probar el circuito de entregas.
 function ocsElegibles() {
-  const verPruebas = viewerCode === '0000';
+  const verPruebas = esSuperAdmin();
   return allOCs.filter(oc =>
     !SIN_PDF.has(oc.estado) &&
     (verPruebas || (!esObraPrueba(oc) && !esProveedorPrueba(oc))));
@@ -618,12 +618,10 @@ function setFoto(file) {
     img.classList.add('hidden');
     thumb.insertAdjacentHTML('beforeend', `<span class="rv-pdf">${icSvg('file')}</span>`);
   }
-  $('rem-file-name').textContent = file.name;
-  $('rem-file-size').textContent = `${(file.size / 1024).toFixed(0)} KB`;
+  pastillaRemito().mostrar(file, { recortar: !!modalRawFile && typeof openScanner === 'function' });
   $('rv-drop').classList.add('hidden');
   $('rv-foto').classList.remove('hidden');
 
-  $('btn-rem-rescan').classList.toggle('hidden', !modalRawFile);
   $('btn-rem-ia').classList.toggle('hidden', typeof extractFromRemito !== 'function');
   $('btn-rem-ia').disabled = false;
   $('btn-rem-ia-t').textContent = 'Leer con IA';
@@ -631,7 +629,16 @@ function setFoto(file) {
   refrescarForm();
 }
 
+// La pastilla «Remito» abre su ficha: vista previa, Abrir, Recortar y Quitar (js/fichaArchivo.js).
+let pastillaRem = null;
+function pastillaRemito() {
+  if (!pastillaRem) pastillaRem = pastillaArchivo($('rem-pastilla'), { tipo: 'remito', etiqueta: 'Remito',
+    onRecortar: () => { if (modalRawFile) escanear(modalRawFile); }, onQuitar: limpiarFoto });
+  return pastillaRem;
+}
+
 function limpiarFoto() {
+  if (pastillaRem) pastillaRem.limpiar();
   if (modalFile) borrarBorradorRemito();
   modalFile = modalRawFile = null;
   if (modalPrevUrl) { URL.revokeObjectURL(modalPrevUrl); modalPrevUrl = null; }
@@ -650,12 +657,14 @@ function limpiarFoto() {
 // de adjuntarse. Un remito enderezado se lee mucho mejor, en Drive y por la IA.
 async function escanear(file) {
   if (!file || typeof openScanner !== 'function') { if (file) setFoto(file); return; }
-  modalRawFile = file;
   try {
     const scan = await openScanner(file);
-    if (scan) setFoto(scan);   // null = canceló: no cambia nada
+    if (!scan) return;   // canceló: queda todo como estaba
+    modalRawFile = scan.original || file;   // otra, si sacó «Otra foto» en el escáner
+    setFoto(scan);
   } catch (_) {
     // Escáner no disponible (p. ej. sin conexión la primera vez): va la original.
+    modalRawFile = file;
     setFoto(file);
     toast('Escáner no disponible; se adjuntó la foto original.', 'warning');
   }
@@ -1121,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   viewerCode = code;
   viewerName = name;
   $('hdr-name').textContent = name;
-  $('btn-back').addEventListener('click', () => { window.location.href = 'compras.html'; });
+  $('btn-back').addEventListener('click', () => vimecoVolver('compras.html'));
 
   ({ isAdmin: viewerIsAdmin, obrasJefe: viewerObras } = await alcanceOC(code));
 
@@ -1172,9 +1181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     drop.classList.remove('drag-over');
     adjuntarArchivo(e.dataTransfer.files[0]);
   });
-  $('btn-rem-rescan').addEventListener('click', () => { if (modalRawFile) escanear(modalRawFile); });
-  $('rv-thumb').addEventListener('click', () => verImagen(modalPrevUrl));
-  $('btn-rem-quitar').addEventListener('click', limpiarFoto);
+  $('rv-thumb').addEventListener('click', () => pastillaRemito().abrir());
   $('btn-rem-ia').addEventListener('click', leerConIA);
 
   try {

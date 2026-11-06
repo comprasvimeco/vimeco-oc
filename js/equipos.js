@@ -523,7 +523,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   puedeVerReportes(code).then(v => { verReportes = v; });
 
   $('hdr-name').textContent = name || '—';
-  $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
+  $('btn-back').addEventListener('click', () => vimecoVolver('menu.html'));
   $('btn-add-equipo').addEventListener('click', openAddModal);
   $('btn-seed').addEventListener('click', seedEquipos);
 

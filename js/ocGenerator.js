@@ -80,7 +80,7 @@ function buildOCDoc(data) {
 
   y = drawTotalsTable(doc, data, y, itmColW, sym);
   y += 2;
-  y = drawAmountInWords(doc, data.totalLetras, y, data.moneda);
+  y = drawAmountInWords(doc, data.totalLetras, y, data.moneda, data.cotizacionUsada);
   y += 3;
   drawFooter(doc, data, y);
 
@@ -517,19 +517,30 @@ function drawTotalsTable(doc, data, y, colW, sym = '$') {
 /* =====================================================
    5. MONTO EN LETRAS
    ===================================================== */
-function drawAmountInWords(doc, totalLetras, y, moneda) {
+function drawAmountInWords(doc, totalLetras, y, moneda, cotiz) {
   const { ml, cw } = PG;
   const cur  = moneda === 'USD' ? 'DOLARES' : 'PESOS';
   const text = `Son ${cur}: ${totalLetras || ''}`;
+  // En dólares: la cotización que toma la OC, la del día en que se emite (traído de Leva).
+  const nota = moneda === 'USD' && cotiz && cotiz.valor
+    ? 'Cotización tomada al día de emisión: US$ 1 = $ ' +
+      Number(cotiz.valor).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '';
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...C.azul);
   const wrapped = doc.splitTextToSize(text, cw - 6);
-  const blockH  = wrapped.length * 4.5 + 5;
+  const blockH  = wrapped.length * 4.5 + 5 + (nota ? 3.8 : 0);
   setThinBorder(doc);
   fillRect(doc, ml, y, cw, blockH, C.fondoLogo);
   doc.rect(ml, y, cw, blockH, 'S');
   wrapped.forEach((ln, i) => doc.text(ln, ml + 3, y + 4 + i * 4.5));
+  if (nota) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(90, 90, 90);
+    doc.text(nota, ml + 3, y + 4 + wrapped.length * 4.5 + 0.6);
+  }
   return y + blockH;
 }
 

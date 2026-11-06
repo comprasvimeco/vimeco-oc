@@ -350,17 +350,20 @@ function render() {
     const meta     = tipoMeta(e.tipo);
     const vista    = !sinVer(e);
     // Las acciones son las pastillas de las fichas (foc-btn), en un renglón al
-    // pie de la tarjeta: Borrar queda aparte, a la derecha.
+    // pie de la tarjeta. En el teléfono, sólo la principal lleva texto: el resto
+    // queda en círculos (act-ib) para que entren todas en un renglón. Marcar,
+    // Anular y Borrar van aparte, a la derecha (traído de Leva v344).
+    const txt = t => `<span class="act-t">${t}</span>`;
     const drive  = e.driveUrl
-      ? `<a class="foc-btn foc-btn--drive act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener" title="Abrir la carpeta en Drive">${icSvg('drive')}Drive</a>`
+      ? `<a class="foc-btn foc-btn--drive act-ib act-drive" data-key="${esc(e.key)}" href="${esc(e.driveUrl)}" target="_blank" rel="noopener" aria-label="Drive" title="Abrir la carpeta en Drive">${icSvg('drive')}${txt('Drive')}</a>`
       : '';
     // Se marcan como vistas con su botón, al abrir su documento o su carpeta, o
     // todas juntas con "Ver todas".
     const accion = vista
-      ? `<span class="act-seen-label">${icSvg('check')} Vista</span>`
-      : `<button class="foc-btn foc-btn--clear act-mark" data-key="${esc(e.key)}">${icSvg('check')}Marcar Vista</button>`;
+      ? `<span class="act-seen-label act-ib" role="img" aria-label="Vista" title="Vista">${icSvg('check')}${txt('Vista')}</span>`
+      : `<button class="foc-btn foc-btn--clear act-ib act-mark" data-key="${esc(e.key)}" aria-label="Marcar vista" title="Marcar vista">${icSvg('check')}${txt('Marcar vista')}</button>`;
     const borrar = isSuper
-      ? `<button class="foc-btn foc-btn--del act-del" data-key="${esc(e.key)}" title="Borrar la novedad para todos">${icSvg('trash')}Borrar</button>`
+      ? `<button class="foc-btn foc-btn--del act-ib act-del" data-key="${esc(e.key)}" aria-label="Borrar" title="Borrar la novedad para todos">${icSvg('trash')}${txt('Borrar')}</button>`
       : '';
     const ocEv    = ocDeEvento(e);
     // Lo que abre la tarjeta: cada novedad, su propio documento. La de un
@@ -368,18 +371,18 @@ function render() {
     // OC. Las de factura y remito suman el camino a su OC.
     const rem = remitoDeEvento(e);
     const fac = facturaDeEvento(e, ocEv);
-    const verBtn = (que, cls, icon, txt) =>
-      `<button class="foc-btn foc-btn--${cls} act-ver" data-ver="${que}">${icSvg(icon)}${txt}</button>`;
+    const verBtn = (que, cls, icon, texto) =>
+      `<button class="foc-btn foc-btn--${cls} act-ver" data-ver="${que}">${icSvg(icon)}${texto}</button>`;
     const ver = rem  ? verBtn('rem', 'rem', 'truck', 'Ver remito')
               : fac  ? verBtn('fact', 'fact', 'file', 'Ver factura')
               : ocEv ? verBtn('oc', 'edit', 'eye', e.tipo === 'oc' ? 'Ver ficha' : 'Ver OC')
               : '';
     // La carpeta de la OC en Archivo (archivo.html?nro=…), con sus archivos a la vista.
     const archivo = puedeArchivo && ocEv?.nroOC
-      ? `<a class="foc-btn foc-btn--arc act-archivo" data-key="${esc(e.key)}" href="archivo.html?nro=${encodeURIComponent(ocEv.nroOC)}" title="Ver los archivos de la OC ${esc(ocEv.nroOC)} en Archivo">${icSvg('folder')}Archivo</a>`
+      ? `<a class="foc-btn foc-btn--arc act-ib act-archivo" data-key="${esc(e.key)}" href="archivo.html?nro=${encodeURIComponent(ocEv.nroOC)}" aria-label="Archivo" title="Ver los archivos de la OC ${esc(ocEv.nroOC)} en Archivo">${icSvg('folder')}${txt('Archivo')}</a>`
       : '';
     const verOC = (rem || fac) && ocEv
-      ? `<button class="foc-btn foc-btn--edit act-oc" title="Ver la ficha de la OC ${esc(ocEv.nroOC)}">${icSvg('eye')}Ver OC</button>`
+      ? `<button class="foc-btn foc-btn--edit act-ib act-oc" aria-label="Ver OC" title="Ver la ficha de la OC ${esc(ocEv.nroOC)}">${icSvg('eye')}${txt('Ver OC')}</button>`
       : '';
     // La OC anulada por duplicada sigue en el feed, tachada y diciendo cuál la
     // reemplazó; la que la reemplaza también lo dice.
@@ -391,8 +394,8 @@ function render() {
     // Anularla como duplicada (js/duplicados.js) las que siguen vigentes, o
     // deshacer la anulación de las anuladas.
     const anular = e.tipo !== 'oc' || !ocEv ? ''
-      : anulada ? `<button class="foc-btn foc-btn--clear act-anular" title="Deshacer la anulación: vuelve a contar en Reportes">${icSvg('undo')}Desanular</button>`
-      : esCompraFirme(ocEv) ? `<button class="foc-btn foc-btn--del act-anular" title="Anularla como duplicada: la reemplazó otra OC">${icSvg('x')}Anular</button>`
+      : anulada ? `<button class="foc-btn foc-btn--clear act-ib act-anular" aria-label="Desanular" title="Deshacer la anulación: vuelve a contar en Reportes">${icSvg('undo')}${txt('Desanular')}</button>`
+      : esCompraFirme(ocEv) ? `<button class="foc-btn foc-btn--del act-ib act-anular" aria-label="Anular" title="Anularla como duplicada: la reemplazó otra OC">${icSvg('x')}${txt('Anular')}</button>`
       : '';
     const cardCls = (vista ? 'act-card-seen' : 'act-card-unseen')
       + (anulada ? ' act-card-anulada' : '');
@@ -618,7 +621,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = name || '';
 
-  $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
+  $('btn-back').addEventListener('click', () => vimecoVolver('menu.html'));
   // Novedades: 0000 o permiso `novedades`. Quien nunca lo tuvo asignado entra
   // si es admin, que era el criterio antes de que existiera el permiso propio.
   let puedeVer = code === '0000';

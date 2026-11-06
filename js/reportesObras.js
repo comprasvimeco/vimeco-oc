@@ -2,13 +2,14 @@
    VIMECO OC — Reportes → Obras y ficha de obra
    reportesObras.js
 
-   Paso 3 del rediseño de Reportes, traído de Leva.
+   Paso 3 del rediseño de Reportes (PLAN-SAAS.md → «Rediseño de Reportes»).
    Usa lo de reportes.js (FIRMES, ars, money, esc, abrirFicha…) y el
    presupuesto y plazo de js/presupuesto.js.
 
-   - Obras: una tarjeta por obra, primero lo que necesita atención
-     (presupuesto o rubro excedido → gasto adelantado → en ritmo → sin
-     presupuesto), con la barra de gasto y la marca del plazo.
+   - Obras: la torta con el reparto de lo comprado y una tarjeta por obra,
+     primero lo que necesita atención (presupuesto o rubro excedido → gasto
+     adelantado → en ritmo). El estado y la barra sólo salen si tiene presupuesto;
+     las obras sin compras ni presupuesto se juntan en una línea.
    - Ficha: presupuesto contra plazo, proveedores, rubros contra su propio
      presupuesto (el ritmo se mide sólo para la obra entera: cada rubro tiene su
      momento), «Sin rubro» con un toque por OC y «Ver sus OC en Explorar».
@@ -24,10 +25,13 @@ const RECIENTE_DIAS = 30;       // una obra inactiva con compras en estos días 
 const SIN_RUBRO = '__sin';      // rubro elegido en la ficha: las OC sin rubro
 const OBRA_CATS = { arquitectura: { label: 'Arquitectura' }, vial: { label: 'Vial' }, oficina: { label: 'Oficina' } };   // las de obras.js
 
-const TABS = [['resumen', 'Resumen'], ['tablero', 'Tablero'], ['obras', 'Obras'], ['explorar', 'Explorar']];
+const TABS = [['resumen', 'Resumen'], ['obras', voc('Centro.p')], ['explorar', 'Explorar']];
 const NAV = { tab: 'explorar', ficha: null, rsel: null };
 let TAB_INICIAL = 'explorar';
 let VER_INACTIVAS = false;
+let VER_SIN_COMPRAS = false;
+let OBRA_PIE = null;            // lo elegido en la torta: la clave de la obra, PIE_OTRAS o null
+const PIE_OTRAS = '__otras';
 
 // Las OC guardan el NOMBRE de la obra: «Edificio  belgrano» y «Edificio Belgrano»
 // son la misma. Explorar agrupa por este nombre.
@@ -98,7 +102,7 @@ function analizarObra(o) {
 }
 
 function estadoObra(a) {
-  if (!a.pres) return { cls: 'rx-off', txt: 'Sin presupuesto', nivel: 0 };
+  if (!a.pres) return { cls: 'rx-off', txt: '', nivel: 0 };
   if (a.gast > a.pres) return { cls: 'rx-bad', txt: 'Presupuesto excedido', nivel: 4 };
   const exc = a.rubros.filter(r => r.p && r.g > r.p).length;
   if (exc) return { cls: 'rx-bad', txt: exc === 1 ? '1 rubro excedido' : `${exc} rubros excedidos`, nivel: 3 };
@@ -117,12 +121,11 @@ function fraseObra(a) {
   const m = v => money(v, a.cur);
   if (!a.pres) {
     if (!a.d30 && !a.p30) return 'Sin compras en los últimos 60 días.';
-    const cargar = ' Cargale presupuesto para saber si está bien.';
-    if (!a.p30) return 'Empezó a comprar en los últimos 30 días.' + cargar;
+    if (!a.p30) return 'Empezó a comprar en los últimos 30 días.';
     if (!a.d30) return 'Sin compras en los últimos 30 días.';
     const v = Math.round((a.d30 / a.p30 - 1) * 100);
-    if (Math.abs(v) < 10) return 'Compra parecido a los 30 días anteriores.' + cargar;
-    return `Compró ${varTxt(a.d30, a.p30)} que los 30 días anteriores.` + cargar;
+    if (Math.abs(v) < 10) return 'Compra parecido a los 30 días anteriores.';
+    return `Compró ${Math.abs(v)}% ${v > 0 ? 'más' : 'menos'} que los 30 días anteriores.`;
   }
   if (a.gast > a.pres) return `Se pasó ${m(a.gast - a.pres)} del presupuesto.`;
   const conP = a.rubros.filter(r => r.p).sort((x, y) => y.g / y.p - x.g / x.p);
@@ -142,7 +145,7 @@ function ritmoTexto(a) {
 }
 
 function ritmoBar(a) {
-  const col = a.gast > a.pres ? 'var(--rosa-fg)' : a.ritmo !== null && a.ritmo > RITMO_UMBRAL ? 'var(--durazno-fg)' : 'var(--lila)';
+  const col = a.gast > a.pres ? 'var(--rosa-fg)' : a.ritmo !== null && a.ritmo > RITMO_UMBRAL ? 'var(--rx-warn)' : 'var(--rx-bar)';
   const marca = a.pl && a.pl.empezo ? Math.min(a.pl.p, 100) : null;
   return `<div class="rx-track" role="img" aria-label="Gastado ${a.gp}%${marca !== null ? `, plazo ${marca}%` : ''}">
     <i style="width:${Math.min(a.gp, 100)}%;background:${col}"></i>${marca !== null ? `<b style="left:calc(${marca}% - 1px)"></b>` : ''}</div>
@@ -167,33 +170,61 @@ function obrasVisibles() {
   return { vis, ocultas: todas.length - vis.length, todas };
 }
 
+// La torta: todo lo comprado por obra, cada una con su color; pasando SERIES_MAX, «Otras».
+function pieInner() {
+  const g = agrupar(FIRMES, obraKey, (oc, k) => obraLabel(k)), total = g.reduce((s, x) => s + x.total, 0) || 1;
+  const filas = g.slice(0, SERIES_MAX).map(x => ({ key: x.key, n: x.label, v: x.total, c: colorDe(x.key) }));
+  if (g.length > SERIES_MAX) filas.push({ key: PIE_OTRAS, n: `Otras (${g.length - SERIES_MAX})`, v: g.slice(SERIES_MAX).reduce((s, x) => s + x.total, 0), c: 'var(--otros)' });
+  const sel = filas.find(f => f.key === OBRA_PIE) || null;
+  let ac = 0;
+  // Cada tramo es un arco de un círculo de perímetro 100; la separación es parte del arco.
+  const arcos = filas.map(f => {
+    const largo = f.v / total * 100, ini = ac;
+    ac += largo;
+    return `<circle class="rx-pie-a${sel && sel !== f ? ' rx-dim' : ''}" cx="21" cy="21" r="15.915" stroke="${f.c}"
+      stroke-dasharray="${Math.max(largo - .6, .3).toFixed(2)} 100" stroke-dashoffset="${(-ini).toFixed(2)}" data-pie="${esc(f.key)}"/>`;
+  }).join('');
+  return `<div class="rx-pie-w">
+      <div class="rx-pie">
+        <svg viewBox="0 0 42 42" role="img" aria-label="${esc(filas.map(f => `${f.n} ${pct(f.v, total)}%`).join(', '))}">${arcos}</svg>
+        <div class="rx-pie-c"><b>${esc(money(sel ? sel.v : total))}</b><span>${esc(sel ? sel.n : `${g.length} ${voc('centro.p')}`)}</span></div>
+      </div>
+    </div>
+    <div class="rx-pie-l">${filas.map(f => `<button type="button" class="rx-pie-r${sel === f ? ' sel' : ''}" data-pie="${esc(f.key)}" aria-pressed="${sel === f}">
+      <span class="rx-sw" style="background:${f.c}"></span><span class="rx-ell">${esc(f.n)}</span><span class="rx-num">${esc(money(f.v))}</span><small class="rx-num">${pct(f.v, total)}%</small></button>`).join('')}</div>`;
+}
+
 function renderObras() {
-  const { vis, ocultas, todas } = obrasVisibles();
-  const fin = finHoy();
-  const t30 = sumARS(FIRMES.filter(oc => (oc.timestamp || 0) >= fin - 30 * DIA));
-  const tp30 = sumARS(FIRMES.filter(oc => (oc.timestamp || 0) >= fin - 60 * DIA && (oc.timestamp || 0) < fin - 30 * DIA));
-  const nSin = todas.filter(a => a.conRubros).reduce((s, a) => s + a.sinRubro.length, 0);
-  const varP = tp30 ? `<span class="rx-pill ${t30 > tp30 ? 'rx-warn' : 'rx-ok'}">${varTxt(t30, tp30)} vs. 30 días anteriores</span>` : '';
+  const { vis, ocultas } = obrasVisibles();
+  const hayPie = new Set(FIRMES.map(obraKey)).size > 1;
 
   const tarjeta = a => {
     const o = a.o;
-    return `<article class="rx-card rx-c6 rx-go" data-ficha="${esc(o.key)}" tabindex="0" role="link" aria-label="${esc(o.nombre)}: ${esc(a.estado.txt)}">
-      <div class="rx-row"><div class="rx-l"><h3 class="rx-h3o">${esc(o.nombre)}</h3><span class="rx-muted">${subObra(o, a)}</span></div>
-        <span class="rx-pill ${a.estado.cls}">${esc(a.estado.txt)}</span></div>
-      ${a.pres ? `<div class="rx-row"><span class="rx-mid">${esc(money(a.gast, a.cur))}</span><span class="rx-muted">de ${esc(money(a.pres, a.cur))}</span></div>${ritmoBar(a)}`
-        : `<div class="rx-row"><span class="rx-mid">${esc(money(a.d30, a.cur))}</span><span class="rx-muted">últimos 30 días</span></div>`}
-      <div class="rx-frase">${esc(fraseObra(a))}</div>
+    return `<article class="rx-card rx-c6 rx-go" data-ficha="${esc(o.key)}" tabindex="0" role="link" aria-label="${esc(o.nombre)}${a.pres ? ': ' + esc(a.estado.txt) : ''}">
+      <div class="rx-row"><div class="rx-l"><h3 class="rx-h3o">${a.ocs.length ? swObra(o.nombre) : ''}${esc(o.nombre)}</h3><span class="rx-muted">${subObra(o, a)}</span></div>
+        ${a.pres ? `<span class="rx-pill ${a.estado.cls}">${esc(a.estado.txt)}</span>` : ''}</div>
+      ${a.pres ? `<div class="rx-row"><span class="rx-mid">${esc(money(a.gast, a.cur))}</span><span class="rx-muted">de ${esc(money(a.pres, a.cur))}</span></div>${ritmoBar(a)}
+        <div class="rx-frase">${esc(fraseObra(a))}</div>`
+        : `<span class="rx-mid">${esc(money(a.gast, a.cur))}</span>
+        <div class="rx-frase">${a.ocs.length ? `${esc(money(a.d30, a.cur))} en 30 días · ${plural(a.ocs.length, 'OC', 'OC')}` : 'Todavía no tiene compras.'}</div>`}
     </article>`;
   };
 
+  // Sin OC en toda la empresa no se junta nada: son la única forma de llegar a sus fichas.
+  const sinCompras = FIRMES.length ? vis.filter(a => !a.ocs.length && !a.pres) : [];
+  const conTarjeta = VER_SIN_COMPRAS ? vis : vis.filter(a => !sinCompras.includes(a));
+  const nombres = sinCompras.length > 3 ? `${sinCompras.length} ${voc('centro.p')}`
+    : sinCompras.map(a => a.o.nombre).join(', ').replace(/, ([^,]*)$/, ' y $1');
+
   $('rx-app').innerHTML = `
-    <div class="rx-head">
-      <div class="rx-ctl"><span class="rx-pill rx-lila">Primero lo que necesita atención</span>
-        ${nSin ? `<button type="button" class="rx-chip2" data-sinrubro="1">${plural(nSin, 'OC sin rubro', 'OC sin rubro')}</button>` : ''}</div>
-      <div class="rx-tot"><span class="rx-muted">Toda la empresa · 30 días</span><span class="v">${esc(money(t30))}</span>${varP}</div>
-    </div>
-    ${vis.length ? `<div class="rx-grid">${vis.map(tarjeta).join('')}</div>`
-      : `<div class="rx-card"><div class="rx-empty">${esc('Todavía no hay obras cargadas. Se dan de alta en Administración → Obras.')}</div></div>`}
+    ${hayPie ? `<section class="rx-card" aria-label="${esc(voc('Cómo se reparte entre los centros'))}">
+      <div class="rx-row"><h3>Cómo se reparte</h3><span class="rx-muted">todo lo comprado</span></div>
+      <div id="rx-pie" class="rx-pie-b">${pieInner()}</div>
+    </section>` : ''}
+    ${conTarjeta.length ? `<div class="rx-grid">${conTarjeta.map(tarjeta).join('')}</div>` : ''}
+    ${!vis.length ? `<div class="rx-card"><div class="rx-empty">${esc(voc('Todavía no hay centros cargados. Se dan de alta en Administración → Centros.'))}</div></div>` : ''}
+    ${sinCompras.length ? `<div class="rx-ctl"><span class="rx-foot">${esc(nombres)} todavía ${sinCompras.length === 1 ? 'no tiene' : 'no tienen'} compras.</span>
+      <button type="button" class="rx-mas" data-sincompras="1">${VER_SIN_COMPRAS ? 'Ocultar' : 'Ver'}</button></div>` : ''}
     ${ocultas || VER_INACTIVAS ? `<button type="button" class="rx-mas" data-inactivas="1">${VER_INACTIVAS ? 'Ocultar las inactivas sin compras recientes' : `Ver también ${plural(ocultas, 'inactiva sin compras recientes', 'inactivas sin compras recientes')}`}</button>` : ''}`;
 }
 
@@ -234,7 +265,7 @@ function renderFicha() {
     <section class="rx-card rx-c8" aria-label="Últimos 30 días">
       <span class="rx-k">Últimos 30 días</span>
       <div><span class="rx-big">${m(a.d30)}</span> ${a.p30 ? `<span class="rx-pill ${a.d30 > a.p30 ? 'rx-warn' : 'rx-ok'}">${varTxt(a.d30, a.p30)} vs. 30 días anteriores</span>` : ''}</div>
-      <div class="rx-muted">${a.ocs.length ? `En total, ${m(a.gast)} en ${plural(a.ocs.length, 'OC', 'OC')}. ` : 'Todavía no tiene compras. '}Sin presupuesto, sólo se puede comparar contra los 30 días anteriores.</div>
+      <div class="rx-muted">${a.ocs.length ? `En total, ${m(a.gast)} en ${plural(a.ocs.length, 'OC', 'OC')}.` : 'Todavía no tiene compras.'}</div>
     </section>`;
 
   const proveedores = `
@@ -251,7 +282,7 @@ function renderFicha() {
     const rb = r => {
       const wg = r.g / max * 100, wp = r.p / max * 100, p = pctRubro(r);
       const tag = p === null ? (r.viejo ? '<span class="rx-pill rx-off">ya no está</span>' : '')
-        : p > 100 ? `<span class="rx-pill rx-bad">${p}%</span>` : !r.g ? '<span class="rx-pill rx-off">sin empezar</span>' : `<span class="rx-pill rx-ok">${p}%</span>`;
+        : p > 100 ? `<span class="rx-pill rx-bad">${p}%</span>` : !r.g ? '<span class="rx-pill rx-off">sin empezar</span>' : `<span class="rx-pill ${p >= 85 ? 'rx-warn' : 'rx-ok'}">${p}%</span>`;
       return `<button type="button" class="rx-rb${NAV.rsel === r.id ? ' sel' : ''}" data-rsel="${esc(r.id)}" aria-pressed="${NAV.rsel === r.id}">
         <span class="rx-row"><b class="rx-ell">${esc(r.n)}</b>${tag}</span>
         <span class="rx-rbar">${r.p ? `<span class="bud" style="width:${wp}%"></span>` : ''}<span class="g${r.p ? '' : ' solo'}" style="width:${r.p ? Math.min(wg, wp) : wg}%"></span>
@@ -264,8 +295,8 @@ function renderFicha() {
         <span class="rx-rbar"><span class="g sin" style="width:${a.sinRubroG / max * 100}%"></span></span>
         <span class="rx-legend"><span>${m(a.sinRubroG)}</span><span>${pct(a.sinRubroG, a.gast)}% de lo gastado</span></span></button>` : '';
     rubrosSec = `
-    <section class="rx-card rx-c7" aria-label="Por rubro">
-      <div class="rx-row"><h3>Por rubro</h3>${a.rubros.some(r => r.p) ? `<span class="rx-muted rx-ley2">┆ presupuesto <span class="rx-sw" style="background:var(--lila)"></span>gastado <span class="rx-sw" style="background:var(--rosa-fg)"></span>excedido</span>` : ''}</div>
+    <section class="rx-card rx-c7 rx-arriba" aria-label="Por rubro">
+      <div class="rx-row"><h3>Por rubro</h3>${a.rubros.some(r => r.p) ? `<span class="rx-muted rx-ley2"><span class="rx-sw" style="background:var(--sunk)"></span>presupuesto <span class="rx-sw" style="background:var(--rx-bar);margin-left:.5rem"></span>gastado <span class="rx-sw" style="background:var(--rosa-fg);margin-left:.5rem"></span>excedido</span>` : ''}</div>
       <div class="rx-rbs">${a.rubros.map(rb).join('')}${sin}</div>
       ${a.otrosPres ? `<div class="rx-muted">Otros (presupuesto sin repartir en rubros): ${m(a.otrosPres)}</div>` : ''}
       ${a.pres && !a.rubros.some(r => r.p) && a.conRubros ? '<div class="rx-muted">El presupuesto no está repartido por rubro: cada rubro muestra sólo lo gastado.</div>' : ''}
@@ -283,7 +314,7 @@ function renderFicha() {
   $('rx-app').innerHTML = `
     <nav class="rx-crumbs" aria-label="Ubicación"><button type="button" data-volver="1">Reportes</button><span>›</span><button type="button" data-volver="1">${esc(tabNom)}</button><span>›</span><span class="rx-ell">${esc(o.nombre)}</span></nav>
     <div class="rx-fhead">
-      <div class="rx-l"><h1>${esc(o.nombre)}</h1><span class="rx-muted">${subObra(o, a, true)}</span></div>
+      <div class="rx-l"><h1>${a.ocs.length ? swObra(o.nombre) : ''}${esc(o.nombre)}</h1><span class="rx-muted">${subObra(o, a, true)}</span></div>
       <div class="rx-ctl">
         ${a.ocs.length ? `<button type="button" class="foc-btn foc-btn--sec" data-verocs="1">Ver sus OC en Explorar</button>` : ''}
         <button type="button" class="foc-btn ${a.pres || a.pl ? 'foc-btn--sec' : 'foc-btn--main'}" data-pres="1">${a.pres || a.pl ? 'Editar presupuesto' : 'Cargar presupuesto'}</button>
@@ -340,7 +371,7 @@ function panelRubro(a) {
     const [n, g] = [...pv.entries()].sort((x, y) => y[1] - x[1])[0];
     if (g / R.g >= .5) nota += `${nota ? ' ' : ''}El ${pct(g, R.g)}% lo compró ${esc(n)}.`;
   }
-  return `<div class="rx-row"><h3>${esc(R.n)}</h3>${p !== null ? `<span class="rx-pill ${p > 100 ? 'rx-bad' : 'rx-ok'}">${p}% de lo presupuestado</span>` : ''}</div>
+  return `<div class="rx-row"><h3>${esc(R.n)}</h3>${p !== null ? `<span class="rx-pill ${p > 100 ? 'rx-bad' : p >= 85 ? 'rx-warn' : 'rx-ok'}">${p}% de lo presupuestado</span>` : ''}</div>
     <div><span class="rx-big rx-big2">${m(R.g)}</span> ${R.p ? `<span class="rx-muted">de ${m(R.p)}</span>` : ''}</div>
     ${R.viejo ? `<div class="rx-muted">${esc('Este rubro ya no está en la obra, pero quedó en estas OC.')}</div>` : ''}
     ${nota ? `<div>${nota}</div>` : ''}
@@ -501,16 +532,18 @@ function pintar() {
   document.querySelectorAll('#rx-tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', String(!NAV.ficha && b.dataset.tab === NAV.tab)));
   if (NAV.ficha) renderFicha();
   else if (NAV.tab === 'obras') renderObras();
-  else if (NAV.tab === 'tablero') renderTablero();
+
   else if (NAV.tab === 'resumen') renderResumen();
   else render();
 }
 
 // Clicks de Obras y de la ficha. Devuelve true si eran suyos.
 function onClickObras(e) {
-  const b = e.target.closest('[data-ficha],[data-volver],[data-rsel],[data-verocs],[data-pres],[data-asignar],[data-sinrubro],[data-inactivas],[data-ver-ficha]');
+  const b = e.target.closest('[data-pie],[data-sincompras],[data-ficha],[data-volver],[data-rsel],[data-verocs],[data-pres],[data-asignar],[data-sinrubro],[data-inactivas],[data-ver-ficha]');
   if (!b) return false;
   const d = b.dataset;
+  if (d.pie)      { OBRA_PIE = OBRA_PIE === d.pie ? null : d.pie; $('rx-pie').innerHTML = pieInner(); return true; }
+  if (d.sincompras) { VER_SIN_COMPRAS = !VER_SIN_COMPRAS; renderObras(); return true; }
   if (d.ficha)    { irA({ ficha: d.ficha, rsel: null }); return true; }
   if (d.verFicha) { const o = obraPorNombre(d.verFicha); if (o) irA({ ficha: o.key, rsel: null }); return true; }
   if (d.volver)   { if (VINO_DE_ADENTRO) history.back(); else irA({ ficha: null, rsel: null }); return true; }
@@ -523,7 +556,7 @@ function onClickObras(e) {
   }
   if (d.verocs)   {
     const o = obraPorKey(NAV.ficha);
-    Object.assign(EX, { obra: o.nombre, resp: null, equipo: null, q: '', per: 'anio', mesOff: 0, ver: VER_PASO });
+    Object.assign(EX, { obra: o.nombre, prov: null, resp: null, equipo: null, q: '', per: 'anio', mesOff: 0, ver: VER_PASO });
     irA({ tab: 'explorar', ficha: null, rsel: null });
     return true;
   }
@@ -546,7 +579,7 @@ function initNav(esAdmin, qs) {
   if (qs.get('ficha') && obraPorKey(qs.get('ficha'))) NAV.ficha = qs.get('ficha');
 
   $('rx-tabs').innerHTML = TABS.map(([k, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="false">${n}</button>`).join('');
-  $('rx-tabs').hidden = false;
+  $('rx-app').removeAttribute('aria-busy');
   $('rx-tabs').addEventListener('click', e => {
     const b = e.target.closest('[data-tab]');
     if (b && b.dataset.tab !== NAV.tab) irA({ tab: b.dataset.tab, ficha: null, rsel: null });

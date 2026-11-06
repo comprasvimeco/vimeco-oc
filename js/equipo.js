@@ -716,6 +716,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btn-doc-elegir').innerHTML   = icSvg('file') + 'Elegir archivo';
 
   // Salir: avisa si hay cambios
+  window.vimecoCambiosSinGuardar = hayCambios;   // el doble toque a la flecha no se saltea la pregunta
   $('btn-back').addEventListener('click', () => salir('equipos.html'));
   $('header-brand').addEventListener('click', () => salir('menu.html'));
   window.addEventListener('beforeunload', ev => {

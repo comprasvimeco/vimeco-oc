@@ -174,6 +174,8 @@ Estructura JSON requerida:
 {
   "estructura_precios": "descripción de las columnas de precio encontradas y criterio aplicado (ej: 'Tabla tiene P.Lista + %Desc + P.Neto → se usa P.Neto directamente', 'Solo tiene Precio Unit. → se usa ese valor', 'Precios incluyen IVA según encabezado')",
   "precios_incluyen_iva": null,
+  "moneda": "USD si los precios están en dólares (US$, U$S, USD, u$s), ARS si están en pesos, null si no se sabe",
+  "cotizacion_dolar": número_o_null,
   "proveedor": "nombre completo o razón social del proveedor",
   "cuit_proveedor": "CUIT del proveedor en formato XX-XXXXXXXX-X si está disponible, sino null",
   "domicilio_proveedor": "domicilio o dirección del proveedor si está disponible, sino null",
@@ -223,6 +225,9 @@ PRECIO UNITARIO — ORDEN DE PRIORIDAD (respetar este orden sin excepciones):
 2. Si existe "P.Lista" + "%Desc." pero NO hay columna de precio neto → calcular: P.Lista × (1 - %Desc / 100)
 3. Solo si no hay ningún precio unitario explícito en el renglón → derivar de total_linea ÷ cantidad
 NUNCA usar P.Lista si en el mismo renglón existe una columna de precio neto.
+
+MONEDA Y COTIZACIÓN:
+- "cotizacion_dolar": el tipo de cambio que indique el documento (ej: "Cotización BNA $1.180", "T.C. 1.175,50", "dólar a $1.200") como número de pesos por dólar. null si el documento no dice ninguno. NO inventes ni uses una cotización que no esté escrita.
 
 DETECCIÓN DE IVA EN PRECIOS:
 - "precios_incluyen_iva": true → si los precios unitarios ya incluyen IVA (el documento lo indica explícitamente o se infiere claramente)
@@ -344,6 +349,8 @@ function parseGeminiResponse(text) {
     ref_presupuesto:        trimOrNull(parsed.ref_presupuesto),
     condicion_pago:         trimOrNull(parsed.condicion_pago),
     estructura_precios:  trimOrNull(parsed.estructura_precios),
+    moneda:           /^(usd|u\$s|us\$|d[oó]lar)/i.test(String(parsed.moneda || '')) ? 'USD' : (parsed.moneda ? 'ARS' : null),
+    cotizacion_dolar: parseFloatSafe(parsed.cotizacion_dolar) || null,
     precios_incluyen_iva: parsed.precios_incluyen_iva === true ? true : parsed.precios_incluyen_iva === false ? false : null,
     items: (parsed.items || []).map(it => ({
       descripcion:     String(it.desc || it.descripcion || '').trim(),

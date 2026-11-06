@@ -18,22 +18,45 @@
 
 <!-- ===== HEADER ===== -->
 <header class="app-header">
-  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
-    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
-      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
-    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+  <div class="header-brand">
+    <button type="button" class="hdr-back" id="btn-back" onclick="vimecoVolver('compras.html')" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <span class="header-home u-pointer" onclick="window.location.href='menu.html'" title="Inicio">
+      <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+        onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+      <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    </span>
     <span class="header-title">Órdenes de Compra</span>
   </div>
   <div class="header-user">
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <button class="btn btn-sm btn-outline btn-icon" aria-label="Volver" title="Volver" onclick="window.location.href='compras.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
 </header>
 
 <!-- ===== MAIN ===== -->
 <main class="app-main">
+
+  <!-- Confirmación de la OC recién generada (js/app.js → abrirOCLista) -->
+  <div class="oc-lista" id="oc-lista" role="status">
+    <div class="oc-lista-card">
+      <div class="oc-lista-ic" id="oc-lista-ic"></div>
+      <div class="oc-lista-t" id="oc-lista-t"></div>
+      <div class="oc-lista-s hidden" id="oc-lista-s"></div>
+      <div class="oc-lista-aviso hidden" id="oc-lista-aviso"></div>
+      <div class="oc-lista-datos" id="oc-lista-datos"></div>
+    </div>
+    <div class="oc-lista-btns">
+      <button type="button" class="foc-btn foc-btn--gen hidden" id="btn-lista-reintentar"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Reintentar</button>
+      <button type="button" class="foc-btn foc-btn--gen" id="btn-lista-otra"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Generar otra orden</button>
+      <button type="button" class="foc-btn foc-btn--edit" id="btn-lista-inicio"><svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Volver al inicio</button>
+    </div>
+    <div class="oc-lista-links">
+      <button type="button" class="hidden" id="btn-lista-pdf"></button>
+      <button type="button" class="hidden" id="btn-lista-mismo">Otra al mismo proveedor</button>
+      <button type="button" class="hidden" id="btn-lista-descartar">Seguir sin registrarla</button>
+    </div>
+  </div>
 
   <div class="oc-layout">
     <div class="oc-col">
@@ -67,14 +90,12 @@
               <span class="import-btn-label">Sacar foto</span>
             </button>
           </div>
-          <div class="upload-filename hidden" id="upload-filename">
-            <span class="upload-filename-txt" id="upload-filename-txt"></span>
-            <button class="foc-btn foc-btn--clear upload-file-x" id="btn-clear-file" title="Quitar el archivo"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Quitar</button>
-          </div>
           <div class="extract-bar">
+            <!-- El presupuesto elegido: la pastilla que abre su ficha (js/fichaArchivo.js) -->
+            <div id="upload-filename"></div>
             <button class="btn btn-primary" id="btn-extract" disabled>
               <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              Extraer datos con IA
+              Extraer con IA
             </button>
             <div id="extract-status" class="extract-status hidden"></div>
           </div>
@@ -244,7 +265,18 @@
               <button type="button" data-chk="moneda-toggle" data-v="0">Pesos</button>
               <button type="button" data-chk="moneda-toggle" data-v="1">Dólares</button>
             </span>
+            <!-- Cotización que toma la OC: la del presupuesto o el oficial (promedio compra/venta), editable -->
+            <label class="iva-pct-wrap hidden" id="tc-wrap" title="Cotización del dólar que toma esta OC al día de emisión">
+              US              <button type="button" data-chk="moneda-toggle" data-v="1">Dólares</button>
+            </span>
           </span>
+nbsp;1&nbsp;=&nbsp;              <button type="button" data-chk="moneda-toggle" data-v="1">Dólares</button>
+            </span>
+          </span>
+nbsp;<input type="text" id="tc-usd" class="iva-pct-input tc-input" inputmode="decimal" aria-label="Cotización del dólar">
+            </label>
+          </span>
+          <span class="tc-origen hidden" id="tc-origen"></span>
         </div>
         <!-- Queda mientras parezca que los precios traen IVA y no se eligió «Con IVA incluido» -->
         <p id="iva-sugerencia" class="iva-sugerencia hidden">Los precios del presupuesto parecen incluir IVA: revisá si corresponde «Con IVA incluido».</p>
@@ -369,7 +401,6 @@
         <!-- Generate bar -->
         <div class="generate-bar">
           <button class="foc-btn foc-btn--clear" id="btn-clear-form"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Limpiar formulario</button>
-          <button class="foc-btn foc-btn--edit hidden" id="btn-same-provider"><svg class="icon" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>Mismo proveedor</button>
           <button class="foc-btn foc-btn--edit" id="btn-preview"><svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Vista previa</button>
           <button class="foc-btn foc-btn--gen btn-generate" id="btn-generate">
             <svg class="icon" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -505,6 +536,8 @@
 <script src="js/ocGenerator.js"></script>
 <script src="js/fichaOC.js"></script>
 <script src="js/duplicados.js"></script>
+<script src="js/scanner.js"></script>
+<script src="js/fichaArchivo.js"></script>
 <script src="js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

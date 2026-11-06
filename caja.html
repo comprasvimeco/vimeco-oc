@@ -204,6 +204,12 @@
     .cj-monto span { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%); color: var(--gray-400); font-weight: 700; pointer-events: none; }
     .cj-monto input { font-size: 1.3rem; font-weight: 800; color: var(--primary-dark); padding-left: 1.6rem; font-variant-numeric: tabular-nums; }
     .cj-monto input::placeholder { color: var(--gray-300); }
+    .cj-calc { margin-top: .3rem; }
+    .cj-calc-ops { display: flex; gap: .25rem; }
+    .cj-calc-op { flex: 1; min-width: 0; font: inherit; font-size: 1rem; font-weight: 700; line-height: 1; padding: .38rem 0; border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600); border-radius: 8px; cursor: pointer; }
+    .cj-calc-op:active { background: var(--gray-100); }
+    .cj-calc-res { font-size: .78rem; font-weight: 700; color: var(--primary-dark); margin-top: .25rem; min-height: 1em; font-variant-numeric: tabular-nums; }
+    .cj-calc-res.is-mal { color: var(--gray-400); font-weight: 600; }
     .cj-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
     .cj-chips + .cj-chips, .cj-fld + .cj-chips { margin-top: .45rem; }
     .cj-chip { font: inherit; font-size: .8rem; font-weight: 600; border: 1px solid var(--gray-200); background: var(--white); color: var(--gray-600); border-radius: 999px; padding: .28rem .7rem; cursor: pointer; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
@@ -284,7 +290,7 @@
   <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
     <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
       onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
-    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+      <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
     <span class="header-title">Caja Chica</span>
   </div>
   <div class="header-user">
@@ -415,7 +421,8 @@
           <div class="cj-sec-h"><span class="cj-n" id="cj-n-monto">2</span><b>Monto y fecha</b></div>
           <div class="cj-f2">
             <div><label for="gasto-monto">Monto</label>
-              <div class="cj-monto"><span>$</span><input type="text" id="gasto-monto" class="form-control" placeholder="0,00" inputmode="decimal" autocomplete="off"></div></div>
+              <div class="cj-monto"><span>$</span><input type="text" id="gasto-monto" class="form-control" placeholder="0,00" inputmode="decimal" autocomplete="off"></div>
+              <div class="cj-calc" id="gasto-monto-calc" hidden><div class="cj-calc-ops"><button type="button" class="cj-calc-op" data-op="+" aria-label="más">+</button><button type="button" class="cj-calc-op" data-op="-" aria-label="menos">−</button><button type="button" class="cj-calc-op" data-op="*" aria-label="por">×</button><button type="button" class="cj-calc-op" data-op="/" aria-label="dividido">÷</button></div><div class="cj-calc-res" id="gasto-monto-res"></div></div></div>
             <div><label for="gasto-fecha">Fecha</label><input type="date" id="gasto-fecha" class="form-control"></div>
           </div>
         </section>
@@ -459,7 +466,8 @@
       <section class="cj-sec">
         <div class="cj-f2">
           <div><label for="recarga-monto">Monto</label>
-            <div class="cj-monto"><span>$</span><input type="text" id="recarga-monto" class="form-control" placeholder="0,00" inputmode="decimal" autocomplete="off"></div></div>
+            <div class="cj-monto"><span>$</span><input type="text" id="recarga-monto" class="form-control" placeholder="0,00" inputmode="decimal" autocomplete="off"></div>
+              <div class="cj-calc" id="recarga-monto-calc" hidden><div class="cj-calc-ops"><button type="button" class="cj-calc-op" data-op="+" aria-label="más">+</button><button type="button" class="cj-calc-op" data-op="-" aria-label="menos">−</button><button type="button" class="cj-calc-op" data-op="*" aria-label="por">×</button><button type="button" class="cj-calc-op" data-op="/" aria-label="dividido">÷</button></div><div class="cj-calc-res" id="recarga-monto-res"></div></div></div>
           <div><label for="recarga-fecha">Fecha</label><input type="date" id="recarga-fecha" class="form-control"></div>
         </div>
         <div class="cj-fld" style="margin-top:.55rem"><label for="recarga-comentario">Comentario (opcional)</label>
@@ -532,6 +540,8 @@
 <script src="js/drive.js"></script>
 <script src="js/gemini.js"></script>
 <script src="js/scanner.js"></script>
+<script src="js/ocCalc.js"></script>
+<script src="js/montoCalc.js"></script>
 <script src="js/caja.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

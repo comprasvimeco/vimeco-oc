@@ -93,12 +93,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     return base.charAt(0).toUpperCase() + base.slice(1);
   }
 
+  // Acepta cuentas ("=1500+230,50", "3x1200") y el punto como coma ("1500.50"): js/montoCalc.js.
   function parseMonto(str) {
-    if (!str) return 0;
-    const n = parseFloat(String(str).replace(/\./g, '').replace(',', '.'));
+    const n = calcMonto(str);
     return isNaN(n) ? 0 : n;
   }
-  const montoInput = n => n ? String(n).replace('.', ',') : '';
+  const montoInput = n => n ? (Number.isInteger(n) ? String(n) : Number(n).toFixed(2)).replace('.', ',') : '';
+
+  // Campo de monto con cuentas: mientras está enfocado, abajo van + − × ÷ (el teclado
+  // numérico del teléfono no los trae) y el resultado de la cuenta; al salir del campo
+  // la cuenta se reemplaza por el resultado.
+  function campoMonto(id, alCambiar) {
+    const inp = $(id), box = $(id + '-calc'), res = $(id + '-res');
+    const pintar = () => {
+      const v = inp.value;
+      if (!esCuentaMonto(v)) { res.textContent = ''; res.classList.remove('is-mal'); return; }
+      const n = calcMonto(v);
+      res.classList.toggle('is-mal', isNaN(n));
+      res.textContent = isNaN(n) ? 'Cuenta incompleta' : '= ' + (n < 0 ? '-' : '') + fmtMonto(n);
+    };
+    inp.addEventListener('focus', () => { box.hidden = false; pintar(); });
+    inp.addEventListener('input', pintar);
+    inp.addEventListener('blur', () => {
+      box.hidden = true;
+      res.textContent = '';
+      if (!esCuentaMonto(inp.value)) return;
+      const n = calcMonto(inp.value);
+      if (!isNaN(n)) { inp.value = montoInput(n); alCambiar(); }
+    });
+    // Tocar un operador no le saca el foco al campo (así no se cierra el teclado).
+    box.addEventListener('pointerdown', e => e.preventDefault());
+    box.addEventListener('mousedown', e => e.preventDefault());
+    box.addEventListener('click', e => {
+      const b = e.target.closest('.cj-calc-op');
+      if (!b) return;
+      const v = inp.value;
+      const i = inp.selectionStart ?? v.length, j = inp.selectionEnd ?? v.length;
+      const pre = (/^\s*=/.test(v) || !v.trim()) ? '' : '=';
+      inp.value = pre + v.slice(0, i) + b.dataset.op + v.slice(j);
+      const pos = pre.length + i + 1;
+      try { inp.setSelectionRange(pos, pos); } catch (_) {}
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
   const sinTildes  = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const neto       = m => m.tipo === 'ingreso' ? (m.monto || 0) : -(m.monto || 0);
   const esEgreso   = m => m.tipo === 'gasto';
@@ -818,6 +855,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   ['gasto-monto', 'gasto-descripcion', 'gasto-proveedor'].forEach(id => $(id).addEventListener('input', refrescarGasto));
+  campoMonto('gasto-monto', refrescarGasto);
   $('gasto-fecha').addEventListener('input', () => { fechaTocada = true; refrescarGasto(); });
   $('gasto-obra').addEventListener('change', refrescarGasto);
   $('gasto-cats').addEventListener('click', e => {
@@ -1101,6 +1139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('btn-recarga-guardar').classList.toggle('is-incompleto', faltan.length > 0);
   }
   ['recarga-monto', 'recarga-fecha'].forEach(id => $(id).addEventListener('input', refrescarRecarga));
+  campoMonto('recarga-monto', refrescarRecarga);
   $('recarga-estado').addEventListener('click', () => {
     const f = faltantesRecarga();
     if (f.length) mostrarFaltantes(f, id => $(id === 'monto' ? 'recarga-monto' : 'recarga-fecha').focus());

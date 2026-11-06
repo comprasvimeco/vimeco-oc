@@ -2,18 +2,18 @@
    VIMECO OC — Reportes → Resumen
    reportesResumen.js
 
-   Paso 5 del rediseño de Reportes, traído de Leva.
-   Usa lo de reportes.js (FIRMES, ars, money…), reportesObras.js (analizarObra,
-   obrasVisibles, ritmoBar, la ventana de Sin rubro, irA…) y reportesTablero.js
-   (tbSinFactura y su ventana).
+   Usa lo de reportes.js (FIRMES, ars, money, los gráficos…) y reportesObras.js
+   (analizarObra, obrasVisibles, la ventana de Sin rubro, irA…).
 
-   - Una frase: lo comprado en los últimos 30 días contra los 30 anteriores y
-     la obra que explica la diferencia.
+   - Arriba, una tarjeta con la frase y «Para mirar». La frase: lo comprado en
+     los últimos 30 días contra los 30 anteriores y la obra que explica la
+     diferencia. Hasta RES_USO_MIN días desde la primera OC no hay con qué
+     comparar: lo dice, y las cuentas van desde esa OC.
    - «Para mirar»: alertas por gravedad, cada una abre lo que ya existe.
      Presupuesto o rubro pasado → la ficha (con ese rubro); gasto adelantado →
      la ficha; precio que sube en un proveedor → su detalle, con el más barato;
-     sin factura → la lista del Tablero; sin rubro → la ventana de asignar.
-   - «Así vienen las obras», al costado.
+     sin factura → su lista; sin rubro → la ventana de asignar.
+   - Comprado, OC y promedio; compras por semana; las últimas OC.
 
    Los umbrales son los iniciales: se afinan con datos reales.
    =================================================== */
@@ -24,8 +24,11 @@ const RES_PRECIO_RECIENTE = 30;   // días: la compra con el precio nuevo
 const RES_PRECIO_VENTANA = 180;   // días: compras anteriores y otros proveedores que cuentan
 const RES_PRECIO_MES = 90;        // días para estimar cuánto se compra por mes
 const RES_PRECIO_MAX = 3;         // subas sueltas en «Para mirar»; el resto, en una sola
-const RES_OBRAS_MAX = 8;          // obras al costado antes de «Ver todas en Obras»
 const RES_PAREJO = 0.05;          // variación de 30 días que se considera «casi lo mismo»
+const RES_USO_MIN = 60;           // días desde la primera OC para comparar 30 días contra 30
+const RES_SEMANAS = 8;            // semanas del gráfico
+const RES_ULTIMAS = 5;            // OC en «Últimas OC»
+const RES_SINFACT_DIAS = 30;      // sin factura pasados estos días
 
 // ===================================================
 //  Lógica (sin DOM; tests/resumen.test.js)
@@ -51,6 +54,15 @@ function fraseVariacion(t30, tp30, obras) {
   else if (parte >= .4) explica = sube ? `La mayor parte del aumento es ${n}.` : `La mayor parte de la baja es ${n}.`;
   else explica = sube ? `Lo que más subió fue ${n}.` : `Lo que más bajó fue ${n}.`;
   return { cuerpo, explica };
+}
+
+// La frase mientras no hay con qué comparar. `desde`: la fecha de la primera OC, ya escrita.
+// `obra`: { n, parte (0 a 100) } de la que más compró, o null si no tiene centro.
+function fraseInicio(desde, obra, proveedor) {
+  const cuerpo = `Desde el ${desde} compraste {M}.`;
+  if (!obra) return { cuerpo, explica: proveedor ? `Tu mayor proveedor es ${proveedor}.` : '' };
+  const reparto = obra.parte >= 100 ? `Todo fue para ${obra.n}` : `El ${obra.parte}% fue para ${obra.n}`;
+  return { cuerpo, explica: proveedor ? `${reparto} y tu mayor proveedor es ${proveedor}.` : `${reparto}.` };
 }
 
 // Subas de precio: la última compra de cada artículo a cada proveedor (en los
@@ -115,7 +127,7 @@ function subasDePrecio(ocs, deps) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { fraseVariacion, subasDePrecio };
+  module.exports = { fraseVariacion, fraseInicio, subasDePrecio };
 }
 
 // ===================================================
@@ -123,7 +135,7 @@ if (typeof module !== 'undefined') {
 // ===================================================
 let SUBAS = [];   // las subas de precio de la última vez que se pintó (las ventanas las leen)
 
-const DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
 const mayus = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 const corto = (s, n = 60) => s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s;
 
@@ -190,9 +202,9 @@ function alertasResumen(todas) {
       s: 'Contra la compra anterior al mismo proveedor.' });
   }
 
-  const sinF = tbSinFactura();
+  const sinF = ocsSinFactura();
   if (sinF.length) A.push({ orden: 5, cls: 'info', imp: 0, attr: 'data-sinfact="1"',
-    t: `${plural(sinF.length, 'OC', 'OC')} sin factura hace más de ${TB_SINFACT_DIAS} días`,
+    t: `${plural(sinF.length, 'OC', 'OC')} sin factura hace más de ${RES_SINFACT_DIAS} días`,
     s: `${money(sumARS(sinF))} en total.` });
 
   const sinR = todas.filter(a => a.conRubros).flatMap(a => a.sinRubro);
@@ -214,53 +226,118 @@ function subaSub(x) {
 }
 
 function renderResumen() {
-  const { vis, todas } = obrasVisibles();
+  if (!FIRMES.length) { $('rx-app').innerHTML = sinOCHtml(); return; }
+  const { todas } = obrasVisibles();
   calcularSubas();
   const fin = finHoy();
+  const poco = fin - PRIMERA_OC < RES_USO_MIN * DIA;
   const l30 = FIRMES.filter(oc => (oc.timestamp || 0) >= fin - 30 * DIA);
   const lp30 = FIRMES.filter(oc => (oc.timestamp || 0) >= fin - 60 * DIA && (oc.timestamp || 0) < fin - 30 * DIA);
-  const t30 = sumARS(l30), tp30 = sumARS(lp30);
-  const porObra = new Map();
-  const sumar = (l, campo) => l.forEach(oc => {
-    const k = obraKey(oc);
-    if (!porObra.has(k)) porObra.set(k, { n: obraLabel(k), d: 0, p: 0 });
-    porObra.get(k)[campo] += ars(oc) || 0;
-  });
-  sumar(l30, 'd'); sumar(lp30, 'p');
-  const fr = fraseVariacion(t30, tp30, [...porObra.values()]);
-  const monto = t30 ? t30 : tp30;
-  const frase = esc(fr.cuerpo).replace('{M}', `<em>${esc(money(monto))}</em>`) + (fr.explica ? ' ' + esc(fr.explica) : '');
+  const base = poco ? FIRMES : l30;   // lo que cuentan los números de arriba
+  const t = sumARS(base), tp30 = sumARS(lp30);
+  const ini = new Date(PRIMERA_OC);
 
-  const hoy = new Date();
-  const fecha = mayus(`${DIAS_SEM[hoy.getDay()]} ${hoy.getDate()} de ${MESES_LG[hoy.getMonth()]}`);
+  let fr;
+  if (poco) {
+    const gO = agrupar(FIRMES, obraKey, (oc, k) => obraLabel(k))[0];
+    const gP = agrupar(FIRMES, PROV_KEY, oc => oc.proveedor?.nombre || '')[0];
+    fr = fraseInicio(`${ini.getDate()} de ${MESES_LG[ini.getMonth()]}`,
+      gO.key === '—' ? null : { n: gO.label, parte: pct(gO.total, t) }, gP.label);
+  } else {
+    const porObra = new Map();
+    const sumar = (l, campo) => l.forEach(oc => {
+      const k = obraKey(oc);
+      if (!porObra.has(k)) porObra.set(k, { n: obraLabel(k), d: 0, p: 0 });
+      porObra.get(k)[campo] += ars(oc) || 0;
+    });
+    sumar(l30, 'd'); sumar(lp30, 'p');
+    fr = fraseVariacion(t, tp30, [...porObra.values()]);
+  }
+  const frase = esc(fr.cuerpo).replace('{M}', `<b class="rx-num">${esc(money(t || tp30))}</b>`) + (fr.explica ? ' ' + esc(fr.explica) : '');
+  const titulo = !poco ? 'Últimos 30 días' : fin - PRIMERA_OC <= 31 * DIA ? 'Tu primer mes' : 'Tus primeros meses';
 
   const A = alertasResumen(todas);
-  const alertas = A.length
-    ? `<div class="rx-list">${A.map(x => `
-        <button type="button" class="rx-alert" ${x.attr}><span class="rx-dot rx-dot-${x.cls}" aria-hidden="true"></span>
-          <span class="rx-l"><span class="t">${esc(x.t)}</span><span class="s">${esc(x.s)}</span></span></button>`).join('')}</div>`
-    : `<div class="rx-empty">Nada fuera de lo normal: ningún presupuesto pasado ni gasto adelantado, ninguna suba de precio de ${Math.round(RES_PRECIO_SUBA * 100)}% o más, ni OC viejas sin factura u OC sin rubro.</div>`;
+  const compara = new Date(PRIMERA_OC + RES_USO_MIN * DIA);
+  // Una recomendación sólo si no hay nada que atender: es la misma del menú (js/consejos.js).
+  const conTip = poco && !A.length && OBRAS.length > 0 && !todas.some(a => a.pres);
+  const mirar = `
+    ${A.length ? `<div class="rx-list">${A.map(x => `
+      <button type="button" class="rx-alert" ${x.attr}><span class="rx-dot rx-dot-${x.cls}" aria-hidden="true"></span>
+        <span class="rx-l"><span class="t">${esc(x.t)}</span><span class="s">${esc(x.s)}</span></span></button>`).join('')}</div>` : ''}
+    ${!poco && !A.length ? '<span class="rx-muted">Nada fuera de lo normal.</span>' : ''}
+    ${poco ? `<p class="rx-muted rx-poco">Todavía es poco para sacar conclusiones. Desde el ${compara.getDate()} de ${MESES_LG[compara.getMonth()]} vas a poder comparar un período contra otro.</p>` : ''}
+    ${conTip ? `<button type="button" class="rx-tipr" data-irtab="obras">${icSvg('bulb')}<span>${esc(voc('Cargale presupuesto a tus centros: Reportes te avisa si el gasto se pasa o va más rápido que el plazo.'))}</span>${icSvg('chevR')}</button>` : ''}`;
 
-  const obra = a => `
-      <button type="button" class="rx-tbo" data-ficha="${esc(a.o.key)}">
-        <span class="rx-row"><b class="rx-ell">${esc(a.o.nombre)}</b><span class="rx-pill ${a.estado.cls}">${esc(a.estado.txt)}</span></span>
-        ${a.pres ? `<span class="rx-muted">${esc(money(a.gast, a.cur))} de ${esc(money(a.pres, a.cur))}</span>${ritmoBar(a)}`
-          : `<span class="rx-muted">${a.d30 ? `${esc(money(a.d30, a.cur))} en 30 días${a.p30 ? ` · ${varTxt(a.d30, a.p30)} vs. 30 días anteriores` : ''}` : 'Sin compras en los últimos 30 días'}</span>`}
-      </button>`;
-  const obras = vis.length ? `<div class="rx-list">${vis.slice(0, RES_OBRAS_MAX).map(obra).join('')}</div>
-      ${vis.length > RES_OBRAS_MAX ? `<button type="button" class="rx-mas" data-tbtab="obras">Ver todas las obras en Obras (${vis.length})</button>` : ''}`
-    : `<div class="rx-empty">${esc('Todavía no hay obras cargadas. Se dan de alta en Administración → Obras.')}</div>`;
+  const nCentros = agrupar(base, obraKey, (oc, k) => k).length;
+  const prom = base.length ? t / base.length : 0, promP = lp30.length ? tp30 / lp30.length : 0;
+  const desdeCorto = `desde el ${ini.getDate()} ${MESES[ini.getMonth()]}`;
+  const kpi = (k, v, delta, sub) => `<div class="rx-kpi"><span class="k">${k}</span><span class="v">${esc(v)}</span>${delta}<span class="s">${esc(sub)}</span></div>`;
+  const vsAnt = 'vs. 30 días ant.';
+  const kpis = poco
+    ? kpi('Comprado', money(t), '', desdeCorto) +
+      kpi('OC', String(base.length), '', `en ${nCentros} ${nCentros === 1 ? voc('centro') : voc('centro.p')}`) +
+      kpi('Promedio', money(prom), '', 'por OC')
+    : kpi('Comprado', money(t), tp30 ? deltaHtml(t, tp30) : '', tp30 ? vsAnt : 'últimos 30 días') +
+      kpi('OC', String(base.length), lp30.length ? deltaHtml(base.length, lp30.length, true) : '', lp30.length ? vsAnt : 'últimos 30 días') +
+      kpi('Promedio', money(prom), promP ? deltaHtml(prom, promP, true) : '', promP ? vsAnt : 'por OC');
+
+  // Compras por semana: lo de cada semana, no el acumulado (ése va en Explorar).
+  const lun = new Date(fin - DIA);
+  lun.setDate(lun.getDate() - (lun.getDay() + 6) % 7 - (RES_SEMANAS - 1) * 7);
+  const lSem = FIRMES.filter(oc => (oc.timestamp || 0) >= lun.getTime());
+  GRAF.res = null;
+  if (lSem.length) {
+    const cub = cubetasCon(lun.getTime(), fin, 'semana', lSem);
+    GRAF.res = { cub, sel: null, prefijo: '', ser: [{ label: 'Compras', color: 'var(--rx-bar)',
+      vals: cub.map(c => sumARS(lSem.filter(oc => (oc.timestamp || 0) >= c.ini && (oc.timestamp || 0) < c.fin))) }] };
+  }
+
+  const ult = [...FIRMES].sort((x, y) => (y.timestamp || 0) - (x.timestamp || 0)).slice(0, RES_ULTIMAS);
+  const fila = oc => `<button type="button" class="rx-ocf" data-oc="${esc(oc.nroOC)}">
+      ${avatarHtml(oc.proveedor?.nombre || 'Sin proveedor')}
+      <span class="rx-l"><b class="rx-ell2">${esc(oc.proveedor?.nombre || 'Sin proveedor')}</b><span class="rx-muted rx-ell2">${swObra(obraKey(oc))}${esc(obraLabel(obraKey(oc)))} · ${dm(oc.timestamp)}</span></span>
+      <span class="rx-ocf-r"><b class="rx-num">${esc(money(oc.total, oc.moneda === 'USD' ? 'USD' : 'ARS'))}</b>${facturaPill(oc)}</span></button>`;
 
   $('rx-app').innerHTML = `
+    <section class="rx-card" aria-label="${esc(titulo)}">
+      <h3>${esc(titulo)}</h3>
+      <p class="rx-lead">${frase}</p>
+      <div class="rx-mirar"><h3>Para mirar</h3>${mirar}</div>
+    </section>
+    <div class="rx-kpis">${kpis}</div>
     <div class="rx-grid">
-      <div class="rx-col rx-c7">
-        <div class="rx-intro"><span class="rx-muted">${esc(fecha)}</span><p class="rx-lead">${frase}</p></div>
-        <section class="rx-card" aria-label="Para mirar"><h3>Para mirar</h3>${alertas}</section>
-      </div>
-      <section class="rx-card rx-c5" aria-label="${esc('Así vienen las obras')}">
-        <h3>${esc('Así vienen las obras')}</h3>${obras}
+      <section class="rx-card rx-c7" aria-label="Compras por semana">
+        <div class="rx-row"><h3>Compras por semana</h3><span class="rx-muted">${poco ? 'desde tu primera OC' : `últimas ${RES_SEMANAS} semanas`}</span></div>
+        ${GRAF.res ? `<div id="rx-gr-res">${grafInner('res')}</div>` : `<div class="rx-empty">Sin compras en las últimas ${RES_SEMANAS} semanas.</div>`}
+      </section>
+      <section class="rx-card rx-c5" aria-label="Últimas OC">
+        <h3>Últimas OC</h3>
+        <div class="rx-list">${ult.map(fila).join('')}</div>
       </section>
     </div>`;
+}
+
+// ---- Sin factura: la lista, agrupada por obra ----
+// La OC sin ningún archivo, pasados 30 días. Las que tienen archivos sin rotular
+// no cuentan: no se puede afirmar que les falte (estadoFacturaOC, firebase.js).
+function ocsSinFactura() {
+  const tope = finHoy() - RES_SINFACT_DIAS * DIA;
+  return FIRMES.filter(oc => (oc.timestamp || 0) < tope && estadoFacturaOC(oc).estado === 'sin')
+    .sort((x, y) => (x.timestamp || 0) - (y.timestamp || 0));
+}
+
+function pintarModalSinFactura() {
+  const l = ocsSinFactura();
+  const grupos = agrupar(l, obraKey, (oc, k) => obraLabel(k));
+  const enSuMoneda = oc => ({ val: x => Number(x.total) || 0, cur: oc.moneda === 'USD' ? 'USD' : 'ARS' });
+  const cuerpo = l.length
+    ? `<div class="rx-muted">${esc(`OC emitidas hace más de ${RES_SINFACT_DIAS} días sin ningún archivo cargado. La factura se carga en Compras → Facturas.`)}</div>` +
+      grupos.map(gr => `<div class="rx-mgrp"><div class="rx-row"><h3>${esc(gr.label)}</h3><span class="rx-muted rx-num">${esc(money(gr.total))}</span></div><div class="rx-list">${
+        l.filter(oc => obraKey(oc) === gr.key).map(oc => ocFila(oc, enSuMoneda(oc))).join('')}</div></div>`).join('')
+    : '<div><b>Listo.</b> <span class="rx-muted">No quedan OC viejas sin factura.</span></div>';
+  MODAL = 'sinfact';
+  abrirModal('Sin factura', l.length ? `${plural(l.length, 'OC', 'OC')} · ${money(sumARS(l))}` : 'Todo al día', cuerpo,
+    l.length ? '<span></span><div class="foc-foot-r"><a class="foc-btn foc-btn--fac" href="facturas.html">Ir a Facturas</a></div>' : '');
 }
 
 // ===================================================
@@ -329,9 +406,13 @@ function pintarModalPrecios() {
 
 // Clicks del Resumen (en la página y en la ventana). Devuelve true si eran suyos.
 function onClickResumen(e) {
-  const b = e.target.closest('[data-precio],[data-precios]');
+  const b = e.target.closest('[data-precio],[data-precios],[data-sinfact],[data-irtab],[data-rubro]');
   if (!b) return false;
-  if (b.dataset.precios) pintarModalPrecios();
-  else pintarModalPrecio(Number(b.dataset.precio));
+  const d = b.dataset;
+  if (d.sinfact) { pintarModalSinFactura(); return true; }
+  if (d.irtab)   { irA({ tab: d.irtab, ficha: null, rsel: null }); return true; }
+  if (d.rubro)   { irA({ ficha: d.ficha, rsel: d.rubro }); return true; }
+  if (d.precios) pintarModalPrecios();
+  else pintarModalPrecio(Number(d.precio));
   return true;
 }

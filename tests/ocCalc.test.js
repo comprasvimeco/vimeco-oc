@@ -87,6 +87,62 @@ test('montos grandes no pierden centavos', () => {
   assert.equal(r.total, 147530367.28);
 });
 
+// La OC que queda al tildar «Con IVA incluido»: unitarios netos + IVA como impuesto.
+function ocConIVA(items, pct = 21) {
+  const netos = OCCalc.netosSinIVA(items, pct);
+  const r = oc({
+    items: items.map((x, i) => it(x.cantidad, netos[i])),
+    impuestos: [{ nombre: 'IVA', pct }]
+  });
+  return { ...r, netos };
+}
+
+test('precios con IVA: la cantidad no multiplica el redondeo del unitario', () => {
+  // Con el unitario redondeado: 1,64 × 1000 = 1640 + IVA = 1984,40, casi $6 menos.
+  const r = ocConIVA([it(1000, 1.99)]);
+  assert.equal(r.subtotal, 1644.63);
+  assert.equal(r.total, 1990);
+});
+
+test('precios con IVA: los renglones parejos suman el total del presupuesto', () => {
+  // Redondeando cada renglón: 82,64 × 3 = 247,92 + IVA = 299,98.
+  const r = ocConIVA([it(1, 100), it(1, 100), it(1, 100)]);
+  assert.equal(r.subtotal, 247.93);
+  assert.equal(r.total, 300);
+});
+
+test('precios con IVA: cada unitario × cantidad da su renglón', () => {
+  const items = [it(7, 1234.56), it(2.5, 830.4), it(0.333, 99.99)];
+  const { netos, subtotal } = ocConIVA(items);
+  const renglones = items.map((x, i) => OCCalc.totalItem(it(x.cantidad, netos[i])));
+  assert.equal(roundCents(renglones.reduce((a, b) => a + b, 0)), subtotal);
+  renglones.forEach((r, i) => assert.ok(Math.abs(r - OCCalc.totalItem(items[i]) / 1.21) <= 0.015, `renglón ${i}`));
+});
+
+test('precios con IVA: como mucho un centavo, con cualquier presupuesto', () => {
+  // Generador fijo: si falla, el caso se repite.
+  let semilla = 12345;
+  const azar = n => (semilla = (semilla * 1103515245 + 12345) % 2147483648) % n;
+  for (let vuelta = 0; vuelta < 3000; vuelta++) {
+    const items = Array.from({ length: 1 + azar(25) }, () =>
+      it((1 + azar(5000)) / (azar(2) ? 1 : 100), (1 + azar(9999999)) / 100));
+    const pct = [21, 10.5, 27][azar(3)];
+    const conIVA = OCCalc.subtotal(items);
+    const { total } = ocConIVA(items, pct);
+    assert.ok(Math.abs(total - conIVA) <= 0.0101, `vuelta ${vuelta}: ${total} contra ${conIVA}`);
+  }
+});
+
+test('precios con IVA: renglón en cero, bonificación y lista vacía', () => {
+  assert.deepEqual(OCCalc.netosSinIVA([], 21), []);
+  assert.equal(OCCalc.netosSinIVA(undefined, 21).length, 0);
+  // Sin cantidad todavía: el unitario queda igual calculado, para cuando la carguen.
+  assert.ok(Math.abs(OCCalc.netosSinIVA([it(0, 121)], 21)[0] - 100) < 1e-9);
+  assert.equal(OCCalc.netosSinIVA([it(5, 0)], 21)[0], 0);
+  const r = ocConIVA([it(1, 1000), it(1, -100)]);
+  assert.ok(Math.abs(r.total - 900) <= 0.0101);
+});
+
 test('parseArgFloat: formatos argentinos', () => {
   assert.equal(parseArgFloat('1.234,56'), 1234.56);
   assert.equal(parseArgFloat('1.234.567,8'), 1234567.8);

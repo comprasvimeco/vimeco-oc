@@ -80,11 +80,22 @@
     return 'pedir';
   };
 
+  // Este equipo llegó a registrar su token para este usuario (con el permiso solo no alcanza:
+  // si Chrome no lo deja suscribirse, no llega nada).
+  window.pushRegistrado = codigo => {
+    try { const p = JSON.parse(localStorage.getItem(LS_KEY)); return !!(p && p.codigo === codigo && p.id); } catch (_) { return false; }
+  };
+  // Mensaje del último error al registrar ('' si no hubo), para explicarlo en Perfil.
+  window.pushError = '';
+
   // Con el permiso ya dado, mantiene el token de este equipo al día.
   window.initPush = async function (codigo) {
     const estado = pushEstado();
     if (estado === 'activas' && codigo) {
-      try { await _registrar(codigo); } catch (e) { console.warn('push/init:', e); }
+      try { await _registrar(codigo); window.pushError = ''; } catch (e) {
+        console.warn('push/init:', e);
+        window.pushError = String((e && e.message) || e);
+      }
     }
     return estado;
   };
@@ -94,7 +105,12 @@
   window.activarPush = async function (codigo) {
     const permiso = await Notification.requestPermission();
     if (permiso !== 'granted') return false;
-    return _registrar(codigo);
+    window.pushError = '';
+    try { return await _registrar(codigo); } catch (e) {
+      console.warn('push/activar:', e);
+      window.pushError = String((e && e.message) || e);
+      return false;
+    }
   };
 
   // Aviso a otro usuario, sin esperar respuesta: si falla, la bandeja y el

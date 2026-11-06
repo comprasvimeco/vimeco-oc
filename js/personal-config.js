@@ -939,6 +939,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (_s.codigo !== '0000') { window.location.href = 'menu.html'; return; }
   $('hdr-name').textContent = _s.nombre;
 
+  window.vimecoCambiosSinGuardar = hayCambios;   // el doble toque a la flecha no se saltea la pregunta
   $('btn-back').addEventListener('click', () => {
     if (!MQ_ANCHA.matches && document.body.classList.contains('pc-open')) { history.back(); return; }
     window.location.href = 'administracion.html';

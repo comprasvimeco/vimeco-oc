@@ -465,7 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   $('hdr-name').textContent = name;
 
-  $('btn-back').addEventListener('click',    () => { window.location.href = 'compras.html'; });
+  $('btn-back').addEventListener('click', () => vimecoVolver('compras.html'));
   $('hist-search').addEventListener('input',  applyFilters);
   $('modal-preview-close').addEventListener('click', cerrarFicha);
   $('preview-base').addEventListener('click', () => { if (fichaOC) usarComoBase(fichaOC); });

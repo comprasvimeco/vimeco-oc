@@ -33,6 +33,34 @@ const OCCalc = {
   // Un renglón con % se calcula sobre el gravado; sin %, queda el monto cargado.
   montoImpuesto(imp, gravado) {
     return (imp.pct != null && imp.pct > 0) ? roundCents(gravado * imp.pct / 100) : roundCents(imp.monto);
+  },
+
+  // Precios con IVA incluido → unitarios netos. Se reparte el neto total en centavos
+  // entre los renglones (los que más perdieron al redondear se llevan el que sobra) y
+  // cada unitario sale de su renglón: redondearlo a él y multiplicar por la cantidad
+  // es lo que corría el total unos pesos.
+  netosSinIVA(items, pct) {
+    const factor = 1 + pct / 100;
+    const conIVA = OCCalc.subtotal(items);
+    // El neto cuyo neto + IVA más se acerca al total. Puede quedar a un centavo: al
+    // redondear el IVA, hay totales a los que ningún neto llega.
+    const base = Math.round(conIVA / factor * 100);
+    const totalDe = c => roundCents(c / 100 + roundCents(c / 100 * pct / 100));
+    const neto = [base, base - 1, base + 1]
+      .reduce((a, c) => Math.abs(totalDe(c) - conIVA) < Math.abs(totalDe(a) - conIVA) ? c : a);
+
+    const filas = (items || []).map(it => {
+      const exacto = OCCalc.totalItem(it) / factor * 100;
+      return { it, cents: Math.floor(exacto), resto: exacto - Math.floor(exacto) };
+    });
+    const conLinea = filas.filter(f => OCCalc.totalItem(f.it) !== 0);
+    const faltan = neto - conLinea.reduce((s, f) => s + f.cents, 0);
+    const orden = [...conLinea].sort((a, b) => faltan > 0 ? b.resto - a.resto : a.resto - b.resto);
+    for (let i = 0; i < Math.abs(faltan) && orden.length; i++) orden[i % orden.length].cents += Math.sign(faltan);
+
+    return filas.map(f => OCCalc.totalItem(f.it) !== 0
+      ? f.cents / 100 / parseFloat(f.it.cantidad)
+      : (parseFloat(f.it.precio_unitario) || 0) / factor);
   }
 };
 

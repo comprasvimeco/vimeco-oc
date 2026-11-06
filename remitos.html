@@ -184,10 +184,10 @@
     .rv-thumb img { display: block; width: 100%; max-height: 380px; object-fit: contain; background: #fff; }
     .rv-thumb .rv-pdf { padding: 1.4rem; color: var(--gray-500); }
     .rv-thumb .rv-pdf .icon { width: 34px; height: 34px; }
-    .rv-foto-n { min-width: 0; flex: 1; }
-    .rv-foto-n b { display: block; font-size: .84rem; color: var(--primary-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .rv-foto-n small { font-size: .72rem; color: var(--gray-500); }
-    .rv-foto-acts { display: flex; gap: .35rem; margin-top: .4rem; flex-wrap: wrap; }
+    /* El remito elegido: la pastilla (js/fichaArchivo.js) y, al lado, Leer con IA */
+    .rv-foto-bar { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .rv-foto-bar #btn-rem-ia { margin-left: auto; }
+    .rv-foto-bar .pa-pill-ext { display: none; }   /* no entra al lado de Leer con IA (en escritorio la columna es angosta); está en la ficha */
     .rv-ia-st { display: flex; gap: .45rem; align-items: flex-start; border-radius: 10px; padding: .5rem .6rem; font-size: .78rem; font-weight: 600; margin-top: .6rem; line-height: 1.35; }
     .rv-ia-st .icon { width: 14px; height: 14px; margin-top: 1px; flex: none; }
     .rv-ia-st .spinner { width: 14px; height: 14px; border-width: 2px; margin-top: 1px; }
@@ -233,11 +233,9 @@
       .rv-col--foto .rv-sec { order: 1; }
       #rem-oc-ref { order: 0; }
       #rv-sec-datos { order: 2; } #rv-sec-items { order: 3; } #rv-sec-obs { order: 4; }
-      .rv-foto { flex-direction: row; align-items: center; }
-      .rv-thumb { width: 64px; height: 84px; flex: none; }
-      .rv-thumb img { height: 100%; max-height: none; object-fit: cover; }
-      .rv-thumb .rv-pdf { padding: 0; }
-      .rv-thumb .rv-pdf .icon { width: 24px; height: 24px; }
+      /* En el teléfono la foto se ve en la ficha de la pastilla: acá ocupaba lugar sin leerse */
+      .rv-thumb { display: none; }
+      .rv-foto-bar #btn-rem-ia { flex: 1 1 auto; justify-content: center; }
       .rv-sh-ft { flex-wrap: wrap; padding-bottom: calc(.7rem + env(safe-area-inset-bottom, 0px)); }
       .rv-st { flex-basis: 100%; }
       .rv-ft-btns { width: 100%; }
@@ -250,17 +248,19 @@
 <body>
 
 <header class="app-header">
-  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
-    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
-      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
-    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+  <div class="header-brand">
+    <button type="button" class="hdr-back" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <span class="header-home u-pointer" onclick="window.location.href='menu.html'" title="Inicio">
+      <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+        onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+      <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    </span>
     <span class="header-title">Remitos</span>
   </div>
   <div class="header-user">
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
 </header>
 
@@ -325,7 +325,6 @@
         <section class="rv-sec" id="rv-sec-foto">
           <div class="rv-sec-h">
             <span class="rv-n" id="rv-n-foto">1</span><b>Foto del remito</b><span class="rv-req" id="rv-req-foto">Obligatoria</span>
-            <button type="button" class="foc-btn foc-btn--vio rv-r hidden" id="btn-rem-ia"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M18 13l.7 1.9L21 16l-2.3.9L18 19l-.9-2.1L15 16l2.1-.7L18 13z"/></svg><span id="btn-rem-ia-t">Leer con IA</span></button>
           </div>
           <input type="file" id="rem-file"   accept=".jpg,.jpeg,.png,.pdf,.webp" style="display:none">
           <input type="file" id="rem-camera" accept="image/*" capture="environment" style="display:none">
@@ -341,14 +340,12 @@
           </div>
 
           <div class="rv-foto hidden" id="rv-foto">
-            <div class="rv-thumb" id="rv-thumb"><img id="rem-preview-img" alt="Foto del remito"></div>
-            <div class="rv-foto-n">
-              <b id="rem-file-name"></b><small id="rem-file-size"></small>
-              <div class="rv-foto-acts">
-                <button type="button" class="foc-btn foc-btn--clear" id="btn-rem-rescan"><svg class="icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Escanear</button>
-                <button type="button" class="foc-btn foc-btn--clear" id="btn-rem-quitar"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Quitar</button>
-              </div>
+            <div class="rv-foto-bar">
+              <div id="rem-pastilla"></div>
+              <button type="button" class="foc-btn foc-btn--vio hidden" id="btn-rem-ia"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z"/><path d="M18 13l.7 1.9L21 16l-2.3.9L18 19l-.9-2.1L15 16l2.1-.7L18 13z"/></svg><span id="btn-rem-ia-t">Leer con IA</span></button>
             </div>
+            <!-- En escritorio, la foto grande al costado para leerla mientras se cargan las cantidades -->
+            <div class="rv-thumb" id="rv-thumb" title="Abrir el remito"><img id="rem-preview-img" alt="Foto del remito"></div>
           </div>
           <div id="rem-ia-status" class="rv-ia-st hidden"></div>
         </section>
@@ -417,6 +414,7 @@
 <script src="js/fichaRemito.js"></script>
 <script src="js/gemini.js"></script>
 <script src="js/scanner.js"></script>
+<script src="js/fichaArchivo.js"></script>
 <script src="js/buscarOC.js"></script>
 <script src="js/borradorArchivo.js"></script>
 <script src="js/remitos.js"></script>

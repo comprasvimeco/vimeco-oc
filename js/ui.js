@@ -292,6 +292,35 @@ function _vimecoSesion() {
   try { return JSON.parse(localStorage.getItem('vimeco_session')) || null; } catch (_) { return null; }
 }
 
+// Flecha de la cabecera (traída de Leva): vuelve a la pantalla de la que viniste (si fue de
+// la app y no el ingreso); si abriste ésta directo, sube a su pantalla madre.
+// Dos toques seguidos: al menú. Si el primero cambia de página, espera un momento (si no,
+// el segundo cae en la página que está cargando y se pierde); si ya va al menú, sale de una.
+const _DOBLE_FLECHA = 320;
+let _flechaTs = 0, _flechaPend = null;
+window.vimecoVolver = function (padre) {
+  let destino = padre, ir = () => { location.href = padre; };
+  try {
+    const r = document.referrer && new URL(document.referrer);
+    const de = r && r.origin === location.origin ? r.pathname.split('/').pop() : '';
+    const aqui = location.pathname.split('/').pop();
+    if (history.length > 1 && /.html$/.test(de) && de !== 'index.html' && de !== aqui) { destino = de; ir = () => history.back(); }
+  } catch (_) {}
+  if (destino === 'menu.html') ir();
+  else _flechaPend = setTimeout(ir, _DOBLE_FLECHA);
+};
+// En captura, para ganarle al handler de cada pantalla. Con cambios sin guardar
+// (vimecoCambiosSinGuardar) sigue como un toque común, que es el que pregunta.
+document.addEventListener('click', e => {
+  if (!e.target.closest || !e.target.closest('#btn-back')) return;
+  const ahora = Date.now(), doble = ahora - _flechaTs < _DOBLE_FLECHA;
+  _flechaTs = ahora;
+  if (!doble || (window.vimecoCambiosSinGuardar && window.vimecoCambiosSinGuardar())) return;
+  e.stopImmediatePropagation();
+  clearTimeout(_flechaPend);
+  location.href = 'menu.html';
+}, true);
+
 // Cierra la sesión de este dispositivo del todo: la guardada, las copias viejas
 // (responsable_code/name, que muchas pantallas leen primero), "Seguir como …" y,
 // si el aviso push de este equipo era de esa persona, su token.

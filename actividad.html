@@ -90,14 +90,23 @@
     .act-detalle { font-size: .82rem; color: var(--gray-600); margin-top: .1rem; }
     .act-meta { font-size: .74rem; color: var(--gray-500); margin-top: .15rem; }
     /* Acciones: las pastillas de las fichas, en un renglón al pie de la tarjeta.
-       Borrar va aparte, a la derecha, como Eliminar en la ficha de Reportes. */
+       Marcar, Anular y Borrar van aparte, a la derecha. En el teléfono, todas menos
+       la principal son círculos con su ícono (act-ib). */
     .act-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
       margin-top: .6rem; padding-top: .55rem; border-top: 1px solid var(--gray-100); }
     .act-actions .foc-btn { font-size: .76rem; padding: .35rem .8rem; white-space: nowrap; }
     .act-actions .foc-btn .icon { width: 13px; height: 13px; }
-    .act-actions .act-del { margin-left: auto; }
-    .act-actions .act-anular { margin-left: auto; }
-    .act-actions .act-anular + .act-del { margin-left: 0; }
+    .act-actions .act-mark, .act-actions .act-seen-label { margin-left: auto; }
+    @media (max-width: 560px) {
+      .act-actions { gap: .3rem; }
+      .act-actions .act-ib { width: 34px; height: 34px; padding: 0; justify-content: center; flex: none; }
+      .act-actions .act-ib .icon { width: 15px; height: 15px; }
+      .act-t { display: none; }
+    }
+    @media (max-width: 380px) {
+      .act-actions { gap: .2rem; }
+      .act-actions .act-ib { width: 30px; height: 30px; padding: 0; }
+    }
     /* La pastilla del tipo elegido toma el color de su etiqueta (act-t-*). */
     .act-pick[class*="act-t-"] { border-color: transparent; }
     .foc-btn--fact { background: #f1e8fb; color: #6b3fa0; }   /* los tonos de las pastillas del Historial */
@@ -111,8 +120,8 @@
     .datos-mover select { flex: 1; min-width: 0; }
     .datos-mover .foc-btn { white-space: nowrap; }
     .act-seen-label {
-      display: inline-flex; align-items: center; gap: .25rem; padding: 0 .3rem;
-      font-size: .74rem; font-weight: 700; color: #1b6b3a;
+      display: inline-flex; align-items: center; gap: .3rem; padding: .35rem .8rem; border-radius: 999px;
+      background: #dff3e5; color: #1a7f3c; font-size: .76rem; font-weight: 700; white-space: nowrap;
     }
     .act-seen-label .icon { width: 13px; height: 13px; }
     .act-card-seen .act-actions { border-top-color: #d6ebdd; }
@@ -134,17 +143,19 @@
 <body>
 
 <header class="app-header">
-  <div class="header-brand u-pointer" onclick="window.location.href='menu.html'">
-    <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
-      onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
-    <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+  <div class="header-brand">
+    <button type="button" class="hdr-back" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <span class="header-home u-pointer" onclick="window.location.href='menu.html'" title="Inicio">
+      <img src="assets/logo_claro.png" id="header-logo" alt="VIMECO" class="header-logo"
+        onerror="this.style.display='none';document.getElementById('header-logo-fb').style.display='inline'">
+      <span id="header-logo-fb" class="header-logo-fallback" style="display:none">VIMECO S.A.</span>
+    </span>
     <span class="header-title">Novedades</span>
   </div>
   <div class="header-user">
     <div class="user-badge">
       <span id="hdr-name">—</span>
     </div>
-    <button class="btn btn-sm btn-outline btn-icon" id="btn-back" aria-label="Volver" title="Volver"><svg class="icon" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>
   </div>
 </header>
 

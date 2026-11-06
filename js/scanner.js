@@ -6,11 +6,17 @@
  *     Abre el editor sobre la foto recibida. Resuelve con un File JPEG
  *     (perspectiva corregida + filtro) o null si el usuario cancela.
  *     Rechaza ante error duro (no se pudieron cargar las librerías/imagen).
+ *     El File devuelto trae `.original`: la foto sin recortar de la que salió
+ *     (otra, si se usó «Otra foto»), para volver a recortarla después.
  *
  * El editor (claro, como el resto de la app) lo arma este archivo la primera
  * vez que se abre: las páginas sólo cargan el script. Título con la indicación,
- * "Toda la foto" (sin recorte), Rotar, filtros con miniatura y una lupa sobre
- * la esquina mientras se arrastra (en el teléfono el dedo la tapa).
+ * "Toda la foto" (sin recorte), Rotar, «Original» (la foto tal cual, recortada) o
+ * «Mejorar» (elegida de entrada: papel blanco parejo y trazo nítido, con el color) y una
+ * lupa sobre la esquina mientras se arrastra (en el teléfono el dedo la tapa).
+ *
+ * Velocidad: OpenCV (10 MB) se precarga cuando la página queda quieta, la foto
+ * se lee mientras tanto, y la iluminación se estima sobre una copia chica.
  *
  * Robustez: el display NO depende de OpenCV — la foto se dibuja siempre con
  * canvas 2D plano. OpenCV se usa solo para la detección de bordes (sobre una
@@ -22,13 +28,14 @@
 
   const OPENCV_SRC   = 'js/vendor/opencv.js';
   const MAX_SRC      = 2600;   // lado mayor de la imagen de trabajo (px)
-  const DETECT_SIZE  = 640;    // lado mayor para correr la detección (px)
+  const DETECT_SIZE  = 512;    // lado mayor para correr la detección (px)
   const MAX_OUT      = 2200;   // lado mayor de la imagen de salida (px)
   const JPEG_QUALITY = 0.88;
   const QUAD_COLOR   = '#2557a7';
   const LOUPE_PX     = 104;    // diámetro de la lupa (px CSS)
   const LOUPE_ZOOM   = 3;
-  const THUMB_PX     = 120;    // lado mayor de las miniaturas de filtro (px)
+  const THUMB_PX     = 120;    // lado mayor de la miniatura de «Mejora» (px)
+  const BG_PX        = 256;    // lado mayor de la copia con la que se estima la luz (px)
 
   // ─── Markup del editor ────────────────────────────────────────────────────
   const SVG = (inner) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${inner}</svg>`;
@@ -37,8 +44,8 @@
     full:   '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
     rotate: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>',
     check:  '<polyline points="20 6 9 17 4 12"/>',
+    camara: '<path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/>',
   };
-  const FILTROS = [['color', 'Color'], ['gray', 'Grises'], ['bw', 'B&N']];
 
   function ensureEditor() {
     let ed = document.getElementById('scan-editor');
@@ -57,6 +64,8 @@
           <span>Mové las esquinas al borde del papel<span class="scan-largo">; la foto se endereza sola</span></span>
         </div>
         <div class="scan-top-acts">
+          <button type="button" class="scan-ib" id="scan-otra" title="Sacar otra foto">${SVG(I.camara)}<span>Otra foto</span></button>
+          <input type="file" id="scan-otra-in" accept="image/*" capture="environment" hidden>
           <button type="button" class="scan-ib" id="scan-full" title="Usar la foto entera, sin recortar">${SVG(I.full)}<span>Toda la foto</span></button>
           <button type="button" class="scan-ib" id="scan-rotate" title="Rotar">${SVG(I.rotate)}<span>Rotar</span></button>
         </div>
@@ -78,8 +87,9 @@
         <span id="scan-loading-text">Cargando escáner…</span>
       </div>
       <div class="scan-bot" id="scan-bot">
-        <div class="scan-filters" role="group" aria-label="Filtro">
-          ${FILTROS.map(([f, l]) => `<button type="button" class="scan-chip" data-filter="${f}" aria-pressed="false"><canvas class="scan-th"></canvas><span>${l}</span></button>`).join('')}
+        <div class="scan-filters">
+          <button type="button" class="scan-chip" id="scan-orig" aria-pressed="false" title="La foto tal cual, sólo recortada"><canvas class="scan-th"></canvas><span>Original</span></button>
+          <button type="button" class="scan-chip" id="scan-mejora" aria-pressed="true" title="Papel blanco parejo y letra más nítida"><canvas class="scan-th"></canvas><span>Mejorar</span></button>
         </div>
         <div class="scan-actions">
           <button type="button" class="scan-btn" data-scan-cancel>Cancelar</button>
@@ -116,6 +126,18 @@
     })().catch((err) => { libsPromise = null; throw err; });
     return libsPromise;
   }
+
+  // Precarga: en las páginas con escáner, OpenCV se baja y compila antes de que haga
+  // falta (al sacar la foto ya está listo). Espera a que la página quede quieta.
+  // Sólo en el celular: en la compu no hay cámara y el escáner casi no se abre.
+  function precargar() {
+    if (!('ontouchstart' in window) && window.innerWidth > 768) return;
+    const ir = () => ensureLibs().catch(() => {});
+    if ('requestIdleCallback' in window) requestIdleCallback(ir, { timeout: 5000 });
+    else setTimeout(ir, 2500);
+  }
+  if (document.readyState === 'complete') precargar();
+  else window.addEventListener('load', precargar, { once: true });
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   function fileToImage(file) {
@@ -361,7 +383,7 @@
             const ap = new cv.Mat();
             let eps = 0.01;
             cv.approxPolyDP(c, ap, eps * peri, true);
-            while (ap.rows > 16 && eps < 0.06) { eps += 0.005; cv.approxPolyDP(c, ap, eps * peri, true); }
+            while (ap.rows > 12 && eps < 0.06) { eps += 0.005; cv.approxPolyDP(c, ap, eps * peri, true); }
             const P = [];
             for (let j = 0; j < ap.rows; j++) P.push({ x: ap.data32S[j * 2], y: ap.data32S[j * 2 + 1] });
             ap.delete();
@@ -425,17 +447,20 @@
         loading:  q('#scan-loading'),
         loadTxt:  q('#scan-loading-text'),
         rotate:   q('#scan-rotate'),
+        otra:     q('#scan-otra'),
+        otraIn:   q('#scan-otra-in'),
         full:     q('#scan-full'),
         cancels:  Array.from(editor.querySelectorAll('[data-scan-cancel]')),
         done:     q('#scan-done'),
-        chips:    Array.from(editor.querySelectorAll('.scan-chip')),
+        mejora:   q('#scan-mejora'),
+        orig:     q('#scan-orig'),
         handles:  Array.from(editor.querySelectorAll('.scan-handle')),
       };
 
       const state = {
         baseImg:  null,
         rotation: 0,
-        filter:   'color',
+        mejora:   true,
         src:      document.createElement('canvas'), // imagen de trabajo (plana, rotada, capada)
         corners:  null,   // {tl,tr,br,bl} en px de state.src
         scale:    1,      // px display / px src
@@ -521,11 +546,17 @@
       // Normaliza la iluminación de un canal de grises IN PLACE:
       // divide por una estimación del fondo (blur grande) → papel blanco parejo,
       // sin bandas ni sombras, conservando trazos. Luego un leve estiramiento.
+      // El fondo es un blur de sigma = 1/20 del lado: se calcula sobre una copia de
+      // BG_PX y se agranda (sobre la foto entera, ese blur tardaba segundos).
       function flattenIllum(gray) {
         const cv = window.cv;
-        const bg = new cv.Mat();
-        const sigma = Math.max(3, Math.max(gray.cols, gray.rows) / 20);
-        cv.GaussianBlur(gray, bg, new cv.Size(0, 0), sigma, sigma, cv.BORDER_REPLICATE);
+        const bg = new cv.Mat(), chico = new cv.Mat();
+        const k = Math.min(1, BG_PX / Math.max(gray.cols, gray.rows));
+        cv.resize(gray, chico, new cv.Size(Math.max(1, Math.round(gray.cols * k)), Math.max(1, Math.round(gray.rows * k))), 0, 0, cv.INTER_AREA);
+        const sigma = Math.max(3, Math.max(chico.cols, chico.rows) / 20);
+        cv.GaussianBlur(chico, chico, new cv.Size(0, 0), sigma, sigma, cv.BORDER_REPLICATE);
+        cv.resize(chico, bg, new cv.Size(gray.cols, gray.rows), 0, 0, cv.INTER_LINEAR);
+        chico.delete();
         cv.divide(gray, bg, gray, 255);          // donde imagen≈fondo → 255 (blanco)
         cv.normalize(gray, gray, 0, 255, cv.NORM_MINMAX); // estira el rango restante
         // Realce de nitidez (unsharp mask) para que el trazo se lea mejor
@@ -535,41 +566,30 @@
         bg.delete();
       }
 
-      // —— Filtro OpenCV sobre un canvas; devuelve canvas filtrado (puede lanzar) ——
-      function applyFilter(srcCanvas, filter) {
+      // —— «Mejora» sobre un canvas; devuelve el canvas mejorado (puede lanzar) ——
+      // Normaliza la iluminación en la luminancia y conserva el color.
+      function applyMejora(srcCanvas) {
         const cv = window.cv;
         const out = document.createElement('canvas');
         let src = cv.imread(srcCanvas);
         let dst = new cv.Mat();
         try {
-          if (filter === 'gray') {
-            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
-            flattenIllum(dst);
-          } else if (filter === 'bw') {
-            cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
-            flattenIllum(dst);
-            const block = Math.max(15, (Math.round(Math.min(dst.cols, dst.rows) / 24) | 1));
-            cv.adaptiveThreshold(dst, dst, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                 cv.THRESH_BINARY, block, 12);
-          } else {
-            // Color: normalizar iluminación en la luminancia, conservar el color
-            const rgb = new cv.Mat();
-            cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-            const ycc = new cv.Mat();
-            cv.cvtColor(rgb, ycc, cv.COLOR_RGB2YCrCb);
-            const chans = new cv.MatVector();
-            cv.split(ycc, chans);
-            const y  = chans.get(0);
-            const cr = chans.get(1);
-            const cb = chans.get(2);
-            flattenIllum(y);
-            const merged = new cv.MatVector();
-            merged.push_back(y); merged.push_back(cr); merged.push_back(cb);
-            cv.merge(merged, ycc);
-            cv.cvtColor(ycc, dst, cv.COLOR_YCrCb2RGB);
-            rgb.delete(); ycc.delete(); chans.delete();
-            y.delete(); cr.delete(); cb.delete(); merged.delete();
-          }
+          const rgb = new cv.Mat();
+          cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+          const ycc = new cv.Mat();
+          cv.cvtColor(rgb, ycc, cv.COLOR_RGB2YCrCb);
+          const chans = new cv.MatVector();
+          cv.split(ycc, chans);
+          const y  = chans.get(0);
+          const cr = chans.get(1);
+          const cb = chans.get(2);
+          flattenIllum(y);
+          const merged = new cv.MatVector();
+          merged.push_back(y); merged.push_back(cr); merged.push_back(cb);
+          cv.merge(merged, ycc);
+          cv.cvtColor(ycc, dst, cv.COLOR_YCrCb2RGB);
+          rgb.delete(); ycc.delete(); chans.delete();
+          y.delete(); cr.delete(); cb.delete(); merged.delete();
           cv.imshow(out, dst);
         } finally {
           src.delete(); dst.delete();
@@ -577,8 +597,8 @@
         return out;
       }
 
-      // —— Miniaturas de los filtros: el recorte enderezado, en chico, con cada filtro ——
-      // (la foto grande queda sin filtro para ver bien los bordes al ubicar las esquinas)
+      // —— Miniatura de «Mejora»: el recorte enderezado, en chico, mejorado ——
+      // (la foto grande queda tal cual para ver bien los bordes al ubicar las esquinas)
       function renderThumbs() {
         const { W, H } = quadSize(state.corners, THUMB_PX * 3);
         let small;
@@ -589,13 +609,15 @@
           const w = state.src.width, h = state.src.height, k = THUMB_PX / Math.max(w, h);
           small = scaledCanvas(state.src, w * k, h * k);
         }
-        els.chips.forEach((ch) => {
-          const c = ch.querySelector('canvas');
-          let shown = small;
-          try { shown = applyFilter(small, ch.dataset.filter); } catch (_) { shown = small; }
-          c.width = shown.width; c.height = shown.height;
-          c.getContext('2d').drawImage(shown, 0, 0);
-        });
+        const pintar = (btn, cv) => {
+          const c = btn.querySelector('canvas');
+          c.width = cv.width; c.height = cv.height;
+          c.getContext('2d').drawImage(cv, 0, 0);
+        };
+        pintar(els.orig, small);
+        let shown = small;
+        try { shown = applyMejora(small); } catch (_) { shown = small; }
+        pintar(els.mejora, shown);
       }
 
       // —— Layout: dimensiona display y posiciona manijas ——
@@ -733,16 +755,18 @@
         cleanups.push(() => el.removeEventListener('pointerdown', onDown));
       }
 
-      // —— Salida: warp (perspectiva) + filtro -> File JPEG ——
+      // —— Salida: warp (perspectiva) + «Mejora» -> File JPEG ——
       function buildOutput() {
         const { W, H } = quadSize(state.corners, MAX_OUT);
         const warped = warpQuad(state.src, state.corners, W, H, window.cv.INTER_CUBIC);
         let result = warped;
-        try { result = applyFilter(warped, state.filter); } catch (_) { result = warped; }
+        if (state.mejora) { try { result = applyMejora(warped); } catch (_) { result = warped; } }
         return new Promise((res) => {
           result.toBlob((blob) => {
             const baseName = (file.name || 'comprobante').replace(/\.[^.]+$/, '');
-            res(new File([blob], baseName + '.jpg', { type: 'image/jpeg' }));
+            const out = new File([blob], baseName + '.jpg', { type: 'image/jpeg' });
+            out.original = file;
+            res(out);
           }, 'image/jpeg', JPEG_QUALITY);
         });
       }
@@ -780,14 +804,15 @@
       }
 
       // —— Controles ——
-      function setFilter(f) {
-        state.filter = f;
-        els.chips.forEach((ch) => ch.setAttribute('aria-pressed', String(ch.dataset.filter === f)));
+      function setMejora(on) {
+        state.mejora = on;
+        els.mejora.setAttribute('aria-pressed', String(on));
+        els.orig.setAttribute('aria-pressed', String(!on));
       }
-      els.chips.forEach((ch) => {
-        const fn = () => setFilter(ch.dataset.filter);
-        ch.addEventListener('click', fn);
-        cleanups.push(() => ch.removeEventListener('click', fn));
+      [[els.mejora, true, 'Mejorar: papel parejo y letra nítida'], [els.orig, false, 'Original: la foto tal cual']].forEach(([btn, on, aviso]) => {
+        const h = () => { if (state.mejora !== on) { setMejora(on); tip(aviso); } };
+        btn.addEventListener('click', h);
+        cleanups.push(() => btn.removeEventListener('click', h));
       });
 
       const onRotate = () => {
@@ -796,6 +821,24 @@
       };
       els.rotate.addEventListener('click', onRotate);
       cleanups.push(() => els.rotate.removeEventListener('click', onRotate));
+
+      // «Otra foto»: la cámara de nuevo, sin salir del escáner. Si la saca, la nueva
+      // reemplaza a la anterior (también como `original` de lo que se devuelva).
+      const onOtra = () => { els.otraIn.value = ''; els.otraIn.click(); };
+      const onOtraIn = async () => {
+        const f = els.otraIn.files[0];
+        els.otraIn.value = '';
+        if (!f) return;
+        showLoading('Cargando la foto…');
+        try { state.baseImg = await fileToImage(f); }
+        catch (_) { hideLoading(); tip('No se pudo abrir la foto'); return; }
+        file = f;
+        state.rotation = 0;
+        refresh();
+      };
+      els.otra.addEventListener('click', onOtra);
+      els.otraIn.addEventListener('change', onOtraIn);
+      cleanups.push(() => { els.otra.removeEventListener('click', onOtra); els.otraIn.removeEventListener('change', onOtraIn); });
 
       const onFull = () => {
         if (!state.corners) return;
@@ -843,15 +886,11 @@
       (async () => {
         document.body.classList.add('scan-open');
         els.editor.classList.remove('hidden');
-        setFilter('color');
-        els.chips.forEach((ch) => {
-          const c = ch.querySelector('canvas');
-          c.getContext('2d').clearRect(0, 0, c.width, c.height);
-        });
+        setMejora(true);
+        [els.orig, els.mejora].forEach(b => { const th = b.querySelector('canvas'); th.getContext('2d').clearRect(0, 0, th.width, th.height); });
         showLoading('Cargando escáner…');
         try {
-          await ensureLibs();
-          state.baseImg = await fileToImage(file);
+          [, state.baseImg] = await Promise.all([ensureLibs(), fileToImage(file)]);
         } catch (err) {
           hideLoading();
           fail(err);   // el llamador adjunta la foto original como fallback

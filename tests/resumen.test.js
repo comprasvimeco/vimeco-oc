@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { fraseVariacion, subasDePrecio } = require('../js/reportesResumen.js');
+const { fraseVariacion, fraseInicio, subasDePrecio } = require('../js/reportesResumen.js');
 
 const DIA = 864e5;
 const AHORA = new Date(2026, 9, 14, 12).getTime();
@@ -9,6 +9,15 @@ const deps = { norm, prov: oc => oc.proveedor?.nombre || '—', ahora: AHORA };
 const oc = (nro, prov, diasAtras, items, moneda) => ({
   nroOC: nro, proveedor: { nombre: prov }, timestamp: AHORA - diasAtras * DIA, moneda,
   items: items.map(([desc, unitario, cant, unidad]) => ({ desc, unitario: String(unitario), cant: String(cant || 1), unidad })),
+});
+
+test('fraseInicio: sin con qué comparar', () => {
+  const f = fraseInicio('8 de octubre', { n: 'Escuela', parte: 67 }, 'Hormigonera');
+  assert.strictEqual(f.cuerpo, 'Desde el 8 de octubre compraste {M}.');
+  assert.strictEqual(f.explica, 'El 67% fue para Escuela y tu mayor proveedor es Hormigonera.');
+  assert.strictEqual(fraseInicio('8 de octubre', { n: 'Escuela', parte: 100 }, '').explica, 'Todo fue para Escuela.');
+  assert.strictEqual(fraseInicio('8 de octubre', null, 'Hormigonera').explica, 'Tu mayor proveedor es Hormigonera.');
+  assert.strictEqual(fraseInicio('8 de octubre', null, '').explica, '');
 });
 
 test('fraseVariacion: sube y una obra explica casi todo', () => {

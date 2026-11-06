@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!_s?.codigo) { window.location.href = 'index.html'; return; }
 
   $('hdr-name').textContent = _s.nombre;
-  $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
+  $('btn-back').addEventListener('click', () => vimecoVolver('menu.html'));
   // Determinar rol: admin (0000 o flag admin) ve todas las obras; jefe ve las suyas.
   let esAdmin = _s.codigo === '0000';
   let esJefe  = false;

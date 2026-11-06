@@ -730,7 +730,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   sessionStorage.setItem('responsable_name', myName);
 
   $('hdr-name').textContent = myName || '';
-  $('btn-back').addEventListener('click', () => { window.location.href = 'menu.html'; });
+  $('btn-back').addEventListener('click', () => vimecoVolver('menu.html'));
   // Modales
   $('modal-preview-close').addEventListener('click', cerrarPreview);
   $('preview-firmar').addEventListener('click', () => firmarOC(currentOC));

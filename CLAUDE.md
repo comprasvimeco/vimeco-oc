@@ -71,6 +71,10 @@ hasta subirlos o descartarlos a propósito (vence a los 7 días): salir sin quer
 
 ## Caja Chica — lógica por mes
 
+- El monto de Ingreso y Egreso acepta cuentas (`=1500+230,50`, `3x1200`) y el punto como coma (`1500.50`):
+  `js/montoCalc.js` (`tests/montoCalc.test.js`, sin eval). Con el campo enfocado aparecen + − × ÷ (el teclado numérico
+  del teléfono no los trae) y el resultado; al salir, la cuenta se reemplaza por el resultado.
+
 - Todo filtrado por mes (sin opción "Todos los movimientos")
 - **Saldo = Excedente anterior + Ingresos del mes − Egresos del mes** (con arrastre acumulado).
   El "Excedente anterior" es el neto de todos los movimientos de meses previos al seleccionado.
@@ -83,10 +87,13 @@ hasta subirlos o descartarlos a propósito (vence a los 7 días): salir sin quer
 
 ## Reportes (rediseño traído de Leva)
 
-`reportes.html` con pestañas **Resumen** (admins abren acá: frase de 30 días y «Para mirar»), **Tablero**,
-**Obras** (+ ficha de obra con `?ficha={key}`) y **Explorar** (período, gráficos y lista de OC; `?obra=` / `?equipo=`).
+`reportes.html` con pestañas **Resumen** (admins abren acá: frase de 30 días, «Para mirar», Comprado/OC/Promedio,
+compras por semana y últimas OC), **Obras** (+ ficha de obra con `?ficha={key}`) y **Explorar** (período, acumulado por
+obra, buscador de artículo con la comparación de precios, lista de OC; `?obra=` / `?equipo=`). Rediseño «opción A» de Leva
+(v341–v342, traído en v328): cada obra con su color fijo (--s1…--s8), se fue Tablero.
 JS: `reportes.js` (Explorar y ficha de OC), `reportesObras.js` (pestañas, navegación, obras y su ficha),
-`reportesTablero.js`, `reportesResumen.js` (con `tests/resumen.test.js`). Sólo OC firmes, desde el corte de Drive
+`reportesResumen.js` (con `tests/resumen.test.js`), `reportesPrecios.js` (con `tests/precios.test.js`). Usa `voc()` de
+`js/vocabulario.js` (de Leva; en VIMECO queda siempre el preset de construcción: obra / equipo / jefe de obra). Sólo OC firmes, desde el corte de Drive
 y sin las de prueba (`esOCPrueba` en `driveBackup.js`); totales en pesos al oficial de cada OC.
 - **Presupuesto y plazo** de obra (`js/presupuesto.js`, `tests/presupuesto.test.js`): `/obras/{k}/presupuesto`
   `{moneda, total, rubros?}` y `/obras/{k}/plazo` `{inicio, n, unidad}`, opcionales. Se cargan en la ficha de Obras
@@ -96,6 +103,10 @@ y sin las de prueba (`esOCPrueba` en `driveBackup.js`); totales en pesos al ofic
   Los egresos de Caja no suman al gasto de obra en Reportes (sólo OC).
 
 ## Navegación
+
+- **Cabecera «‹ Título»** (traída de Leva): la flecha va a la izquierda del logo; en el teléfono se va el logo y queda
+  «‹ Título». `vimecoVolver(padre)` (`js/ui.js`) vuelve a la pantalla anterior si se vino de la app, si no al padre;
+  dos toques seguidos a la flecha van al menú, salvo con cambios sin guardar (`window.vimecoCambiosSinGuardar`).
 
 - `menu.html` (raíz) → dos secciones: **Compras** (`compras.html`) y **Caja** (`caja.html`)
 - `compras.html` → submenú: Órdenes de Compra (`app.html`), Facturas (`facturas.html`), Historial (`historial.html`)
@@ -119,3 +130,17 @@ y sin las de prueba (`esOCPrueba` en `driveBackup.js`); totales en pesos al ofic
   comprados con el último precio y comparación por artículo. Lo tildado abre `app.html` precargado vía
   `sessionStorage.oc_desde_proveedor` (`loadOCDesdeProveedor`). Todos ven precios por unidad; no se muestran
   totales de OC ni cantidades de compras ajenas (salvo admins).
+
+## Traído de Leva (v328)
+
+- **Confirmación al generar la OC** (`abrirOCLista` en `js/app.js`): reemplaza al formulario con N°, proveedor y monto;
+  «Generar otra orden», «Otra al mismo proveedor», compartir/descargar el PDF de nuevo. Queda guardada (localStorage
+  `vimeco_oc_lista_{código}` + IndexedDB del borrador) hasta 1 hora; si no se pudo registrar, «Reintentar».
+- **Pastilla del archivo** (`js/fichaArchivo.js`, estilos `.pa-*` y `.pa-vis-*`): presupuesto (OC), Factura/Otro
+  (Facturas) y Remito; abre una ficha con vista previa, Abrir (visor propio: foto o PDF con pdf.js), Recortar y Quitar.
+- **Escáner** de Leva (`js/scanner.js` entero): ~1 s en vez de ~8 s, Original/Mejorar; «Sacar foto» en la OC pasa por el escáner.
+- **IVA incluido exacto**: `OCCalc.netosSinIVA` reparte el neto entre renglones (el total coincide con el presupuesto).
+- **Cotización del dólar en la OC**: `tcUSD`/`tcOrigen` (del presupuesto si la IA la lee, si no el oficial promedio,
+  editable); va al PDF y a `/historial/{k}/cotizacion.usada`.
+- Encabezados de la OC en un renglón; push: «Activadas» sólo con token registrado; Novedades con acciones en círculos
+  en el teléfono; Facturas con el cuadradito verde/durazno según la factura.
