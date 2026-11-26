@@ -17,7 +17,7 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deploy1.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,10 +38,19 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add app.html caja.html menu.html index.html sw.js
           git diff --cached --quiet || git commit -m "ci: bump version [skip ci]"
-          git push
+          # En un «Re-run» el bump ya está en main y el push rebota: que no frene la publicación.
+          git push || echo "::warning::No se pudo pushear el bump (¿re-run?); se publica igual."
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
+      # deploy-pages a veces no encuentra el artefacto recién subido (lado de GitHub): un segundo intento tras esperar.
+      - id: deploy1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Esperar antes de reintentar
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 60
       - id: deployment
+        if: steps.deploy1.outcome == 'failure'
         uses: actions/deploy-pages@v4
