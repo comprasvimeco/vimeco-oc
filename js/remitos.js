@@ -91,10 +91,10 @@ const renglonesCompletos = e => e.pedido.filter((p, i) => e.recibido[i] >= p).le
 // OC contra las que tiene sentido cargar un remito: las que realmente se
 // emitieron (una pendiente de autorización todavía no es una compra, y una
 // rechazada no va a llegar nunca) y que no son pruebas.
-// Quien administra (0000 o super admin) sí ve las de prueba: es quien las crea (obra "X" del
+// El super-admin (0000) sí ve las de prueba: es quien las crea (obra "X" del
 // desplegable) y las necesita para probar el circuito de entregas.
 function ocsElegibles() {
-  const verPruebas = esSuperAdmin();
+  const verPruebas = viewerCode === '0000';
   return allOCs.filter(oc =>
     !SIN_PDF.has(oc.estado) &&
     (verPruebas || (!esObraPrueba(oc) && !esProveedorPrueba(oc))));
